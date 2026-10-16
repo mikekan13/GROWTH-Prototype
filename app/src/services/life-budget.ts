@@ -11,6 +11,14 @@
  *   cash      = Σ holdings × the currency's krmaPerUnit
  *   remaining = budget − spent − cash   (negative = over budget: say so)
  *
+ * ITEM KV IS DECIMAL (Mike 2026-10-16: sub-1 KRMA items allowed) — the
+ * archetype's `data.value` is the truth, karmicValue its rounded mirror;
+ * sums run in decimals and display at 2 places.
+ *
+ * KITS (2026-10-16): a holder's kit (fridge, pantry, junk drawer) counts
+ * here at its kvBudget — spent ONCE, at stocking. Items later drawn out of
+ * it (data.drawnFromKit) are NOT counted again.
+ *
  * Named `possessions` grants on a block are priced in the block itself and
  * are NOT part of this budget — only the unnamed life is. Items that came
  * from a named grant are therefore excluded from `spent` when the instance
@@ -23,6 +31,7 @@ import { liveBlockLinks, type LinkWithBlock } from './genesis-sheet-sync';
 import { DEED_RELATIONSHIP } from './genesis-possessions';
 import { holdingsKrma } from './wealth';
 import type { GrowthCharacter } from '@/types/growth';
+import { instanceKvOf, itemKvOf, readKit, roundKv } from '@/lib/item-kv';
 
 export interface LifeBudget {
   budgetKv: number;
@@ -53,8 +62,7 @@ export function sumAccumulatedWealth(links: Array<Pick<LinkWithBlock, 'block' | 
 
 /** The KV of one owned instance. Pure. `value` is the item's KV on GrowthWorldItem. */
 export function itemKv(data: Record<string, unknown>): number {
-  const v = typeof data.value === 'number' ? data.value : typeof data.kv === 'number' ? data.kv : 0;
-  return Math.max(0, v);
+  return itemKvOf(data);
 }
 
 /** Did this instance come from a NAMED block grant (priced in the block already)? Pure. */
@@ -67,7 +75,7 @@ export function fromNamedGrant(history: string): boolean {
 
 export function budgetLine(b: Omit<LifeBudget, 'line'>): string {
   const over = b.remainingKv < 0;
-  return `LIFE BUDGET: ${b.budgetKv} KV accumulated wealth − ${b.spentKv} KV in things − ${Math.round(b.cashKv)} KV in cash = ${Math.round(b.remainingKv)} KV ${over ? 'OVER — cut or re-rate' : 'left to place or exchange'}`;
+  return `LIFE BUDGET: ${roundKv(b.budgetKv)} KV accumulated wealth − ${roundKv(b.spentKv)} KV in things − ${roundKv(b.cashKv)} KV in cash = ${roundKv(b.remainingKv)} KV ${over ? 'OVER — cut or re-rate' : 'left to place or exchange'}`;
 }
 
 export async function lifeBudget(characterId: string): Promise<LifeBudget> {
@@ -91,15 +99,22 @@ export async function lifeBudget(characterId: string): Promise<LifeBudget> {
   // (genesis once wrote 400 on a laptop) — never trust it over the archetype.
   const archetypeIds = [...new Set(rows.map(r => r.sourceForgeItemId).filter((x): x is string => !!x))];
   const archetypes = archetypeIds.length
-    ? await prisma.forgeItem.findMany({ where: { id: { in: archetypeIds } }, select: { id: true, karmicValue: true } })
+    ? await prisma.forgeItem.findMany({ where: { id: { in: archetypeIds } }, select: { id: true, karmicValue: true, data: true } })
     : [];
-  const archetypeKv = new Map(archetypes.map(a => [a.id, Number(a.karmicValue)]));
+  const archetypeById = new Map(archetypes.map(a => [a.id, a]));
   const items = rows
     .filter(r => !fromNamedGrant(r.history))
-    .map(r => ({
-      id: r.id, name: r.name,
-      kv: r.sourceForgeItemId && archetypeKv.has(r.sourceForgeItemId) ? Math.max(0, archetypeKv.get(r.sourceForgeItemId)!) : itemKv(parse(r.data)),
-    }));
+    .flatMap(r => {
+      const d = parse(r.data);
+      // Drawn out of a kit: its KV was spent when the kit was stocked.
+      if (typeof d.drawnFromKit === 'string') return [];
+      const a = r.sourceForgeItemId ? archetypeById.get(r.sourceForgeItemId) : undefined;
+      const own = instanceKvOf(d, a ? { data: typeof a.data === 'string' ? parse(a.data) : null, karmicValue: a.karmicValue } : null);
+      const kit = readKit(d);
+      const out = [{ id: r.id, name: r.name, kv: own }];
+      if (kit && kit.kvBudget > 0) out.push({ id: `${r.id}#kit`, name: `${r.name} (kit: ${kit.contents})`, kv: kit.kvBudget });
+      return out;
+    });
   const spentKv = items.reduce((a, i) => a + i.kv, 0);
 
   const sheet = parse(c.data) as Partial<GrowthCharacter>;

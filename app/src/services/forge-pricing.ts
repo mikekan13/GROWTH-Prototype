@@ -299,6 +299,13 @@ export function priceBlueprintByType(type: string, data: Record<string, unknown>
           breakdown: [`kit budget ${item.kvBudget} KV — draw-down pool, contents resolve on plausible demand (r-2026-08-24-16)`],
         };
       }
+      // An item's `value` IS its KV (Mike 2026-10-16: "KV IS the price";
+      // decimal, sub-1 allowed). When stocked content carries it, that is the
+      // price; Kai may still re-grade.
+      const itemValue = (data as { value?: unknown }).value;
+      if (type === 'item' && typeof itemValue === 'number' && Number.isFinite(itemValue) && itemValue > 0) {
+        return { kv: itemValue, breakdown: [`item value ${itemValue} KV (KV is the price — decimal, Mike 2026-10-16)`] };
+      }
       // item/skill/spell: Kai/chain grades case-by-case.
       const declared = (data as { declaredKv?: number; declaredKvRationale?: string });
       if (typeof declared.declaredKv === 'number') {

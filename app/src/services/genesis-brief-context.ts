@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db';
 import { PLACE_RELATIONS } from '@/lib/genesis-stages';
 import { DEED_RELATIONSHIP } from './genesis-possessions';
 import { lifeBudget } from './life-budget';
+import { instanceKvOf, readKit, roundKv, WARDROBE_KIT_RE } from '@/lib/item-kv';
 import type { DesignerLayer, DesignerState } from '@/lib/appearance-designer';
 
 const MARK_KINDS = new Set(['scar', 'tattoo', 'piercing', 'birthmark', 'bodymod', 'makeup']);
@@ -39,7 +40,7 @@ export interface WorldBriefInput {
   /** The home as a tree: rooms, containers, contents (services/placement renderTree). */
   map?: string[];
   look: LookLine[];
-  items: Array<{ name: string; archetype: string | null; where: string | null; kv: number }>;
+  items: Array<{ name: string; archetype: string | null; where: string | null; kv: number; kit?: string }>;
   places: Array<{ name: string; relation: string }>;
   people: Array<{ name: string; relation: string }>;
   /** Names of the garments she owns (dress.ts isGarment). */
@@ -52,12 +53,14 @@ export function renderWorldBrief(w: WorldBriefInput): string {
   lines.push(w.wealth?.length ? `CASH + INCOME ON THE SHEET: ${w.wealth.join(' · ')}` : 'CASH + INCOME ON THE SHEET: none yet.');
   lines.push(w.look.length ? `HER LOOK (approved): ${w.look.map(l => `${l.kind}: ${l.text}`).join(' · ')}` : 'HER LOOK: approved at the designer (no marks).');
   lines.push(w.places.length ? `PLACES: ${w.places.map(p => `${p.name} (${p.relation})`).join(', ')}` : 'PLACES: none yet — seed her home first.');
-  lines.push(w.items.length ? `THINGS (${w.items.length}): ${w.items.map(i => `${i.name}${i.archetype && i.archetype !== i.name ? ` [${i.archetype}]` : ''}${i.where ? ` @ ${i.where}` : ''} ${i.kv} KV`).join('; ')}` : 'THINGS: none yet.');
+  lines.push(w.items.length ? `THINGS (${w.items.length}): ${w.items.map(i => `${i.name}${i.archetype && i.archetype !== i.name ? ` [${i.archetype}]` : ''}${i.where ? ` @ ${i.where}` : ''} ${i.kv} KV${i.kit ? ` ${i.kit}` : ''}`).join('; ')}` : 'THINGS: none yet.');
   if (w.map?.length) lines.push(`THE MAP (top-down: ▣ room · thing; indented = inside):\n${w.map.join('\n')}`);
   const loose = w.items.filter(i => !i.where).length;
   if (loose) lines.push(`${loose} thing${loose === 1 ? ' has' : 's have'} no place — give each a room or a container (move_item).`);
   lines.push(w.people.length ? `PEOPLE: ${w.people.map(p => `${p.name} (${p.relation})`).join(', ')}` : 'PEOPLE: none seeded yet.');
-  if (w.garments) lines.push(w.garments.length ? `WARDROBE (${w.garments.length} garments): ${w.garments.join(', ')}` : 'WARDROBE: EMPTY — she owns no clothes. Build her wardrobe this stage; the portrait can only dress her from it.');
+  const wardrobeKits = w.items.filter(i => i.kit && WARDROBE_KIT_RE.test(i.kit));
+  if (wardrobeKits.length) lines.push(`WARDROBE KIT${wardrobeKits.length > 1 ? 'S' : ''}: ${wardrobeKits.map(i => `${i.name} ${i.kit}`).join(' · ')} — her clothes; the outfit is drawn from it at dress time.`);
+  if (w.garments && !(wardrobeKits.length && !w.garments.length)) lines.push(w.garments.length ? `WARDROBE (${w.garments.length} garments): ${w.garments.join(', ')}` : 'WARDROBE: EMPTY — she owns no clothes. Build her wardrobe this stage; the portrait can only dress her from it.');
   return lines.join('\n');
 }
 
@@ -102,7 +105,7 @@ async function loadHerWorld(characterId: string) {
     select: { id: true, name: true, story: true, locationId: true, sourceForgeItemId: true, data: true },
   });
   const archIds = [...new Set(items.map(i => i.sourceForgeItemId).filter((x): x is string => !!x))];
-  const archetypes = archIds.length ? await prisma.forgeItem.findMany({ where: { id: { in: archIds } }, select: { id: true, name: true, karmicValue: true } }) : [];
+  const archetypes = archIds.length ? await prisma.forgeItem.findMany({ where: { id: { in: archIds } }, select: { id: true, name: true, karmicValue: true, data: true } }) : [];
   const arch = new Map(archetypes.map(a => [a.id, a]));
   const locIds = [...new Set([...placeEdges.map(p => p.targetId), ...items.map(i => i.locationId).filter((x): x is string => !!x)])];
   const locations = locIds.length ? await prisma.location.findMany({ where: { id: { in: locIds } }, select: { id: true, name: true } }) : [];
@@ -130,13 +133,24 @@ async function loadHerWorld(characterId: string) {
     const archName = i.sourceForgeItemId ? arch.get(i.sourceForgeItemId)?.name ?? null : null;
     return isGarment(i.name, archName, d as { armorCategory?: string; tags?: unknown; itemType?: string });
   }).map(i => i.name);
+  const parseData = (raw: string): Record<string, unknown> => { try { return JSON.parse(raw) as Record<string, unknown>; } catch { return {}; } };
+  // Item KV is decimal (Mike 2026-10-16): archetype `data.value`, mirror fallback.
+  const kvOfItem = (i: { data: string; sourceForgeItemId: string | null }) => {
+    const a = i.sourceForgeItemId ? arch.get(i.sourceForgeItemId) : undefined;
+    return instanceKvOf(parseData(i.data), a ? { data: parseData(a.data), karmicValue: a.karmicValue } : null);
+  };
+  // A holder's KIT (2026-10-16): budget + one-line truth, drawn down when observed.
+  const kitOf = (i: { data: string }) => {
+    const k = readKit(parseData(i.data));
+    return k ? { kit: `[KIT ${roundKv(k.kvBudget)} KV, ${roundKv(k.kvBudget - k.spentKv)} left: ${k.contents}]` } : {};
+  };
   return {
     wealth,
     garments,
     // Floor-tier goods (stock_goods, tag mundane) carry a memory only when they have a story.
     mundaneIds: items.filter(i => { try { const d = JSON.parse(i.data) as { tags?: unknown }; return Array.isArray(d.tags) && d.tags.includes('mundane'); } catch { return false; } }).map(i => i.id),
     look: lookLines(sheet.identity?.designer),
-    items: items.map(i => ({ id: i.id, name: i.name, archetype: i.sourceForgeItemId ? arch.get(i.sourceForgeItemId)?.name ?? null : null, kv: i.sourceForgeItemId ? Number(arch.get(i.sourceForgeItemId)?.karmicValue ?? 0) : 0, where: i.locationId ? (containerOf.get(i.id) ? `${locName.get(i.locationId) ?? '?'} › ${containerOf.get(i.id)}` : locName.get(i.locationId) ?? null) : null, story: i.story })),
+    items: items.map(i => ({ id: i.id, name: i.name, archetype: i.sourceForgeItemId ? arch.get(i.sourceForgeItemId)?.name ?? null : null, kv: roundKv(kvOfItem(i)), ...kitOf(i), where: i.locationId ? (containerOf.get(i.id) ? `${locName.get(i.locationId) ?? '?'} › ${containerOf.get(i.id)}` : locName.get(i.locationId) ?? null) : null, story: i.story })),
     places: placeEdges.map(p => ({ id: p.targetId, name: locName.get(p.targetId) ?? p.targetId, relation: p.relationshipType })),
     people: seeds.map(s => ({ id: s.id, name: s.name, relation: relationOf(s.id) })),
   };
@@ -156,7 +170,7 @@ export async function buildWorldBrief(characterId: string): Promise<string | nul
     } catch { map = []; }
   }
   const { lifeCoverage, coverageLine } = await import('./life-goods');
-  const coverage = coverageLine(lifeCoverage(w.items.map(i => `${i.name} ${i.archetype ?? ''}`)));
+  const coverage = coverageLine(lifeCoverage(w.items.map(i => `${i.name} ${i.archetype ?? ''}`), w.items.map(i => i.kit ?? '').filter(Boolean)));
   const brief0 = renderWorldBrief({ budgetLine: budget.line, wealth: w.wealth, map, look: w.look, items: w.items, places: w.places, people: w.people, garments: w.garments });
   const brief = `${brief0}
 ${coverage}`;

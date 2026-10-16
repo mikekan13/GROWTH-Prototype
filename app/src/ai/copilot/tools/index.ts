@@ -53,6 +53,7 @@ import './genesis-completion';
 import './sketch-npc';
 import './move-item';
 import './stock-goods';
+import './stock-kit';
 import './move-items';
 import './organize-place';
 

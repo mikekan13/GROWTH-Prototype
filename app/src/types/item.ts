@@ -59,7 +59,17 @@ export interface GrowthWorldItem {
   quality?: number;                // 1-10 (canon — see QUALITY_TIER_NAMES for flavor label, zero mechanical weight)
   // Rarity canon is 1-10 (Material_System.md:41). Old 6-bucket enum kept for back-compat with existing data.
   rarity?: ItemRarity | number;
-  value?: number;                  // KV value
+  value?: number;                  // KV — THE price (Mike 2026-10-16); decimal, sub-1 allowed (0.02). Source of truth; ForgeItem.karmicValue is its rounded mirror.
+
+  // ── Capacity (Mike 2026-10-16: "I can't put a whale in my apartment") ──
+  volumeCuFt?: number;             // Space it takes up, cubic feet
+  capacityCuFt?: number;           // Holders only: space inside
+  capacityLbs?: number;            // Holders only: weight it can bear
+  /** A holder's KIT: KV budget + one-line truth of its ordinary contents,
+   *  drawn down into real items when observed (services/kits.ts). */
+  kit?: { kvBudget: number; contents: string; spentKv: number; resolvedItemIds: string[] };
+  /** Set on an item crystallized out of a holder's kit (its KV was paid at stocking). */
+  drawnFromKit?: string;
 
   // ── Item-level abilities (the Nectars/Thorns of items) ──
   itemAbilities?: ItemAbility[];

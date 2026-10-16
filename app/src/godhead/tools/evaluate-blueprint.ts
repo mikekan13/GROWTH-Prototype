@@ -125,7 +125,10 @@ registerTool({
     await prisma.forgeItem.update({
       where: { id: forgeItemId },
       data: {
-        karmicValue: BigInt(price),
+        // Decimal-safe: item KV may be fractional (Mike 2026-10-16); the
+        // BigInt column is the rounded mirror, `data.value` stays the truth.
+        karmicValue: BigInt(Math.round(price)),
+        ...(item.type === 'item' && priced ? { data: JSON.stringify({ ...(data as Record<string, unknown>), value: price }) } : {}),
         evaluatedAt: new Date(),
         relationshipTags: JSON.stringify(newTags),
       },

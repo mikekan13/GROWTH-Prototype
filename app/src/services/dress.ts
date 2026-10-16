@@ -14,6 +14,15 @@
  *   proposeOutfit  ONE JEWL call (lane local, fiction) → {pieces} from her things
  *   applyOutfit    the approved proposal → the states (garments left out are taken off)
  *
+ * WARDROBE KITS (Mike 2026-10-16: "she doesn't need a full wardrobe… she
+ * needs a kit… the initial outfit would be dealer's choice from that
+ * allotment"): a closet / dresser holding a KIT (services/kits.ts) is part
+ * of her wardrobe. JEWL may propose pieces drawn FROM it (dealer's choice,
+ * true to the kit's line and inside its remaining budget); on approval each
+ * piece is crystallized by drawFromHolderKit (budget spent, recorded in
+ * resolvedItemIds) and then worn — one item per piece, one boot per foot.
+ * Drawing from HER OWN kit is not inventing.
+ *
  * Inventory law (Inventory_Paperdoll.md): equipped = worn OVER a body region
  * (data.equippedTo), carried = holderId with no region, possessions = `owns`
  * edges (links, not containment). A thing she picks up leaves its place
@@ -33,6 +42,8 @@ import { factPrefix } from './genesis-reset';
 import { extractJson } from './sketch-genesis-rules';
 import { lightFacts } from './portrait-brief';
 import type { GrowthCharacter } from '@/types/growth';
+import { readKit } from '@/lib/item-kv';
+import { drawFromHolderKit } from './kits';
 
 export const DRESS_TIMEOUT_MS = 25_000;
 export const DRESS_STATES = ['worn', 'carried', 'owned'] as const;
@@ -60,24 +71,61 @@ export interface WardrobeItem {
   where: string | null;
 }
 
+/** A wardrobe KIT on one of her holders (closet, dresser): pieces are drawn from it at dress time. */
+export interface WardrobeKit {
+  holderId: string;
+  holderName: string;
+  kvBudget: number;
+  remainingKv: number;
+  contents: string;
+}
+
 export interface Wardrobe {
   /** Her body regions (anatomy-derived; never a slot list). */
   regions: string[];
   garments: WardrobeItem[];
   things: WardrobeItem[];
-  /** No garments at all → the DRESS section says so and offers no paint. */
+  /** Wardrobe kits (2026-10-16): clothes not yet crystallized, drawn on demand. */
+  kits: WardrobeKit[];
+  /** No garments and no wardrobe kit → the DRESS section says so and offers no paint. */
   empty: boolean;
+  /** applyOutfit only: kit pieces that could not be drawn (budget, capacity). */
+  drawFailed?: string[];
+}
+
+/** A piece to crystallize out of a wardrobe kit (dealer's choice). */
+export interface KitDraw {
+  holderId: string;
+  /** Singular archetype — ONE piece ("Wool Sweater", "Leather Ankle Boot"). */
+  archetype: string;
+  primaryMaterial: string;
+  weightLbs: number;
+  /** KV (decimal) — used when the archetype is new; stock carries its own. */
+  value: number;
 }
 
 export interface OutfitPiece {
+  /** A crystallized thing of hers, or `kit:<holderId>:<n>` for a piece drawn from a kit. */
   itemId: string;
+  fromKit?: KitDraw;
   name: string;
   state: 'worn' | 'carried';
   region: string | null;
   why: string;
 }
 
+/**
+ * WHO CHOOSES (Mike 2026-10-16: "the character is basically living at that
+ * point so it would be the AI or the human steering"): no player seated →
+ * the CHARACTER chooses (her persona, mood, the weather, where she is going);
+ * a player seated in her → the proposal is offered to that player to steer.
+ */
+export type OutfitChooser = 'character' | 'player';
+
 export interface OutfitProposal {
+  chooser: OutfitChooser;
+  /** Who is offered the proposal to steer: the seated player, or the GM's table. */
+  audience: 'player' | 'gm';
   pieces: OutfitPiece[];
   /** True = JEWL wrote it; false = the deterministic fallback (he was cold or unreadable). */
   byJewl: boolean;
@@ -137,9 +185,23 @@ export function guessRegion(name: string, regions: string[]): string | null {
   return find(/^torso$/i) ?? root;
 }
 
+/** A holder that keeps clothes, or a kit whose line reads as clothes. Pure. */
+export function isWardrobeKit(holderName: string, contents: string): boolean {
+  return /\b(closet|wardrobe|dresser|armoire|chest of drawers|hamper|clothes|garment)\b/i.test(holderName) || GARMENT_WORDS.test(contents);
+}
+
+const kitDrawSchema = z.object({
+  holderId: z.string().min(1).max(64),
+  archetype: z.string().min(1).max(100),
+  primaryMaterial: z.string().min(1).max(60).optional(),
+  weightLbs: z.number().min(0).max(100).optional(),
+  value: z.number().min(0).max(100).optional(),
+});
+
 const outfitAnswerSchema = z.object({
   pieces: z.array(z.object({
-    itemId: z.string().min(1).max(64),
+    itemId: z.string().min(1).max(64).optional(),
+    fromKit: kitDrawSchema.optional(),
     state: z.enum(['worn', 'carried']).optional(),
     region: z.string().max(120).optional().nullable(),
     why: z.string().max(240).optional(),
@@ -159,7 +221,25 @@ export function parseOutfitAnswer(text: string, wardrobe: Wardrobe): OutfitPiece
   const all = new Map([...wardrobe.garments, ...wardrobe.things].map(i => [i.id, i]));
   const seen = new Set<string>();
   const out: OutfitPiece[] = [];
+  const kitLeft = new Map(wardrobe.kits.map(k => [k.holderId, k.remainingKv]));
   for (const p of r.data.pieces) {
+    if (p.fromKit) {
+      // Dealer's choice from HER kit: only a kit she has, only inside its budget, worn.
+      const k = p.fromKit;
+      const left = kitLeft.get(k.holderId);
+      const value = k.value ?? 0;
+      if (left == null || value > left + 1e-9) continue;
+      kitLeft.set(k.holderId, left - value);
+      const n = out.filter(o => o.fromKit).length;
+      const region = p.region && wardrobe.regions.includes(p.region) ? p.region : guessRegion(k.archetype, wardrobe.regions);
+      out.push({
+        itemId: `kit:${k.holderId}:${n}`, name: k.archetype, state: 'worn', region,
+        fromKit: { holderId: k.holderId, archetype: k.archetype, primaryMaterial: k.primaryMaterial ?? 'Cotton', weightLbs: k.weightLbs ?? 0.5, value },
+        why: (p.why ?? '').trim().slice(0, 240),
+      });
+      continue;
+    }
+    if (!p.itemId) continue;
     const item = all.get(p.itemId);
     if (!item || seen.has(item.id)) continue;
     seen.add(item.id);
@@ -198,6 +278,10 @@ export function renderWardrobe(w: Wardrobe): string {
     `HER REGIONS (a worn piece covers one; outermost shared region — a whole outfit goes on the root): ${w.regions.join(', ')}`,
     `GARMENTS (${w.garments.length}):`, ...w.garments.map(row),
     `THE REST (${w.things.length}; what she carries comes from here):`, ...w.things.map(row),
+    ...(w.kits.length ? [
+      `WARDROBE KITS (${w.kits.length}; clothes not yet itemized — draw pieces from one with "fromKit", true to its line, inside its KV left; ONE piece each, nothing in pairs: a left boot and a right boot are two pieces):`,
+      ...w.kits.map(k => `- ${k.holderId} · ${k.holderName} · ${Math.round(k.remainingKv * 100) / 100} of ${Math.round(k.kvBudget * 100) / 100} KV left — ${k.contents}`),
+    ] : []),
   ].join('\n');
 }
 
@@ -224,6 +308,15 @@ async function loadWardrobe(characterId: string, campaignId: string | null, shee
     select: { id: true, name: true, type: true, data: true, holderId: true, locationId: true, sourceForgeItemId: true },
     orderBy: { name: 'asc' },
   });
+  const kits: WardrobeKit[] = [];
+  for (const r of rows) {
+    let d: Record<string, unknown> = {};
+    try { d = JSON.parse(r.data) as Record<string, unknown>; } catch { d = {}; }
+    const k = readKit(d);
+    if (k && isWardrobeKit(r.name, k.contents)) {
+      kits.push({ holderId: r.id, holderName: r.name, kvBudget: k.kvBudget, remainingKv: Math.max(0, k.kvBudget - k.spentKv), contents: k.contents });
+    }
+  }
   const archIds = [...new Set(rows.map(r => r.sourceForgeItemId).filter((x): x is string => !!x))];
   const archetypes = archIds.length ? await prisma.forgeItem.findMany({ where: { id: { in: archIds } }, select: { id: true, name: true } }) : [];
   const archName = new Map(archetypes.map(a => [a.id, a.name]));
@@ -249,7 +342,7 @@ async function loadWardrobe(characterId: string, campaignId: string | null, shee
     };
     (item.garment ? garments : things).push(item);
   }
-  return { regions, garments, things, empty: garments.length === 0 };
+  return { regions, garments, things, kits, empty: garments.length === 0 && kits.length === 0 };
 }
 
 /** Her wardrobe + kit for the DRESS section. Viewer must see the character. */
@@ -341,11 +434,39 @@ export async function setDressState(characterId: string, input: unknown, actor: 
 
 // ── JEWL proposes; the table approves ───────────────────────────────────
 
-const SYSTEM =
-  'You are JEWL, the AI in a tabletop game, and you know every object this character owns. Dress her for today from HER OWN THINGS ONLY — ' +
-  'never name a thing that is not in the list, never invent one. Choose what she WEARS (one piece per body region, outermost shared region; ' +
-  'a whole outfit goes on the root) and what she CARRIES (bag, keys, phone, the pocket kit). Fit the place, the hour, the weather, her means and who she is. ' +
-  'Answer with ONE JSON object and nothing else: {"pieces":[{"itemId":"<id from the list>","state":"worn"|"carried","region":"<one of her regions, worn only>","why":"<one short clause>"}]}.';
+const OUTPUT_RULES =
+  'From YOUR OWN THINGS ONLY — never name a thing that is not in the list, never invent one. WEAR one piece per body region (outermost shared region; ' +
+  'a whole outfit goes on the root) and CARRY what goes out the door (bag, keys, phone, the pocket kit). ' +
+  'A WARDROBE KIT is clothes owned but not itemized yet: pieces may be drawn from it (dealer\u2019s choice) — true to its line, within its KV left, ONE piece each (a left boot and a right boot are two pieces): ' +
+  '{"fromKit":{"holderId":"<kit id>","archetype":"<singular piece, e.g. Wool Sweater>","primaryMaterial":"Wool","weightLbs":1.2,"value":<KV, decimal>},"state":"worn","region":"<one of the regions>","why":"…"}. ' +
+  'Answer with ONE JSON object and nothing else: {"pieces":[{"itemId":"<id from the list>","state":"worn"|"carried","region":"<one of the regions, worn only>","why":"<one short clause>"}]}.';
+
+/** The system prompt for whoever chooses. Pure. */
+export function dressSystem(chooser: OutfitChooser, name: string): string {
+  if (chooser === 'character') {
+    return `You are ${name}. Choose what you put on today from your own clothes — as yourself: your mood, the weather and the light, where you are going, what you can afford to wear out. ${OUTPUT_RULES}`;
+  }
+  return `You are JEWL, the AI in a tabletop game, and you know every object ${name} owns. A player is seated in ${name}: offer them an outfit to steer (they approve, swap or ask for another take). Fit the place, the hour, the weather, the means and who ${name} is. ${OUTPUT_RULES}`;
+}
+
+/** Is a player seated in her? A user who is not the campaign's GM. Pure. */
+export function chooserFor(row: { userId: string | null; campaign?: { gmUserId: string } | null }): OutfitChooser {
+  return row.userId && row.userId !== row.campaign?.gmUserId ? 'player' : 'character';
+}
+
+/** Her persona (DayaEntity.personaProfile) as context lines for the character's own choice. */
+async function personaLines(characterId: string): Promise<string[]> {
+  const e = await prisma.dayaEntity.findUnique({ where: { characterId }, select: { personaProfile: true } });
+  if (!e?.personaProfile) return [];
+  try {
+    const pp = JSON.parse(e.personaProfile) as { identityNarrative?: string; voiceNotes?: string; mood?: string };
+    return [
+      ...(pp.identityNarrative ? [`WHO YOU ARE: ${pp.identityNarrative.slice(0, 400)}`] : []),
+      ...(pp.voiceNotes ? [`YOUR VOICE: ${pp.voiceNotes.slice(0, 200)}`] : []),
+      ...(pp.mood ? [`YOUR MOOD: ${pp.mood.slice(0, 120)}`] : []),
+    ];
+  } catch { return []; }
+}
 
 async function dressContext(characterId: string, row: { name: string; campaignId: string | null }, sheet: Sheet): Promise<string> {
   const lines: string[] = [];
@@ -376,11 +497,11 @@ async function dressContext(characterId: string, row: { name: string; campaignId
 }
 
 /** The ONE local-lane call. Throws on timeout / transport error. */
-async function askJewlToDress(campaignId: string | null, context: string, wardrobe: Wardrobe, draft: OutfitPiece[]): Promise<string> {
+async function askJewlToDress(campaignId: string | null, system: string, context: string, wardrobe: Wardrobe, draft: OutfitPiece[]): Promise<string> {
   const call = routedChatText(
     { caller: 'dress', lane: 'local', contentClass: 'fiction', ...(campaignId ? { campaignId } : {}) },
     {
-      system: SYSTEM,
+      system,
       user: `${context}\n\n${renderWardrobe(wardrobe)}\n\nA PLAIN DRAFT (improve it from her things):\n${JSON.stringify({ pieces: draft })}\n\nDress her. JSON only.`,
       maxTokens: 900,
       temperature: 0.4,
@@ -405,17 +526,20 @@ export async function proposeOutfit(characterId: string, viewer: { id: string; r
   const { row, sheet } = await loadCharacter(characterId);
   if (!canViewCharacter(viewer.id, viewer.role, row)) throw new ForbiddenError('Not allowed to view this character');
   const wardrobe = await loadWardrobe(characterId, row.campaignId, sheet);
-  if (wardrobe.empty) return { pieces: [], byJewl: false, empty: true };
+  const chooser = chooserFor(row);
+  const who = { chooser, audience: chooser === 'player' ? 'player' as const : 'gm' as const };
+  if (wardrobe.empty) return { ...who, pieces: [], byJewl: false, empty: true };
   const draft = draftOutfit(wardrobe);
   try {
-    const text = await askJewlToDress(row.campaignId, await dressContext(characterId, row, sheet), wardrobe, draft);
+    const context = [await dressContext(characterId, row, sheet), ...(chooser === 'character' ? await personaLines(characterId) : [])].join('\n');
+    const text = await askJewlToDress(row.campaignId, dressSystem(chooser, row.name), context, wardrobe, draft);
     const pieces = parseOutfitAnswer(text, wardrobe);
-    if (pieces && pieces.length) return { pieces, byJewl: true, empty: false };
+    if (pieces && pieces.length) return { ...who, pieces, byJewl: true, empty: false };
     console.warn('[dress] JEWL answer unparseable or empty — the draft stands');
   } catch (e) {
     console.warn(`[dress] JEWL call failed (${e instanceof Error ? e.message : 'error'}) — the draft stands`);
   }
-  return { pieces: draft, byJewl: false, empty: false };
+  return { ...who, pieces: draft, byJewl: false, empty: false };
 }
 
 export const applyOutfitSchema = z.object({
@@ -423,6 +547,14 @@ export const applyOutfitSchema = z.object({
     itemId: z.string().min(1).max(64),
     state: z.enum(['worn', 'carried']),
     region: z.string().max(120).optional().nullable(),
+    /** A piece drawn out of one of her wardrobe kits (crystallized on approval). */
+    fromKit: z.object({
+      holderId: z.string().min(1).max(64),
+      archetype: z.string().min(1).max(100),
+      primaryMaterial: z.string().min(1).max(60),
+      weightLbs: z.number().min(0).max(100),
+      value: z.number().min(0).max(100),
+    }).optional(),
   })).max(60),
 });
 export type ApplyOutfitInput = z.infer<typeof applyOutfitSchema>;
@@ -438,14 +570,31 @@ export async function applyOutfit(characterId: string, input: unknown, actor: { 
   const before = await loadWardrobe(characterId, row.campaignId, sheet);
   const mine = new Map([...before.garments, ...before.things].map(i => [i.id, i]));
   const named = new Set<string>();
+  // Kit pieces first: crystallize each out of HER wardrobe kit, then treat it as hers.
+  const drawFailed: string[] = [];
+  const kitIds = new Set(before.kits.map(k => k.holderId));
+  const pieces: Array<{ itemId: string; state: 'worn' | 'carried'; region?: string | null }> = [];
   for (const piece of p.pieces) {
+    if (!piece.fromKit) { pieces.push(piece); continue; }
+    const k = piece.fromKit;
+    if (!kitIds.has(k.holderId) || !row.campaignId) throw new ValidationError(`"${k.holderId}" is not one of her wardrobe kits — nothing is invented at the dress step.`);
+    // The draw is the table's approval acting on her own kit; the item is written under the GM's hand.
+    const r = await drawFromHolderKit(row.campaignId, k.holderId, [{
+      archetype: k.archetype, primaryMaterial: k.primaryMaterial, weightLbs: k.weightLbs, value: k.value, worn: true,
+    }], { id: row.campaign?.gmUserId ?? actor.id, role: 'WATCHER' });
+    const made = r.items?.[0];
+    if (!made) { drawFailed.push(`${k.archetype}: ${r.failed[0]?.reason ?? 'not drawn'}`); continue; }
+    mine.set(made.id, { id: made.id, name: made.name, archetype: k.archetype, type: 'armor', description: null, material: k.primaryMaterial, category: null, garment: true, state: 'carried', region: null, where: null });
+    pieces.push({ itemId: made.id, state: piece.state, region: piece.region });
+  }
+  for (const piece of pieces) {
     const w = mine.get(piece.itemId);
     if (!w) throw new ValidationError(`"${piece.itemId}" is not one of her things — nothing is invented at the dress step.`);
     named.add(w.id);
   }
   const rows = await prisma.campaignItem.findMany({ where: { id: { in: [...named, ...before.garments.filter(g => g.state === 'worn').map(g => g.id)] } }, select: { id: true, name: true, data: true, holderId: true, locationId: true } });
   const byId = new Map(rows.map(r => [r.id, r]));
-  for (const piece of p.pieces) {
+  for (const piece of pieces) {
     const r = byId.get(piece.itemId);
     if (r) await writeState(characterId, before.regions, r, piece.state, piece.region);
   }
@@ -455,5 +604,6 @@ export async function applyOutfit(characterId: string, input: unknown, actor: { 
       if (r) await writeState(characterId, before.regions, r, 'carried', null);
     }
   }
-  return loadWardrobe(characterId, row.campaignId, sheet);
+  const after = await loadWardrobe(characterId, row.campaignId, sheet);
+  return drawFailed.length ? { ...after, drawFailed } : after;
 }

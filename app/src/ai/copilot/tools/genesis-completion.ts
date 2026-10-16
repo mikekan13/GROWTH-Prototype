@@ -131,7 +131,8 @@ export const establishCurrencyTool: JewlTool = {
   description:
     'Genesis POSSESSIONS stage (and world-keeping). A currency is a campaign object — a stored-KRMA vehicle; a campaign ' +
     'may have many (earth alone has ~180). A unit has NO fixed value: anchor krmaPerUnit on the KRMA value of objects ' +
-    'in THIS campaign\'s time and place (a 1 KV skillet sells for 30 units there → krmaPerUnit ≈ 0.033). Say the anchor ' +
+    'in THIS campaign\'s time and place — KV IS the price, so krmaPerUnit = Σ KV ÷ Σ price over several graded anchor ' +
+    'objects, calculated at the table, never assumed. A unit is a container: the KRMA it stores (plus its paper or metal). Say the anchor ' +
     'objects in note. Re-calling with the same code re-rates it. Never invent currency ITEMS — cash lives on the sheet.',
   inputSchema: establishCurrencySchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {

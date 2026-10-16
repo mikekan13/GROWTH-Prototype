@@ -12,7 +12,7 @@ const h = vi.hoisted(() => ({
   fail: false,
 }));
 
-const CH = { id: 'ch1', name: 'Violet Okafor', userId: 'u_violet', campaignId: 'c1', campaign: { gmUserId: 'u_gm' }, data: JSON.stringify({ identity: { sex: 'female', designer: { layers: [{ imagePath: '/portraits/ch1/faces/b.png', text: 'Locked', kind: 'base' }] } }, wealth: { holdings: [{ amount: 300, code: 'USD', where: 'checking' }] } }) };
+const CH: { id: string; name: string; userId: string | null; campaignId: string; campaign: { gmUserId: string }; data: string } = { id: 'ch1', name: 'Violet Okafor', userId: 'u_violet', campaignId: 'c1', campaign: { gmUserId: 'u_gm' }, data: JSON.stringify({ identity: { sex: 'female', designer: { layers: [{ imagePath: '/portraits/ch1/faces/b.png', text: 'Locked', kind: 'base' }] } }, wealth: { holdings: [{ amount: 300, code: 'USD', where: 'checking' }] } }) };
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -45,7 +45,18 @@ vi.mock('@/lib/db', () => ({
       findUnique: vi.fn(async () => ({ name: "Violet's Apartment", data: JSON.stringify({ description: 'A walkup studio.' }) })),
     },
     worldFact: { findMany: vi.fn(async () => [{ subjectKey: 'violet.apartment.light_now', fact: 'Cold grey morning.' }]) },
+    dayaEntity: { findUnique: vi.fn(async () => ({ personaProfile: JSON.stringify({ identityNarrative: 'A frugal novelist who dresses for the walk, not the room.', mood: 'restless' }) })) },
   },
+}));
+const draws = vi.hoisted(() => ({ calls: [] as Array<{ holderId: string; goods: Array<{ archetype: string; value: number; worn?: boolean }>; actor: { id: string; role: string } }>, n: 0, fail: '' }));
+vi.mock('./kits', () => ({
+  drawFromHolderKit: vi.fn(async (_c: string, holderId: string, goods: Array<{ archetype: string; value: number; worn?: boolean }>, actor: { id: string; role: string }) => {
+    draws.calls.push({ holderId, goods, actor });
+    if (draws.fail) return { created: 0, archetypesCreated: 0, failed: [{ archetype: goods[0].archetype, reason: draws.fail }], containers: [], items: [], kit: {}, remainingKv: 0 };
+    const id = `i_drawn_${++draws.n}`;
+    h.items.push({ id, name: goods[0].archetype, type: 'armor', data: { drawnFromKit: holderId }, holderId: 'ch1', locationId: null, sourceForgeItemId: null, status: 'ACTIVE', campaignId: 'c1' });
+    return { created: 1, archetypesCreated: 1, failed: [], containers: [], items: [{ id, name: goods[0].archetype, kv: goods[0].value }], kit: {}, remainingKv: 0 };
+  }),
 }));
 vi.mock('@/ai/network', () => ({
   routedChatText: vi.fn(async () => { h.calls++; if (h.fail) throw new Error('cold'); return { text: h.answer, model: 'm', usage: {}, lane: {} }; }),
@@ -71,6 +82,8 @@ beforeEach(() => {
   h.answer = '';
   h.calls = 0;
   h.fail = false;
+  draws.calls = []; draws.n = 0; draws.fail = '';
+  CH.userId = 'u_violet';
 });
 
 describe('pure', () => {
@@ -163,7 +176,7 @@ describe('proposeOutfit / applyOutfit', () => {
     h.items = h.items.filter(i => !i.name.match(/coat|outfit|boots/i));
     h.deeds = ['i_laptop'];
     const p = await proposeOutfit('ch1', player);
-    expect(p).toEqual({ pieces: [], byJewl: false, empty: true });
+    expect(p).toEqual({ chooser: 'player', audience: 'player', pieces: [], byJewl: false, empty: true });
     expect(h.calls).toBe(0);
   });
   it('JEWL cold → the deterministic draft from her things (what she wears stays, the kit is carried)', async () => {
@@ -195,5 +208,75 @@ describe('nothing comes in pairs (Mike 2026-10-16)', () => {
     expect(guessRegion('Hiking Boot', regions)).toBe('Body/Left Upper Leg/Left Lower Leg/Left Foot');
     expect(guessRegion('Right winter glove', regions)).toBe('Body/Right Upper Arm/Right Lower Arm/Right Hand');
     expect(guessRegion('Her jeans', regions)).toBe('Body');
+  });
+});
+
+describe('wardrobe KITS at the dress step (Mike 2026-10-16: "she needs a kit… dealer’s choice from that allotment")', () => {
+  const closet = () => item('i_closet', 'Bedroom closet', { kit: { kvBudget: 3, contents: 'everyday clothes for a frugal writer in autumn: jeans, sweaters, two good dresses, worn boots', spentKv: 1, resolvedItemIds: [] } }, { type: 'misc', holderId: null, locationId: 'loc_home' });
+  beforeEach(() => {
+    h.items = [closet(), item('i_phone', 'Phone', {}, { type: 'tool' })];
+    h.deeds = ['i_closet'];
+  });
+
+  it('listWardrobe shows the wardrobe kit (budget left, its line); a kit alone is not an empty wardrobe', async () => {
+    const w = await listWardrobe('ch1', player);
+    expect(w.empty).toBe(false);
+    expect(w.kits).toEqual([{ holderId: 'i_closet', holderName: 'Bedroom closet', kvBudget: 3, remainingKv: 2, contents: expect.stringMatching(/jeans, sweaters/) }]);
+  });
+
+  it('JEWL proposes pieces FROM the kit: one boot per foot, inside the budget (over-budget and not-hers dropped)', async () => {
+    h.answer = JSON.stringify({ pieces: [
+      { fromKit: { holderId: 'i_closet', archetype: 'Wool Sweater', primaryMaterial: 'Wool', weightLbs: 1.2, value: 0.4 }, state: 'worn', region: 'Body/Torso', why: 'cold' },
+      { fromKit: { holderId: 'i_closet', archetype: 'Left Leather Boot', primaryMaterial: 'Leather', weightLbs: 1.5, value: 0.3 }, state: 'worn' },
+      { fromKit: { holderId: 'i_closet', archetype: 'Right Leather Boot', primaryMaterial: 'Leather', weightLbs: 1.5, value: 0.3 }, state: 'worn' },
+      { fromKit: { holderId: 'i_closet', archetype: 'Silk Ballgown', primaryMaterial: 'Silk', weightLbs: 3, value: 5 }, state: 'worn' },
+      { fromKit: { holderId: 'i_not_hers', archetype: 'Hat', primaryMaterial: 'Wool', weightLbs: 0.2, value: 0.1 }, state: 'worn' },
+    ] });
+    const p = await proposeOutfit('ch1', player);
+    expect(p.pieces.map(x => [x.name, x.region])).toEqual([
+      ['Wool Sweater', 'Body/Torso'],
+      ['Left Leather Boot', 'Body/Left Upper Leg/Left Lower Leg/Left Foot'],
+      ['Right Leather Boot', 'Body/Right Upper Leg/Right Lower Leg/Right Foot'],
+    ]);
+    expect(p.pieces.every(x => x.fromKit?.holderId === 'i_closet')).toBe(true);
+    expect(draws.calls).toHaveLength(0); // nothing crystallized until approved
+  });
+
+  it('applyOutfit crystallizes each kit piece through drawFromHolderKit, then wears it; a non-kit holder is refused', async () => {
+    const w = await applyOutfit('ch1', { pieces: [
+      { itemId: 'kit:i_closet:0', state: 'worn', region: 'Body/Torso', fromKit: { holderId: 'i_closet', archetype: 'Wool Sweater', primaryMaterial: 'Wool', weightLbs: 1.2, value: 0.4 } },
+      { itemId: 'kit:i_closet:1', state: 'worn', fromKit: { holderId: 'i_closet', archetype: 'Left Leather Boot', primaryMaterial: 'Leather', weightLbs: 1.5, value: 0.3 } },
+      { itemId: 'i_phone', state: 'carried' },
+    ] }, player);
+    expect(draws.calls.map(c => [c.holderId, c.goods[0].archetype, c.goods[0].worn])).toEqual([['i_closet', 'Wool Sweater', true], ['i_closet', 'Left Leather Boot', true]]);
+    expect(draws.calls[0].actor).toEqual({ id: 'u_gm', role: 'WATCHER' });
+    expect(h.items.find(i => i.name === 'Wool Sweater')!.data.equippedTo).toBe('Body/Torso');
+    expect(h.items.find(i => i.name === 'Left Leather Boot')!.data.equippedTo).toBe('Body/Left Upper Leg/Left Lower Leg/Left Foot');
+    expect(w.drawFailed).toBeUndefined();
+    await expect(applyOutfit('ch1', { pieces: [{ itemId: 'kit:x:0', state: 'worn', fromKit: { holderId: 'i_phone', archetype: 'Hat', primaryMaterial: 'Wool', weightLbs: 0.2, value: 0.1 } }] }, player)).rejects.toThrow(/not one of her wardrobe kits/);
+  });
+
+  it('a draw the kit cannot pay for is reported, not invented', async () => {
+    draws.fail = 'exceeds the kit remaining 0 KV';
+    const w = await applyOutfit('ch1', { pieces: [{ itemId: 'kit:i_closet:0', state: 'worn', fromKit: { holderId: 'i_closet', archetype: 'Wool Sweater', primaryMaterial: 'Wool', weightLbs: 1.2, value: 0.4 } }] }, player);
+    expect(w.drawFailed).toEqual(['Wool Sweater: exceeds the kit remaining 0 KV']);
+  });
+});
+
+describe('who chooses (Mike 2026-10-16: "the AI or the human steering")', () => {
+  it('a seated player is offered the outfit to steer; with no player, SHE chooses, in her own persona', async () => {
+    const { routedChatText } = await import('@/ai/network');
+    h.answer = JSON.stringify({ pieces: [{ itemId: 'i_coat', state: 'worn', region: 'Body/Torso' }] });
+    const seated = await proposeOutfit('ch1', player);
+    expect(seated).toMatchObject({ chooser: 'player', audience: 'player' });
+    const sys1 = (vi.mocked(routedChatText).mock.calls.at(-1)![1] as { system: string }).system;
+    expect(sys1).toMatch(/A player is seated in Violet Okafor/);
+    CH.userId = 'u_gm';
+    const own = await proposeOutfit('ch1', { id: 'u_gm', role: 'WATCHER' });
+    expect(own).toMatchObject({ chooser: 'character', audience: 'gm' });
+    const last = vi.mocked(routedChatText).mock.calls.at(-1)![1] as { system: string; user: string };
+    expect(last.system).toMatch(/^You are Violet Okafor\. Choose what you put on today from your own clothes/);
+    expect(last.user).toMatch(/WHO YOU ARE: A frugal novelist/);
+    expect(last.user).toMatch(/YOUR MOOD: restless/);
   });
 });

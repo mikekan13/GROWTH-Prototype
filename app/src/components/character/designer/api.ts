@@ -114,8 +114,8 @@ export interface WardrobeRow {
   category: string | null; garment: boolean; state: 'worn' | 'carried' | 'owned'; region: string | null; where: string | null;
 }
 export interface WardrobeView { regions: string[]; garments: WardrobeRow[]; things: WardrobeRow[]; empty: boolean }
-export interface OutfitPieceView { itemId: string; name: string; state: 'worn' | 'carried'; region: string | null; why: string }
-export interface OutfitProposalView { pieces: OutfitPieceView[]; byJewl: boolean; empty: boolean }
+export interface OutfitPieceView { itemId: string; name: string; state: 'worn' | 'carried'; region: string | null; why: string; fromKit?: { holderId: string; archetype: string; primaryMaterial: string; weightLbs: number; value: number } }
+export interface OutfitProposalView { pieces: OutfitPieceView[]; byJewl: boolean; empty: boolean; chooser?: 'character' | 'player'; audience?: 'player' | 'gm' }
 
 type Lined<T> = { ok: true; value: T } | { ok: false; line: string };
 
@@ -150,7 +150,7 @@ export function proposeOutfit(characterId: string): Promise<Lined<OutfitProposal
 
 /** APPROVE OUTFIT → the states are written (garments left out come off). */
 export function applyOutfit(characterId: string, pieces: OutfitPieceView[]): Promise<Lined<WardrobeView>> {
-  return call(`/api/characters/${characterId}/dress/apply`, json({ pieces: pieces.map(p => ({ itemId: p.itemId, state: p.state, region: p.region })) }), b => (b.wardrobe as WardrobeView | undefined) ?? null);
+  return call(`/api/characters/${characterId}/dress/apply`, json({ pieces: pieces.map(p => ({ itemId: p.itemId, state: p.state, region: p.region, ...(p.fromKit ? { fromKit: p.fromKit } : {}) })) }), b => (b.wardrobe as WardrobeView | undefined) ?? null);
 }
 
 /** APPROVE AS BASE → Character.portrait. */

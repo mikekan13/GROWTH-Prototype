@@ -12,9 +12,10 @@ export const stockGoodsTool: JewlTool = {
     'Genesis WORLD stage. Stock a room, a wardrobe, a pantry, a drawer in ONE call: up to 120 ordinary things, each a real ' +
     'item she owns, placed in a room or INSIDE ANY OTHER THING — everything is a container (the sink holds a dish, the ' +
     'fridge the eggs, the junk drawer the batteries, a coat pocket a receipt); holders named in the same call are placed ' +
-    'first. The canvas shows only what is at the top of a room; what is inside folds into its holder. Everyday goods ' +
-    'with no mechanics are floor tier (0 KV) and need no Forge draft; anything with abilities or real value goes through ' +
-    'grant_possession / the Forge. Garments: ONE item per piece — nothing comes in pairs (two socks = two goods). ' +
+    'first. The canvas shows only what is at the top of a room; what is inside folds into its holder. KV IS THE PRICE ' +
+    '(decimal: an onion 0.02, a couch 2): a new everyday archetype under 1 KV is made on the spot (give its value); a new ' +
+    'thing worth 1 KV or more goes through the Forge first. CAPACITY: give volumeCuFt (and capacityCuFt / capacityLbs for ' +
+    'new holders) — a holder refuses what will not fit. A holder’s ordinary contents can be a KIT instead (stock_kit). Garments: ONE item per piece — nothing comes in pairs (two socks = two goods). ' +
     'Consumables carry qty. Real pounds. Be exhaustive and specific to HER: what a real person in her life, means and ' +
     'season actually has, down to the half-used spices and the rubber bands.',
   inputSchema: stockGoodsSchema,

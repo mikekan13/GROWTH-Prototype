@@ -85,7 +85,7 @@ export async function placePath(entityId: string): Promise<string[]> {
   return (await placeChain(entityId)).map(l => l.name);
 }
 
-export interface PlaceResult { itemId: string; name: string; into: Place; path: string[]; locationId: string | null }
+export interface PlaceResult { itemId: string; name: string; into: Place; path: string[]; locationId: string | null; warnings?: string[] }
 
 /**
  * Put an item in a room (Location) or inside a container (item). Replaces
@@ -93,7 +93,7 @@ export interface PlaceResult { itemId: string; name: string; into: Place; path: 
  * carried), and sets locationId to the enclosing room.
  */
 export async function placeItem(campaignId: string, opts: { item: string; into: string }): Promise<PlaceResult> {
-  const items = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', OR: [{ id: opts.item.trim() }, { name: opts.item.trim() }] }, select: { id: true, name: true } });
+  const items = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', OR: [{ id: opts.item.trim() }, { name: opts.item.trim() }] }, select: { id: true, name: true, data: true } });
   const item = items.find(i => i.id === opts.item.trim()) ?? items.find(i => i.name.toLowerCase() === opts.item.trim().toLowerCase());
   if (!item) throw new NotFoundError(`No item "${opts.item}" in this campaign (exact local name or id).`);
   const into = await resolvePlace(campaignId, opts.into);
@@ -101,6 +101,11 @@ export async function placeItem(campaignId: string, opts: { item: string; into: 
   if (into.kind === 'item' && await isSelfOrDescendant(item.id, into.id)) {
     throw new ValidationError(`"${into.name}" is ${into.id === item.id ? 'the item itself' : `inside "${item.name}"`} — a thing cannot contain itself.`);
   }
+  // CAPACITY (Mike 2026-10-16: "I can't put a whale in my apartment").
+  const { assertFits, bulkOf } = await import('./capacity');
+  let itemData: Record<string, unknown> = {};
+  try { itemData = JSON.parse((item as { data?: string }).data ?? '{}') as Record<string, unknown>; } catch { itemData = {}; }
+  const warnings = await assertFits(into, bulkOf(item.name, itemData), item.id);
   const locationId = into.kind === 'location' ? into.id : (into.locationId ?? await enclosingLocationId(into.id));
   await prisma.$transaction([
     prisma.entityRelationship.deleteMany({ where: { sourceId: item.id, relationshipType: REL } }),
@@ -114,7 +119,7 @@ export async function placeItem(campaignId: string, opts: { item: string; into: 
     prisma.campaignItem.update({ where: { id: item.id }, data: { locationId, holderId: null } }),
   ]);
   const path = await placePath(item.id);
-  return { itemId: item.id, name: item.name, into, path, locationId };
+  return { itemId: item.id, name: item.name, into, path, locationId, ...(warnings.length ? { warnings } : {}) };
 }
 
 export interface PlaceNode { id: string; kind: 'location' | 'item'; name: string; children: PlaceNode[] }

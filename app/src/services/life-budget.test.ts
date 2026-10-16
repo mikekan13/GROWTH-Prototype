@@ -85,3 +85,21 @@ describe('lifeBudget', () => {
     }));
   });
 });
+
+describe('decimals + kits (Mike 2026-10-16)', () => {
+  it('sub-1 KV sums in decimals; a kit counts once at its budget; things drawn from it are not counted again', async () => {
+    db.campaignItem.findMany.mockResolvedValue([
+      { id: 'i_onion', name: 'Onion', data: JSON.stringify({ quantity: 3 }), history: '[]', sourceForgeItemId: 'f_onion' },
+      { id: 'i_fridge', name: 'The fridge', data: JSON.stringify({ kit: { kvBudget: 1.25, contents: 'milk, eggs', spentKv: 0.12, resolvedItemIds: ['i_egg'] } }), history: '[]', sourceForgeItemId: 'f_fridge' },
+      { id: 'i_egg', name: 'Egg', data: JSON.stringify({ quantity: 6, drawnFromKit: 'i_fridge' }), history: '[]', sourceForgeItemId: 'f_onion' },
+    ]);
+    db.forgeItem.findMany.mockResolvedValue([
+      { id: 'f_onion', karmicValue: BigInt(0), data: JSON.stringify({ value: 0.02 }) },
+      { id: 'f_fridge', karmicValue: BigInt(4), data: JSON.stringify({ value: 4 }) },
+    ] as never);
+    const b = await lifeBudget('v');
+    expect(b.items.map(i => i.name)).toEqual(['Onion', 'The fridge', 'The fridge (kit: milk, eggs)']);
+    expect(b.spentKv).toBeCloseTo(0.06 + 4 + 1.25);
+    expect(b.line).toMatch(/5\.31 KV in things/);
+  });
+});

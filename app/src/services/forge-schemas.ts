@@ -124,7 +124,22 @@ const forgeItemDataSchema = z.object({
   /** REQUIRED when itemType='kit': the finite draw-down pool. Anything
    *  plausibly in the kit and needed is pulled FROM this budget on demand —
    *  never pre-itemized. */
-  kvBudget: z.number().int().min(1).max(500).optional(),
+  kvBudget: z.number().positive().max(500).optional(),
+  // Item KV is DECIMAL (Mike 2026-10-16: sub-1 KRMA items allowed) — `value`
+  // above is the source of truth; karmicValue is its rounded mirror.
+  // CAPACITY (Mike 2026-10-16: "I can't put a whale in my apartment"):
+  // every item has a volume; holders also say what they can hold.
+  volumeCuFt: z.number().min(0).optional(),
+  capacityCuFt: z.number().min(0).optional(),
+  capacityLbs: z.number().min(0).optional(),
+  /** A holder's KIT (2026-10-16): a KV budget + one-line truth of its
+   *  ordinary contents, drawn down into real items when observed. */
+  kit: z.object({
+    kvBudget: z.number().min(0),
+    contents: z.string().max(500),
+    spentKv: z.number().min(0).default(0),
+    resolvedItemIds: z.array(z.string().max(64)).default([]),
+  }).optional(),
   // Canonical GrowthWorldItem fields (item-fields canon 2026-05-14)
   primaryMaterial: z.string().max(100).optional(),
   subordinateMaterials: z.array(z.string().max(100)).max(10).optional(),
@@ -377,7 +392,8 @@ const blockGrantFields = {
   possessions: z.array(z.object({
     name: z.string().min(1).max(100),
     description: z.string().max(300),
-    kv: z.number().int().min(0),
+    /** Item KV — decimal (sub-1 allowed, Mike 2026-10-16). */
+    kv: z.number().min(0),
     /** Unpack hint for the canvas build (own traits, inventory, layout). */
     unpackNote: z.string().max(200).optional(),
   })).max(5).optional(),
@@ -386,7 +402,7 @@ const blockGrantFields = {
     description: z.string().max(300),
     /** Draw-down budget: plausible, needed contents are pulled FROM this —
      *  never pre-itemized (ruled 2026-08-25; plausibility gate applies). */
-    kvBudget: z.number().int().min(1).max(100),
+    kvBudget: z.number().positive().max(100),
   })).max(3).optional(),
   allocatableSkills: z.array(z.object({
     levels: z.number().int().min(1).max(5),

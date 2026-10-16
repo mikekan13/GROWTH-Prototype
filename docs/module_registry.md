@@ -684,3 +684,20 @@ Rulings: memory `ruling-passive-active-perception-familiarity-2026-10-08`. Unit 
 | `services/placement-geometry.ts` | `setLocationGeometry`, `setTokenPosition` | Writes Location.data.footprint / level and the located_at edge's data.position. |
 | `PATCH /api/campaigns/[id]/locations/[locationId]/footprint`, `PATCH /api/entities/[id]/contents/[edgeId]` | — | Thin routes over placement-geometry. |
 | `components/canvas/ItemToken.tsx`, `LevelSwitcher.tsx` (+ RelationsCanvas, FolderGroup, folder-tooltips) | — | Items render as tokens inside rooms (card content in the dynamic tooltip); one level shown at a time. |
+
+
+## KV is the price · kits · capacity (2026-10-16)
+
+| Module | Purpose |
+|---|---|
+| `src/lib/item-kv.ts` | Item KV is DECIMAL (sub-1 allowed). `itemKvOf` (data.value truth, karmicValue mirror fallback), `kvMirror` (Math.round → BigInt), `instanceKvOf` (archetype KV × quantity), `readKit`, `roundKv`, `WARDROBE_KIT_RE`. |
+| `src/services/capacity.ts` | "I can't put a whale in my apartment." Pure `fits(holder, contents, incoming)` on volumeCuFt + weightLbs; `roomCapacityCuFt` (footprint shoelace area × scale² × height, default 9 ft); `checkFit` / `assertFits` (DB). Unknown volume/capacity = allowed with a warning. Enforced in `placement.placeItem` (so `applyLayout`/`moveItems`) and `life-goods.placeGoods`. |
+| `src/services/kits.ts` | Holder KITS (quantum contents): `stockKit(campaignId, holderItemId, {kvBudget, contents})`, `drawFromHolderKit(campaignId, holderItemId, goods, actor)` — crystallizes goods via `placeGoods` against the remaining budget; records `spentKv` + `resolvedItemIds`; drawn items carry `data.drawnFromKit`. |
+| `src/services/life-goods.ts` | `placeGoods` = shared stocking engine (stock_goods + kit draws): decimal `value`, `volumeCuFt`, `capacityCuFt/Lbs` on goods; new on-the-spot archetypes must be < 1 KV (≥ 1 KV → forge first); capacity-checked; optional kit budget. `lifeCoverage(names, kitContents)` counts kit lines; a wardrobe kit covers every clothing area. |
+| `src/services/life-budget.ts` | Decimal sums; a holder kit counts once at its kvBudget; `drawnFromKit` items not re-counted. |
+| `src/services/dress.ts` | Wardrobe KITS: `Wardrobe.kits`; proposals may draw pieces `fromKit` (budget-checked, one piece each); `applyOutfit` crystallizes them via `drawFromHolderKit` (under the GM's hand) then wears them. `chooser: 'character' \| 'player'` + `audience` on the proposal; `dressSystem` frames the character case as "You are <name>…" with her persona. |
+| `src/services/currency.ts` | `unitKrma(currency)` — a unit is a container: krmaPerUnit (+ material KV per unit when known). No fixed rate anywhere; rate is calculated at the table. |
+| `src/ai/copilot/tools/stock-kit.ts` | JEWL `stock_kit` (WORLD stage only). |
+| `src/ai/copilot/tools/draw-from-kit.ts` | Extended: holder kits take `goods[]` → `drawFromHolderKit`; item-kit `declaredKv` now decimal. |
+
+Item data fields (shared with the stock content pass): `value` (KRMA, decimal), `volumeCuFt`, `capacityCuFt`, `capacityLbs` (holders), `weightLbs`, `kit = { kvBudget, contents, spentKv, resolvedItemIds }`.

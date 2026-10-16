@@ -9,6 +9,18 @@
  * (a 1 KV skillet costs what a skillet costs there). JEWL establishes and
  * adjusts them; the GM may too. Cash on a sheet is denominated in one
  * (GrowthWealth, services/wealth.ts). Retired currencies stay for history.
+ *
+ * NO FIXED RATE (Mike 2026-10-16: "my 150 to 1 dollar was just a random off
+ * from the couch… that should still be a calculation determined at the
+ * table"). krmaPerUnit is CALCULATED per campaign by JEWL (establish_currency)
+ * from what graded objects cost there — KV IS the price, so the rate is
+ * Σ KV ÷ Σ price over the anchor objects. Nothing in code assumes a rate.
+ *
+ * A UNIT IS A CONTAINER (Mike 2026-10-16: "it just acts as a container for
+ * KRMA (plus the paper or metal it is made of)"): one unit's worth =
+ * the KRMA it stores + the KV of its material (`unitKrma`). Physical cash
+ * (bills, coins in a wallet) are items inside a holder; a bank balance is a
+ * ledger line — nothing physical holds it.
  */
 import 'server-only';
 import { z } from 'zod';
@@ -22,7 +34,7 @@ export const establishCurrencySchema = z.object({
   name: z.string().min(1).max(100).describe('"United States dollar"'),
   code: z.string().min(1).max(CURRENCY_CODE_MAX).describe('Short code, unique in the campaign: "USD", "GBP", "crowns".'),
   symbol: z.string().max(8).optional().describe('"$", "£", "¤".'),
-  krmaPerUnit: z.number().positive().max(1_000_000).describe('KRMA stored in ONE unit. Anchor it on objects: if a 1 KV skillet sells for 30 units, krmaPerUnit ≈ 1/30.'),
+  krmaPerUnit: z.number().positive().max(1_000_000).describe('KRMA stored in ONE unit — calculated at the table, never assumed: KV is the price, so over several graded anchor objects krmaPerUnit = Σ their KV ÷ Σ their price in units here and now.'),
   scope: z.string().max(200).optional().describe('Where and when it is tender ("Sacramento, 2026").'),
   note: z.string().max(400).optional().describe('The anchor objects and prices the rate was set from.'),
 });
@@ -55,6 +67,16 @@ export function unitsForKrma(kv: number, krmaPerUnit: number): number {
 export function krmaForUnits(units: number, krmaPerUnit: number): number {
   if (!(krmaPerUnit > 0)) throw new ValidationError('krmaPerUnit must be positive');
   return Math.max(0, units) * krmaPerUnit;
+}
+
+/**
+ * What ONE unit is worth in KRMA: the KRMA it stores + the KV of what it is
+ * made of (paper, metal) when known. Currency rows carry no material yet, so
+ * this is krmaPerUnit until one is given. Pure.
+ */
+export function unitKrma(c: { krmaPerUnit: number; materialKvPerUnit?: number | null }): number {
+  const material = typeof c.materialKvPerUnit === 'number' && c.materialKvPerUnit > 0 ? c.materialKvPerUnit : 0;
+  return Math.max(0, c.krmaPerUnit) + material;
 }
 
 /** "$1,250.00" / "1250 USD" — a display line. Pure. */
