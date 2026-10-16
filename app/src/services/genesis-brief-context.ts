@@ -36,6 +36,8 @@ export interface WorldBriefInput {
   budgetLine: string;
   /** Cash + income already on the sheet ("$800 USD (checking) · $28,000 USD/yr — fiction author"). */
   wealth?: string[];
+  /** The home as a tree: rooms, containers, contents (services/placement renderTree). */
+  map?: string[];
   look: LookLine[];
   items: Array<{ name: string; archetype: string | null; where: string | null; kv: number }>;
   places: Array<{ name: string; relation: string }>;
@@ -49,6 +51,9 @@ export function renderWorldBrief(w: WorldBriefInput): string {
   lines.push(w.look.length ? `HER LOOK (approved): ${w.look.map(l => `${l.kind}: ${l.text}`).join(' · ')}` : 'HER LOOK: approved at the designer (no marks).');
   lines.push(w.places.length ? `PLACES: ${w.places.map(p => `${p.name} (${p.relation})`).join(', ')}` : 'PLACES: none yet — seed her home first.');
   lines.push(w.items.length ? `THINGS (${w.items.length}): ${w.items.map(i => `${i.name}${i.archetype && i.archetype !== i.name ? ` [${i.archetype}]` : ''}${i.where ? ` @ ${i.where}` : ''} ${i.kv} KV`).join('; ')}` : 'THINGS: none yet.');
+  if (w.map?.length) lines.push(`THE MAP (top-down: ▣ room · thing; indented = inside):\n${w.map.join('\n')}`);
+  const loose = w.items.filter(i => !i.where).length;
+  if (loose) lines.push(`${loose} thing${loose === 1 ? ' has' : 's have'} no place — give each a room or a container (move_item).`);
   lines.push(w.people.length ? `PEOPLE: ${w.people.map(p => `${p.name} (${p.relation})`).join(', ')}` : 'PEOPLE: none seeded yet.');
   return lines.join('\n');
 }
@@ -99,6 +104,14 @@ async function loadHerWorld(characterId: string) {
   const locIds = [...new Set([...placeEdges.map(p => p.targetId), ...items.map(i => i.locationId).filter((x): x is string => !!x)])];
   const locations = locIds.length ? await prisma.location.findMany({ where: { id: { in: locIds } }, select: { id: true, name: true } }) : [];
   const locName = new Map(locations.map(l => [l.id, l.name]));
+  // Which things sit INSIDE another thing (located_at → CAMPAIGN_ITEM).
+  const inEdges = items.length
+    ? await prisma.entityRelationship.findMany({ where: { sourceId: { in: items.map(i => i.id) }, relationshipType: 'located_at', targetType: 'CAMPAIGN_ITEM' }, select: { sourceId: true, targetId: true } })
+    : [];
+  const containerIds = [...new Set(inEdges.map(e => e.targetId))];
+  const containers = containerIds.length ? await prisma.campaignItem.findMany({ where: { id: { in: containerIds } }, select: { id: true, name: true } }) : [];
+  const cName = new Map(containers.map(c => [c.id, c.name]));
+  const containerOf = new Map(inEdges.map(e => [e.sourceId, cName.get(e.targetId) ?? '?']));
   const seedEdges = seeds.length
     ? await prisma.entityRelationship.findMany({ where: { sourceId: characterId, targetId: { in: seeds.map(s => s.id) } }, select: { targetId: true, data: true } })
     : [];
@@ -109,7 +122,7 @@ async function loadHerWorld(characterId: string) {
   return {
     wealth,
     look: lookLines(sheet.identity?.designer),
-    items: items.map(i => ({ id: i.id, name: i.name, archetype: i.sourceForgeItemId ? arch.get(i.sourceForgeItemId)?.name ?? null : null, kv: i.sourceForgeItemId ? Number(arch.get(i.sourceForgeItemId)?.karmicValue ?? 0) : 0, where: i.locationId ? locName.get(i.locationId) ?? null : null, story: i.story })),
+    items: items.map(i => ({ id: i.id, name: i.name, archetype: i.sourceForgeItemId ? arch.get(i.sourceForgeItemId)?.name ?? null : null, kv: i.sourceForgeItemId ? Number(arch.get(i.sourceForgeItemId)?.karmicValue ?? 0) : 0, where: i.locationId ? (containerOf.get(i.id) ? `${locName.get(i.locationId) ?? '?'} › ${containerOf.get(i.id)}` : locName.get(i.locationId) ?? null) : null, story: i.story })),
     places: placeEdges.map(p => ({ id: p.targetId, name: locName.get(p.targetId) ?? p.targetId, relation: p.relationshipType })),
     people: seeds.map(s => ({ id: s.id, name: s.name, relation: relationOf(s.id) })),
   };
@@ -119,7 +132,16 @@ export async function buildWorldBrief(characterId: string): Promise<string | nul
   const w = await loadHerWorld(characterId);
   if (!w) return null;
   const budget = await lifeBudget(characterId);
-  return renderWorldBrief({ budgetLine: budget.line, wealth: w.wealth, look: w.look, items: w.items, places: w.places, people: w.people });
+  // The home as a top-down map (2026-10-16): rooms, containers, contents.
+  let map: string[] = [];
+  const home = w.places.find(p => p.relation === 'home') ?? w.places[0];
+  if (home) {
+    try {
+      const { contentsTree, renderTree } = await import('./placement');
+      map = [`▣ ${home.name}`, ...renderTree(await contentsTree(home.id), 1)];
+    } catch { map = []; }
+  }
+  return renderWorldBrief({ budgetLine: budget.line, wealth: w.wealth, map, look: w.look, items: w.items, places: w.places, people: w.people });
 }
 
 export async function buildMemoriesBrief(characterId: string): Promise<string | null> {

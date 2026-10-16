@@ -49,13 +49,13 @@ export const grantPossessionSchema = z.object({
   localName: z.string().min(1).max(100).optional().describe('NARRATIVE PAINT: her name for it ("Rosemary\'s keepsake"). May carry proper nouns.'),
   story: z.string().min(1).max(600).describe('NARRATIVE PAINT: this object\'s story with her — whose it was, how she came by it.'),
   weightLbs: z.number().min(0).max(1_000_000).optional().describe('Real pounds. Required for equipped/carried when the archetype has none.'),
-  location: z.string().max(200).optional().describe('owned only: the Location (name or id) where the thing physically is.'),
+  location: z.string().max(200).optional().describe('owned only: WHERE it sits — a room (Location name/id) or a CONTAINER item (its local name/id: a bookcase, a drawer, a closet). The world is a top-down map; everything has a place.'),
 });
 
 export type GrantPossessionInput = z.infer<typeof grantPossessionSchema>;
 
 export type GrantResult =
-  | { ok: true; itemId: string; name: string; archetype: string; tier: PossessionTier; source: 'campaign' | 'stock'; deedId?: string; reused?: boolean }
+  | { ok: true; itemId: string; name: string; archetype: string; tier: PossessionTier; source: 'campaign' | 'stock'; deedId?: string; reused?: boolean; inside?: string }
   | { ok: false; reason: string; blueprintId?: string };
 
 /** Is this region key on her body? Pure. */
@@ -130,11 +130,19 @@ export async function grantPossession(
   if (p.tier !== 'owned' && p.location) {
     throw new ValidationError('location is for owned things — what she wears or carries is with her.');
   }
+  // WHERE it sits (2026-10-16): a room, or inside a container item.
   let locationId: string | null = null;
+  let container: { id: string; name: string } | null = null;
   if (p.location) {
     const loc = await findCampaignLocation(campaignId, p.location);
-    if (!loc) throw new ValidationError(`No Location "${p.location}" in this campaign — seed or create it first.`);
-    locationId = loc.id;
+    if (loc) locationId = loc.id;
+    else {
+      const { resolvePlace, enclosingLocationId } = await import('./placement');
+      const place = await resolvePlace(campaignId, p.location);
+      if (!place || place.kind !== 'item') throw new ValidationError(`No Location or container item "${p.location}" in this campaign — seed or create it first.`);
+      container = { id: place.id, name: place.name };
+      locationId = place.locationId ?? await enclosingLocationId(place.id);
+    }
   }
 
   const name = p.localName?.trim() || row.name;
@@ -186,20 +194,20 @@ export async function grantPossession(
     });
     deedId = deed.id;
   }
-  if (locationId) {
+  if (container || locationId) {
     await prisma.entityRelationship.create({
       data: {
         campaignId,
         sourceId: item.id,
         sourceType: 'CAMPAIGN_ITEM',
-        targetId: locationId,
-        targetType: 'LOCATION',
+        targetId: container ? container.id : locationId!,
+        targetType: container ? 'CAMPAIGN_ITEM' : 'LOCATION',
         relationshipType: 'located_at',
         strength: 5,
       },
     });
   }
-  return { ok: true, itemId: item.id, name, archetype: row.name, tier: p.tier, source, deedId };
+  return { ok: true, itemId: item.id, name, archetype: row.name, tier: p.tier, source, deedId, ...(container ? { inside: container.name } : {}) };
 }
 
 // ── drop_possession (2026-10-16) — JEWL corrects his own grants ──────────

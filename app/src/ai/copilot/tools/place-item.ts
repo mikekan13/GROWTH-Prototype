@@ -29,7 +29,7 @@ const inputSchema = z.object({
   ),
   weightLevel: z.number().min(0).max(10).optional(),
   tags: z.array(z.string()).max(10).optional(),
-  location: z.string().optional().describe('Location (name or id) this object sits in.'),
+  location: z.string().optional().describe('Where it sits: a room (Location name/id) or a CONTAINER item (local name/id — a bookcase, a drawer, a box). The world is a top-down map.'),
   holder: z.string().optional().describe('Character (name or id) carrying it — alternative to location.'),
   fromForgeItem: z.string().optional().describe(
     'Instantiate from a PUBLISHED Forge blueprint (name or id). Refused while the blueprint ' +
@@ -56,7 +56,18 @@ export const placeItemTool: JewlTool = {
 
     let locationId: string | null = null;
     let locationName: string | null = null;
+    // A container item is a place too (2026-10-16): resolve it after Locations.
+    let containerId: string | null = null;
     if (parsed.location) {
+      const { resolvePlace, enclosingLocationId } = await import('@/services/placement');
+      const place = await resolvePlace(ctx.campaignId, parsed.location);
+      if (place?.kind === 'item') {
+        containerId = place.id;
+        locationId = place.locationId ?? await enclosingLocationId(place.id);
+        locationName = place.name;
+      }
+    }
+    if (parsed.location && !containerId) {
       const loc = await resolveLocationRef(ctx.campaignId, parsed.location);
       if (!loc) {
         return { output: { ok: false, reason: `No Location "${parsed.location}" in this campaign — create it first with create_location.` } };
@@ -135,14 +146,14 @@ export const placeItemTool: JewlTool = {
     // Canvas folder membership is driven by located_at EDGES, not the
     // locationId column — without this edge the object renders as a
     // free-floating card instead of living inside its room.
-    if (locationId) {
+    if (containerId || locationId) {
       await prisma.entityRelationship.create({
         data: {
           campaignId: ctx.campaignId,
           sourceId: item.id,
           sourceType: 'CAMPAIGN_ITEM',
-          targetId: locationId,
-          targetType: 'LOCATION',
+          targetId: containerId ?? locationId!,
+          targetType: containerId ? 'CAMPAIGN_ITEM' : 'LOCATION',
           relationshipType: 'located_at',
           strength: 5,
         },
