@@ -57,6 +57,10 @@ export interface CompleteOptions {
    *  nobody's to approve at the designer; the walk would hold forever. */
   skipGates?: boolean;
   spawnedFrom?: SpawnedFrom;
+  /** Re-open these stages even when their evidence or stamp says done (the
+   *  2026-10-16 simulation-level rerun of a born character's WORLD). Their
+   *  stamps are cleared; built things are KEPT and built on. */
+  reopen?: GenesisPostSheetStage[];
 }
 
 /** The goal suffix a spawned genesis carries. Pure. NEVER brackets the parent
@@ -95,7 +99,14 @@ export async function completeCharacter(characterId: string, actor: { id: string
   // pool) where a born sheet disagrees with her seed; the sync logs them.
   const { corrections } = await syncCreationFromBlockLinks(characterId);
 
+  if (opts.reopen?.length) {
+    const row = await prisma.character.findUnique({ where: { id: characterId }, select: { data: true } });
+    const sheet = JSON.parse(row?.data ?? '{}') as { _genesisStages?: Record<string, string> };
+    for (const s of opts.reopen) delete sheet._genesisStages?.[s];
+    await prisma.character.update({ where: { id: characterId }, data: { data: JSON.stringify(sheet) } });
+  }
   const missing = await detectMissingStages(characterId);
+  for (const s of opts.reopen ?? []) missing.add(s);
   const stages = GENESIS_POST_SHEET_STAGES.filter(s => missing.has(s) && !(opts.skipGates && isGateStage(s)));
   if (!stages.length) return { opened: false as const, sessionId: null, stages, removedDuplicateLinks: removed.length, seedCorrections: corrections };
 
