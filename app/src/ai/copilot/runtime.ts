@@ -43,6 +43,8 @@ import {
 } from './table-history';
 import { laneBudget, measureCtx, formatCtxLine, trimHistoryToBudget } from './dispatch-budget';
 import { coerceToolInput, describeLimits } from './tools/coerce';
+import { shouldContinueAsWorkSession, continuationGoal, withContinuingNote } from './continue-ask';
+import { openWorkSession } from '@/services/daya-work-session';
 import type { JewlToolContext } from './tools/types';
 import type { JewlPrompt, JewlResponse, JewlToolCallResult } from './prompts/types';
 import {
@@ -616,6 +618,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   let model = resolvedLane.model;
   let rounds = 0;
   let lastStopReason: string | undefined;
+  let lastRoundHadTools = false;
 
   // F-2 construction-site feedback: surfaces (the canvas) show "JEWL is
   // working here" live instead of silence until the reply lands. Best-
@@ -679,6 +682,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       else if (b.type === 'tool_use') toolUseBlocks.push({ id: b.id, name: b.name, input: b.input });
     }
     if (textBlocks.length) finalText = textBlocks.join('\n').trim();
+    lastRoundHadTools = toolUseBlocks.length > 0;
 
     // Truncated with NOTHING usable: tell the model what happened and let
     // it retry in smaller batches instead of silently ending on its own
@@ -814,6 +818,27 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   }
 
   if (announcedWorking) announceWorking({ phase: 'done' });
+
+  // A chat ask never dies at the cap (Mike 2026-10-16: "why did he stop"):
+  // out of rounds with the model still calling tools → the rest runs as an
+  // unattended work session and the reply says so. Best-effort.
+  if (shouldContinueAsWorkSession({ source: prompt.source, kind, rounds, maxToolIterations, lastStopReason, lastRoundHadTools })) {
+    try {
+      const ask = prompt.text || prompt.canvasAction?.intent || '';
+      await openWorkSession({
+        campaignId: prompt.campaignId,
+        goal: continuationGoal(ask),
+        plan: ask,
+        continueUnattended: true,
+        createdBy: prompt.actorId,
+      });
+      const { kickWorkLoop } = await import('./work-loop');
+      kickWorkLoop();
+      finalText = withContinuingNote(finalText);
+    } catch (e) {
+      console.error('[jewl-dispatch] continuation not opened:', e instanceof Error ? e.message : e);
+    }
+  }
 
   const response: JewlResponse = {
     message: finalText,

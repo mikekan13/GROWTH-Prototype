@@ -52,6 +52,8 @@ import './genesis-prods';
 import './genesis-completion';
 import './sketch-npc';
 import './move-item';
+import './move-items';
+import './organize-place';
 
 export { getJewlTool, listJewlTools, registerJewlTool } from './registry';
 export type { JewlTool, JewlToolContext, JewlToolHandlerResult, JewlToolAffectedObjects } from './types';
