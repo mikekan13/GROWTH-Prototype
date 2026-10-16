@@ -86,7 +86,7 @@ describe('pure', () => {
     expect(guessRegion('Everyday Outfit', regions)).toBe('Body');
     expect(guessRegion('Winter Coat', regions)).toBe('Body/Torso');
     expect(guessRegion('Wool hat', regions)).toBe('Body/Head');
-    expect(guessRegion('Work boots', regions)).toBe('Body');
+    expect(guessRegion('Work boots', regions)).toBe('Body') // this fixture's regions have no feet → the root;
     expect(guessRegion('Coat', [])).toBeNull();
   });
 });
@@ -119,7 +119,7 @@ describe('setDressState', () => {
   it('wears a deeded garment: picked up from the room, equippedTo guessed from its name', async () => {
     const r = await setDressState('ch1', { itemId: 'i_boots', state: 'worn' }, player);
     expect(r.state).toBe('worn');
-    expect(r.region).toBe('Body'); // the baseline anatomy has no feet region → the root
+    expect(r.region).toBe('Body/Left Upper Leg/Left Lower Leg/Left Foot'); // one boot, one foot (nothing comes in pairs)
     const row = h.items.find(i => i.id === 'i_boots')!;
     expect(row.holderId).toBe('ch1');
     expect(row.locationId).toBeNull();
@@ -153,7 +153,7 @@ describe('proposeOutfit / applyOutfit', () => {
     expect(p.byJewl).toBe(true);
     expect(p.pieces.map(x => [x.itemId, x.state, x.region])).toEqual([
       ['i_coat', 'worn', 'Body/Torso'],
-      ['i_boots', 'worn', 'Body'], // a region she has not → guessed
+      ['i_boots', 'worn', 'Body/Left Upper Leg/Left Lower Leg/Left Foot'], // a region she has not → guessed
       ['i_phone', 'carried', null],
     ]);
     expect(h.calls).toBe(1);
@@ -170,8 +170,9 @@ describe('proposeOutfit / applyOutfit', () => {
     h.fail = true;
     const p = await proposeOutfit('ch1', player);
     expect(p.byJewl).toBe(false);
-    expect(p.pieces.map(x => [x.itemId, x.state])).toEqual([['i_outfit', 'worn'], ['i_coat', 'worn'], ['i_phone', 'carried']]);
-    expect(draftOutfit(await listWardrobe('ch1', player)).length).toBe(3);
+    // one boot on one foot no longer collides with the outfit on the body (nothing comes in pairs)
+    expect(p.pieces.map(x => [x.itemId, x.state])).toEqual([['i_outfit', 'worn'], ['i_coat', 'worn'], ['i_boots', 'worn'], ['i_phone', 'carried']]);
+    expect(draftOutfit(await listWardrobe('ch1', player)).length).toBe(4);
   });
   it('parseOutfitAnswer returns null on no JSON', async () => {
     expect(parseOutfitAnswer('nothing', await listWardrobe('ch1', player))).toBeNull();
@@ -184,5 +185,15 @@ describe('proposeOutfit / applyOutfit', () => {
     expect(h.items.find(i => i.id === 'i_laptop')!.holderId).toBe('ch1');
     expect(w.garments.find(g => g.id === 'i_outfit')!.state).toBe('carried');
     await expect(applyOutfit('ch1', { pieces: [{ itemId: 'i_nope', state: 'worn' }] }, player)).rejects.toThrow(/not one of her things/);
+  });
+});
+
+describe('nothing comes in pairs (Mike 2026-10-16)', () => {
+  it('a boot or a glove goes on ONE side — the named side, else the left; trousers span the legs', async () => {
+    const { guessRegion, regionKeys } = { ...(await import('./dress')), ...(await import('./genesis-possessions')) };
+    const regions = regionKeys({} as never);
+    expect(guessRegion('Hiking Boot', regions)).toBe('Body/Left Upper Leg/Left Lower Leg/Left Foot');
+    expect(guessRegion('Right winter glove', regions)).toBe('Body/Right Upper Arm/Right Lower Arm/Right Hand');
+    expect(guessRegion('Her jeans', regions)).toBe('Body');
   });
 });

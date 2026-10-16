@@ -115,20 +115,22 @@ export function guessRegion(name: string, regions: string[]): string | null {
   const root = regions.find(r => !r.includes('/')) ?? regions[0];
   if (/\b(outfit|dress|gown|robe|suit|uniform|overalls|coveralls|pyjamas|pajamas|nightgown|kimono|sari)\b/.test(n)) return root;
   if (/\b(hat|cap|beanie|hood|helmet|scarf|glasses|earrings?)\b/.test(n)) return find(/^head$/i) ?? root;
-  // PAIRS cover both sides → the outermost region both sides share (the
-  // outermost-shared-region rule): boots span both feet, so they sit on the
-  // root when the feet meet only there. SINGLES go on one side (a ring on the
-  // left ring finger, a watch on the left wrist). 2026-10-16: the Human body
-  // now has limbs to every finger and toe.
-  const pair = (side: RegExp) => {
-    const left = regions.find(r => side.test(r.split('/').pop() ?? '') && /left/i.test(r.split('/').pop() ?? ''));
-    const right = regions.find(r => side.test(r.split('/').pop() ?? '') && /right/i.test(r.split('/').pop() ?? ''));
-    if (left && right) return sharedRegion(left, right) ?? root;
-    return left ?? right ?? null;
+  // NOTHING COMES IN PAIRS (Mike 2026-10-16: "Boots, gloves etc… do not come
+  // in pairs"): each boot, shoe, sock, glove is its own thing on its own
+  // part — the side its name says, else the left. Two boots = two items.
+  // Garments that truly span both sides as ONE piece (trousers, tights,
+  // a skirt) sit on the region both legs share (outermost-shared-region).
+  const side = /\bright\b/.test(n) ? 'right' : 'left';
+  const oneSide = (part: RegExp) => regions.find(r => part.test(r.split('/').pop() ?? '') && new RegExp(`^${side}\\b`, 'i').test(r.split('/').pop() ?? ''))
+    ?? regions.find(r => part.test(r.split('/').pop() ?? ''));
+  const spanning = (part: RegExp) => {
+    const l = regions.find(r => part.test(r.split('/').pop() ?? '') && /^left\b/i.test(r.split('/').pop() ?? ''));
+    const rr = regions.find(r => part.test(r.split('/').pop() ?? '') && /^right\b/i.test(r.split('/').pop() ?? ''));
+    return l && rr ? sharedRegion(l, rr) : l ?? rr ?? null;
   };
-  if (/\b(boots?|shoes?|sneakers|trainers|sandals|heels|socks)\b/.test(n)) return pair(/foot$/i) ?? find(/^(feet|foot)$/i) ?? root;
-  if (/\b(jeans|trousers|pants|slacks|shorts|skirt|leggings|tights|stockings)\b/.test(n)) return pair(/upper leg$/i) ?? find(/^(legs?|hips|waist)$/i) ?? root;
-  if (/\b(gloves?|mittens)\b/.test(n)) return pair(/hand$/i) ?? root;
+  if (/\b(boots?|shoes?|sneakers|trainers|sandals|heels|socks?|slippers?)\b/.test(n)) return oneSide(/foot$/i) ?? root;
+  if (/\b(gloves?|mittens?)\b/.test(n)) return oneSide(/hand$/i) ?? root;
+  if (/\b(jeans|trousers|pants|slacks|shorts|skirt|leggings|tights|stockings)\b/.test(n)) return spanning(/upper leg$/i) ?? find(/^(legs?|hips|waist)$/i) ?? root;
   if (/\bring\b/.test(n)) return find(/^left ring finger$/i) ?? find(/hand$/i) ?? root;
   if (/\b(watch|bracelet)\b/.test(n)) return find(/^left lower arm$/i) ?? find(/hand$/i) ?? root;
   if (/\b(necklace|choker|pendant|collar|tie)\b/.test(n)) return find(/^neck$/i) ?? find(/^torso$/i) ?? root;
