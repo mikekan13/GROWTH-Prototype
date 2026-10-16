@@ -34,7 +34,7 @@ async function main() {
 
   const { Qwen21Provider } = await import('../src/ai/portraits/providers/qwen21');
   const provider = new Qwen21Provider();
-  const out = await provider.renderPortrait(id, r.brief, { face: refs.face, body: refs.body, seed });
+  const out = await provider.renderPortrait(id, r.brief, { face: refs.face, body: refs.body, seed, frame: args.includes('--figure') ? 'figure' : 'bust' });
   console.log('\n== RESULT ==', JSON.stringify(out, null, 2).slice(0, 1500));
 }
 main().catch(e => { console.error(e); process.exit(1); }).finally(() => process.exit(0));

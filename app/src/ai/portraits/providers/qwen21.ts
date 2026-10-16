@@ -121,6 +121,7 @@ export function isStoredPortraitPath(webPath: string): boolean {
 }
 
 /** The character PORTRAIT canvas (plan 2026-10-15 §4 C): 4:5, head to knees. */
+/** @deprecated the FIGURE size; the portrait is a 1:1 bust (QWEN21_PORTRAIT_SIZES). */
 export const QWEN21_PORTRAIT_SIZE = { width: 832, height: 1040 } as const;
 
 // 2026-10-16 first paints: the body reference's blank studio backdrop and the
@@ -128,7 +129,24 @@ export const QWEN21_PORTRAIT_SIZE = { width: 832, height: 1040 } as const;
 // teal void), and "the figure as in <image2>" copied the whole full-length
 // reference. The portrait takes ONLY her build and marks from <image2>; the
 // place is around her and in the frame.
-const PORTRAIT_FRAMING = 'Framed from the head to the knees, the face unmistakably the person in <image1>; take only her build, skin and every mark from <image2>, never its plain background or its clothing. The room she is in fills the background around her, lit as described.';
+/**
+ * Two framings (Mike 2026-10-16: "We have different definitions of portrait…
+ * this is a clothed full body — cool, we will need it for things like
+ * inventory — but I meant the portrait"):
+ *  - BUST = the PORTRAIT: head and shoulders, the face the subject, the
+ *    clothes at the collar and shoulders, the room soft behind. The canvas image.
+ *  - FIGURE = the clothed full body (inventory / paperdoll).
+ */
+export type PortraitFrame = 'bust' | 'figure';
+export const QWEN21_PORTRAIT_SIZES: Record<PortraitFrame, { width: number; height: number }> = {
+  bust: { width: 1024, height: 1024 },
+  figure: { width: 832, height: 1040 },
+};
+const PORTRAIT_FRAMINGS: Record<PortraitFrame, string> = {
+  bust: 'A head-and-shoulders PORTRAIT: from the top of the head to the upper chest, the face of the person in <image1> is the subject, large in the upper middle of the frame, looking at the viewer. Her clothes show only at the collar and shoulders; her skin and every mark on the neck and collarbone as in <image2>, never its plain background. The room she is in is behind her, softly out of focus, lit as described.',
+  figure: 'Framed from the head to the feet, the face unmistakably the person in <image1>; take only her build, skin and every mark from <image2>, never its plain background or its clothing. The room she is in fills the background around her, lit as described.',
+};
+const PORTRAIT_FRAMING = PORTRAIT_FRAMINGS.bust;
 
 /** The campaign mood minus its backdrop clause — a portrait has a place behind her. Pure. */
 export function portraitMood(moodText: string): string {
@@ -145,8 +163,8 @@ export function portraitMood(moodText: string): string {
  * the campaign mood without its backdrop — the v1 recipe's prompt shape (no
  * medium paragraph; the LoRA trigger is added by the workflow builder). Pure.
  */
-export function buildQwen21PortraitPrompt(briefPrompt: string, mood?: string): string {
-  return [briefPrompt.trim(), PORTRAIT_FRAMING, LOCK_REALISM, portraitMood(getCampaignMood(mood))].filter(Boolean).join(' ');
+export function buildQwen21PortraitPrompt(briefPrompt: string, mood?: string, frame: PortraitFrame = 'bust'): string {
+  return [briefPrompt.trim(), frame === 'bust' ? PORTRAIT_FRAMING : PORTRAIT_FRAMINGS.figure, LOCK_REALISM, portraitMood(getCampaignMood(mood))].filter(Boolean).join(' ');
 }
 
 export interface Qwen21StepResult {
@@ -531,19 +549,20 @@ export class Qwen21Provider extends ServerlessProvider {
     brief: { prompt: string },
     refs: { face: string; body: string },
     seed: number,
-    opts?: { mood?: string; inkAt?: number; loras?: Qwen21Lora[] },
+    opts?: { mood?: string; inkAt?: number; loras?: Qwen21Lora[]; frame?: PortraitFrame },
   ): Promise<Qwen21StepResult & { inkAt: number }> {
     if (!brief.prompt.includes('<image1>') || !brief.prompt.includes('<image2>')) {
       throw new Error('The portrait brief must name <image1> (the face) and <image2> (the body)');
     }
+    const frame = opts?.frame ?? 'bust';
     // Chained steps consume the RAW copies (never finish twice) at full resolution.
     const face = await this.preferRaw(await this.fullResWebPath(refs.face));
     const body = await this.preferRaw(await this.fullResWebPath(refs.body));
-    const prompt = buildQwen21PortraitPrompt(brief.prompt, opts?.mood);
+    const prompt = buildQwen21PortraitPrompt(brief.prompt, opts?.mood, frame);
     const t0 = Date.now();
-    const { raw, inkAt } = await this.renderStyled(prompt, seed, { ...QWEN21_PORTRAIT_SIZE }, { images: [face, body], inkAt: opts?.inkAt, loras: opts?.loras });
-    console.log(`[Qwen21] portrait seed=${seed} ink@${inkAt} in ${Date.now() - t0} ms`);
-    const r = await this.saveStep(characterId, 'portrait', 'portrait', prompt, raw, seed, Date.now() - t0, opts?.mood, { inkAt, loras: opts?.loras });
+    const { raw, inkAt } = await this.renderStyled(prompt, seed, { ...QWEN21_PORTRAIT_SIZES[frame] }, { images: [face, body], inkAt: opts?.inkAt, loras: opts?.loras });
+    console.log(`[Qwen21] ${frame} seed=${seed} ink@${inkAt} in ${Date.now() - t0} ms`);
+    const r = await this.saveStep(characterId, frame === 'bust' ? 'portrait' : 'figure', frame === 'bust' ? 'portrait' : 'figure', prompt, raw, seed, Date.now() - t0, opts?.mood, { inkAt, loras: opts?.loras });
     return { ...r, inkAt };
   }
 
@@ -555,11 +574,11 @@ export class Qwen21Provider extends ServerlessProvider {
   override async renderPortrait(
     characterId: string,
     brief: { prompt: string },
-    refs: { face: string; body: string; seed?: number; mood?: string },
+    refs: { face: string; body: string; seed?: number; mood?: string; frame?: PortraitFrame },
   ): Promise<PortraitResult> {
     const seed = refs.seed ?? Math.floor(Math.random() * 2147483647);
     try {
-      const r = await this.paintPortrait(characterId, brief, { face: refs.face, body: refs.body }, seed, { mood: resolveMoodKey(refs.mood) });
+      const r = await this.paintPortrait(characterId, brief, { face: refs.face, body: refs.body }, seed, { mood: resolveMoodKey(refs.mood), frame: refs.frame });
       return this.toResult(r, r.generationTimeMs, `qwen21 portrait: face=${refs.face} body=${refs.body}`, { portrait: true, inkAt: r.inkAt, rawPath: r.rawPath });
     } catch (e) {
       if (e instanceof PortraitEndpointError) throw e;

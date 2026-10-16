@@ -121,14 +121,33 @@ function article(name: string): string {
   return `${/^[aeiou]/i.test(n) ? 'an' : 'a'} ${n.toLowerCase()}`;
 }
 
-/** The clothes clause from what is EQUIPPED; nothing equipped → the at-home line (never an invented wardrobe). Pure. */
+/** How far out a garment sits by its words: coats 0 … sweaters 1 … shirts 2 … underwear 3. Pure. */
+export function layerRank(p: Pick<EquippedPiece, 'name' | 'category'>): number {
+  const base = OUTER_RANK[p.category ?? ''] ?? 3;
+  const n = p.name.toLowerCase();
+  const word = /\b(coat|jacket|parka|raincoat|cloak|poncho)\b/.test(n) ? 0
+    : /\b(cardigan|sweater|jumper|hoodie|sweatshirt|blazer|vest|flannel)\b/.test(n) ? 1
+      : /\b(tee|t-shirt|shirt|blouse|top|tank|camisole|dress)\b/.test(n) ? 2
+        : /\b(bra|underwear|briefs|panties|boxers|undershirt|thermal)\b/.test(n) ? 3 : 1.5;
+  return base * 10 + word;
+}
+
+/**
+ * The clothes clause from what is EQUIPPED, LAYERS INCLUDED (2026-10-16: the
+ * first dressed paint dropped the tee under her open cardigan): per region
+ * outermost first, "X over Y"; underwear is named only when it is all she
+ * wears there. Nothing equipped → the at-home line. Pure.
+ */
 export function clothesLine(pieces: EquippedPiece[], pronoun: PortraitInputs['pronoun']): string {
-  const outer = outermostPerRegion(pieces);
-  if (outer.length === 0) return `in the clothes ${pronoun} would wear at home`;
-  const parts = outer.map(p => {
-    const mat = p.material ? ` of ${p.material.toLowerCase()}` : '';
-    const over = p.region.toLowerCase() === 'body' ? '' : ` over the ${regionLabel(p.region)}`;
-    return `${article(p.name)}${mat}${over}`;
+  if (pieces.length === 0) return `in the clothes ${pronoun} would wear at home`;
+  const byRegion = new Map<string, EquippedPiece[]>();
+  for (const p of pieces) byRegion.set(p.region, [...(byRegion.get(p.region) ?? []), p]);
+  const parts = [...byRegion.entries()].map(([region, ps]) => {
+    const sorted = [...ps].sort((a, b) => layerRank(a) - layerRank(b));
+    const shown = sorted.filter((p, i) => i === 0 || layerRank(p) % 10 < 3);
+    const names = shown.map(p => `${article(p.name)}${p.material ? ` of ${p.material.toLowerCase()}` : ''}`);
+    const over = region.toLowerCase() === 'body' ? '' : ` on the ${regionLabel(region)}`;
+    return `${names.join(' over ')}${over}`;
   });
   const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
   return `wearing ${list}`;

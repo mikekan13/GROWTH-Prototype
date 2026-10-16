@@ -54,7 +54,7 @@ describe('pure composition', () => {
   it('clothesLine: nothing equipped → the at-home line, never an invented wardrobe', () => {
     expect(clothesLine([], 'she')).toBe('in the clothes she would wear at home');
     expect(clothesLine([piece('Winter Coat', 'Body/Torso', 'Clothing', 'Nylon'), piece('Dress Shoes', 'Body/Feet')], 'she'))
-      .toBe('wearing a winter coat of nylon over the torso and dress shoes over the feet');
+      .toBe('wearing a winter coat of nylon on the torso and dress shoes on the feet');
     expect(clothesLine([piece('Everyday Outfit', 'Body')], 'he')).toBe('wearing an everyday outfit');
   });
   it('markSentence turns the designer sentence into a clause; markSentences reads both stacks', () => {
@@ -162,9 +162,9 @@ describe('buildPortraitBrief (prisma + JEWL mocked)', () => {
     h.fail = true;
     const r = await buildPortraitBrief('ch1');
     expect(r.brief.byJewl).toBe(false);
-    expect(r.brief.clothes).toBe('wearing her grey coat of wool over the torso');
+    expect(r.brief.clothes).toBe('wearing her grey coat of wool on the torso');
     expect(r.brief.light).toBe('Grey morning light through the alley window');
-    expect(r.brief.prompt).toMatch(/^A painted character illustration of the person in <image1> with the body in <image2>, wearing her grey coat of wool over the torso, /);
+    expect(r.brief.prompt).toMatch(/^A painted character illustration of the person in <image1> with the body in <image2>, wearing her grey coat of wool on the torso, /);
     expect(r.brief.prompt).toContain('a scar on her neck');
     expect(h.updates).toHaveLength(1);
   });
@@ -190,5 +190,19 @@ describe('buildPortraitBrief (prisma + JEWL mocked)', () => {
     const c = { ...a, refs: { ...a.refs, face: '/portraits/ch1/faces/other.png' } };
     expect(briefInputHash(a)).toBe(briefInputHash(b));
     expect(briefInputHash(a)).not.toBe(briefInputHash(c));
+  });
+});
+
+describe('clothes layers (2026-10-16: the tee under the open cardigan)', () => {
+  it('names the under-layer: cardigan over tee; underwear only when alone', async () => {
+    const { clothesLine } = await import('./portrait-brief');
+    const line = clothesLine([
+      { name: 'The black tee', region: 'Body/Torso', category: 'Clothing' },
+      { name: 'The big cardigan', region: 'Body/Torso', category: 'Clothing' },
+      { name: 'The everyday bra', region: 'Body/Torso', category: 'Clothing' },
+    ] as never, 'she');
+    expect(line).toContain('the big cardigan over the black tee on the torso');
+    expect(line).not.toContain('bra');
+    expect(clothesLine([{ name: 'The everyday bra', region: 'Body/Torso', category: 'Clothing' }] as never, 'she')).toContain('bra');
   });
 });
