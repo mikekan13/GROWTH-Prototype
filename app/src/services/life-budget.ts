@@ -84,11 +84,22 @@ export async function lifeBudget(characterId: string): Promise<LifeBudget> {
   });
   const rows = await prisma.campaignItem.findMany({
     where: { campaignId, status: 'ACTIVE', OR: [{ holderId: characterId }, { id: { in: deeds.map(d => d.targetId) } }] },
-    select: { id: true, name: true, data: true, history: true },
+    select: { id: true, name: true, data: true, history: true, sourceForgeItemId: true },
   });
+  // The instance's KV is its ARCHETYPE's grade (stock blueprints carry it);
+  // instance `value` is narrative paint and may be a price in currency
+  // (genesis once wrote 400 on a laptop) — never trust it over the archetype.
+  const archetypeIds = [...new Set(rows.map(r => r.sourceForgeItemId).filter((x): x is string => !!x))];
+  const archetypes = archetypeIds.length
+    ? await prisma.forgeItem.findMany({ where: { id: { in: archetypeIds } }, select: { id: true, karmicValue: true } })
+    : [];
+  const archetypeKv = new Map(archetypes.map(a => [a.id, Number(a.karmicValue)]));
   const items = rows
     .filter(r => !fromNamedGrant(r.history))
-    .map(r => ({ id: r.id, name: r.name, kv: itemKv(parse(r.data)) }));
+    .map(r => ({
+      id: r.id, name: r.name,
+      kv: r.sourceForgeItemId && archetypeKv.has(r.sourceForgeItemId) ? Math.max(0, archetypeKv.get(r.sourceForgeItemId)!) : itemKv(parse(r.data)),
+    }));
   const spentKv = items.reduce((a, i) => a + i.kv, 0);
 
   const sheet = parse(c.data) as Partial<GrowthCharacter>;

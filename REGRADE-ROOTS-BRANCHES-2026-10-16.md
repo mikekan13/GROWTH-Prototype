@@ -49,16 +49,16 @@ Her blocks were authored by genesis at the old scale and sit well under it (root
 
 | Block | yrs | old KV | proposed lines | **new KV** | Δ | KV/yr |
 |---|---|---|---|---|---|---|
-| root **Grandparent Household** | 17 (archetype 18) | 61 | attributes 44 → 62 (clout 4, celerity 5, constitution 7, flow 6, focus 11, willpower 9, wisdom 10, wit 10); skills 17 → 23 (Needlework & Repair 3→5, Ancient Stories 5→6, + Cooking 3); named grants: Handmade Stuffed Animal (1), Sewing Box (2), Handwritten Recipe Collection (1); accumulated wealth **18** (the stucco house sold to settle Rosemary's debts — four things kept, little else) | **107** | +46 | 6.3 |
-| branch **Violated Trust** | 2 | 11 | attributes +2 (willpower 2→3, focus 1→2); skills +2 (Concealment 2→3, Reading Intent 3→4); accumulated wealth **1** | **17** | +6 | 8.5 |
+| root **Grandparent Household** | 17 (archetype 18) | 61 | attributes 44 → 72 (clout 8, celerity 9, constitution 9, flow 6, focus 11, willpower 9, wisdom 10, wit 10 — Mike: "2 in Clt and 3 in Cel? Like no way"); skills 17 → 23 (Needlework & Repair 3→5, Ancient Stories 5→6, + Cooking 3); named grants: Handmade Stuffed Animal (1), Sewing Box (2), Handwritten Recipe Collection (1); accumulated wealth **18** (the stucco house sold to settle Rosemary's debts — four things kept, little else) | **117** | +56 | 6.9 |
+| branch **Violated Trust** | 2 | 11 | attributes +2 (willpower 2→3, focus 1→2); skills +2 (Concealment 2→3, Reading Intent 3→4); accumulated wealth **1** | **16** | +5 | 8.0 |
 | branch **Years of Solitary Craft** | 6 | 28 | attributes +3 (focus 3→4, willpower 3→4, flow 3→4); skills +3 (Self-Teaching 3→4, Web Markup 2→3, Creative Writing 5→6); named grant: Laptop (10) = her Personal Laptop; accumulated wealth **6** | **50** | +22 | 8.3 |
 
 Her life budget after this: 18 + 1 + 6 = **25 KV** of accumulated wealth, minus the things she already holds or owns that did not come as named grants. [QUESTION Mike] What has she lived on for six years in that apartment (`set_income` needs a source and a figure; the budget assumes modest, steady, solitary work)?
 
-## 4. Open before seeding
+## 4. Mike's answers (16 Oct) — APPLIED
 
-1. **Foster System (135) and Artist's Household (137)** land under the 144 line on purpose (materially poorer upbringings; the lift went to skills and attributes). Keep, or level everyone to 144?
-2. **Violet's root at 107** against a 136 line: keep her deliberately under it, or lift her toward it?
-3. **Violet's income** (§3).
+1. 144 is the balance point, not a ceiling: "we will have things above it and below it. Quite possibly high above and below." Foster and Artist stay under. Someone always pays — a 1000 TKV root is possible, the question is who puts up the KRMA.
+2. Violet was "incredibly frail physically… like a baby level" — her root's physical attributes are lifted to a functioning young woman (above); she sits at 117 against her 136 line.
+3. Her income is JEWL's question to her player at the WORLD stage, held to reality ("a couple of books published but they aren't big"), never invented here. By the end of creation she carries a full job history and nearly every dollar.
 
-On "yes": `cd app && npx tsx scripts/seed-modern-earth.ts` re-publishes the 27 stock blocks (idempotent), and I patch Violet's three with a one-off script.
+Applied with  (the seeder only creates missing rows; the apply script updates published stock in place).

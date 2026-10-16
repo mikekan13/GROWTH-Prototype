@@ -6,6 +6,7 @@ const { db, links } = vi.hoisted(() => ({
     character: { findUnique: vi.fn() },
     entityRelationship: { findMany: vi.fn() },
     campaignItem: { findMany: vi.fn() },
+    forgeItem: { findMany: vi.fn(async () => []) },
     currency: { findMany: vi.fn() },
   },
   links: vi.fn(),
@@ -24,10 +25,12 @@ beforeEach(() => {
   db.character.findUnique.mockResolvedValue({ campaignId: 'c1', data: JSON.stringify({ wealth: { holdings: [{ currencyId: 'cur1', code: 'USD', amount: 400 }] } }) });
   db.entityRelationship.findMany.mockResolvedValue([{ targetId: 'i_deed' }]);
   db.campaignItem.findMany.mockResolvedValue([
-    { id: 'i_held', name: 'Smartphone', data: JSON.stringify({ value: 6 }), history: '[]' },
-    { id: 'i_deed', name: 'City Apartment (Unit)', data: JSON.stringify({ value: 80 }), history: '[{"kind":"origin","text":"genesis: pulled from stock"}]' },
-    { id: 'i_grant', name: 'Sewing Box', data: JSON.stringify({ value: 4 }), history: '[{"kind":"origin","text":"block grant: Grandparent Household"}]' },
+    { id: 'i_held', name: 'Smartphone', data: JSON.stringify({ value: 6 }), history: '[]', sourceForgeItemId: null },
+    // Paint said 400 (a price); the archetype's grade (80) is what counts.
+    { id: 'i_deed', name: 'City Apartment (Unit)', data: JSON.stringify({ value: 400 }), history: '[{"kind":"origin","text":"genesis: pulled from stock"}]', sourceForgeItemId: 'f_apt' },
+    { id: 'i_grant', name: 'Sewing Box', data: JSON.stringify({ value: 4 }), history: '[{"kind":"origin","text":"block grant: Grandparent Household"}]', sourceForgeItemId: null },
   ]);
+  db.forgeItem.findMany.mockResolvedValue([{ id: 'f_apt', karmicValue: BigInt(80) }]);
   db.currency.findMany.mockResolvedValue([{ id: 'cur1', krmaPerUnit: 0.05 }]);
   links.mockResolvedValue([
     block('seed', 'Human', { fatedAge: 80 }),
