@@ -647,3 +647,13 @@ Rulings: memory `ruling-passive-active-perception-familiarity-2026-10-08`. Unit 
 | `services/genesis-gates.ts` | `gateSatisfied`, `holdOrPassGate(sessionId)`, `reopenGenesisGates(characterId)` | Player gates: the session waits at the designer, no model call; the designer save / portrait lock reopen it. |
 | `ai/copilot/work-loop.ts` / `work-cycle-text.ts` / `runtime.ts` (changed) | gate pre-check in `runCycle`; `COMPLETION_STAGE_TOOLS` / `COMPLETION_STAGE_LAW` for WORLD + MEMORIES (+ gate lines); `BUILD_STAGE_TOOLS` += `set_starting_age`; STAGE_ONLY += the four material-life tools | The cycles. |
 | `services/character-genesis-progress.ts` (changed) | ladder keys age · appearance · world · memories · vines · portrait · born | The GM's progress view. |
+
+## Genesis rerun — reset + stage briefs (Mike 2026-10-16, "get the new way completely done and then rerun Violet")
+
+| Module | Exports | Purpose |
+|---|---|---|
+| `services/genesis-reset.ts` | `resetCompletionStages(characterId, actor)`, pure `factPrefix`, `paintedFor` | Strips the OLD post-sheet genesis's products (items held/deeded/painted-for-her incl. orphans, deeds, place edges, her-only Locations + rooms, world facts under her name, AI goals, wealth, stamps; NPC seed shells RETIRED + unlinked). Keeps sheet, blocks, look, ledger memories. |
+| `POST /api/characters/[id]/genesis/reset` (`?open=0` to skip) | — | Reset, then `completeCharacter` opens the new walk at her first missing stage. Watcher+. |
+| `services/genesis-brief-context.ts` | `buildWorldBrief`, `buildMemoriesBrief`, pure `lookLines`, `renderWorldBrief`, `renderMemoriesBrief` | The WORLD cycle's brief (life budget line, her approved look, places, things with archetype KV, people — "never grant twice") and the MEMORIES brief (every built thing with its `source` key `genesis:item|mark|place|person:<id>` and ✓/○). Rendered via `CompletionContext.stageBrief`. |
+| `scripts/genesis-progress.ts` | — | Terminal watch of a walk: session status/stage/notes + evidence counts. |
+| `ai/copilot/tools/daya-seed-memory.ts` (+) | `source` on each memory | The MEMORIES stage ticks items off by source key. |
