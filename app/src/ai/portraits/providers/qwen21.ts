@@ -134,13 +134,16 @@ export const QWEN21_PORTRAIT_SIZE = { width: 832, height: 1040 } as const;
  * this is a clothed full body — cool, we will need it for things like
  * inventory — but I meant the portrait"):
  *  - BUST = the PORTRAIT: WAIST UP (Mike: "Portrait is like waist up… not a
- *    headshot, not a full length… a portrait"), 4:5, the face the subject,
- *    the clothes from shoulders to waist, the room behind. The canvas image.
+ *    headshot, not a full length… a portrait"), the face the subject,
+ *    the clothes from shoulders to waist, the room behind. The canvas image —
+ *    the same shape as the character sheet's portrait frame on the canvas
+ *    (400×437, CharacterCard expanded; Mike: "A portrait should be the same
+ *    aspect that goes in the cs on the canvas").
  *  - FIGURE = the clothed full body (inventory / paperdoll).
  */
 export type PortraitFrame = 'bust' | 'figure';
 export const QWEN21_PORTRAIT_SIZES: Record<PortraitFrame, { width: number; height: number }> = {
-  bust: { width: 832, height: 1040 },
+  bust: { width: 864, height: 944 },
   figure: { width: 832, height: 1040 },
 };
 const PORTRAIT_FRAMINGS: Record<PortraitFrame, string> = {

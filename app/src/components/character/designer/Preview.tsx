@@ -45,8 +45,9 @@ export function Preview({
   const src = view === 'body' ? bodyImagePath : view === 'portrait' ? portraitImagePath : layer?.imagePath ?? null;
   // The preview shows the web-sized copy under .thumbs/; the full-res PNG sits one level up.
   const fullRes = src ? src.replace('/.thumbs/', '/').replace(/\.webp$/i, '.png') : null;
-  const aspect = view === 'body' ? '2 / 3' : view === 'portrait' ? '4 / 5' : '1 / 1';
-  const maxWidth = view === 'body' ? 'calc(62vh * 2 / 3)' : view === 'portrait' ? 'calc(62vh * 4 / 5)' : undefined;
+  // The portrait has the character sheet's frame shape (400×437 on the canvas).
+  const aspect = view === 'body' ? '2 / 3' : view === 'portrait' ? '400 / 437' : '1 / 1';
+  const maxWidth = view === 'body' ? 'calc(62vh * 2 / 3)' : view === 'portrait' ? 'calc(62vh * 400 / 437)' : undefined;
   const empty = view === 'body'
     ? '[ BODY · made when you approve the base ]'
     : view === 'portrait'

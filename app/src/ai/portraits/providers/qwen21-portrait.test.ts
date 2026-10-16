@@ -57,7 +57,7 @@ describe('Qwen21Provider.renderPortrait', () => {
     expect(wf.LOAD_REF2.inputs.image).toBe('ref:/portraits/ch1/bodies/body.png');
     expect(wf.LOAD_REF3).toBeUndefined();
     expect(wf.LORA_1.inputs).toMatchObject({ lora_name: 'grwthpaint_v1.safetensors', strength_model: 0.7 });
-    expect(wf.EMPTY_LATENT.inputs).toMatchObject({ width: 832, height: 1040 }); // the portrait is waist up (2026-10-16)
+    expect(wf.EMPTY_LATENT.inputs).toMatchObject({ width: 864, height: 944 }); // the character sheet's frame shape, 400×437
     const prompt = String(wf.TEXT_ENCODE.inputs.prompt);
     expect(prompt).toMatch(/^grwthpaint, A painted character illustration of the person in <image1> with the body in <image2>, wearing her grey wool coat/);
     expect(prompt).toContain('A PORTRAIT framed from just above the top of the head down to just above the waist');
