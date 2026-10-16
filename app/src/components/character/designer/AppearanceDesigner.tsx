@@ -15,8 +15,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, BODY_ONLY_NOTE, STATUS_LABEL, currentLayer, deriveDesignerStatus, designerReducer,
-  editScope, layersOf, possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE, NOT_LOCALIZED_NOTE, POLISH_TEXT,
-  type DesignerAction, type DesignerState, type EditTarget, type LayerKind,
+  editScope, layersOf, possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE, NOT_LOCALIZED_NOTE, POLISH_TEXT, PORTRAIT_TEXT,
+  type DesignerAction, type DesignerState, type EditTarget, type LayerKind, type StackTarget,
 } from '@/lib/appearance-designer';
 import { C, F, ActionBar, DesignerStyles, Readout, SigilBorder } from './parts';
 
@@ -24,10 +24,16 @@ import { C, F, ActionBar, DesignerStyles, Readout, SigilBorder } from './parts';
 const SCOPE_LINES: ReadonlySet<string> = new Set([CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, BODY_ONLY_NOTE]);
 
 const BODY_NOT_YET = 'The body is made when you approve the base. Approve the face first, then shape the body here.';
+const PORTRAIT_APPROVED_NOTE = 'Portrait approved — it is the canvas image now.';
+/** The veil's sub line: the route writes the brief first (a local JEWL call), then paints; the clock decides the words. */
+const PAINT_SUB_BRIEF = 'JEWL is writing the brief — the place, her bearing, her mood, what she wears';
+const PAINT_SUB_PAINT = 'painting from the face and body';
+const PAINT_SUB_SWITCH_MS = 9000;
 import { Preview, type PreviewView } from './Preview';
 import { EditStack } from './EditStack';
 import { Shape, StartFrom } from './Sections';
-import { approveBase, editLayer, generateBody, loadIdentity, lockIdentity, persistDesigner, polishImage } from './api';
+import { BriefReadout, DressSection } from './Dress';
+import { approveBase, editLayer, generateBody, loadIdentity, lockIdentity, paintPortrait, persistDesigner, polishImage, readPortraitBrief, type PaintBrief, type WardrobeView } from './api';
 
 export interface AppearanceDesignerProps {
   characterId: string | null;
@@ -46,7 +52,7 @@ export interface AppearanceDesignerProps {
   onApproved: (bust: string, body: string | null) => void;
 }
 
-type Busy = null | 'lock' | 'edit' | 'regen' | 'approve' | 'polishBody' | 'body';
+type Busy = null | 'lock' | 'edit' | 'regen' | 'approve' | 'polishBody' | 'body' | 'portrait' | 'portraitRegen' | 'portraitApprove';
 
 const BUSY_LINE: Record<Exclude<Busy, null>, string> = {
   lock: '[ LOCKING IDENTITY · lock, then style · the engine may take a minute to wake ]',
@@ -55,6 +61,9 @@ const BUSY_LINE: Record<Exclude<Busy, null>, string> = {
   approve: '[ APPROVING · CLEAN RE-RENDER OF THE FACE ]',
   polishBody: '[ CLEAN RE-RENDER OF THE BODY ]',
   body: '[ RENDERING BODY FROM THE BASE ]',
+  portrait: '[ PAINTING THE PORTRAIT ]',
+  portraitRegen: '[ PAINTING THE PORTRAIT · new seed ]',
+  portraitApprove: '[ APPROVING THE PORTRAIT ]',
 };
 
 export default function AppearanceDesigner({
@@ -75,6 +84,11 @@ export default function AppearanceDesigner({
   useEffect(() => { photosRef.current = referencePhotos; }, [referencePhotos]);
   // "Or describe them" is typed locally and saved after a pause (not per keystroke).
   const [describeText, setDescribeText] = useState('');
+  // PORTRAIT (16 Oct): the last brief (identity.portraitBrief), what is worn (gates the paint), the veil's sub line.
+  const [brief, setBrief] = useState<PaintBrief | null>(null);
+  const [worn, setWorn] = useState<boolean | null>(null);
+  const [paintSub, setPaintSub] = useState<string | null>(null);
+  const onWardrobe = useCallback((w: WardrobeView) => { setWorn(w.garments.some(g => g.state === 'worn')); }, []);
 
   /** Photos key last saved (null = not yet seen for this character). */
   const lastPhotosKey = useRef<string | null>(null);
@@ -94,6 +108,8 @@ export default function AppearanceDesigner({
       ref.current = s;
       setDesigner(s);
       setDescribeText(s.description ?? '');
+      setBrief(readPortraitBrief(identity.portraitBrief));
+      setWorn(null);
       setError(null);
       setNote(null);
       lastPhotosKey.current = null;
@@ -150,8 +166,10 @@ export default function AppearanceDesigner({
 
   /** The tab decides what an edit lands on: BODY edits the body stack, everything else the face. */
   const target: EditTarget = view === 'body' ? 'body' : 'face';
+  /** The stack the tab shows (the PORTRAIT tab has its own row of paints; edits never land there). */
+  const stackTarget: StackTarget = view;
   const bodyPath = designer.bodyImagePath ?? null;
-  const stack = layersOf(designer, target);
+  const stack = layersOf(designer, stackTarget);
   const stackTop = stack.length - 1;
   /** An older stack layer being looked at (null = the newest). */
   const [peek, setPeek] = useState<number | null>(null);
@@ -225,9 +243,46 @@ export default function AppearanceDesigner({
     newLayerLanded();
   };
 
-  /** REGENERATE re-rolls the newest layer of the tab's stack: the base from its source, an edit on the layer under it. */
+  /**
+   * PAINT PORTRAIT / REGENERATE (Mike 16 Oct; plan §4 C): the route has JEWL
+   * write the brief (reused while nothing changed) and paints it from the
+   * approved face + body on the v1 recipe. A paint is a new row on the
+   * PORTRAIT stack; REGENERATE replaces the newest with a new seed.
+   */
+  const paint = async (mode: 'paint' | 'regen') => {
+    if (!characterId || working || !designer.approvedImagePath || !bodyPath) return;
+    if (worn === false) { setNote('Nothing is worn — dress her first, or let JEWL dress her.'); return; }
+    setBusy(mode === 'paint' ? 'portrait' : 'portraitRegen'); setError(null); setNote(null);
+    setPaintSub(PAINT_SUB_BRIEF);
+    const t = setTimeout(() => setPaintSub(PAINT_SUB_PAINT), PAINT_SUB_SWITCH_MS);
+    const r = await paintPortrait(characterId);
+    clearTimeout(t);
+    setPaintSub(null);
+    setBusy(null);
+    if (!r.ok) { setError(r.line); return; }
+    if (r.brief) setBrief(r.brief);
+    const layer = { imagePath: r.imagePath, text: `${PORTRAIT_TEXT}${r.brief ? (r.brief.byJewl ? ' · JEWL’s brief' : ' · plain brief') : ''}`, kind: 'portrait' as const, seed: r.seed, at: new Date().toISOString() };
+    commit({ type: mode === 'paint' || stackTop < 0 ? 'append' : 'replaceTop', layer, target: 'portrait' }, { type: 'levers', levers: r.levers });
+    setView('portrait');
+    newLayerLanded();
+  };
+
+  /** APPROVE PORTRAIT → /api/portraits/lock sets Character.portrait: the canvas image (the first one = the BASE portrait). */
+  const approvePortrait = async () => {
+    const newest = currentLayer(designer, 'portrait');
+    if (!characterId || working || !newest) return;
+    setBusy('portraitApprove'); setError(null); setNote(null);
+    const a = await approveBase(characterId, newest.imagePath);
+    setBusy(null);
+    if (!a.ok) { setError(a.line); return; }
+    commit({ type: 'portraitApproved', imagePath: newest.imagePath, at: new Date().toISOString() });
+    setNote(PORTRAIT_APPROVED_NOTE);
+  };
+
+  /** REGENERATE re-rolls the newest layer of the tab's stack: the base from its source, an edit on the layer under it (a paint: a new seed). */
   const regenerate = () => {
-    if (view === 'portrait' || stackTop < 0) return;
+    if (view === 'portrait') { if (stackTop >= 0) void paint('regen'); return; }
+    if (stackTop < 0) return;
     if (stackTop === 0) { void (target === 'body' ? regenBody() : runLock('regen')); return; }
     const newest = stack[stackTop];
     const prev = stack[stackTop - 1];
@@ -250,20 +305,28 @@ export default function AppearanceDesigner({
     }
     newLayerLanded();
   };
-  const canRegenerate = editable && !working && view !== 'portrait' && stackTop >= 0 && (
-    stackTop > 0 || (target === 'body' ? !!designer.approvedImagePath : (!!seedName && referencePhotos.length > 0))
+  const portraitReady = !!designer.approvedImagePath && !!bodyPath;
+  const canPaint = editable && !working && portraitReady && worn === true;
+  const canRegenerate = editable && !working && stackTop >= 0 && (
+    view === 'portrait'
+      ? canPaint
+      : stackTop > 0 || (target === 'body' ? !!designer.approvedImagePath : (!!seedName && referencePhotos.length > 0))
   );
 
   const showLayer = (index: number) => setPeek(index >= stackTop ? null : index);
   const deleteLayer = (index: number) => {
-    commit({ type: 'dropFrom', index, target });
+    commit({ type: 'dropFrom', index, target: stackTarget });
     newLayerLanded();
   };
   const peekLine = peeking !== null
-    ? `[ viewing ${peeking === 0 ? 'the base' : `layer ${peeking}`} · ${stackTop - peeking} newer · edits and REGENERATE go on the newest ]`
+    ? view === 'portrait'
+      ? `[ viewing paint ${peeking + 1} · ${stackTop - peeking} newer · REGENERATE and APPROVE take the newest ]`
+      : `[ viewing ${peeking === 0 ? 'the base' : `layer ${peeking}`} · ${stackTop - peeking} newer · edits and REGENERATE go on the newest ]`
     : null;
-  const shownFace = target === 'face' && peeking !== null ? designer.layers[peeking] : top;
-  const shownBody = target === 'body' && peeking !== null ? (designer.bodyLayers?.[peeking]?.imagePath ?? bodyPath) : bodyPath;
+  const shownFace = view === 'face' && peeking !== null ? designer.layers[peeking] : top;
+  const shownBody = view === 'body' && peeking !== null ? (designer.bodyLayers?.[peeking]?.imagePath ?? bodyPath) : bodyPath;
+  const portraitTop = currentLayer(designer, 'portrait');
+  const shownPortrait = view === 'portrait' && peeking !== null ? (designer.portraitLayers?.[peeking]?.imagePath ?? null) : (portraitTop?.imagePath ?? null);
 
   /** Shape / Tell follow the tab; the body waits for its render. */
   const editDisabled = !locked || working || (target === 'body' && !bodyPath);
@@ -317,8 +380,10 @@ export default function AppearanceDesigner({
     : null;
   const shownView: PreviewView = demoVeil === 'portrait' ? 'portrait' : view;
   const shownBusy = busy ? BUSY_LINE[busy] : demoVeil === 'portrait' ? '[ PAINTING THE PORTRAIT · preview ]' : demoVeil === 'face' ? '[ EDITING IN PLACE · preview ]' : null;
+  const shownSub = paintSub ?? (demoVeil === 'portrait' ? PAINT_SUB_BRIEF : null);
   const statusColor = status === 'awaiting' ? C.gold : C.teal;
   const startIsOpen = !locked || startOpen;
+  const portraitApproved = !!portraitTop && designer.approvedPortraitPath === portraitTop.imagePath;
 
   return (
     <div className="relative" data-testid="appearance-designer" style={{ background: C.powder, color: C.ink, fontFamily: F.body }}>
@@ -352,10 +417,13 @@ export default function AppearanceDesigner({
                 onView={changeView}
                 layer={shownFace}
                 bodyImagePath={shownBody}
-                portraitImagePath={designer.approvedImagePath ?? null}
-                portraitLocked={!designer.approvedImagePath || !bodyPath}
+                portraitImagePath={shownPortrait}
+                portraitEmpty={!portraitTop}
+                onPaint={() => { void paint('paint'); }}
+                canPaint={canPaint}
+                portraitLocked={!portraitReady}
                 busyLine={shownBusy}
-                busySub={demoVeil === 'portrait' ? 'JEWL reads the sheet, dresses her from inventory, places her in the scene' : null}
+                busySub={shownSub}
                 error={error}
                 note={note}
                 peekLine={peekLine}
@@ -366,7 +434,38 @@ export default function AppearanceDesigner({
             </div>
 
             <div className="space-y-6 mt-5 md:mt-0">
-              {editable && (
+              {view === 'portrait' && (
+                <>
+                  <DressSection characterId={characterId} editable={editable} disabled={working} onWardrobe={onWardrobe} />
+                  <BriefReadout brief={brief} worn={worn} hasPaint={!!portraitTop} />
+                  <EditStack
+                    key="portrait"
+                    layers={stack}
+                    target="portrait"
+                    selected={peeking ?? stackTop}
+                    onSelect={showLayer}
+                    onDelete={deleteLayer}
+                    editable={editable && !working}
+                    approvedPath={designer.approvedPortraitPath}
+                  />
+                  {editable && portraitTop && (
+                    <div className="space-y-1">
+                      <ActionBar
+                        label={portraitApproved ? 'PORTRAIT APPROVED' : 'APPROVE PORTRAIT'}
+                        onClick={() => { void approvePortrait(); }}
+                        disabled={portraitApproved || working}
+                        busy={busy === 'portraitApprove'}
+                        tone="soul"
+                        testId="designer-approve-portrait"
+                      />
+                      <div style={{ fontFamily: F.mono, fontSize: 11, color: C.soul }}>
+                        Approving makes this paint the character&rsquo;s portrait — the image on the canvas. The approved face stays the identity anchor.
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              {editable && view !== 'portrait' && (
                 <>
                   <StartFrom
                     open={startIsOpen}
@@ -392,17 +491,19 @@ export default function AppearanceDesigner({
                 </>
               )}
 
-              <EditStack
-                key={target}
-                layers={stack}
-                target={target}
-                selected={peeking ?? stackTop}
-                onSelect={showLayer}
-                onDelete={deleteLayer}
-                editable={editable && !working}
-              />
+              {view !== 'portrait' && (
+                <EditStack
+                  key={target}
+                  layers={stack}
+                  target={target}
+                  selected={peeking ?? stackTop}
+                  onSelect={showLayer}
+                  onDelete={deleteLayer}
+                  editable={editable && !working}
+                />
+              )}
 
-              {editable && locked && (
+              {editable && locked && view !== 'portrait' && (
                 <div className="space-y-1">
                   <ActionBar
                     label={status === 'approved' ? 'BASE APPROVED' : 'APPROVE AS BASE'}
@@ -412,7 +513,7 @@ export default function AppearanceDesigner({
                     testId="designer-approve"
                   />
                   <div style={{ fontFamily: F.mono, fontSize: 11, color: C.soul }}>
-                    Approving re-renders the face and body clean (seams and artifacts from the edits go, the look stays). The portrait, tokens and paperdoll are then made from them in the background.
+                    Approving re-renders the face and body clean (seams and artifacts from the edits go, the look stays). Then the PORTRAIT tab: dress her from her own things and paint.
                   </div>
                 </div>
               )}

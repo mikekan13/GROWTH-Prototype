@@ -32,6 +32,7 @@ import type { PortraitInput, PortraitMetadata, PortraitResult } from '../types';
 import { ServerlessProvider } from './serverless';
 import { PortraitEndpointError } from '@/lib/errors';
 import {
+  LOCK_REALISM,
   QWEN21_BODY_SIZE,
   QWEN21_LOCK_SIZE,
   QWEN21_MAX_IMAGES,
@@ -57,7 +58,7 @@ import { buildCorpusContentPrompt } from '../corpus-prompts';
 import { compositeEditWithMask } from '../mask-composite';
 import { LOCALIZE_FEATHER, localizeMask, type Localized } from '../edit-localize';
 import { finishEnabled, finishImage, inkImage, rawSiblingPath } from '../finish';
-import { resolveMoodKey } from '../style-config';
+import { getCampaignMood, resolveMoodKey } from '../style-config';
 import { checkBaseLock, lockGateEnabled, type LockGateMeta, type LockGateVerdict } from '../lock-gate';
 import { photoPrepEnabled, prepSiblingPath } from '../photo-prep';
 
@@ -117,6 +118,21 @@ export async function resolveQwen21StyleRefs(repoRoot: string = path.resolve(pro
 /** A stored, generated portrait (an existing lock) vs. an uploaded photo. */
 export function isStoredPortraitPath(webPath: string): boolean {
   return /^\/?portraits\//.test(webPath.replace(/\\/g, '/'));
+}
+
+/** The character PORTRAIT canvas (plan 2026-10-15 §4 C): 4:5, head to knees. */
+export const QWEN21_PORTRAIT_SIZE = { width: 832, height: 1040 } as const;
+
+const PORTRAIT_FRAMING = 'Framed from the head to the knees, the face unmistakably the person in <image1>, the figure as in <image2>.';
+
+/**
+ * The PORTRAIT prompt: JEWL's brief (plain content, already naming <image1> =
+ * the face and <image2> = the body) + the fixed framing + the realism dial +
+ * the campaign mood — the v1 recipe's prompt shape (no medium paragraph; the
+ * LoRA trigger is added by the workflow builder). Pure.
+ */
+export function buildQwen21PortraitPrompt(briefPrompt: string, mood?: string): string {
+  return [briefPrompt.trim(), PORTRAIT_FRAMING, LOCK_REALISM, getCampaignMood(mood)].filter(Boolean).join(' ');
 }
 
 export interface Qwen21StepResult {
@@ -488,9 +504,55 @@ export class Qwen21Provider extends ServerlessProvider {
     return this.saveStep(characterId, folder, 'polish', prompt, raw, seed, Date.now() - t0, mood);
   }
 
+  /**
+   * THE PORTRAIT (Mike 16 Oct; plan §4 C): JEWL's brief painted from the
+   * approved face (<image1>) and the body (<image2>) — the multi-reference
+   * render proven 14 Oct (renderStyled with images) on the v1 recipe (the
+   * active LoRA blend, mid-generation ink at QWEN21_LOCK_INK_AT), 4:5 canvas,
+   * saved under portraits/<id>/portrait/. Brief in, image out: no UI coupling,
+   * so the LIVE portrait can call it on its own triggers later.
+   */
+  async paintPortrait(
+    characterId: string,
+    brief: { prompt: string },
+    refs: { face: string; body: string },
+    seed: number,
+    opts?: { mood?: string; inkAt?: number; loras?: Qwen21Lora[] },
+  ): Promise<Qwen21StepResult & { inkAt: number }> {
+    if (!brief.prompt.includes('<image1>') || !brief.prompt.includes('<image2>')) {
+      throw new Error('The portrait brief must name <image1> (the face) and <image2> (the body)');
+    }
+    // Chained steps consume the RAW copies (never finish twice) at full resolution.
+    const face = await this.preferRaw(await this.fullResWebPath(refs.face));
+    const body = await this.preferRaw(await this.fullResWebPath(refs.body));
+    const prompt = buildQwen21PortraitPrompt(brief.prompt, opts?.mood);
+    const t0 = Date.now();
+    const { raw, inkAt } = await this.renderStyled(prompt, seed, { ...QWEN21_PORTRAIT_SIZE }, { images: [face, body], inkAt: opts?.inkAt, loras: opts?.loras });
+    console.log(`[Qwen21] portrait seed=${seed} ink@${inkAt} in ${Date.now() - t0} ms`);
+    const r = await this.saveStep(characterId, 'portrait', 'portrait', prompt, raw, seed, Date.now() - t0, opts?.mood, { inkAt, loras: opts?.loras });
+    return { ...r, inkAt };
+  }
+
   // ============================================================
   // Route entry points (same signatures as LocalProvider)
   // ============================================================
+
+  /** /api/portraits/paint entry point: brief + face + body → the portrait. */
+  override async renderPortrait(
+    characterId: string,
+    brief: { prompt: string },
+    refs: { face: string; body: string; seed?: number; mood?: string },
+  ): Promise<PortraitResult> {
+    const seed = refs.seed ?? Math.floor(Math.random() * 2147483647);
+    try {
+      const r = await this.paintPortrait(characterId, brief, { face: refs.face, body: refs.body }, seed, { mood: resolveMoodKey(refs.mood) });
+      return this.toResult(r, r.generationTimeMs, `qwen21 portrait: face=${refs.face} body=${refs.body}`, { portrait: true, inkAt: r.inkAt, rawPath: r.rawPath });
+    } catch (e) {
+      if (e instanceof PortraitEndpointError) throw e;
+      console.error('[Qwen21] portrait failed:', e);
+      return { success: false, metadata: this.meta(brief.prompt, seed, 0, 0, 0), error: e instanceof Error ? e.message : String(e) };
+    }
+  }
 
   /** /api/portraits/polish entry point. */
   override async polishImage(

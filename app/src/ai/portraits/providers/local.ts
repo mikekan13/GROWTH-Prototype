@@ -625,6 +625,27 @@ export class LocalProvider implements ImageGenerationProvider {
   }
 
   /**
+   * THE PORTRAIT (Mike, 16 Oct 2026): JEWL's brief painted from the approved
+   * face + body. Qwen-Image-2.1 implements it (multi-reference render on the
+   * v1 recipe); the FLUX path has no equivalent and reports so.
+   */
+  async renderPortrait(
+    characterId: string,
+    brief: { prompt: string },
+    refs: { face: string; body: string; seed?: number; mood?: string },
+  ): Promise<PortraitResult> {
+    void characterId; void refs;
+    return {
+      success: false,
+      metadata: {
+        prompt: brief.prompt, negativePrompt: '', seed: refs.seed ?? 0, model: 'flux2-dev-fp8mixed',
+        steps: 0, cfg: 0, width: 0, height: 0, generationTimeMs: 0,
+      },
+      error: 'The portrait paint is only available on the Qwen-Image-2.1 provider (PORTRAIT_PROVIDER=qwen21)',
+    };
+  }
+
+  /**
    * Edit an image using FLUX.2 Dev. Picks the right sub-workflow based on
    * the caller's options: flux2-edit-with-refpull when an object-pull
    * reference is supplied, flux2-edit-masked when a paint mask is present,

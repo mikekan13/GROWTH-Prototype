@@ -212,7 +212,7 @@ export const QUICK_TELLS: Record<EditTarget, string[]> = {
 export const CLOTHING_GEAR_RE = /\b(?:coats?|jackets?|dress(?:es)?|shirts?|armou?rs?|cloaks?|robes?|hats?|helmets?|boots?|gloves?|clothes|clothing|outfits?|gowns?|pants|trousers|swords?|shields?|weapons?|necklaces?|jewel\w*)\b/i;
 
 export const CLOTHING_NOTE =
-  'Clothing and gear come from inventory. Give the character the item as a possession and it shows up on the portrait by itself.';
+  'Clothing and gear come from inventory. Dress the character on the PORTRAIT tab — what is EQUIPPED is what the portrait paints.';
 
 export function isClothingOrGear(text: string | null | undefined): boolean {
   return CLOTHING_GEAR_RE.test(text ?? '');
@@ -277,7 +277,16 @@ export type LayerKind =
   | 'underwear'
   | 'jewl'
   /** The clean re-render made by APPROVE (15 Oct): the approved image itself. */
-  | 'polish';
+  | 'polish'
+  /** A painted PORTRAIT (16 Oct): JEWL's brief rendered from the face + body references. */
+  | 'portrait';
+
+/**
+ * The three stacks: FACE and BODY take edits (EditTarget); PORTRAIT only
+ * holds paints (each a fresh render from the approved face + body, so a
+ * layer is never "painted on" the one before — every row can be deleted).
+ */
+export type StackTarget = EditTarget | 'portrait';
 
 export interface DesignerLayer {
   imagePath: string;
@@ -345,6 +354,11 @@ export interface DesignerState {
   /** The layer approved as the base (Character.portrait). */
   approvedImagePath?: string | null;
   approvedAt?: string | null;
+  /** PORTRAIT, oldest first: each a paint of JEWL's brief from the approved face + body (Mike 2026-10-16). */
+  portraitLayers?: DesignerLayer[];
+  /** The portrait approved as Character.portrait — the canvas image. */
+  approvedPortraitPath?: string | null;
+  portraitApprovedAt?: string | null;
   /** What the last call used (read-only display). */
   levers?: DesignerLevers | null;
 }
@@ -352,26 +366,31 @@ export interface DesignerState {
 export const EMPTY_DESIGNER: DesignerState = { baseImagePath: null, layers: [] };
 
 export const BODY_BASE_TEXT = 'Rendered from the approved base';
+export const PORTRAIT_TEXT = 'Painted from the face and body';
 
 export type DesignerAction =
   | { type: 'lock'; layer: DesignerLayer }
-  | { type: 'append'; layer: DesignerLayer; target?: EditTarget }
-  | { type: 'replaceTop'; layer: DesignerLayer; target?: EditTarget }
-  | { type: 'revertTo'; index: number; target?: EditTarget }
-  /** Delete layer `index` and every layer painted on it (never the base, index 0). */
-  | { type: 'dropFrom'; index: number; target?: EditTarget }
+  | { type: 'append'; layer: DesignerLayer; target?: StackTarget }
+  | { type: 'replaceTop'; layer: DesignerLayer; target?: StackTarget }
+  | { type: 'revertTo'; index: number; target?: StackTarget }
+  /** Delete layer `index` and every layer painted on it (never the base, index 0 — except on the portrait stack, where every paint stands alone). */
+  | { type: 'dropFrom'; index: number; target?: StackTarget }
   | { type: 'approved'; imagePath: string; at: string }
+  /** APPROVE PORTRAIT: this paint is Character.portrait. */
+  | { type: 'portraitApproved'; imagePath: string; at: string }
   /** A fresh body render from the approved base: the body stack restarts from it. */
   | { type: 'body'; imagePath: string | null; seed?: number | null; at?: string }
   | { type: 'levers'; levers: DesignerLevers }
   | { type: 'describe'; text: string };
 
 /** The stack for a target. */
-export function layersOf(s: DesignerState, target: EditTarget): DesignerLayer[] {
+export function layersOf(s: DesignerState, target: StackTarget): DesignerLayer[] {
+  if (target === 'portrait') return s.portraitLayers ?? [];
   return target === 'body' ? (s.bodyLayers ?? []) : s.layers;
 }
 
-function withLayers(s: DesignerState, target: EditTarget, layers: DesignerLayer[]): DesignerState {
+function withLayers(s: DesignerState, target: StackTarget, layers: DesignerLayer[]): DesignerState {
+  if (target === 'portrait') return { ...s, portraitLayers: layers };
   if (target === 'body') {
     return { ...s, bodyLayers: layers, bodyImagePath: layers.length ? layers[layers.length - 1].imagePath : null };
   }
@@ -381,12 +400,15 @@ function withLayers(s: DesignerState, target: EditTarget, layers: DesignerLayer[
 export function designerReducer(state: DesignerState, action: DesignerAction): DesignerState {
   switch (action.type) {
     case 'lock':
-      // A new identity: the old stacks and body no longer describe her.
-      return { ...state, baseImagePath: action.layer.imagePath, layers: [{ ...action.layer, kind: 'base' }], bodyImagePath: null, bodyLayers: [] };
+      // A new identity: the old stacks, body and portrait no longer describe her.
+      return {
+        ...state, baseImagePath: action.layer.imagePath, layers: [{ ...action.layer, kind: 'base' }],
+        bodyImagePath: null, bodyLayers: [], portraitLayers: [], approvedPortraitPath: null, portraitApprovedAt: null,
+      };
     case 'append': {
       const target = action.target ?? 'face';
       const layers = layersOf(state, target);
-      if (layers.length === 0) return state; // edits need a base
+      if (layers.length === 0 && target !== 'portrait') return state; // edits need a base; paints stand alone
       return withLayers(state, target, [...layers, action.layer]);
     }
     case 'replaceTop': {
@@ -395,7 +417,7 @@ export function designerReducer(state: DesignerState, action: DesignerAction): D
       if (prev.length === 0) return state;
       const layers = [...prev.slice(0, -1), action.layer];
       const next = withLayers(state, target, layers);
-      if (target === 'body' || layers.length > 1) return next;
+      if (target !== 'face' || layers.length > 1) return next;
       // A re-rolled face base: the body was made from the old one.
       return { ...next, baseImagePath: layers[0].imagePath, bodyImagePath: null, bodyLayers: [] };
     }
@@ -408,11 +430,21 @@ export function designerReducer(state: DesignerState, action: DesignerAction): D
     case 'dropFrom': {
       const target = action.target ?? 'face';
       const layers = layersOf(state, target);
-      if (action.index < 1 || action.index >= layers.length) return state;
+      if (action.index < 0 || action.index >= layers.length) return state;
+      if (target === 'portrait') {
+        // Paints are independent: only this one goes.
+        const kept = layers.filter((_, i) => i !== action.index);
+        const next = withLayers(state, target, kept);
+        const approvedStill = kept.some(l => l.imagePath === state.approvedPortraitPath);
+        return approvedStill ? next : { ...next, approvedPortraitPath: null, portraitApprovedAt: null };
+      }
+      if (action.index < 1) return state;
       return withLayers(state, target, layers.slice(0, action.index));
     }
     case 'approved':
       return { ...state, approvedImagePath: action.imagePath, approvedAt: action.at };
+    case 'portraitApproved':
+      return { ...state, approvedPortraitPath: action.imagePath, portraitApprovedAt: action.at };
     case 'body':
       if (!action.imagePath) return { ...state, bodyImagePath: null, bodyLayers: [] };
       return {
@@ -429,25 +461,26 @@ export function designerReducer(state: DesignerState, action: DesignerAction): D
   }
 }
 
-export function currentLayer(s: DesignerState, target: EditTarget = 'face'): DesignerLayer | null {
+export function currentLayer(s: DesignerState, target: StackTarget = 'face'): DesignerLayer | null {
   const layers = layersOf(s, target);
   return layers.length ? layers[layers.length - 1] : null;
 }
 
 /** How many layers a revert to `index` drops (for the confirm line). */
-export function layersDroppedBy(s: DesignerState, index: number, target: EditTarget = 'face'): number {
+export function layersDroppedBy(s: DesignerState, index: number, target: StackTarget = 'face'): number {
   return Math.max(0, layersOf(s, target).length - 1 - index);
 }
 
-/** How many layers go when layer `index` is deleted: it and every one painted on it. */
-export function layersDeletedBy(s: DesignerState, index: number, target: EditTarget = 'face'): number {
+/** How many layers go when layer `index` is deleted: it and every one painted on it (a portrait paint: just itself). */
+export function layersDeletedBy(s: DesignerState, index: number, target: StackTarget = 'face'): number {
   const n = layersOf(s, target).length;
+  if (target === 'portrait') return index < 0 || index >= n ? 0 : 1;
   return index < 1 || index >= n ? 0 : n - index;
 }
 
 const LAYER_KINDS: ReadonlySet<string> = new Set<LayerKind>([
   'base', 'skin', 'hair', 'eyes', 'face', 'build', 'age',
-  'scar', 'tattoo', 'makeup', 'piercing', 'birthmark', 'bodymod', 'underwear', 'jewl', 'polish',
+  'scar', 'tattoo', 'makeup', 'piercing', 'birthmark', 'bodymod', 'underwear', 'jewl', 'polish', 'portrait',
 ]);
 
 export const POLISH_TEXT = 'Clean render (approved)';
@@ -470,18 +503,18 @@ export function restoreDesigner(identity: unknown): DesignerState {
   const legacyBust = str(id.generatedBust);
   const legacyBody = str(id.generatedFullBody);
 
-  const readLayers = (v: unknown): DesignerLayer[] => {
+  const readLayers = (v: unknown, paints = false): DesignerLayer[] => {
     const layers = (Array.isArray(v) ? v : [])
       .map((l): DesignerLayer | null => {
         if (!l || typeof l !== 'object') return null;
         const o = l as Record<string, unknown>;
         const imagePath = str(o.imagePath);
         if (!imagePath) return null;
-        const kind = typeof o.kind === 'string' && LAYER_KINDS.has(o.kind) ? (o.kind as LayerKind) : 'jewl';
+        const kind = paints ? 'portrait' : typeof o.kind === 'string' && LAYER_KINDS.has(o.kind) ? (o.kind as LayerKind) : 'jewl';
         return { imagePath, text: typeof o.text === 'string' ? o.text : '', kind, seed: num(o.seed), at: str(o.at) ?? '' };
       })
       .filter((l): l is DesignerLayer => !!l);
-    if (layers.length) layers[0] = { ...layers[0], kind: 'base' };
+    if (layers.length && !paints) layers[0] = { ...layers[0], kind: 'base' };
     return layers;
   };
   const bodyStackFor = (bodyImagePath: string | null, saved: DesignerLayer[]): DesignerLayer[] => {
@@ -495,6 +528,8 @@ export function restoreDesigner(identity: unknown): DesignerState {
     const bodyLayers = readLayers(raw.bodyLayers);
     const bodyImagePath = bodyLayers.length ? bodyLayers[bodyLayers.length - 1].imagePath : (str(raw.bodyImagePath) ?? legacyBody);
     const lv = raw.levers && typeof raw.levers === 'object' ? raw.levers as Record<string, unknown> : null;
+    const portraitLayers = readLayers(raw.portraitLayers, true);
+    const approvedPortrait = str(raw.approvedPortraitPath);
     return {
       baseImagePath: layers[0]?.imagePath ?? str(raw.baseImagePath),
       layers,
@@ -503,6 +538,10 @@ export function restoreDesigner(identity: unknown): DesignerState {
       bodyLayers: bodyStackFor(bodyImagePath, bodyLayers),
       approvedImagePath: str(raw.approvedImagePath),
       approvedAt: str(raw.approvedAt),
+      portraitLayers,
+      // An approved portrait whose paint was deleted is no longer the stack's.
+      approvedPortraitPath: approvedPortrait && portraitLayers.some(l => l.imagePath === approvedPortrait) ? approvedPortrait : null,
+      portraitApprovedAt: approvedPortrait ? str(raw.portraitApprovedAt) : null,
       levers: lv ? { seed: num(lv.seed), guidance: num(lv.guidance), steps: num(lv.steps), refs: num(lv.refs) ?? 0 } : null,
     };
   }
