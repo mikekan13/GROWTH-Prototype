@@ -256,7 +256,7 @@ export const COMPLETION_STAGE_LAW: Record<GenesisPostSheetStage, string> = {
   VINES: [
     'STAGE: VINES — choose the GOALS of her GRO.vines, now that the whole person and her whole life stand.',
     '- A GRO.vine is a three-author contract: the Goal is the entity\'s, the Resistance is the Watcher\'s, the Opportunity is the godhead\'s. You write the GOAL only — never resistance, never opportunity.',
-    '- What she wants, in her own terms, as her history, her world and her memories make her want it — up to her seed\'s slots (the tool says how many). Fewer is fine. An open thread never becomes a goal\'s answer.',
+    '- What she wants, in her own terms, as her history, her world and her memories make her want it — one in EVERY slot her seed gives (the tool says how many; a Human has 4). The stage is not done while a slot is empty. An open thread never becomes a goal\'s answer.',
     '- These are AI-chosen, as simulation is: a Trailblazer seated in her overwrites them.',
   ].join('\n'),
   PORTRAIT: 'STAGE: PORTRAIT — her portrait is painted from her face, body, clothes and world, and approved at the designer. Not yours to do; the session waits.',

@@ -113,6 +113,8 @@ export interface StageEvidence {
   npcSeeds: number;
   placeEdges: number;
   vines: number;
+  /** GRO.vine slots her seed grants. When known, VINES is missing until every slot holds a vine. */
+  vineSlots?: number;
   /** The designer's face approved and the body rendered. */
   lookOk?: boolean;
   /** Character.portrait set. */
@@ -136,7 +138,10 @@ export function missingStages(e: StageEvidence): Set<GenesisPostSheetStage> {
   const worldEvidence = e.heldItems + e.ownsEdges > 0 && e.npcSeeds + e.placeEdges > 0;
   if (!done('WORLD') && !legacyWorld && !worldEvidence) missing.add('WORLD');
   if (!done('MEMORIES')) missing.add('MEMORIES');
-  if (!done('VINES') && e.vines === 0) missing.add('VINES');
+  // Every slot her seed gives holds a vine (Mike 2026-10-17: "Violet is a
+  // human so she should have 4 gro.vines active") — the stamp does not
+  // excuse an empty slot.
+  if (e.vineSlots !== undefined ? e.vines < e.vineSlots : (!done('VINES') && e.vines === 0)) missing.add('VINES');
   if (e.portraitGate && !done('PORTRAIT') && !e.portraitOk) missing.add('PORTRAIT');
   return missing;
 }

@@ -136,14 +136,15 @@ export const QWEN21_PORTRAIT_SIZE = { width: 832, height: 1040 } as const;
  *  - BUST = the PORTRAIT: WAIST UP (Mike: "Portrait is like waist up… not a
  *    headshot, not a full length… a portrait"), the face the subject,
  *    the clothes from shoulders to waist, the room behind. The canvas image —
- *    the same shape as the character sheet's portrait frame on the canvas
- *    (400×437, CharacterCard expanded; Mike: "A portrait should be the same
- *    aspect that goes in the cs on the canvas").
+ *    1024×1536 (2:3), the resolution of the sheet's portrait (Mike 2026-10-17,
+ *    pointing at public/EmptyPortrait.png: "that is supposed to be the
+ *    resolution of the portrait for the CS"). The 16 Oct 864×944 came from
+ *    measuring a stretched frame — wrong.
  *  - FIGURE = the clothed full body (inventory / paperdoll).
  */
 export type PortraitFrame = 'bust' | 'figure';
 export const QWEN21_PORTRAIT_SIZES: Record<PortraitFrame, { width: number; height: number }> = {
-  bust: { width: 864, height: 944 },
+  bust: { width: 1024, height: 1536 },
   figure: { width: 832, height: 1040 },
 };
 const PORTRAIT_FRAMINGS: Record<PortraitFrame, string> = {

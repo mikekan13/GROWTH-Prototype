@@ -26,7 +26,7 @@ interface NodeDimensions {
 // topH/bottomH are measured from the node's center point.
 // Character cards overflow downward (portrait, TKV badge use negative margins).
 const CARD_SIZES: Record<string, { compact: NodeDimensions; expanded: NodeDimensions }> = {
-  character: { compact: { width: 520, topH: 120, bottomH: 120 }, expanded: { width: 1920, topH: 250, bottomH: 480 } },
+  character: { compact: { width: 520, topH: 120, bottomH: 120 }, expanded: { width: 1920, topH: 250, bottomH: 643 } }, // +163: the 400×600 portrait frame (2026-10-17)
   location:  { compact: { width: 340, topH: 90, bottomH: 90 },   expanded: { width: 500, topH: 350, bottomH: 350 } },
   // Things are TOKENS on the map (2026-10-16), never expanded cards.
   item:      { compact: { width: TOKEN_DIAMETER, topH: TOKEN_DIAMETER / 2, bottomH: TOKEN_DIAMETER / 2 }, expanded: { width: TOKEN_DIAMETER, topH: TOKEN_DIAMETER / 2, bottomH: TOKEN_DIAMETER / 2 } },

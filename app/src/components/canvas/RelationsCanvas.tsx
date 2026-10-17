@@ -6,7 +6,7 @@ import type { CharacterNodeData } from "./CharacterCard";
 import InventoryCard from "./InventoryCard";
 import type { GrowthCharacter } from "@/types/growth";
 import type { HeldItemData } from "@/types/item";
-import { addSkill, removeSkill, updateSkillLevel, addTrait, removeTrait, updateTrait } from "@/lib/character-actions";
+import { addSkill, removeSkill, updateSkillLevel, removeTrait, updateTrait } from "@/lib/character-actions";
 import VitalsCard from "./VitalsCard";
 import TraitsCard from "./TraitsCard";
 import SkillsCard from "./SkillsCard";
@@ -529,6 +529,17 @@ export default function RelationsCanvas({
     for (const f of folders) if (hiddenFolderIds.has(f.id)) for (const id of f.nodeIds) s.add(id);
     return s;
   }, [folders, hiddenFolderIds]);
+  // Nodes in the list that are NOT drawn: hidden levels, and items held by a
+  // character (they live in the inventory, not on the canvas — the item
+  // layer skips them). Tethers and the marquee must skip them too, or they
+  // hit "ghosts" at stale x/y (Mike 2026-10-17, Violet's possessions).
+  const unrenderedNodeIds = useMemo(() => {
+    const s = new Set(hiddenNodeIds);
+    for (const n of nodes) if (n.type === 'item' && (n.holderId || !n.itemData)) s.add(n.id);
+    return s;
+  }, [nodes, hiddenNodeIds]);
+  const unrenderedNodeIdsRef = useRef(unrenderedNodeIds);
+  unrenderedNodeIdsRef.current = unrenderedNodeIds;
   const visibleFolders = useMemo(() => hiddenFolderIds.size === 0 ? folders : folders.filter(f => !hiddenFolderIds.has(f.id)), [folders, hiddenFolderIds]);
   useEffect(() => {
     // A level that no longer exists (places re-levelled) falls back to ALL.
@@ -2508,6 +2519,7 @@ export default function RelationsCanvas({
       const hits = new Set<string>();
       if (!isClick) {
         for (const n of nodes) {
+          if (unrenderedNodeIdsRef.current.has(n.id)) continue;
           const pos = nodePositionsRef.current.get(n.id) ?? { x: n.x, y: n.y };
           const dims = getNodeDimensions(n.type, expandedNodesRef.current.has(n.id));
           const nx1 = pos.x - dims.width / 2;
@@ -3086,9 +3098,11 @@ export default function RelationsCanvas({
   /** Node card dimensions in SVG units. Mirrors the toggleExpand sizes map. */
   const nodeRect = (n: CanvasNode): { w: number; h: number } => {
     const expanded = expandedNodes.has(n.id);
-    if (n.type === 'character') return expanded ? { w: 1885, h: 670 } : { w: 500, h: 240 };
+    if (n.type === 'character') return expanded ? { w: 1885, h: 833 } : { w: 500, h: 240 };
     if (n.type === 'location')  return expanded ? { w: 480,  h: 700 } : { w: 320, h: 180 };
-    if (n.type === 'item')      return expanded ? { w: 420,  h: 600 } : { w: 280, h: 160 };
+    // Items are map TOKENS (2026-10-16), not cards — the old 280×160 card
+    // size put every tether end 140px left of its token (Mike 2026-10-17).
+    if (n.type === 'item')      return { w: TOKEN_DIAMETER, h: TOKEN_DIAMETER };
     return { w: 120, h: 120 };
   };
 
@@ -3282,7 +3296,11 @@ export default function RelationsCanvas({
     // edges keep the directional offset.
     let endX: number;
     let endY: number;
-    if (isPossessionEdge) {
+    if (isPossessionEdge && toNode?.type === 'item') {
+      // A token is round: land on its rim, facing the line.
+      endX = toPos.x - ux * (TOKEN_DIAMETER / 2);
+      endY = toPos.y - uy * (TOKEN_DIAMETER / 2);
+    } else if (isPossessionEdge) {
       let w: number;
       let h: number;
       if (toNode) {
@@ -3834,23 +3852,9 @@ export default function RelationsCanvas({
                   fateDie={(charData.creation as Record<string, unknown>)?.seed ? ((charData.creation as Record<string, unknown>).seed as Record<string, unknown>)?.baseFateDie as string : undefined}
                   characterName={node.name}
                   onClose={() => togglePanel(node.id, panelKey)}
-                  onAddTrait={onCharacterUpdate ? async (trait) => {
-                    // Blossom with a duration: anchor expiry to the campaign clock (T23).
-                    let expiresAtCycle: number | undefined;
-                    if (trait.type === 'blossom' && trait.durationCycles && campaignId) {
-                      try {
-                        const res = await fetch(`/api/campaigns/${campaignId}/clock`, { cache: 'no-store' });
-                        if (res.ok) {
-                          const clock = await res.json();
-                          if (typeof clock.currentCycle === 'number') {
-                            expiresAtCycle = clock.currentCycle + trait.durationCycles;
-                          }
-                        }
-                      } catch { /* open-ended if the clock is unreachable */ }
-                    }
-                    const result = addTrait(charData as unknown as GrowthCharacter, { ...trait, expiresAtCycle });
-                    if (result.changes.length > 0) onCharacterUpdate(node.id, result.character, result.changes);
-                  } : undefined}
+                  // No onAddTrait: traits are not typed onto the sheet (Mike
+                  // 2026-10-17) — they arrive through Seed/Root/Branch, the
+                  // Forge and the Godheads. Without it TraitsCard hides "+ add".
                   onRemoveTrait={onCharacterUpdate ? (type, name) => {
                     const result = removeTrait(charData as unknown as GrowthCharacter, type, name);
                     if (result.changes.length > 0) onCharacterUpdate(node.id, result.character, result.changes);
@@ -3863,6 +3867,7 @@ export default function RelationsCanvas({
               case 'skills':
                 return <SkillsCard
                   skills={(charData.skills as SkillItem[]) || []}
+                  attributes={charData.attributes as Record<string, { level?: number }> | undefined}
                   campaignId={campaignId}
                   onClose={() => togglePanel(node.id, panelKey)}
                   onAddSkill={onCharacterUpdate ? (skill) => {
@@ -4330,7 +4335,7 @@ export default function RelationsCanvas({
         {/* Creation Toolbox moved to HTML overlay (always visible in viewport) */}
 
         {/* â”€â”€ Connections (behind nodes) â”€â”€ */}
-        {connections.filter(c => !hiddenNodeIds.has(c.from) && !hiddenNodeIds.has(c.to)).map((c) => renderConnection(c))}
+        {connections.filter(c => !unrenderedNodeIds.has(c.from) && !unrenderedNodeIds.has(c.to)).map((c) => renderConnection(c))}
 
         {/* â”€â”€ Folder backgrounds (behind cards) â”€â”€ */}
         {visibleFolders.map(folder => {

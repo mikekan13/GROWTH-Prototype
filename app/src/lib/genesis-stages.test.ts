@@ -91,6 +91,10 @@ describe('missing stages', () => {
     expect([...missingStages({ ...none, stamps: { POSSESSIONS: 'x', SEEDS: 'x', WORLD_FACTS: 'x' } })]).not.toContain('WORLD');
     expect([...missingStages({ ...none, stamps: { WORLD: 'x', VINES: 'x' } })]).toEqual(['AGE', 'APPEARANCE', 'MEMORIES']);
   });
+  it('VINES stays missing while a seed slot is empty, stamp or not (Mike 2026-10-17)', () => {
+    expect([...missingStages({ ...none, vines: 3, vineSlots: 4, stamps: { VINES: 'x' } })]).toContain('VINES');
+    expect([...missingStages({ ...none, vines: 4, vineSlots: 4 })]).not.toContain('VINES');
+  });
   it('the look is a gate: an approved face + body passes it', () => {
     expect([...missingStages({ ...none, lookOk: true })]).not.toContain('APPEARANCE');
   });

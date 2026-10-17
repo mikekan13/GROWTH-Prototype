@@ -40,6 +40,11 @@ export function vineSlotsForSeed(seedData: Record<string, unknown> | null): numb
   return Math.min(MAX_ACTIVE_GOALS, base + (ambitious ? 1 : 0));
 }
 
+/** Vine slots this character's seed grants. */
+export async function vineSlotsForCharacter(characterId: string, sheetData: string): Promise<number> {
+  return vineSlotsForSeed(await seedDataOf(characterId, sheetData));
+}
+
 async function seedDataOf(characterId: string, sheetData: string): Promise<Record<string, unknown> | null> {
   let seedId: string | undefined;
   try { seedId = (JSON.parse(sheetData) as { creation?: { seedForgeItemId?: string } }).creation?.seedForgeItemId; } catch { /* none */ }

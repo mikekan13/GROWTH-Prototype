@@ -97,8 +97,8 @@ export const seedLocationTool: JewlTool = {
 export const authorVineGoalTool: JewlTool = {
   name: 'author_vine_goal',
   description:
-    'Genesis VINES stage. Choose the GOALS of her GRO.vines — what she wants, in her terms, from who she is — up to ' +
-    'her seed\'s slots. Goal only: Resistance is the Watcher\'s, Opportunity the godhead\'s — never write either. ' +
+    'Genesis VINES stage. Choose the GOALS of her GRO.vines — what she wants, in her terms, from who she is — one in ' +
+    'every slot her seed gives (the result reports slots and used). Goal only: Resistance is the Watcher\'s, Opportunity the godhead\'s — never write either. ' +
     'Marked AI-chosen; a Trailblazer seated in her overwrites them.',
   inputSchema: authorVineGoalSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {

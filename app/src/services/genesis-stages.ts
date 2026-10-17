@@ -33,6 +33,7 @@ import {
   type GmWorldMessage,
 } from '@/lib/genesis-stages';
 import type { GrowthCharacter } from '@/types/growth';
+import { vineSlotsForCharacter } from './genesis-vines';
 
 export * from '@/lib/genesis-stages';
 
@@ -41,7 +42,7 @@ export async function detectMissingStages(characterId: string): Promise<Set<Gene
   const character = await prisma.character.findUnique({ where: { id: characterId }, select: { data: true } });
   let sheet: Partial<GrowthCharacter> & { _genesisStages?: unknown } = {};
   try { sheet = JSON.parse(character?.data ?? '{}'); } catch { sheet = {}; }
-  const [links, heldItems, ownsEdges, npcSeeds, placeEdges, vines, portraitRow] = await Promise.all([
+  const [links, heldItems, ownsEdges, npcSeeds, placeEdges, vines, portraitRow, vineSlots] = await Promise.all([
     prisma.characterBlockLink.findMany({ where: { characterId }, select: { forgeItemId: true, ageAdded: true } }),
     prisma.campaignItem.count({ where: { holderId: characterId, status: 'ACTIVE' } }),
     prisma.entityRelationship.count({ where: { sourceId: characterId, relationshipType: 'owns' } }),
@@ -49,6 +50,7 @@ export async function detectMissingStages(characterId: string): Promise<Set<Gene
     prisma.entityRelationship.count({ where: { sourceId: characterId, targetType: 'LOCATION', relationshipType: { in: [...PLACE_RELATIONS] } } }),
     prisma.goal.count({ where: { characterId, status: { in: ['ACTIVE', 'DORMANT'] } } }),
     prisma.character.findUnique({ where: { id: characterId }, select: { portrait: true } }),
+    vineSlotsForCharacter(characterId, character?.data ?? '{}'),
   ]);
   const blocks = links.length
     ? await prisma.forgeItem.findMany({ where: { id: { in: links.map(l => l.forgeItemId) }, status: { not: 'superseded' } }, select: { id: true, type: true, data: true } })
@@ -65,7 +67,7 @@ export async function detectMissingStages(characterId: string): Promise<Set<Gene
   const ageOk = typeof sheet.birthCycle === 'number' && typeof age === 'number'
     && (ageLinks.length === 0 || startingAgeFromLinks(ageLinks) === age);
   return missingStages({
-    stamps: stagesDone(sheet), ageOk, heldItems, ownsEdges, npcSeeds, placeEdges, vines,
+    stamps: stagesDone(sheet), ageOk, heldItems, ownsEdges, npcSeeds, placeEdges, vines, vineSlots,
     lookOk: lookApproved(sheet.identity),
     portraitOk: !!portraitRow?.portrait,
     portraitGate: portraitGateOn(),

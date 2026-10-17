@@ -5,6 +5,10 @@ import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import type { SkillGovernor } from '@/types/growth';
 import { SKILL_GOVERNORS } from '@/types/growth';
 import { safeJsonParse } from '@/lib/safe-json';
+import { computeSkillPoints, missingSkillPoints, SKILL_PILLARS } from '@/lib/skill-points';
+
+const PILLAR_LABEL = { body: 'BODY', spirit: 'SPIRIT', soul: 'SOUL' } as const;
+const PILLAR_BG = { body: 'var(--pillar-body)', spirit: 'var(--pillar-spirit)', soul: 'var(--pillar-soul)' } as const;
 
 export interface SkillItem {
   name: string;
@@ -24,6 +28,8 @@ export interface ForgeSkillItem {
 
 interface SkillsCardProps {
   skills: SkillItem[];
+  /** The character's attributes — LEVELS drive the per-pillar skill points. */
+  attributes?: Record<string, { level?: number } | undefined>;
   campaignId?: string;
   isPlayer?: boolean;
   onClose?: () => void;
@@ -90,7 +96,7 @@ const GOV_COLOR: Record<string, string> = {
   willpower: '#002f6c', wisdom: '#002f6c', wit: '#002f6c',
 };
 
-export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAddSkill, onRemoveSkill, onUpdateSkillLevel, onRollSkill, onCheckSkill, onRequestSkill }: SkillsCardProps) {
+export default function SkillsCard({ skills, attributes, campaignId, isPlayer, onClose, onAddSkill, onRemoveSkill, onUpdateSkillLevel, onRollSkill, onCheckSkill, onRequestSkill }: SkillsCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
@@ -137,6 +143,8 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
   const safeSkills = Array.isArray(skills) ? skills : [];
   const sorted = [...safeSkills].sort((a, b) => b.level - a.level);
   const isEditable = !!(onAddSkill || onRemoveSkill || onUpdateSkillLevel);
+  const points = computeSkillPoints(attributes, safeSkills);
+  const selectedMissing = selectedForgeSkill ? missingSkillPoints(points, selectedForgeSkill.data.governors) : [];
 
   const toggleGov = (gov: SkillGovernor) => {
     setNewSkillGovs(prev => {
@@ -295,11 +303,17 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                     />
                     <span className="text-[9px]" style={{ color: dieColor(forgeSkillLevel) }}>{getSkillDie(forgeSkillLevel)}</span>
                   </div>
+                  {selectedMissing.length > 0 && (
+                    <div className="text-[9px]" style={{ color: '#ff6b6b' }} data-testid="skill-points-short">
+                      Not enough skill points: {selectedMissing.map(p => PILLAR_LABEL[p]).join(', ')}
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <button
                       onClick={e => { e.stopPropagation(); handleAddForgeSkill(); }}
                       onMouseDown={e => e.stopPropagation()}
-                      className="text-[9px] px-2 py-0.5 uppercase"
+                      disabled={selectedMissing.length > 0}
+                      className="text-[9px] px-2 py-0.5 uppercase disabled:opacity-40"
                       style={{ color: 'var(--terminal-prime)', border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px' }}
                     >
                       Assign
@@ -428,6 +442,21 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
               </div>
             </div>
           )}
+
+          {/* Skill points available per pillar — floor(levels ÷ 3) minus one
+              per governor of every learned skill (Mike 2026-10-17). */}
+          <div className="flex gap-1 mb-2" data-testid="skill-points">
+            {SKILL_PILLARS.map(p => (
+              <div key={p} className="flex-1 flex items-center justify-between px-1.5 py-0.5"
+                title={`${PILLAR_LABEL[p]}: ${points[p].total} skill points (levels ÷ 3${p === 'spirit' ? ', Frequency not counted' : ''}), ${points[p].committed} committed to skills`}
+                style={{ backgroundColor: PILLAR_BG[p], borderRadius: '2px', border: points[p].available < 0 ? '1px solid #ff6b6b' : '1px solid transparent' }}>
+                <span className="text-[9px] text-white" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.06em' }}>{PILLAR_LABEL[p]} SP</span>
+                <span className="text-[11px] font-bold" style={{ color: points[p].available < 0 ? '#ff6b6b' : 'var(--krma-gold)' }}>
+                  {points[p].available}<span className="text-[9px] text-white/60">/{points[p].total}</span>
+                </span>
+              </div>
+            ))}
+          </div>
 
           {/* Die legend */}
           <div className="flex gap-2 mb-2 text-[8px] flex-wrap" style={{ color: '#666' }}>

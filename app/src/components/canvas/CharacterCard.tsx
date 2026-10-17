@@ -17,10 +17,9 @@ import { NATURAL_TARGET, targetingHint, type TargetAttribute } from '@/lib/damag
 import { parseDie } from '@/lib/dice-utils';
 import type { GrowthCharacter, AugmentSource } from '@/types/growth';
 import type { TooltipModifier } from '@/components/ui/ComplexTooltip';
-import type { PossessionRow } from './PossessionsCard';
 import { AwaitingImageBadge } from '@/components/character/AwaitingImageBadge';
 import { requestComplete } from '@/lib/genesis-complete-ui';
-import { useCharacterInventory, useCharacterSheetFacts } from '@/components/character/useCharacterSheetFacts';
+import { useCharacterSheetFacts } from '@/components/character/useCharacterSheetFacts';
 import { resolveBlocks, type LegacySheetLike } from '@/components/character/CharacterGenesisSections';
 import { blocksOfKind, blockTooltip, formatAge, type CharacterBlockView } from '@/lib/character-sheet-facts';
 import { calculateCharacterTKV } from '@/lib/kv-calculator';
@@ -392,11 +391,26 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   }, []);
 
   // What genesis made (2026-10-12 audit): blocks with paint, canonical age,
-  // TKV, memories, vines + the 3-tier inventory (equipped / carried /
-  // owned 'owns' links — the same possessions PossessionsCard lists).
-  // Read only when expanded.
+  // TKV, memories, vines. Read only when expanded. Possessions are NOT on
+  // the main card — they live in the POSSESSIONS sub-tab (Mike 2026-10-17).
   const { data: facts } = useCharacterSheetFacts(node?.id, isExpanded);
-  const { data: inventoryTiers } = useCharacterInventory(node?.id, isExpanded);
+
+  // The sub-tab bar sits under the middle column, however tall the vines
+  // make it (Mike 2026-10-17: with 4 vines it sat in the middle of the card).
+  const middleColRef = useRef<HTMLDivElement | null>(null);
+  const [middleBottom, setMiddleBottom] = useState(0);
+  useEffect(() => {
+    const col = middleColRef.current;
+    if (!isExpanded || !col) return;
+    const measure = () => {
+      const grid = col.offsetParent as HTMLElement | null;
+      setMiddleBottom((grid?.offsetTop ?? 0) + col.offsetTop + col.offsetHeight);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(col);
+    return () => ro.disconnect();
+  }, [isExpanded]);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -1018,13 +1032,13 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           onPointerDown={handleMouseDown}
           onContextMenu={handleContextMenu}
         >
-          {/* Portrait - 160px */}
-          <div className="flex-shrink-0 mr-3" style={{ width: '160px', height: '220px' }}>
+          {/* Portrait — 147×220, the sheet portrait's 2:3 (1024×1536). */}
+          <div className="flex-shrink-0 mr-3" style={{ width: '147px', height: '220px' }}>
             <div className="w-full h-full relative bg-gray-900 overflow-hidden">
               {node.portrait ? (
-                <img src={node.portrait} alt={node.name} className="w-full h-full object-contain" />
+                <img src={node.portrait} alt={node.name} className="w-full h-full object-cover" />
               ) : (
-                <img src="/EmptyPortrait.png" alt="Empty Portrait" className="w-full h-full object-contain" />
+                <img src="/EmptyPortrait.png" alt="Empty Portrait" className="w-full h-full object-cover" />
               )}
               <AwaitingImageBadge awaiting={node.awaitingImage} style={{ position: 'absolute', left: 0, bottom: 6 }} />
             </div>
@@ -1138,15 +1152,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   }
 
   // ── Expanded View (1885x670) — faithful port of prototype ─────────────────
-
-  // Possessions — legacy free text only when the inventory read has nothing.
-  const possessionsText = data?.possessions || '';
-  const possessionsList = possessionsText.split(/\n|,/).map(s => s.trim()).filter(s => s.length > 0);
-  const equippedItems = inventoryTiers?.equipped ?? [];
-  const carriedItems = inventoryTiers?.carried ?? [];
-  const ownedLinks: PossessionRow[] = inventoryTiers?.possessions ?? [];
-  const itemTitle = (i: { name: string; archetypeName?: string | null; story?: string | null; weightLbs: number }) =>
-    [i.archetypeName && i.archetypeName !== i.name ? `archetype: ${i.archetypeName}` : null, i.story, `${i.weightLbs} lbs`].filter(Boolean).join('\n\n');
 
   // Age (canon): currentCycle − birthCycle, else identity.age, else "—" — never 0.
   const ageText = facts ? formatAge(facts.age) : '—';
@@ -1267,12 +1272,15 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           }} />
 
           {/* Portrait Column */}
-          <div className="relative" style={{
+          {/* The frame is FIXED at 400×600 — 2:3, the sheet portrait's
+              resolution 1024×1536 (EmptyPortrait.png; Mike 2026-10-17). It
+              never stretches with the middle column. */}
+          <div className="relative self-start" style={{
             marginTop: '-55px', marginLeft: '3px',
             paddingTop: '3px', paddingRight: '13px', paddingBottom: '3px', paddingLeft: '0',
             backgroundColor: 'var(--krma-gold)'
           }}>
-            <div className="relative w-full h-full bg-gray-900 overflow-hidden" style={{ width: '400px' }}>
+            <div className="relative bg-gray-900 overflow-hidden" style={{ width: '400px', height: '600px' }}>
               {node.portrait ? (
                 <img src={node.portrait} alt={node.name} className="w-full h-full object-cover" />
               ) : (
@@ -1292,7 +1300,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 
           {/* Buffer stripe */}
           <div className="flex flex-col" style={{ width: '10px', flexShrink: 0, marginTop: '-55px' }}>
-            <div style={{ height: '473px', backgroundColor: 'var(--pillar-spirit)' }} />
+            {/* Runs the full height of the 600px portrait frame (+163 from the old 437). */}
+            <div style={{ height: '636px', backgroundColor: 'var(--pillar-spirit)' }} />
             <div style={{ height: '15px', backgroundColor: 'var(--terminal-prime)' }} />
             <div style={{ height: '3px', backgroundColor: 'var(--krma-gold)' }} />
           </div>
@@ -1307,7 +1316,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           </div>
 
           {/* ── Middle Column ── */}
-          <div className="flex flex-col">
+          <div ref={middleColRef} className="flex flex-col self-start">
             {/* Top section: SEED, ROOT, POSSESSIONS, Downtime, Age, Birthday */}
             <div className="flex gap-0.5 mb-2">
               {/* SEED / ROOT / BRANCH — from CharacterBlockLink paint: LOCAL name
@@ -1335,43 +1344,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 })}
               </div>
 
-              <div className="flex gap-0.5 flex-1">
-                {/* Possessions */}
-                <div className="rounded border border-blue-500/40 p-2 flex flex-col" style={{ backgroundColor: 'var(--pillar-soul)', width: '276px', marginLeft: '8px' }}>
-                  {/* Three tiers (GDT §13.5): equipped / carried / owned-not-carried.
-                      Item names are the instance's LOCAL name; archetype + story in the tooltip. */}
-                  <div className="text-xs font-bold text-white mb-1" data-testid="card-carry-heading">
-                    EQUIPPED · CARRIED · OWNED
-                    {inventoryTiers && (
-                      <span className="ml-1 text-[9px] font-normal" style={{ color: 'var(--krma-gold)', fontFamily: 'Consolas, monospace' }}
-                        title="Encumbrance: total lbs held vs Clout × 10">
-                        {inventoryTiers.encumbrance.totalLbs}/{inventoryTiers.encumbrance.capacityLbs} lbs
-                      </span>
-                    )}
-                  </div>
-                  <div className="overflow-y-auto flex-1 space-y-0.5">
-                    {([
-                      { tier: 'EQUIPPED', rows: equippedItems.map(i => ({ id: i.id, label: i.name, sub: i.equippedTo?.split('/').pop() ?? null, title: itemTitle(i) })) },
-                      { tier: 'CARRIED', rows: carriedItems.map(i => ({ id: i.id, label: i.name, sub: `${i.weightLbs} lbs`, title: itemTitle(i) })) },
-                      { tier: 'OWNED', rows: ownedLinks.length > 0
-                          ? ownedLinks.map(r => ({ id: r.id, label: r.targetName, sub: (r.targetSubtype ?? r.targetType).toLowerCase(), title: r.note ?? '' }))
-                          : possessionsList.map((p, i) => ({ id: `legacy-${i}`, label: p, sub: null, title: '' })) },
-                    ]).map(group => (
-                      <div key={group.tier}>
-                        <div className="text-[8px] font-bold" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>{group.tier}</div>
-                        {group.rows.length > 0 ? group.rows.map((row, i) => (
-                          <div key={row.id} title={row.title || undefined} className="border border-white/20 px-2 py-0.5 flex justify-between gap-1" style={{ backgroundColor: i % 2 === 0 ? '#8e7cc3' : '#b4a7d6' }}>
-                            <span className="text-[10px] font-bold text-white truncate">{row.label}</span>
-                            {row.sub && <span className="text-[9px] text-white/80" style={{ fontFamily: 'Consolas, monospace' }}>{row.sub}</span>}
-                          </div>
-                        )) : (
-                          <div className="text-[10px] text-white/60 italic">none yet</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
+              <div className="flex gap-0.5 flex-1" style={{ marginLeft: '8px' }}>
                 {/* Downtime + Age/Birthday */}
                 <div className="grid grid-cols-2 gap-0.5 flex-1">
                   <div className="space-y-0.5 h-full">
@@ -1583,7 +1556,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           </div>
 
           {/* ── TKV Box (centered under portrait) ── */}
-          <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: '120px', top: '530px', border: '3px solid var(--krma-gold)', zIndex: 10 }}>
+          <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: '120px', top: '693px', border: '3px solid var(--krma-gold)', zIndex: 10 }}>
             <div className="w-full flex items-center justify-center" style={{ backgroundColor: 'var(--pillar-body)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: 'var(--krma-gold)', height: '28px' }}>T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V</div>
             <div className="w-full flex items-center justify-center" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '19px', color: '#8e7cc3', height: '34px' }}>{tkv}</div>
           </div>
@@ -1712,15 +1685,16 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               { key: 'traits', icon: '\u2736', label: 'TRAITS', isOpen: openPanels?.has('traits') || false, onClick: () => onPanelToggle(node.id, 'traits') },
               { key: 'skills', icon: '\u2605', label: 'SKILLS', isOpen: openPanels?.has('skills') || false, onClick: () => onPanelToggle(node.id, 'skills') },
               { key: 'magic', icon: '\u2728', label: 'MAGIC', isOpen: openPanels?.has('magic') || false, onClick: () => onPanelToggle(node.id, 'magic') },
-              { key: 'backstory', icon: '\u270E', label: 'BACKSTORY', isOpen: openPanels?.has('backstory') || false, onClick: () => onPanelToggle(node.id, 'backstory') },
+              // BACKSTORY retired from the sheet "for now" (Mike 2026-10-17) \u2014 BackstoryCard kept for its return.
               { key: 'goals', icon: '\ud83c\udf31', label: 'GRO.VINES', isOpen: openPanels?.has('goals') || false, onClick: () => onPanelToggle(node.id, 'goals') },
               { key: 'harvests', icon: '\u2618', label: 'HARVESTS', isOpen: openPanels?.has('harvests') || false, onClick: () => onPanelToggle(node.id, 'harvests') },
               { key: 'possessions', icon: '\u2756', label: 'POSSESSIONS', isOpen: openPanels?.has('possessions') || false, onClick: () => onPanelToggle(node.id, 'possessions') },
-              { key: 'krma', icon: '\u049c', label: 'KRMA', isOpen: openPanels?.has('krma') || false, onClick: () => onPanelToggle(node.id, 'krma') },
+              // KRMA ledger is not a sheet tab (Mike 2026-10-17) \u2014 its data belongs to the Tapestry + JEWL's table history.
             ] : []),
           ];
+          // Designed seat is 515px; drops below the middle column when vines grow it.
           return (
-            <div className="absolute flex gap-1" style={{ top: '515px', left: '436px', zIndex: 20 }}>
+            <div className="absolute flex gap-1" style={{ top: `${Math.max(515, middleBottom + 6)}px`, left: '436px', zIndex: 20 }}>
               {panels.map(p => (
                 <Btn key={p.key} icon={p.icon} label={p.label} isOpen={p.isOpen} onClick={p.onClick} />
               ))}
