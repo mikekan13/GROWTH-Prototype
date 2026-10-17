@@ -48,6 +48,8 @@ export const grantPossessionSchema = z.object({
   slot: z.string().max(120).optional().describe('equipped only: a body-region key from her anatomy (e.g. "Body/Torso").'),
   localName: z.string().min(1).max(100).optional().describe('NARRATIVE PAINT: her name for it ("Rosemary\'s keepsake"). May carry proper nouns.'),
   story: z.string().min(1).max(600).describe('NARRATIVE PAINT: this object\'s story with her — whose it was, how she came by it.'),
+  look: z.string().min(1).max(240).optional().describe('How THIS one looks, as a noun phrase the portrait paints (colour, marks, how it is worn): "a blue polo with the red, white and blue Chess Pizza logo", "a wool prayer rope wrapped five times around his left wrist". Worn things need it.'),
+  concealed: z.boolean().optional().describe('Worn hidden, under the clothes, never seen (a cross under the shirt).'),
   weightLbs: z.number().min(0).max(1_000_000).optional().describe('Real pounds. Required for equipped/carried when the archetype has none.'),
   location: z.string().max(200).optional().describe('owned only: WHERE it sits — a room (Location name/id) or a CONTAINER item (its local name/id: a bookcase, a drawer, a closet). The world is a top-down map; everything has a place.'),
   allowDuplicate: z.boolean().optional().describe('She already holds or owns an instance of this archetype → the grant is refused unless this is true (two mugs are fine; the same laptop twice is not).'),
@@ -181,6 +183,8 @@ export async function grantPossession(
     ...forgeData,
     ...(weightLbs != null ? { weightLbs } : {}),
     ...(equippedTo ? { equippedTo, equipped: true } : {}),
+    ...(p.look ? { look: p.look } : {}),
+    ...(p.concealed ? { concealed: true } : {}),
   };
   const item = await createCampaignItem(campaignId, actor.id, actor.role, {
     name,

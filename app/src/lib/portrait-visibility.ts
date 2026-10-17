@@ -63,6 +63,9 @@ export interface Piece {
   category?: string | null;
   material?: string | null;
   description?: string | null;
+  /** How THIS one looks, as a noun phrase ("a blue Chess Pizza polo with the red, white and blue logo") — painted
+   *  instead of name + material (2026-10-17: the painter only saw "a chess pizza visor of cotton" and invented a white one). */
+  look?: string | null;
 }
 
 export interface Layer {
@@ -93,9 +96,10 @@ export function layerOf(p: Piece): Layer {
   const base: Omit<Layer, 'covers' | 'depth'> = { piece: p, open: false, edgeAtCollar: false, ornament: false, under: false, opens: false };
 
   // Ornaments first — a ring on a finger covers nothing.
-  if (/\b(ring|watch|bracelet|bangle|necklace|pendant|chain|earrings?|stud|anklet|locket|choker)\b/.test(n)) {
-    const at: Zone = /\b(earrings?|stud)\b/.test(n) ? 'face' : /\b(necklace|pendant|chain|locket|choker)\b/.test(n) ? 'neck'
-      : /\banklet\b/.test(n) ? 'feet' : /\b(watch|bracelet|bangle)\b/.test(n) ? 'forearms' : 'hands';
+  // Crosses and prayer ropes too (2026-10-17: Kristopher's wrist prayer rope was read as a garment).
+  if (/\b(ring|watch|bracelet|bangle|necklace|pendant|chain|earrings?|stud|anklet|locket|choker|cross|crucifix|rosary|prayer rope|chotki|komboskini)\b/.test(n)) {
+    const at: Zone = /\b(earrings?|stud)\b/.test(n) ? 'face' : /\b(necklace|pendant|chain|locket|choker|cross|crucifix)\b/.test(n) ? 'neck'
+      : /\banklet\b/.test(n) ? 'feet' : /\b(watch|bracelet|bangle|rosary|prayer rope|chotki|komboskini)\b/.test(n) ? 'forearms' : 'hands';
     return { ...base, covers: [at], depth: -1, ornament: true };
   }
   // Feet, hands, head, neck by where it is worn.
@@ -338,7 +342,7 @@ function article(name: string): string {
   return `${/^[aeiou]/i.test(n) ? 'an' : 'a'} ${n.toLowerCase()}`;
 }
 
-const named = (p: Piece) => `${article(p.name)}${p.material ? ` of ${p.material.toLowerCase()}` : ''}`;
+const named = (p: Piece) => p.look?.trim() ? p.look.trim().replace(/[.\s]+$/, '') : `${article(p.name)}${p.material ? ` of ${p.material.toLowerCase()}` : ''}`;
 
 const BODY_ORDER: Zone[] = ['scalp', 'face', 'neck', 'collar', 'chest', 'belly', 'back', 'upperArms', 'forearms', 'hands', 'waist', 'hips', 'thighs', 'lowerLegs', 'feet'];
 /** Head to feet, then outermost first. */

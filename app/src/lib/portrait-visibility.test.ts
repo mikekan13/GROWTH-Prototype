@@ -95,3 +95,11 @@ describe('viewBody — waist up, facing the viewer', () => {
     expect(markZone('a lucky charm')).toBeNull();
   });
 });
+
+describe('a piece\'s own look is painted (Kristopher, 17 Oct: "a chess pizza visor of cotton" came out white with a cross)', () => {
+  it('look replaces name + material', () => {
+    const polo = { name: 'Chess Pizza polo', region: 'Body/Torso', material: 'Cotton', look: 'a blue Chess Pizza polo shirt with the red, white and blue logo.' };
+    const line = clothesClause(viewBody([polo], [], { frame: 'bust', facing: 'front' }), 'he');
+    expect(line).toBe('wearing a blue Chess Pizza polo shirt with the red, white and blue logo');
+  });
+});

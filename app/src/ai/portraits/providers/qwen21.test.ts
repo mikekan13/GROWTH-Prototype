@@ -284,7 +284,7 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
     expect(p.queued).toHaveLength(1);
     const wf = p.queued[0];
     expect(wf.SAMPLE.inputs.latent_image).toEqual(['EMPTY_LATENT', 0]);
-    expect(wf.TEXT_ENCODE.inputs.prompt).toContain('Wearing a grey shift');
+    expect(wf.TEXT_ENCODE.inputs.prompt).toContain('wearing only a grey shift');
     expect(p.saved[0]).toContain('/bodies/');
   });
 

@@ -74,6 +74,8 @@ export interface EquippedPiece {
   material: string | null;
   /** Clothing | Light | Heavy | null (non-armour gear). */
   category: string | null;
+  /** How this one looks (item data.look), painted instead of name + material. */
+  look?: string | null;
 }
 
 export interface PortraitInputs {
@@ -451,7 +453,8 @@ export async function gatherPortraitInputs(characterId: string): Promise<Portrai
   if (!c) throw new NotFoundError('Character not found');
   const sheet = parseSheet(c.data);
   const designer = restoreDesigner(sheet.identity);
-  const possessive = possessiveFor(sheet.identity?.sex);
+  // The designer writes sex into physicalDescription.gender; identity.sex is often unset (Kristopher painted as 'her', 2026-10-17).
+  const possessive = possessiveFor(sheet.identity?.sex ?? (sheet.identity as { physicalDescription?: { gender?: string } } | undefined)?.physicalDescription?.gender);
   const campaignId = c.campaignId ?? null;
 
   // Where she is: located_at first, else her home (PLACE_RELATIONS order).
@@ -535,12 +538,13 @@ export async function gatherPortraitInputs(characterId: string): Promise<Portrai
   const archName = new Map(archetypes.map(a => [a.id, a.name]));
   const equipped: EquippedPiece[] = [];
   for (const h of held) {
-    let d: { equippedTo?: string; description?: string; primaryMaterial?: string; material?: string; armorCategory?: string } = {};
+    let d: { equippedTo?: string; description?: string; primaryMaterial?: string; material?: string; armorCategory?: string; look?: string; concealed?: boolean } = {};
     try { d = JSON.parse(h.data) as typeof d; } catch { d = {}; }
     if (!d.equippedTo) continue;
+    if (d.concealed) continue; // worn hidden (the cross under his shirt, 2026-10-17): the camera never sees it
     equipped.push({
       itemId: h.id, name: h.name, archetype: h.sourceForgeItemId ? archName.get(h.sourceForgeItemId) ?? null : null,
-      region: d.equippedTo, description: d.description ?? null, material: d.primaryMaterial ?? d.material ?? null, category: d.armorCategory ?? null,
+      region: d.equippedTo, description: d.description ?? null, material: d.primaryMaterial ?? d.material ?? null, category: d.armorCategory ?? null, look: d.look ?? null,
     });
   }
 
