@@ -53,6 +53,7 @@ Each later test adds one of the excluded pieces.
 |---|---|---|---|---|
 | A1 | **Portrait.** Settle the bust framing for the 2:3 frame, repaint at 1024×1536, approve it onto `Character.portrait`, set `GENESIS_PORTRAIT_GATE=on`. Right now her portrait field points at a training-folder thumbnail, `approvedPortraitPath` is empty, and there are 0 generation rows. | the 2 proofs are the old 864×944 shape | Mike: framing call, OK to spend. Me: prompt and run. | ½ day |
 | A2 | **4th GRO.vine.** The fix shipped (73cf120); right-click → Complete. | needs Mike's click (JEWL cloud call) | Mike | minutes |
+| A3-done | **DONE 17 Oct.** 89 memories dated from their own text (ages 3.5 → 24.99); source tags normalized; `daya_seed_memory` now takes `atAge`. **NEW, Mike to decide:** two genesis runs left TWO conflicting biographies. Rows from the older runs (Rosemary dies "Tuesday" vs "Thursday in March"; one self-published book with 47 downloads vs the THREE published novels of the newest run) sit beside the new ones. | decision |
 | A3 | **Her memories are all at cycle 0.** All 93 are dated "now", but she was born at cycle −25. Recall by time ("when I was a girl…") and fallible memory need dates. Build a re-dating pass that places each genesis memory in her life, using its source (item/mark/place/person story), her blocks' years and the root/branch timeline. Also fix the source tags, which are written two ways (with and without brackets; 4 items have a memory under both). | not built | me (deterministic plus a JEWL pass; ask before spending) | ½–1 day |
 | A4 | **Session start has never been run in the Incubator.** 0 GameSession rows. The only way in is typing `/session start`, and the TABLE tab only appears while a session is open. Add a Start/End Session button, then do a **dry-run session**. | code exists, never exercised | me + Mike rehearsal | ½ day |
 | A5 | **Table loop speed.** `TABLE_SPLIT_LOOP` is off, so the old serial loop runs at ~50 s per turn (10-01 measurement). Turn it on and run the U2d live harness (billable). Check the cold-start overlay and keep-warm (~100–340 s cold start). | built behind the flag, never run live | Mike: OK to spend, plus the 4 owed U2c answers | 1 day |
@@ -173,6 +174,49 @@ All are decisions pending from Mike (17 Oct thread), deferred for an ordinary-li
 8. **Vitals & Equipment design** (a 20-minute session).
 9. **Inventory:** what looks buggy to you?
 10. **OK to spend:** the U2d live run, the A3 JEWL pass, the repaint, and Complete.
+
+## SESSION 0 — the five-dollar bill (Mike, 17 Oct: "could we do an actual test of that… sort of a session 0")
+
+**The scene:**
+- **When:** Saturday 17 October 2026, ~7 pm. Cycle 0 = 17 Oct; the clock is set to 0.0022 ≈ 19:00. The campaign proper opens a week later, on 24 Oct.
+- **Who:**
+  - Violet, AI-run, in her studio. She has DECIDED (a 1 pm memory): the bill is folded by the door, she will give it to him as the tip tonight, and the terms are call → something new / no call → the Fifth Street shelter and the cat.
+  - Kristopher (NPC, **voiced by Mike as Watcher**), on the Fourth-floor landing at her door, holding the pizza (Hawaiian + black olives).
+- **The door:** locked from inside; tap a door to cycle it.
+
+**Built 17 Oct (no GPU):**
+- 32 memories retired → `app/data/archive/violet-retired-memories-2026-10-17.json`: the duplicate older biography, the self-published-book conflict, and the handing-over.
+- The landing (10×20 ft, against her entry wall, stair down at the far end), the entry door relinked to it, Kristopher + the pizza + the bill (`tmp/session0-setup.ts`), the Kristopher world fact.
+
+**Run it (when the GPU budget allows — today's is spent):**
+1. Open the Incubator → ▶ Session. The warm-up overlay covers the ~100 s cold start.
+2. TABLE tab: narrate the knock, then speak as Kristopher.
+3. Violet answers through her own lane. Expect 30–50 s a reply (TABLE_SPLIT_LOOP off).
+4. Open, unlock and hand over by narration; JEWL can `set_door`.
+5. End the session.
+6. **Afterwards:** read what she remembers and whether the bill changed hands (canon + her memory).
+
+**Parked after session 0 (17 Oct, from building Kristopher):**
+- Kristopher's mechanics review. Mike: "his attributes look pretty low". Clout 6, Celerity 8, Constitution 12, Flow 13, Focus 15, Willpower 17, Wisdom 17, Wit 11 (Violet: 8/9/9/10/17/16/14/13). He still needs his new 7-year turbulent branch (Miami → TN, 1st marriage, 2 kids), which will add levels.
+- Designer: the server should persist each paint itself, so a reload can't orphan it. The age slider defaults to 25 and is sent as the age. The sex lives in `physicalDescription.gender`, so an empty value = the unknown-sex underwear.
+- Genesis: post-build stages (WORLD/MEMORIES) re-run after BUILDING already did that work, and JEWL calls them "build churn". "her" is hard-coded for every character, in the stage texts AND in the character-creation prod window (Mike spotted it on Kristopher). It needs the sheet's pronouns everywhere.
+- **Tapestry → Entities: clicking Kristopher sometimes opens Violet** (Mike, 17 Oct). It's intermittent. Suspect a stale selection or index/key mix-up in the entity list (components/tapestry/EntityView.tsx / TapestryTab.tsx). Not diagnosed.
+- **Tapestry → Entities is slow to load** (Mike, 17 Oct). Measure it first: which request and how long. The campaign has 98 items plus memories, so it may be loading everything up front.
+- **Character sheet: everything above the GRO.vines and Opportunities needs visual clarity** (Mike, 17 Oct). The tooltips don't match each other; the root/branch tooltips are the standard the rest should follow. The information is displayed poorly. Needs a design pass.
+- **★ Portrait clothing comes from the engine, not hard prompts** (Mike, 17 Oct: "these are things in the engine dynamically… Items get their image generated (this isn't happening yet). Then that can be used as a reference in addition to the visual details"). The design:
+  1. Every item gets its own generated image.
+  2. The portrait paint takes each worn item's image as a reference, plus its visual details.
+  3. Placement comes from the body region; hidden/shown comes from the layer; the look comes from the item's own data/story.
+  4. JEWL's brief step must not silently time out.
+  - My 17 Oct patches are to be REMOVED when this lands: the word list in portrait-visibility (cross|prayer rope|rosary…) and the hand-written `look` text on Kristopher's 4 items. Commit 89111c6. Keep the pronoun fix and the concealed flag as data.
+- **★ JEWL needs far more control** (Mike, 17 Oct: "we are bypassing JEWL a lot and having you do this stuff and that is a note of how much more control JEWL needs"). On Kristopher alone I did by hand, because JEWL couldn't or didn't: fix the brief's AGE, re-balance branch years, seat corrected vines, move a prod answer, restore lost paints, grant every possession plus 5 new blueprints, and set the income. Each is a missing or failing JEWL capability: revise goal, revise years, materialize item blocks, finish request_tool rounds, and draft + publish item blueprints in one flow.
+- **Cold starts make every designer step ~3–6 min.** The portrait worker idles out after 30 s, so each click between steps waits on a new H100 boot plus a model load. The portrait brief also called the text lane, which was THROTTLED (no H100 free), and it timed out after 30 s.
+- **JEWL table-chat turns are slow.** Kristopher's possessions message (13:30:53) got its first reply at 13:33:58, and that round only *requested* place_item; placing comes next round. That's about 3 min a round on the local lane with 5.4k tokens of tools. The reply also leaked a "[2026-10-17T13:09:35Z]:" timestamp prefix into the text.
+- **Nectar/thorn tooltips name conditions without saying what they do** (Mike, 17 Oct). "confused" etc. is mentioned, but the tooltip doesn't show which blossom that is or what it does mechanically. Tooltips should resolve the condition → blossom → its effect.
+- **Possessions attached as blueprints, never made into things.** JEWL linked 4 item *blueprints* to Kristopher (Smartphone, Ballpoint Pen, Sticky Note Pad, Personal Laptop are all CharacterBlockLinks of type item). No CampaignItem was created, though, so he owns nothing on the map or sheet, and the portrait tab has nothing to dress him from. Something in genesis has to turn an attached item block into a real owned item. Audit the other "done" claims too.
+- **Possessions must be asked, not assumed** (Mike, 17 Oct: "JEWL didn't ask about any possessions during the build. This should be important step with the user"). Kristopher got Smartphone/Pen/Sticky Notes/Laptop in BUILDING with no question. Possessions need their own question round with the player/GM, like the other stages.
+- **Body composition comes largely from the attributes** (Mike, 17 Oct). The body render and build should read from Clout/Celerity/Constitution (etc.), not be free-picked or guessed.
+- Kristopher's GRO.vines: JEWL wrote all 4 before the "Mike writes them" note landed. Mike corrected #2 and #4 at the check-in, but **JEWL has no tool to change a seated goal**: author_vine_goal only adds, so he hit "slots full" and stalled. I applied the corrections by hand. Needed: a revise_vine_goal tool, or the check-in applying keep/change/cut itself.
 
 ## Proposed week (if scope = shakedown)
 
