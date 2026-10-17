@@ -29,6 +29,7 @@ const seedMemorySchema = z.object({
   salience: z.number().min(0).max(1).optional(),
   /** Narrative cycle this memory is anchored to; defaults to the campaign's current cycle. */
   cycle: z.number().optional(),
+  atAge: z.number().min(0).max(10000).optional().describe('Her age in years when she LIVED this (a childhood memory at 6, the lease at 19). Give it for every past memory; omit only for what is happening now.'),
   /** Provenance key (genesis MEMORIES stage: genesis:item:<id> etc.); defaults to "seed". */
   source: z.string().max(80).optional(),
 });

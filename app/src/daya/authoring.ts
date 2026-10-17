@@ -255,7 +255,16 @@ export interface SeedMemoryInput {
   arousal?: number;
   salience?: number;
   cycle?: number;
+  /** Her age (years) when this was lived — resolved against her birth cycle (2026-10-17: every genesis memory had landed at "now"). */
+  atAge?: number;
   source?: string;
+}
+
+/** The cycle a memory was lived at: an explicit cycle, else birth + age, else the campaign's now. Pure. */
+export function seedMemoryCycle(m: { cycle?: number; atAge?: number }, birthCycle: number | null, fallback: number): number {
+  if (typeof m.cycle === 'number') return m.cycle;
+  if (typeof m.atAge === 'number' && typeof birthCycle === 'number') return Math.round((birthCycle + m.atAge) * 1000) / 1000;
+  return fallback;
 }
 
 /**
@@ -279,6 +288,8 @@ export async function seedEntityMemories(
   if (!entity) throw new NotFoundError('Character is not wrapped as a DAYA entity yet — wrap it first');
 
   const cycleFallback = character.campaignId ? await currentCycleOf(character.campaignId) : 0;
+  let birthCycle: number | null = null;
+  try { const b = (JSON.parse(character.data) as { birthCycle?: unknown }).birthCycle; birthCycle = typeof b === 'number' ? b : null; } catch { birthCycle = null; }
 
   memories.forEach((m, i) => {
     const hits = sealLint(m.content);
@@ -294,7 +305,7 @@ export async function seedEntityMemories(
   for (const m of memories) {
     const row = await writeMemoryEntry({
       entityId: entity.id,
-      narrativeCycle: m.cycle ?? cycleFallback,
+      narrativeCycle: seedMemoryCycle(m, birthCycle, cycleFallback),
       source: m.source ?? 'seed',
       content: m.content,
       valence: m.valence ?? 0,

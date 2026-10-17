@@ -250,6 +250,7 @@ export const COMPLETION_STAGE_LAW: Record<GenesisPostSheetStage, string> = {
   MEMORIES: [
     'STAGE: MEMORIES — one memory for every thing built: each item she owns, each mark on her face and body, each place, each person.',
     '- daya_seed_memory in batches: first-person lived experience in HER register, no game vocabulary. Three weights — fleeting (one line: "bought at the corner store, nothing to it"), held (how it came to her, 2–4 sentences), chain (a thread across years, cross-linked to a person or place). Salience follows the weight.',
+    '- Each memory carries `atAge` — her age in years when she LIVED it (the rabbit at 4, the lease at 19), read from her roots and branches; omit it only for what is happening now. Without it a childhood memory lands at today.',
     '- Each memory carries its KEY as `source` exactly as the brief prints it ([genesis:item:<id>], [genesis:mark:<face|body>:<n>], [genesis:place:<id>], [genesis:person:<id>]) so the brief can tick it off; name the thing in the content too so the memory survives losing it. Memory belongs to the PERSON; the object keeps its own history.',
     '- Marks (scars, tattoos, piercings, birthmarks, body mods, makeup) come from her approved look: how each came to be — invent from her life unless the brief or the settled answers say; never answer an OPEN THREAD.',
   ].join('\n'),
