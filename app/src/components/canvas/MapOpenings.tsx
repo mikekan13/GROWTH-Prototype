@@ -77,8 +77,10 @@ export default function MapOpenings({ campaignId, homeId, openings, canEdit }: P
             )}
             {(o.kind === 'archway' || o.kind === 'opening') && (
               <>
-                <line x1={o.a.x - nx * 8} y1={o.a.y - ny * 8} x2={o.a.x + nx * 8} y2={o.a.y + ny * 8} stroke="rgba(203,217,232,0.8)" strokeWidth={6} />
-                <line x1={o.b.x - nx * 8} y1={o.b.y - ny * 8} x2={o.b.x + nx * 8} y2={o.b.y + ny * 8} stroke="rgba(203,217,232,0.8)" strokeWidth={6} />
+                {/* the threshold: a pale dashed line across the gap, bold jambs at each side */}
+                <line x1={o.a.x} y1={o.a.y} x2={o.b.x} y2={o.b.y} stroke="rgba(203,217,232,0.75)" strokeWidth={4} strokeDasharray="14 10" />
+                <line x1={o.a.x - nx * 14} y1={o.a.y - ny * 14} x2={o.a.x + nx * 14} y2={o.a.y + ny * 14} stroke="rgba(203,217,232,0.9)" strokeWidth={8} strokeLinecap="round" />
+                <line x1={o.b.x - nx * 14} y1={o.b.y - ny * 14} x2={o.b.x + nx * 14} y2={o.b.y + ny * 14} stroke="rgba(203,217,232,0.9)" strokeWidth={8} strokeLinecap="round" />
               </>
             )}
             {state === 'locked' && (

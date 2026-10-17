@@ -250,7 +250,8 @@ export default function RelationsCanvas({
   const [measured, setMeasured] = useState(false);
   // Max zoom IN. 1x on a laptop; a phone may go closer so one 520-wide card
   // fits its 412 px (2026-10-06: at 1x the floor was 474 world units across).
-  const MIN_ZOOM = containerSize.width < 768 ? 0.45 : 1.0;
+  // The map needs room-scale close-ups (2026-10-17: a 20-ft studio could not fill the screen).
+  const MIN_ZOOM = containerSize.width < 768 ? 0.2 : 0.3;
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
