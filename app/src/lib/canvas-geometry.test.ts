@@ -157,3 +157,23 @@ describe('openings (doors, windows — 2026-10-17)', () => {
     expect(out[1].state).toBeUndefined();
   });
 });
+
+describe('grid snapping + walls (2026-10-17)', () => {
+  it('walls snap to half-squares; people to square centres', async () => {
+    const { snapOutline, cellCentre } = await import('./canvas-geometry');
+    expect(snapOutline([{ x: 0.4, y: 0 }, { x: 19.8, y: 0 }, { x: 20, y: 8.2 }, { x: 0, y: 7.9 }])).toEqual([{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 7.5 }, { x: 0, y: 7.5 }]);
+    expect(cellCentre(7.3, 5)).toBe(7.5);
+    expect(cellCentre(12, 5)).toBe(12.5);
+  });
+  it('a door on the bathroom\'s outer wall joins the bathroom and OUTSIDE; on the shared wall it joins both rooms', async () => {
+    const { openingSides, snapOpeningToWall, wallEdges } = await import('./canvas-geometry');
+    const home = [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 22 }, { x: 0, y: 22 }];
+    const bath = { owner: 'Bathroom', points: [{ x: 0, y: 15 }, { x: 5, y: 15 }, { x: 5, y: 22 }, { x: 0, y: 22 }] };
+    const main = { owner: 'Main Room', points: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 22 }, { x: 5, y: 22 }, { x: 5, y: 15 }, { x: 0, y: 15 }] };
+    expect(openingSides({ x: 0, y: 17 }, { x: 0, y: 20 }, [bath, main], home)).toEqual(['Bathroom', 'outside']);
+    expect(openingSides({ x: 5, y: 17 }, { x: 5, y: 20 }, [bath, main], home).sort()).toEqual(['Bathroom', 'Main Room']);
+    const snapped = snapOpeningToWall({ x: 4.6, y: 17 }, { x: 4.7, y: 20 }, wallEdges([bath, main]));
+    expect(snapped.from.x).toBe(5);
+    expect(snapped.to.x).toBe(5);
+  });
+});

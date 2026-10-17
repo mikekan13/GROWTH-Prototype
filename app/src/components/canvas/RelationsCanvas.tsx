@@ -4174,8 +4174,11 @@ export default function RelationsCanvas({
         {/* â”€â”€ Definitions â”€â”€ */}
         <defs>
           {/* Grid pattern */}
-          <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-            <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#1a1a1a" strokeWidth="1" opacity="0.5" />
+          {/* The map grid = 5-ft squares (100 units) with a faint half-square line —
+              what JEWL's drawings snap to (Mike 2026-10-17). */}
+          <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+            <path d="M 50 0 L 50 100 M 0 50 L 100 50" fill="none" stroke="#1c2433" strokeWidth="1" opacity="0.45" />
+            <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#2a3a55" strokeWidth="1.5" opacity="0.75" />
           </pattern>
 
           {/* Circuit-trace pattern */}

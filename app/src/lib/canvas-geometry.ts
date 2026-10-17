@@ -366,3 +366,67 @@ export function visibleOnLevel(place: LeveledPlace, level: number | null): boole
   if (place.level === level) return true;
   return (place.connects ?? []).includes(level);
 }
+
+// ── Grid snapping + walls (Mike 2026-10-17: "We have a grid already in the
+// background and it should snap to that as best it can"; "her bathroom has a
+// door to outside"). All in FEET in a home's frame; the map grid is 5-ft
+// squares with half-square (2.5 ft) lines.
+export const GRID_FT = 5;
+export const HALF_GRID_FT = GRID_FT / 2;
+
+/** Nearest multiple of `step`. Pure. */
+export function snapTo(v: number, step: number): number {
+  return Math.round(v / step) * step;
+}
+/** Centre of the cell of size `step` that holds v. Pure. */
+export function cellCentre(v: number, step: number): number {
+  return Math.floor(v / step) * step + step / 2;
+}
+/** Walls on half-squares. Pure. */
+export function snapOutline(points: Point[]): Point[] {
+  const out = points.map(p => ({ x: snapTo(p.x, HALF_GRID_FT), y: snapTo(p.y, HALF_GRID_FT) }));
+  return out.filter((p, i) => i === 0 || p.x !== out[i - 1].x || p.y !== out[i - 1].y);
+}
+
+export interface WallEdge { owner: string; a: Point; b: Point }
+
+/** Every edge of every polygon, tagged with its owner. Pure. */
+export function wallEdges(polys: Array<{ owner: string; points: Point[] }>): WallEdge[] {
+  const out: WallEdge[] = [];
+  for (const p of polys) for (let i = 0; i < p.points.length; i++) out.push({ owner: p.owner, a: p.points[i], b: p.points[(i + 1) % p.points.length] });
+  return out;
+}
+
+function projectOnSegment(p: Point, a: Point, b: Point): { point: Point; dist: number } {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const L = dx * dx + dy * dy;
+  const t = L === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L));
+  const q = { x: a.x + t * dx, y: a.y + t * dy };
+  return { point: q, dist: Math.hypot(p.x - q.x, p.y - q.y) };
+}
+
+/** Put an opening ON the nearest wall: both ends projected onto the wall its middle is closest to. Pure. */
+export function snapOpeningToWall(from: Point, to: Point, edges: WallEdge[]): { from: Point; to: Point; wall: WallEdge | null } {
+  const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+  let best: { e: WallEdge; d: number } | null = null;
+  for (const e of edges) {
+    const d = projectOnSegment(mid, e.a, e.b).dist;
+    if (!best || d < best.d) best = { e, d };
+  }
+  if (!best) return { from, to, wall: null };
+  const r = (p: Point) => { const q = projectOnSegment(p, best!.e.a, best!.e.b).point; return { x: Math.round(q.x * 2) / 2, y: Math.round(q.y * 2) / 2 }; };
+  return { from: r(from), to: r(to), wall: best.e };
+}
+
+/**
+ * What an opening really joins, from the walls it sits on: every ROOM whose
+ * wall carries it; if only one room does and the HOME outline carries it
+ * too, the other side is outside. Pure.
+ */
+export function openingSides(from: Point, to: Point, rooms: Array<{ owner: string; points: Point[] }>, home: Point[] | null, tol = 0.35): string[] {
+  const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+  const onWalls = (pts: Point[]) => wallEdges([{ owner: '', points: pts }]).some(e => projectOnSegment(mid, e.a, e.b).dist <= tol);
+  const sides = rooms.filter(r => onWalls(r.points)).map(r => r.owner);
+  if (sides.length < 2 && home && onWalls(home)) sides.push('outside');
+  return [...new Set(sides)];
+}
