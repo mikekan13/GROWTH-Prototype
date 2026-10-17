@@ -64,6 +64,10 @@ function parseTaggerJson(raw: string): TaggerResult | null {
   try {
     const cleaned = raw.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
     const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+    // The prompt asks for "activation" (2026-10-17: the word "arousal" in the tagger's own
+    // instructions tripped the tone filter, Claude got a withheld placeholder instead of the
+    // instructions, the JSON failed, and every ingest retried). Stored as arousal.
+    if (typeof parsed.arousal !== 'number' && typeof parsed.activation === 'number') parsed.arousal = parsed.activation;
     if (
       typeof parsed.valence !== 'number' ||
       typeof parsed.arousal !== 'number' ||

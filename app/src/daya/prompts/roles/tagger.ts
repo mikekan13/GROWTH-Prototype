@@ -31,7 +31,7 @@ export function buildTaggerPrompt(args: TaggerPromptArgs): string {
   return `You annotate a moment of experience for a memory archive. Output ONLY JSON:
 {
  "valence": -1..1        (how it felt: harm/loss negative, warmth/relief positive),
- "arousal": 0..1         (calm → activating),
+ "activation": 0..1      (calm → activating),
  "salience": 0..1        (how likely a human would remember this in a year),
  "entityRefs": [ids from the provided roster present or referenced],
  "classification": {
