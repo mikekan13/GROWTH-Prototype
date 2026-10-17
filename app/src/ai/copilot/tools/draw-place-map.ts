@@ -20,6 +20,9 @@ export const drawPlaceMapTool: JewlTool = {
     'y down): the home outline, each room\'s outline inside it (rooms must already exist — organize_place first), and ' +
     'where every floor thing and every person stands. 5-ft squares: a person fills one square (centre them in it); a ' +
     'bed, couch or desk covers the squares it really covers — give its centre. Things inside containers are not drawn. ' +
+    'OPENINGS: every door (with its state: open/closed/locked), window and archway, as a segment ON a wall line ' +
+    '(fromFt→toFt, a door ~3 ft) and what it joins (rooms, or "outside"/"stairwell"/"fire escape"). Already drawn? ' +
+    'omit outlineFt/rooms and send only what changes. ' +
     'Use the sizes the description gives (sq ft, dimensions); never contradict them.',
   inputSchema: placeMapSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {

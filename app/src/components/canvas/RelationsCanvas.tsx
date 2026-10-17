@@ -35,6 +35,7 @@ import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight, drawnPlaceRect } from "./FolderGroup";
 import { settle, packFolder, pickRoomAt, type SettleNode, type SettleFolder, type SettlePriority } from "./canvas-settle";
 import CharacterToken from "./CharacterToken";
+import MapOpenings from "./MapOpenings";
 import { clampCameraToContent, contentBoxOf, maxZoomForContent, type Rect as WorldRect } from "./camera-bounds";
 import FolderGroup from "./FolderGroup";
 
@@ -4548,6 +4549,11 @@ export default function RelationsCanvas({
             />
           );
         })}
+
+        {/* ── Doors, windows, archways on the walls (2026-10-17): above the rooms, below the tokens ── */}
+        {visibleFolders.filter(f => f.locationInfo?.openings && f.locationInfo.openings.length > 0).map(f => (
+          <MapOpenings key={`openings-${f.id}`} campaignId={campaignId ?? ''} homeId={f.locationInfo!.locationId} openings={f.locationInfo!.openings!} canEdit={!!isGM} />
+        ))}
 
         {/* â”€â”€ Character nodes (foreignObject cards) â€” sorted by z-index â”€â”€ */}
         {/* Hide nodes inside collapsed folders */}

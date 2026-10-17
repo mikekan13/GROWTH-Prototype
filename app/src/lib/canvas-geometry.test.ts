@@ -135,3 +135,25 @@ describe('levels', () => {
     expect(visibleOnLevel(places[1], null)).toBe(true);
   });
 });
+
+describe('openings (doors, windows — 2026-10-17)', () => {
+  it('a tapped door cycles closed → open → locked → closed', async () => {
+    const { nextDoorState } = await import('./canvas-geometry');
+    expect(nextDoorState('closed')).toBe('open');
+    expect(nextDoorState('open')).toBe('locked');
+    expect(nextDoorState('locked')).toBe('closed');
+    expect(nextDoorState(undefined)).toBe('open');
+  });
+  it('parseOpenings keeps well-formed openings and drops the rest', async () => {
+    const { parseOpenings } = await import('./canvas-geometry');
+    const out = parseOpenings([
+      { id: 'op-1', kind: 'door', a: { x: 0, y: 0 }, b: { x: 60, y: 0 }, between: ['Main Room', 'outside'], state: 'locked' },
+      { id: 'op-2', kind: 'window', a: { x: 0, y: 0 }, b: { x: 80, y: 0 }, between: ['Main Room'] },
+      { id: 'bad', kind: 'portal', a: { x: 0, y: 0 }, b: { x: 1, y: 1 } },
+      { kind: 'door', a: { x: 0, y: 0 }, b: { x: 1, y: 1 } },
+    ]);
+    expect(out.map(o => o.id)).toEqual(['op-1', 'op-2']);
+    expect(out[0].state).toBe('locked');
+    expect(out[1].state).toBeUndefined();
+  });
+});

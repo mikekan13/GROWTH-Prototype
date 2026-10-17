@@ -86,6 +86,55 @@ export function parsePassageLinks(raw: unknown): PassageLink[] {
   return out;
 }
 
+/**
+ * OPENINGS (Mike 2026-10-17: "We need openings, doors windows ect… we need
+ * doors at least for now"). Stored on the HOME Location (`data.openings`):
+ * a wall segment a→b in absolute map units, what it joins, and — for a
+ * door — whether it stands open, closed or locked.
+ */
+export type OpeningKind = 'door' | 'window' | 'archway' | 'opening';
+export type DoorState = 'open' | 'closed' | 'locked';
+export const OPENING_KINDS: readonly OpeningKind[] = ['door', 'window', 'archway', 'opening'];
+export const DOOR_STATES: readonly DoorState[] = ['open', 'closed', 'locked'];
+export interface Opening {
+  id: string;
+  kind: OpeningKind;
+  a: Point;
+  b: Point;
+  /** What it joins: room names, or "outside" / "stairwell" / "fire escape". */
+  between: string[];
+  state?: DoorState;
+  name?: string;
+}
+
+export function parseOpenings(raw: unknown): Opening[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Opening[] = [];
+  for (const o of raw) {
+    if (!o || typeof o !== 'object') continue;
+    const r = o as Record<string, unknown>;
+    const a = r.a as Record<string, unknown> | undefined;
+    const b = r.b as Record<string, unknown> | undefined;
+    if (typeof r.id !== 'string' || !OPENING_KINDS.includes(r.kind as OpeningKind)) continue;
+    if (!a || !b || !isFiniteNum(a.x) || !isFiniteNum(a.y) || !isFiniteNum(b.x) || !isFiniteNum(b.y)) continue;
+    out.push({
+      id: r.id,
+      kind: r.kind as OpeningKind,
+      a: { x: a.x, y: a.y },
+      b: { x: b.x, y: b.y },
+      between: Array.isArray(r.between) ? r.between.filter((s): s is string => typeof s === 'string') : [],
+      ...(DOOR_STATES.includes(r.state as DoorState) ? { state: r.state as DoorState } : {}),
+      ...(typeof r.name === 'string' ? { name: r.name } : {}),
+    });
+  }
+  return out;
+}
+
+/** The next door state when tapped: closed → open → locked → closed. Pure. */
+export function nextDoorState(s: DoorState | undefined): DoorState {
+  return s === 'closed' || s === undefined ? 'open' : s === 'open' ? 'locked' : 'closed';
+}
+
 /** The DEFAULT footprint: the folder rectangle itself, four corners clockwise. */
 export function defaultFootprintFromRect(rect: Rect, level = DEFAULT_LEVEL, scale = DEFAULT_SCALE_FT_PER_UNIT): Footprint {
   const { x, y, width, height } = rect;

@@ -2,7 +2,7 @@
  * Canvas Folder — groups cards on the Relations Canvas.
  * Persisted to localStorage per campaign.
  */
-import type { Footprint, PassageLink } from '@/lib/canvas-geometry';
+import type { Footprint, PassageLink, Opening } from '@/lib/canvas-geometry';
 
 export interface CanvasFolder {
   id: string;
@@ -69,5 +69,7 @@ export interface CanvasFolder {
     footprint?: Footprint;
     /** A passage (stairs, fire escape, elevator): the levels it links. */
     connects?: PassageLink[];
+    /** Doors, windows, archways on this place's walls (absolute map units, 2026-10-17). */
+    openings?: Opening[];
   };
 }

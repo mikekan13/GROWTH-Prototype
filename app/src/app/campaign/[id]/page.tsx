@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import CampaignCanvas from '@/components/CampaignCanvas';
 import { locationDepths } from '@/components/canvas/canvas-lod';
-import { parseFootprint, parsePassageLinks, parseTokenPosition, footprintBounds, fractionToWorld, tokenArea, autoLayoutGrid, LOCATION_HEADER_ESTIMATE, TOKEN_CELL } from '@/lib/canvas-geometry';
+import { parseFootprint, parsePassageLinks, parseOpenings, parseTokenPosition, footprintBounds, fractionToWorld, tokenArea, autoLayoutGrid, LOCATION_HEADER_ESTIMATE, TOKEN_CELL } from '@/lib/canvas-geometry';
 import { recomputeAugments } from '@/lib/character-actions';
 import { warmLocalLane } from '@/lib/local-warm';
 import { canEnterAdultCampaign } from '@/lib/permissions';
@@ -377,10 +377,11 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
             tags: Array.isArray(loc.data.tags) ? (loc.data.tags as unknown[]).filter((t): t is string => typeof t === 'string') : undefined,
             timescaleId: typeof loc.data.timescaleId === 'string' ? loc.data.timescaleId : undefined,
             // The map (2026-10-16): shape + story; a passage's links.
-            ...((): { footprint?: NonNullable<ReturnType<typeof parseFootprint>>; connects?: ReturnType<typeof parsePassageLinks> } => {
+            ...((): { footprint?: NonNullable<ReturnType<typeof parseFootprint>>; connects?: ReturnType<typeof parsePassageLinks>; openings?: ReturnType<typeof parseOpenings> } => {
               const fp = parseFootprint(loc.data.footprint);
               const connects = parsePassageLinks(loc.data.connects);
-              return { ...(fp ? { footprint: fp } : {}), ...(connects.length > 0 ? { connects } : {}) };
+              const openings = parseOpenings(loc.data.openings);
+              return { ...(fp ? { footprint: fp } : {}), ...(connects.length > 0 ? { connects } : {}), ...(openings.length > 0 ? { openings } : {}) };
             })(),
           }
         : undefined,

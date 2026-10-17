@@ -469,6 +469,13 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     return () => window.removeEventListener('growth:crystallize-location', handler);
   }, []);
 
+  // The map changed server-side (a door opened, a place redrawn) — refresh through the gate.
+  useEffect(() => {
+    const handler = () => requestRefresh();
+    window.addEventListener('growth:map-changed', handler);
+    return () => window.removeEventListener('growth:map-changed', handler);
+  }, [requestRefresh]);
+
   const commitCrystallize = useCallback(async () => {
     if (!pendingLocationCommit) return;
     setCrystallizing(true);

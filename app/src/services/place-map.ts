@@ -19,7 +19,8 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
-import { DEFAULT_LEVEL, DEFAULT_SCALE_FT_PER_UNIT, footprintBounds, parseFootprint, pointInPolygon, worldToFraction, type Point } from '@/lib/canvas-geometry';
+import { DEFAULT_LEVEL, DEFAULT_SCALE_FT_PER_UNIT, footprintBounds, parseFootprint, parseOpenings, pointInPolygon, worldToFraction, type DoorState, type Opening, type Point } from '@/lib/canvas-geometry';
+import { updateLocation } from './location';
 import { setLocationGeometry, setTokenPosition } from './placement-geometry';
 import { moveCharacterToLocation } from './character-location';
 
@@ -34,11 +35,19 @@ export const placeMapSchema = z.object({
     name: z.string().min(1).max(200).describe('An existing room inside the home (name or id).'),
     outlineFt: z.array(ftPoint).min(3).max(64).describe('The room\'s outline in feet, in the HOME\'s frame (same origin).'),
     ceilingFt: z.number().min(4).max(500).optional(),
-  })).max(30),
+  })).max(30).default([]),
   tokens: z.array(z.object({
     thing: z.string().min(1).max(200).describe('A thing on the floor of a room, or a person (exact name or id).'),
     atFt: ftPoint.describe('Where it stands, in feet, in the HOME\'s frame. People take a 5-ft square; centre them in it.'),
-  })).max(200),
+  })).max(200).default([]),
+  openings: z.array(z.object({
+    kind: z.enum(['door', 'window', 'archway', 'opening']),
+    fromFt: ftPoint.describe('One end of the opening ON a wall line, feet, home frame (a door\'s hinge side).'),
+    toFt: ftPoint.describe('The other end, on the same wall (a door is usually 3 ft wide, a window 3–4 ft).'),
+    between: z.array(z.string().min(1).max(200)).min(1).max(2).describe('What it joins: room names, or "outside" / "stairwell" / "fire escape".'),
+    state: z.enum(['open', 'closed', 'locked']).optional().describe('Doors only: how it stands right now.'),
+    name: z.string().max(80).optional(),
+  })).max(40).optional().describe('Doors, windows, archways. REPLACES the home\'s openings when given.'),
 });
 export type PlaceMapPlan = z.infer<typeof placeMapSchema>;
 
@@ -47,7 +56,28 @@ export interface PlaceMapReport {
   rooms: string[];
   placed: string[];
   people: string[];
+  openings?: number;
   errors: string[];
+}
+
+/** Open / close / lock a door on a home's map (the tap on the canvas, or JEWL). */
+export async function setDoorState(
+  campaignId: string,
+  actor: { userId: string; role: string },
+  homeId: string,
+  openingId: string,
+  state: DoorState,
+): Promise<Opening> {
+  const loc = await prisma.location.findUnique({ where: { id: homeId }, select: { campaignId: true, data: true } });
+  if (!loc || loc.campaignId !== campaignId) throw new NotFoundError('Location not found');
+  const data = parseData(loc.data);
+  const openings = parseOpenings(data.openings);
+  const o = openings.find(x => x.id === openingId);
+  if (!o) throw new NotFoundError('Opening not found');
+  if (o.kind !== 'door') throw new ValidationError('Only a door opens, closes and locks');
+  o.state = state;
+  await updateLocation(homeId, campaignId, actor.userId, actor.role, { data: { ...data, openings } });
+  return o;
 }
 
 /** Feet in the home frame → world units, anchored at `anchor`. Pure. */
@@ -85,9 +115,13 @@ export async function drawPlaceMap(
   const report: PlaceMapReport = { homeId: home.id, rooms: [], placed: [], people: [], errors: [] };
 
   const toWorld = (pts: Array<{ x: number; y: number }>) => pts.map(p => ftToWorld(p, anchor));
-  await setLocationGeometry(campaignId, home.id, actor.userId, actor.role, {
-    footprint: { points: toWorld(plan.outlineFt), scale: DEFAULT_SCALE_FT_PER_UNIT, level, ...(plan.ceilingFt ? { height: plan.ceilingFt } : {}) },
-  });
+  if (plan.outlineFt) {
+    await setLocationGeometry(campaignId, home.id, actor.userId, actor.role, {
+      footprint: { points: toWorld(plan.outlineFt), scale: DEFAULT_SCALE_FT_PER_UNIT, level, ...(plan.ceilingFt ? { height: plan.ceilingFt } : {}) },
+    });
+  } else if (!parseFootprint(homeData.footprint)) {
+    throw new ValidationError(`${home.name} is not drawn yet — give its outlineFt`);
+  }
 
   // Rooms: must already be inside the home (organize_place makes them).
   const childEdges = await prisma.entityRelationship.findMany({
@@ -106,7 +140,20 @@ export async function drawPlaceMap(
     roomPolys.push({ id: room.id, name: room.name, points });
     report.rooms.push(room.name);
   }
-  const roomAt = (p: Point) => roomPolys.find(r => pointInPolygon(p, r.points)) ?? null;
+  // A point on a shared wall lies in two rooms: prefer the thing's own room,
+  // else the smallest room that holds the point.
+  const area = (pts: Point[]) => { const b = footprintBounds(pts); return b.width * b.height; };
+  // Rooms not redrawn in this call keep their drawn shape for placing tokens.
+  for (const id of childIds) {
+    if (roomPolys.some(r => r.id === id)) continue;
+    const l = locations.find(x => x.id === id);
+    const fp = l ? parseFootprint(parseData(l.data).footprint) : null;
+    if (l && fp) roomPolys.push({ id: l.id, name: l.name, points: fp.points });
+  }
+  const roomAt = (p: Point, prefer?: string) => {
+    const hits = roomPolys.filter(r => pointInPolygon(p, r.points));
+    return hits.find(r => r.id === prefer) ?? hits.sort((x, y) => area(x.points) - area(y.points))[0] ?? null;
+  };
 
   // Tokens: things on a room's floor get their spot; people stand where named.
   const [items, people] = await Promise.all([
@@ -118,13 +165,13 @@ export async function drawPlaceMap(
 
   for (const t of plan.tokens) {
     const world = ftToWorld(t.atFt, anchor);
-    const room = roomAt(world);
     const item = find(items, t.thing);
     if (item) {
       const edge = await prisma.entityRelationship.findFirst({
         where: { sourceId: item.id, relationshipType: 'located_at', targetType: 'LOCATION' },
         select: { id: true, targetId: true },
       });
+      const room = roomAt(world, edge?.targetId);
       if (!edge) { report.errors.push(`"${item.name}" is not on a room's floor (inside a container, or unplaced) — place it first`); continue; }
       if (!room || room.id !== edge.targetId) {
         const inRoom = roomPolys.find(r => r.id === edge.targetId)?.name ?? 'another room';
@@ -136,6 +183,7 @@ export async function drawPlaceMap(
       continue;
     }
     const person = find(people, t.thing);
+    const room = roomAt(world);
     if (person) {
       if (!room) { report.errors.push(`${person.name}: (${t.atFt.x},${t.atFt.y}) ft is outside every room`); continue; }
       await moveCharacterToLocation(actor.userId, actor.role, { characterId: person.id, locationId: room.id });
@@ -148,6 +196,20 @@ export async function drawPlaceMap(
       continue;
     }
     report.errors.push(`no thing or person named "${t.thing}"`);
+  }
+  if (plan.openings) {
+    const openings: Opening[] = plan.openings.map((o, i) => ({
+      id: `op-${i + 1}`,
+      kind: o.kind,
+      a: ftToWorld(o.fromFt, anchor),
+      b: ftToWorld(o.toFt, anchor),
+      between: o.between,
+      ...(o.kind === 'door' ? { state: o.state ?? 'closed' } : {}),
+      ...(o.name ? { name: o.name } : {}),
+    }));
+    const fresh = parseData((await prisma.location.findUnique({ where: { id: home.id }, select: { data: true } }))?.data ?? null);
+    await updateLocation(home.id, campaignId, actor.userId, actor.role, { data: { ...fresh, openings } });
+    report.openings = openings.length;
   }
   if (plan.rooms.length > 0 && roomPolys.length === 0) throw new ValidationError(`No room drawn: ${report.errors.join('; ')}`);
   return report;

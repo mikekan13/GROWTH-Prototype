@@ -57,6 +57,7 @@ import './stock-kit';
 import './move-items';
 import './organize-place';
 import './draw-place-map';
+import './set-door';
 
 export { getJewlTool, listJewlTools, registerJewlTool } from './registry';
 export type { JewlTool, JewlToolContext, JewlToolHandlerResult, JewlToolAffectedObjects } from './types';
