@@ -459,3 +459,41 @@ export function openingSides(from: Point, to: Point, rooms: Array<{ owner: strin
   if (sides.length < 2 && home && onWalls(home)) sides.push('outside');
   return [...new Set(sides)];
 }
+
+// ── Things take up space (Mike 2026-10-17: "items can take up space too and be
+// irregular sizes just like a location. If it takes up less than a 5b5 then…
+// small little pins"). A thing's map shape = polygon in FEET around its centre.
+export interface MapShape { points: Point[] }
+/** Pin diameter for a thing smaller than a square (world units ≈ 1.2 ft). */
+export const PIN_DIAMETER = 24;
+
+/** A w×d rectangle (or a given outline) centred on the thing, rotated by 0/90/180/270. Pure. */
+export function makeMapShape(opts: { sizeFt?: { w: number; d: number }; outlineFt?: Point[]; rotation?: number }): MapShape | null {
+  let pts: Point[];
+  if (opts.outlineFt && opts.outlineFt.length >= 3) {
+    const b = footprintBounds(opts.outlineFt);
+    pts = opts.outlineFt.map(p => ({ x: p.x - b.x - b.width / 2, y: p.y - b.y - b.height / 2 }));
+  } else if (opts.sizeFt && opts.sizeFt.w > 0 && opts.sizeFt.d > 0) {
+    const { w, d } = opts.sizeFt;
+    pts = [{ x: -w / 2, y: -d / 2 }, { x: w / 2, y: -d / 2 }, { x: w / 2, y: d / 2 }, { x: -w / 2, y: d / 2 }];
+  } else return null;
+  const r = (((opts.rotation ?? 0) % 360) + 360) % 360;
+  const rot = (p: Point): Point => r === 90 ? { x: -p.y, y: p.x } : r === 180 ? { x: -p.x, y: -p.y } : r === 270 ? { x: p.y, y: -p.x } : p;
+  return { points: pts.map(rot).map(p => ({ x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100 })) };
+}
+
+export function parseMapShape(raw: unknown): MapShape | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const pts = (raw as { points?: unknown }).points;
+  if (!Array.isArray(pts) || pts.length < 3) return null;
+  const out: Point[] = [];
+  for (const p of pts) { const q = p as Record<string, unknown>; if (!isFiniteNum(q?.x) || !isFiniteNum(q?.y)) return null; out.push({ x: q.x as number, y: q.y as number }); }
+  return { points: out };
+}
+
+/** Drawn as its shape when its long side reaches a 5-ft square; else a pin. Pure. */
+export function drawsAsShape(shape: MapShape | null): boolean {
+  if (!shape) return false;
+  const b = footprintBounds(shape.points);
+  return Math.max(b.width, b.height) >= GRID_FT;
+}

@@ -13,7 +13,20 @@ import { createPortal } from 'react-dom';
 import type { GrowthWorldItem } from '@/types/item';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { itemTokenTooltip } from './folder-tooltips';
-import { TOKEN_DIAMETER, tokenMark, tokenRingColor } from '@/lib/canvas-geometry';
+import { TOKEN_DIAMETER, PIN_DIAMETER, DEFAULT_SCALE_FT_PER_UNIT, drawsAsShape, footprintBounds, parseMapShape, polygonPointsAttr, tokenMark, tokenRingColor } from '@/lib/canvas-geometry';
+
+/**
+ * How big a thing is on the map (Mike 2026-10-17: "items can take up space
+ * too… if smaller than that then maybe small little pins"): its SHAPE in
+ * world units when its long side reaches 5 ft, else a pin. Pure.
+ */
+export function itemTokenBox(data: unknown): { w: number; h: number; points: Array<{ x: number; y: number }> | null } {
+  const shape = parseMapShape((data as { mapShape?: unknown } | null)?.mapShape);
+  if (!drawsAsShape(shape)) return { w: shape ? PIN_DIAMETER : TOKEN_DIAMETER * 0.75, h: shape ? PIN_DIAMETER : TOKEN_DIAMETER * 0.75, points: null };
+  const b = footprintBounds(shape!.points);
+  const k = 1 / DEFAULT_SCALE_FT_PER_UNIT;
+  return { w: b.width * k, h: b.height * k, points: shape!.points.map(p => ({ x: (p.x - b.x) * k, y: (p.y - b.y) * k })) };
+}
 
 export interface ItemTokenNode {
   id: string;
@@ -269,14 +282,15 @@ export default function ItemToken({ node, isDraggingNode = false, onDelete, onPo
     document.body,
   );
 
-  const d = TOKEN_DIAMETER;
+  const box = itemTokenBox(node.data);
+  const d = Math.min(box.w, box.h);
   const dragging = isDragging || isDraggingNode;
   return (
     <div
       data-item-token={node.id}
       onMouseDown={handleMouseDown}
       onContextMenu={handleContextMenu}
-      style={{ width: d, height: d, position: 'relative', cursor: dragging ? 'grabbing' : 'grab', userSelect: 'none' }}
+      style={{ width: box.w, height: box.h, position: 'relative', cursor: dragging ? 'grabbing' : 'grab', userSelect: 'none' }}
     >
       <ComplexTooltip
         title={tip.title}
@@ -287,8 +301,18 @@ export default function ItemToken({ node, isDraggingNode = false, onDelete, onPo
         hideTotal={tip.hideTotal}
         disabled={dragging || !!contentsAnchor}
         inline
-        triggerStyle={{ display: 'block', width: d, height: d }}
+        triggerStyle={{ display: 'block', width: box.w, height: box.h }}
       >
+        {box.points ? (
+          // The thing's real floor shape, to scale.
+          <svg width={box.w} height={box.h} style={{ display: 'block', overflow: 'visible', filter: dragging ? 'drop-shadow(0 8px 12px rgba(0,0,0,0.7))' : undefined }}>
+            <polygon points={polygonPointsAttr(box.points)} fill="rgba(13,13,26,0.82)" stroke={ring} strokeWidth={3} strokeLinejoin="round" />
+            <text x={box.w / 2} y={box.h / 2} dy="0.35em" textAnchor="middle" fill={GOLD}
+              style={{ fontFamily: 'var(--font-header), "Bebas Neue", sans-serif', fontSize: Math.max(12, Math.min(26, Math.min(box.w, box.h) * 0.45)), letterSpacing: '0.04em', pointerEvents: 'none' }}>
+              {Math.min(box.w, box.h) >= 50 && box.w >= 90 ? node.name.replace(/^the\s+/i, '').slice(0, Math.floor(box.w / 11)) : mark}
+            </text>
+          </svg>
+        ) : (
         <div
           style={{
             width: d,
@@ -313,6 +337,7 @@ export default function ItemToken({ node, isDraggingNode = false, onDelete, onPo
         >
           {mark}
         </div>
+        )}
       </ComplexTooltip>
       {count > 0 && (
         <div

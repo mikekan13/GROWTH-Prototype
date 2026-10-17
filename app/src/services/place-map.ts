@@ -19,7 +19,7 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
-import { DEFAULT_LEVEL, DEFAULT_SCALE_FT_PER_UNIT, GRID_FT, HALF_GRID_FT, cellCentre, footprintBounds, gridSizedOpening, openingSides, parseFootprint, parseOpenings, pointInPolygon, snapOpeningToWall, snapOutline, snapTo, wallEdges, worldToFraction, type DoorState, type Opening, type Point } from '@/lib/canvas-geometry';
+import { DEFAULT_LEVEL, DEFAULT_SCALE_FT_PER_UNIT, GRID_FT, HALF_GRID_FT, cellCentre, footprintBounds, gridSizedOpening, makeMapShape, openingSides, parseFootprint, parseOpenings, pointInPolygon, snapOpeningToWall, snapOutline, snapTo, wallEdges, worldToFraction, type DoorState, type Opening, type Point } from '@/lib/canvas-geometry';
 import { updateLocation } from './location';
 import { setLocationGeometry, setTokenPosition } from './placement-geometry';
 import { moveCharacterToLocation } from './character-location';
@@ -38,7 +38,11 @@ export const placeMapSchema = z.object({
   })).max(30).default([]),
   tokens: z.array(z.object({
     thing: z.string().min(1).max(200).describe('A thing on the floor of a room, or a person (exact name or id).'),
-    atFt: ftPoint.describe('Where it stands, in feet, in the HOME\'s frame. People take a 5-ft square; centre them in it.'),
+    atFt: ftPoint.describe('Where it stands (its CENTRE), in feet, in the HOME\'s frame. People take a 5-ft square; centre them in it.'),
+    sizeFt: z.object({ w: z.number().min(0.2).max(200), d: z.number().min(0.2).max(200) }).optional()
+      .describe('Things: the floor space it really covers, width × depth in feet (a couch 7×3, a bed 5×6.5). Under 5 ft on both sides it shows as a pin.'),
+    outlineFt: z.array(ftPoint).min(3).max(32).optional().describe('Things: an irregular floor shape instead of sizeFt (an L-desk), in feet.'),
+    rotation: z.number().optional().describe('Things: 0, 90, 180 or 270 — turns the shape.'),
   })).max(200).default([]),
   openings: z.array(z.object({
     kind: z.enum(['door', 'window', 'archway', 'opening']),
@@ -186,6 +190,12 @@ export async function drawPlaceMap(
         continue;
       }
       await setTokenPosition(room.id, edge.id, actor.userId, actor.role, worldToFraction(world, footprintBounds(room.points)));
+      // The floor space it takes (Mike 2026-10-17: "items can take up space too").
+      const shape = makeMapShape({ sizeFt: t.sizeFt, outlineFt: t.outlineFt, rotation: t.rotation });
+      if (shape) {
+        const row = await prisma.campaignItem.findUnique({ where: { id: item.id }, select: { data: true } });
+        await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify({ ...parseData(row?.data ?? null), mapShape: shape }) } });
+      }
       report.placed.push(item.name);
       continue;
     }

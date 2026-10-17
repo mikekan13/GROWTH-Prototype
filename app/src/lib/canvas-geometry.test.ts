@@ -190,3 +190,16 @@ describe('openings sized to the grid (2026-10-17)', () => {
     expect(Math.hypot(w.to.x - w.from.x, w.to.y - w.from.y)).toBe(2.5);
   });
 });
+
+describe('things take up space (2026-10-17)', () => {
+  it('a 7×3 couch is a centred rectangle, drawn as a shape; a 1-ft lamp is a pin; rotation swaps the sides', async () => {
+    const { makeMapShape, drawsAsShape, footprintBounds } = await import('./canvas-geometry');
+    const couch = makeMapShape({ sizeFt: { w: 7, d: 3 } })!;
+    expect(footprintBounds(couch.points)).toEqual({ x: -3.5, y: -1.5, width: 7, height: 3 });
+    expect(drawsAsShape(couch)).toBe(true);
+    expect(drawsAsShape(makeMapShape({ sizeFt: { w: 1, d: 1 } }))).toBe(false);
+    const turned = makeMapShape({ sizeFt: { w: 7, d: 3 }, rotation: 90 })!;
+    expect(footprintBounds(turned.points).width).toBe(3);
+    expect(drawsAsShape(null)).toBe(false);
+  });
+});

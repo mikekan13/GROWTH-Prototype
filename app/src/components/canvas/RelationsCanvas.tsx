@@ -25,7 +25,7 @@ import LocationCard from "./LocationCard";
 import type { LocationNodeData } from "./LocationCard";
 // Things are TOKENS on the map (2026-10-16); a tap opens WorldItemCard as an overlay (2026-10-17).
 import WorldItemCard, { type WorldItemNodeData } from "./WorldItemCard";
-import ItemToken from "./ItemToken";
+import ItemToken, { itemTokenBox } from "./ItemToken";
 import LevelSwitcher from "./LevelSwitcher";
 import { TOKEN_DIAMETER, CHARACTER_TOKEN_DIAMETER, CHARACTER_TOKEN_LABEL, levelsPresent, visibleOnLevel, worldToFraction, type LeveledPlace, type Footprint, type TokenPosition, type Rect as GeoRect } from "@/lib/canvas-geometry";
 import type { GrowthLocation } from "@/types/location";
@@ -3366,9 +3366,13 @@ export default function RelationsCanvas({
     let endX: number;
     let endY: number;
     if (isPossessionEdge && toNode?.type === 'item') {
-      // A token is round: land on its rim, facing the line.
-      endX = toPos.x - ux * (TOKEN_DIAMETER / 2);
-      endY = toPos.y - uy * (TOKEN_DIAMETER / 2);
+      // Land on the thing's edge (its shape box, or its pin), facing the line.
+      const ib = itemTokenBox(toNode.itemData);
+      const tx = Math.abs(ux) > 1e-4 ? (ib.w / 2) / Math.abs(ux) : Infinity;
+      const ty = Math.abs(uy) > 1e-4 ? (ib.h / 2) / Math.abs(uy) : Infinity;
+      const t = Math.min(tx, ty);
+      endX = toPos.x - ux * t;
+      endY = toPos.y - uy * t;
     } else if (isPossessionEdge) {
       let w: number;
       let h: number;
@@ -4726,8 +4730,10 @@ export default function RelationsCanvas({
           .map((node) => {
             const position = getNodePosition(node.id, node.x, node.y);
             const isDraggingNode = dragOffsets.has(node.id);
-            const cardWidth = TOKEN_DIAMETER;
-            const cardHeight = TOKEN_DIAMETER;
+            // A thing takes the floor space it really covers, or is a pin (2026-10-17).
+            const tokBox = itemTokenBox(node.itemData);
+            const cardWidth = tokBox.w;
+            const cardHeight = tokBox.h;
 
             // Margin scales with viewport so culling works at all zoom levels
             const cullMarginX = viewBox.width * 0.5 + cardWidth;
