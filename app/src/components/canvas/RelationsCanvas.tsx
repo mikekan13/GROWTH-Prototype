@@ -5166,8 +5166,9 @@ export default function RelationsCanvas({
         )}
       </svg>
 
-      {/* The map's level switcher (2026-10-16): one story at a time. */}
-      {levels.length > 0 && (
+      {/* The map's level switcher (2026-10-16): one story at a time. Only when there IS more
+          than one story — a lone "All / G" covered the Terminal (Mike 2026-10-17). */}
+      {levels.length > 1 && (
         <LevelSwitcher levels={levels} active={activeLevel} onChange={setActiveLevel} />
       )}
 
