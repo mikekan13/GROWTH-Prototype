@@ -54,6 +54,12 @@ export interface CalendarSpec {
   hoursPerDay?: number; // default 24
   /** Year numbering: localized year shown = epochYear + elapsed local years. */
   epochYear?: number;   // default 1
+  /** The day of the year (0-based) that cycle 0 falls on — a campaign can
+   *  open mid-year (Incubator: 24 October 2026 = day 296). Default 0 (1st day). */
+  epochDayOfYear?: number;
+  /** The weekday (index into dayNames) of the FIRST day of epochYear, so real
+   *  calendars name their days right (1 Jan 2026 = Thursday = 3). Default 0. */
+  epochWeekday?: number;
   /** Label appended to the year, e.g. "AC", "of the Third Age". */
   epochLabel?: string;
   holidays?: CalendarHoliday[];
@@ -129,7 +135,8 @@ export function cycleToLocalDate(
   ts: { unitsPerMetaCycle: number; calendar: CalendarSpec | null; unitName: string },
 ): LocalDate {
   const cal = ts.calendar ?? STANDARD_CALENDAR;
-  const localYearsFloat = currentCycle * ts.unitsPerMetaCycle;
+  const totalDaysForEpoch = daysPerLocalYear(cal);
+  const localYearsFloat = currentCycle * ts.unitsPerMetaCycle + (cal.epochDayOfYear ?? 0) / Math.max(1, totalDaysForEpoch);
   const yearsWhole = Math.floor(localYearsFloat);
   const yearFrac = localYearsFloat - yearsWhole;
 
@@ -155,7 +162,7 @@ export function cycleToLocalDate(
   // Week-day = total elapsed local days since epoch, cycled through dayNames.
   const elapsedDays = yearsWhole * totalDays + Math.floor(yearFrac * totalDays);
   const dayName = cal.dayNames?.length
-    ? cal.dayNames[((elapsedDays % cal.dayNames.length) + cal.dayNames.length) % cal.dayNames.length]
+    ? cal.dayNames[((((elapsedDays + (cal.epochWeekday ?? 0)) % cal.dayNames.length) + cal.dayNames.length) % cal.dayNames.length)]
     : undefined;
 
   const holidays = (cal.holidays ?? []).filter(h => h.month === monthIndex + 1 && h.day === day);

@@ -36,6 +36,8 @@ export const calendarSpecSchema = z.object({
   dayNames: z.array(z.string().min(1).max(40)).max(30).optional(),
   hoursPerDay: z.number().int().min(1).max(1000).optional(),
   epochYear: z.number().int().optional(),
+  epochDayOfYear: z.number().int().min(0).max(100000).optional(),
+  epochWeekday: z.number().int().min(0).max(100).optional(),
   epochLabel: z.string().max(40).optional(),
   holidays: z.array(z.object({
     name: z.string().min(1).max(80),
