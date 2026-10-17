@@ -1,0 +1,103 @@
+{
+ "events": [
+  {
+   "id": "cmvcide740087sk48s4n8uc37",
+   "campaignId": "cms5z4j6z0000zg48z5vzl2jn",
+   "sessionId": "cmvchb561001isk48d6hl406i",
+   "type": "game_event",
+   "actor": "gm",
+   "actorUserId": "cmrep1oh300002g48ue1bn5rg",
+   "actorName": "Mikekan13",
+   "characterId": null,
+   "characterName": null,
+   "payload": "{\"kind\":\"game_event\",\"eventType\":\"declaration\",\"description\":\"The interior of the apartment almost seems to grow quieter like her slowly opening the door is letting all the normal noises rush out to the pizza.\",\"cycle\":0.0022,\"via\":\"typed\",\"narration\":\"The interior of the apartment almost seems to grow quieter like her slowly opening the door is letting all the normal noises rush out to the pizza.\",\"speech\":[]}",
+   "createdAt": "2026-10-17T14:45:14.656Z"
+  },
+  {
+   "id": "cmvcidoh3008lsk48sjt1j47l",
+   "campaignId": "cms5z4j6z0000zg48z5vzl2jn",
+   "sessionId": "cmvchb561001isk48d6hl406i",
+   "type": "chat",
+   "actor": "ai_copilot",
+   "actorUserId": "cmrep1oh300002g48ue1bn5rg",
+   "actorName": "Violet",
+   "characterId": "cms60ndtn0000kw48ioq10i68",
+   "characterName": "Violet",
+   "payload": "{\"kind\":\"chat\",\"message\":\"The door is closed. The lock is turned. The chain is slid into place.\\n\\nI stand there for a second, my hand still resting on the wood, feeling the residual warmth of the hallway light that just bled through the gap. The air in the apartment is cooler, thicker. It smells like old paper and the faint, ghostly scent of the pepperoni pizza box I haven’t opened yet.\\n\\nEleven minutes.\\n\\nI counted them. Not with a watch, but with the rhythm of my own breathing. In for four, hold for four, out for four. I practiced this in the shower, in the shower, in the shower. I didn’t do it for the first week. I did it because I was afraid that if I stopped counting, the silence would swallow me whole, and I’d be back to the house with the open sewing room, waiting for someone who wasn’t coming.\\n\\nThe phone is on the counter. It’s face up. I can see the screen from here. It’s black. It’s just a black rectangle, like a small, dark window into a night that isn’t mine.\\n\\nI wonder if he’ll notice the number is on a bill. I wonder if he’ll keep it. I wonder if he’s already thrown it away, or if he’s holding it in his hand right now, feeling the crispness of the five, thinking about whether a stranger’s number is a gift or a trap.\\n\\nPersephone didn’t choose the pomegranate seeds. She was told they were just a snack. But they were a tether. They were a reason to come back, a reason to stay.\\n\\nI didn’t give him a pomegranate. I gave him a dollar bill.\\n\\nI turn away from the door. The floorboard creaks under my weight. It’s a sound I know. It’s the sound of the floor settling, of the house breathing. I walk to the counter. The pizza box is there. I don’t open it. I just look at it. It’s warm. It’s proof that someone was here. That someone knocked.\\n\\nI reach for the box. My fingers hover over the lid. I don’t want to eat it. I want to keep it. I want to keep the moment of the knock, the moment of the handoff, the moment of the door opening. If I eat it, it’s just food.\",\"via\":\"being\",\"cycle\":0.0022,\"raw\":\"Say: The door is closed. The lock is turned. The chain is slid into place.\\n\\nI stand there for a second, my hand still resting on the wood, feeling the residual warmth of the hallway light that just bled through the gap. The air in the apartment is cooler, thicker. It smells like old paper and the faint, ghostly scent of the pepperoni pizza box I haven’t opened yet.\\n\\nEleven minutes.\\n\\nI counted them. Not with a watch, but with the rhythm of my own breathing. In for four, hold for four, out for four. I practiced this in the shower, in the shower, in the shower. I didn’t do it for the first week. I did it because I was afraid that if I stopped counting, the silence would swallow me whole, and I’d be back to the house with the open sewing room, waiting for someone who wasn’t coming.\\n\\nThe phone is on the counter. It’s face up. I can see the screen from here. It’s black. It’s just a black rectangle, like a small, dark window into a night that isn’t mine.\\n\\nI wonder if he’ll notice the number is on a bill. I wonder if he’ll keep it. I wonder if he’s already thrown it away, or if he’s holding it in his hand right now, feeling the crispness of the five, thinking about whether a stranger’s number is a gift or a trap.\\n\\nPersephone didn’t choose the pomegranate seeds. She was told they were just a snack. But they were a tether. They were a reason to come back, a reason to stay.\\n\\nI didn’t give him a pomegranate. I gave him a dollar bill.\\n\\nI turn away from the door. The floorboard creaks under my weight. It’s a sound I know. It’s the sound of the floor settling, of the house breathing. I walk to the counter. The pizza box is there. I don’t open it. I just look at it. It’s warm. It’s proof that someone was here. That someone knocked.\\n\\nI reach for the box. My fingers hover over the lid. I don’t want to eat it. I want to keep it. I want to keep the moment of the knock, the moment of the handoff, the moment of the door opening. If I eat it, it’s just food.\"}",
+   "createdAt": "2026-10-17T14:45:27.975Z"
+  }
+ ],
+ "canon": [
+  {
+   "id": "cmvcide700086sk484xvbwy4w",
+   "campaignId": "cms5z4j6z0000zg48z5vzl2jn",
+   "cycle": 0.0022,
+   "seq": 0,
+   "kind": "narration",
+   "locationId": null,
+   "actorId": null,
+   "targetId": null,
+   "narration": "The interior of the apartment almost seems to grow quieter like her slowly opening the door is letting all the normal noises rush out to the pizza.",
+   "detail": "{\"declaredBy\":\"cmrep1oh300002g48ue1bn5rg\"}",
+   "consequences": "{}",
+   "sourceType": "gm",
+   "sourceId": null,
+   "parentId": null,
+   "provenanceId": null,
+   "itemIds": "[]",
+   "goalIds": "[]",
+   "domains": "[\"abjuration\",\"alteration\"]",
+   "createdAt": "2026-10-17T14:45:14.652Z"
+  }
+ ],
+ "memories": [
+  {
+   "id": "cmvcidha4008dsk48yahrqh75",
+   "entityId": "cmv57ezn2000lds4859pxeux4",
+   "narrativeCycle": 0.0022,
+   "realTime": "2026-10-17T14:45:18.652Z",
+   "source": "perception",
+   "content": "The air thins as the door releases its hold, the familiar hum of the city slipping out into the dark like a held breath finally let go. I stand in the sudden, heavy quiet, the only sound the faint, two-note creak of the floorboards waiting for my weight.",
+   "valence": 0.1,
+   "arousal": 0.18,
+   "salience": 0.4,
+   "entityRefs": "[]",
+   "classification": "{\"contentCategory\":\"perception\",\"sensitivity\":\"safe\",\"icOoc\":\"IC\",\"rationaleTag\":\"threshold liminal sensory transition\",\"mirror\":{\"fidelityLevel\":4,\"distortions\":[\"denial:+0.65→dampened\",\"catastrophize:+0.25→amplified\",\"scene:kept=6/6\"],\"locationId\":\"cmvahhpg00001ss48yarg3fbg\",\"truthLines\":5,\"truthChars\":147,\"observer\":{\"mood\":{\"morale\":0,\"stress\":0.1,\"grief\":0.05},\"attunement\":0.8}}}",
+   "clusterId": null,
+   "parentMemoryId": null,
+   "truthRef": "cmvcide700086sk484xvbwy4w",
+   "pillar": null,
+   "domain": "abjuration",
+   "domains": "[\"abjuration\"]",
+   "chain": "{\"truthRefs\":[\"cmvcide700086sk484xvbwy4w\"],\"entities\":[],\"items\":[],\"locationId\":null,\"goalIds\":[],\"antecedentId\":\"cmvchxqy9007rsk48m1nc6lwg\"}",
+   "noticed": true,
+   "perceivedVia": "{\"via\":[\"hearing\"],\"clarity\":{\"hearing\":1}}",
+   "visibleForm": null,
+   "firstVisibleForm": null
+  },
+  {
+   "id": "cmvcidhb2008esk48agopsj11",
+   "entityId": "cmv57ezn2000lds4859pxeux4",
+   "narrativeCycle": 0.0022,
+   "realTime": "2026-10-17T14:45:18.686Z",
+   "source": "perception",
+   "content": "Something in you reaches for it and finds only its edge.",
+   "valence": 0,
+   "arousal": 0.1,
+   "salience": 0.1,
+   "entityRefs": "[]",
+   "classification": "{\"contentCategory\":\"perception\",\"sensitivity\":\"safe\",\"icOoc\":\"IC\",\"rationaleTag\":\"failed recall attempt\"}",
+   "clusterId": null,
+   "parentMemoryId": "cmvcidha4008dsk48yahrqh75",
+   "truthRef": null,
+   "pillar": null,
+   "domain": null,
+   "domains": "[]",
+   "chain": "{\"truthRefs\":[],\"entities\":[],\"items\":[],\"locationId\":null,\"goalIds\":[],\"antecedentId\":null}",
+   "noticed": true,
+   "perceivedVia": "[]",
+   "visibleForm": null,
+   "firstVisibleForm": null
+  }
+ ]
+}
