@@ -20,6 +20,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { requireCampaignGM } from './campaign-access';
 import { updateWorkSession } from './daya-work-session';
 import { parseGenesisGoal } from './character-genesis-progress';
+import { pickProdForReply } from '@/lib/prod-reply';
 import { PRODS_BLOCKED_REASON, isProdsBlocked, prodsBlockedReason } from '@/lib/genesis-question';
 
 export const PRODDING_STAGE = 'PRODDING';
@@ -414,7 +415,13 @@ export async function decideProd(opts: { campaignId: string; prodId: string; use
   let ack: string | null = null;
   try {
     const { announceProdDecision } = await import('./character-genesis-progress');
-    ack = await announceProdDecision(session, d.decision, resumed);
+    // Not resumed: say what he is still waiting on, so the wait is never silent (2026-10-17).
+    const stillOpen = resumed ? [] : (await prisma.genesisProd.findMany({
+      where: { sessionId: session.id, status: 'OPEN' },
+      orderBy: [{ round: 'asc' }, { order: 'asc' }],
+      select: { question: true },
+    })).map(p => p.question);
+    ack = await announceProdDecision(session, d.decision, resumed, stillOpen);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[genesis-prods] ack not posted:', err);
@@ -424,10 +431,10 @@ export async function decideProd(opts: { campaignId: string; prodId: string; use
 
 /**
  * The Watcher's plain chat reply while a prod is OPEN IS its answer (Mike
- * 2026-10-12: "Jewl should just ask there in the chat"). The most recent
- * OPEN prod of a live genesis session in the campaign takes it as ANSWER;
- * the reply never goes on to a normal JEWL turn. Null when nothing is open
- * or the sender is not the campaign GM / ADMIN.
+ * 2026-10-12: "Jewl should just ask there in the chat"). The OPEN prod of a
+ * live genesis session the reply matches best (pickProdForReply) takes it as
+ * ANSWER; the reply never goes on to a normal JEWL turn. Null when nothing is
+ * open or the sender is not the campaign GM / ADMIN.
  */
 export async function answerOpenProdFromChat(opts: {
   campaignId: string;
@@ -446,9 +453,15 @@ export async function answerOpenProdFromChat(opts: {
     orderBy: { createdAt: 'desc' },
     take: 10,
   });
+  const live: typeof open = [];
   for (const prod of open) {
     const session = await prisma.dayaWorkSession.findUnique({ where: { id: prod.sessionId }, select: { status: true } });
-    if (!session || session.status === 'done' || session.status === 'cancelled') continue;
+    if (session && session.status !== 'done' && session.status !== 'cancelled') live.push(prod);
+  }
+  // One session at a time: the newest live session's prods, then the best match among them.
+  const sessionId = live[0]?.sessionId;
+  const prod = pickProdForReply(live.filter(p => p.sessionId === sessionId), text);
+  if (prod) {
     await prisma.copilotMessage.create({
       data: {
         campaignId: opts.campaignId,

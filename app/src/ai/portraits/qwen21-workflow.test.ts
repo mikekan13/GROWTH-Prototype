@@ -83,7 +83,8 @@ describe('qwen21 prompt builders', () => {
     const p = buildQwen21BodyPrompt('a grey linen shift.');
     expect(p).toContain('relaxed A-pose');
     expect(p).toContain('feet visible');
-    expect(p).toContain('Wearing only a grey linen shift and nothing else: no shirt, no trousers, no shoes, no socks; bare arms, bare legs, bare feet.');
+    expect(p).toContain('bare legs and bare feet, wearing only a grey linen shift.');
+    expect(p).not.toMatch(/\b(shirt|trousers|shoes|socks)\b/); // a named garment gets painted, even forbidden
     expect(p).toContain('Keep the face and hair of <image1> exactly.');
     expect(p.endsWith(getFlux2Backdrop('studio'))).toBe(true);
     expect(p).toContain(GROWTH_MEDIUM);
@@ -92,9 +93,9 @@ describe('qwen21 prompt builders', () => {
   });
 
   it('body prompt: always underwear only — the default names the garments (Kristopher came out in a tee and jeans, 2026-10-17)', () => {
-    expect(buildQwen21BodyPrompt(undefined, undefined, 'Male')).toContain('Wearing only plain fitted grey boxer briefs and nothing else');
-    expect(buildQwen21BodyPrompt(undefined, undefined, 'female')).toContain('Wearing only a plain grey bra and plain grey briefs and nothing else');
-    expect(buildQwen21BodyPrompt()).toContain('Wearing only a plain grey bandeau top and plain grey briefs and nothing else');
+    expect(buildQwen21BodyPrompt(undefined, undefined, 'Male')).toContain('Bare-chested: bare torso, bare shoulders, bare arms, bare legs and bare feet, wearing only plain fitted grey boxer briefs.');
+    expect(buildQwen21BodyPrompt(undefined, undefined, 'female')).toContain('Bare midriff, bare shoulders, bare arms, bare legs and bare feet, wearing only a plain grey bra and plain grey briefs.');
+    expect(buildQwen21BodyPrompt()).toContain('wearing only a plain grey bandeau top and plain grey briefs.');
     expect(buildQwen21BodyPrompt()).not.toContain('underclothing with a clean minimal cut');
   });
 

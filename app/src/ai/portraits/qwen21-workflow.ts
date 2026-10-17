@@ -211,19 +211,27 @@ export function buildQwen21StylePrompt(styleRefCount: number, styleLine: string 
  * sneakers, so the default names the garments and the bare skin around them outright.
  */
 export function defaultUnderwear(gender?: string): string {
-  const g = (gender ?? '').trim().toLowerCase();
-  if (/^(m|male|man)$/.test(g)) return 'plain fitted grey boxer briefs';
-  if (/^(f|female|woman)$/.test(g)) return 'a plain grey bra and plain grey briefs';
-  return 'a plain grey bandeau top and plain grey briefs';
+  return isMale(gender) ? 'plain fitted grey boxer briefs'
+    : isFemale(gender) ? 'a plain grey bra and plain grey briefs'
+      : 'a plain grey bandeau top and plain grey briefs';
 }
+const isMale = (g?: string) => /^(m|male|man)$/i.test((g ?? '').trim());
+const isFemale = (g?: string) => /^(f|female|woman)$/i.test((g ?? '').trim());
 
-/** Full body from the styled bust (<image1>), in underwear only. Underclothing = character data. MEDIUM + MOOD + studio wall. */
+/**
+ * Full body from the styled bust (<image1>), in underwear only. Underclothing = character data.
+ * POSITIVE words only: "no shirt" painted a white tee on Kristopher (17 Oct) — a named garment is
+ * drawn even when it is forbidden, as with FLUX. The bare skin is named instead.
+ */
 export function buildQwen21BodyPrompt(underclothing?: string, mood?: string, gender?: string): string {
   const under = (underclothing?.trim() || defaultUnderwear(gender)).replace(/[.\s]+$/, '');
+  const skin = isMale(gender)
+    ? 'Bare-chested: bare torso, bare shoulders, bare arms, bare legs and bare feet'
+    : 'Bare midriff, bare shoulders, bare arms, bare legs and bare feet';
   return (
     'A full-length front view of the person in <image1> standing in a relaxed A-pose, arms at the sides, feet visible, ' +
     'with clear margin above the head and below the feet. ' +
-    `Wearing only ${under} and nothing else: no shirt, no trousers, no shoes, no socks; bare arms, bare legs, bare feet. ` +
+    `${skin}, wearing only ${under}. ` +
     'Keep the face and hair of <image1> exactly. ' +
     `${getQwen21StyleLine(mood)} ` +
     getFlux2Backdrop('studio')

@@ -731,10 +731,12 @@ export async function announceProdDecision(
   session: { id: string; campaignId: string; goal: string },
   decision: ProdDecision,
   resumed: boolean,
+  stillOpen: string[] = [],
 ): Promise<string | null> {
   const parsed = parseGenesisGoal(session.goal);
   if (!parsed) return null;
-  const line = prodDecisionAck(parsed.name, decision, resumed);
+  const line = prodDecisionAck(parsed.name, decision, resumed)
+    + (stillOpen.length ? `\n\nStill waiting on you: ${stillOpen.map(q => `“${q.length > 160 ? `${q.slice(0, 157)}…` : q}”`).join(' · ')}` : '');
   await postJewlChat(session.campaignId, line, JSON.stringify({ source: 'GENESIS_PROD_ACK', sessionId: session.id, decision, resumed }));
   return line;
 }
