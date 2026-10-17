@@ -79,7 +79,9 @@ export async function deriveStyleProfile(
           `\n\nBACKSTORY:\n${backstory.slice(0, 4000)}\n\n` +
           'Reply with ONLY a JSON object, no prose:\n' +
           '{"era": "<one-line era/culture summary>", ' +
-          '"underclothing": "<concrete garment description for a neutral reference image — specific nouns, fabric, cut; plain and unornamented>", ' +
+          // UNDERWEAR only (2026-10-17): "a garment for a neutral reference image" came back as Kristopher's
+          // tee, jeans and belt, and the body step painted him dressed.
+          '"underclothing": "<their UNDERWEAR only, as their era and culture would have it — specific nouns, fabric, cut; plain and unornamented; never a shirt, trousers, shoes or any outer garment>", ' +
           '"garmentNorms": "<one line: what this person\'s everyday clothing looks like>", ' +
           '"materials": "<comma list of typical materials>"}',
       },

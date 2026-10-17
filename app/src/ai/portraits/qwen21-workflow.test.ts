@@ -97,6 +97,14 @@ describe('qwen21 prompt builders', () => {
     expect(buildQwen21BodyPrompt(undefined, undefined, 'female')).toContain('Bare midriff, bare shoulders, bare arms, bare legs and bare feet, wearing only a plain grey bra and plain grey briefs.');
     expect(buildQwen21BodyPrompt()).toContain('wearing only plain grey briefs and a plain grey bandeau bra.');
     expect(buildQwen21BodyPrompt()).not.toMatch(/\btop\b/);
+  });
+
+  it('body prompt: outer clothing in underclothing is ignored (the style profile wrote Kristopher a tee, jeans and belt)', () => {
+    const styleProfile = 'Plain crew-neck cotton t-shirt in a muted color such as grey or olive, tucked loosely into straight-leg dark denim jeans fastened with a plain leather belt';
+    const p = buildQwen21BodyPrompt(styleProfile, undefined, 'Male');
+    expect(p).toContain('wearing only plain fitted grey boxer briefs.');
+    expect(p).not.toMatch(/t-shirt|jeans|belt/);
+    expect(buildQwen21BodyPrompt('plain linen boxers', undefined, 'Male')).toContain('wearing only plain linen boxers.');
     expect(buildQwen21BodyPrompt()).not.toContain('underclothing with a clean minimal cut');
   });
 

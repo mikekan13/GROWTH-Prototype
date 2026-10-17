@@ -216,6 +216,14 @@ export function defaultUnderwear(gender?: string): string {
       // No sex on the sheet: underwear nouns only — "bandeau top" painted Kristopher a tee (17 Oct).
       : 'plain grey briefs and a plain grey bandeau bra';
 }
+const UNDERWEAR_WORDS = /\b(underwear|undergarments?|underclothes|briefs|boxers?|trunks|bra|bralette|bandeau|panties|knickers|thong|shift|chemise|loincloth|undershirt|singlet|camisole|slip|drawers|smallclothes|breechcloth)\b/i;
+const OUTER_WORDS = /\b(t-shirt|shirt|tee|blouse|top|jeans|denim|trousers|pants|slacks|shorts|skirt|dress|gown|belt|buckle|shoes?|boots?|sneakers|socks|jacket|coat|sweater|hoodie|cardigan|vest|tunic|robe|uniform|overalls)\b/i;
+/** Underclothing text the body step may use as given: names underwear and no outer garment. The style profile
+ *  once wrote "crew-neck t-shirt … dark denim jeans … leather belt" and every body came out dressed (17 Oct). Pure. */
+export function isUnderwearOnly(s?: string): boolean {
+  const t = s?.trim() ?? '';
+  return !!t && UNDERWEAR_WORDS.test(t) && !OUTER_WORDS.test(t);
+}
 const isMale = (g?: string) => /^(m|male|man)$/i.test((g ?? '').trim());
 const isFemale = (g?: string) => /^(f|female|woman)$/i.test((g ?? '').trim());
 
@@ -225,7 +233,7 @@ const isFemale = (g?: string) => /^(f|female|woman)$/i.test((g ?? '').trim());
  * drawn even when it is forbidden, as with FLUX. The bare skin is named instead.
  */
 export function buildQwen21BodyPrompt(underclothing?: string, mood?: string, gender?: string): string {
-  const under = (underclothing?.trim() || defaultUnderwear(gender)).replace(/[.\s]+$/, '');
+  const under = (isUnderwearOnly(underclothing) ? underclothing!.trim() : defaultUnderwear(gender)).replace(/[.\s]+$/, '');
   const skin = isMale(gender)
     ? 'Bare-chested: bare torso, bare shoulders, bare arms, bare legs and bare feet'
     : 'Bare midriff, bare shoulders, bare arms, bare legs and bare feet';
