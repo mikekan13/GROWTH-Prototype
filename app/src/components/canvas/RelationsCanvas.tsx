@@ -23,17 +23,18 @@ import PossessionsCard from "./PossessionsCard";
 // same as the retired die menu. Excise in a dedicated cleanup PR.
 import LocationCard from "./LocationCard";
 import type { LocationNodeData } from "./LocationCard";
-// Things are TOKENS on the map (2026-10-16); WorldItemCard stays for drawers/inspectors.
+// Things are TOKENS on the map (2026-10-16); a tap opens WorldItemCard as an overlay (2026-10-17).
+import WorldItemCard, { type WorldItemNodeData } from "./WorldItemCard";
 import ItemToken from "./ItemToken";
 import LevelSwitcher from "./LevelSwitcher";
-import { TOKEN_DIAMETER, levelsPresent, visibleOnLevel, worldToFraction, type LeveledPlace, type Footprint, type TokenPosition, type Rect as GeoRect } from "@/lib/canvas-geometry";
+import { TOKEN_DIAMETER, CHARACTER_TOKEN_DIAMETER, CHARACTER_TOKEN_LABEL, levelsPresent, visibleOnLevel, worldToFraction, type LeveledPlace, type Footprint, type TokenPosition, type Rect as GeoRect } from "@/lib/canvas-geometry";
 import type { GrowthLocation } from "@/types/location";
 import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
 import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/ContextMenu";
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight } from "./FolderGroup";
 import { settle, packFolder, pickRoomAt, type SettleNode, type SettleFolder, type SettlePriority } from "./canvas-settle";
-import { lodForZoom, folderLabelSize } from "./canvas-lod";
+import CharacterToken from "./CharacterToken";
 import { clampCameraToContent, contentBoxOf, maxZoomForContent, type Rect as WorldRect } from "./camera-bounds";
 import FolderGroup from "./FolderGroup";
 
@@ -306,8 +307,6 @@ export default function RelationsCanvas({
   // Whether the opening camera came from storage (else the phone opening view
   // is recomputed after measurement with the real width).
   const cameraWasStoredRef = useRef(false);
-  // Semantic zoom (Mike 2026-09-28): what a card renders as depends on how far out the Watcher is.
-  const lod = lodForZoom(zoom);
   const [camera, setCamera] = useState(() => {
     // Migrate from old viewBox storage or load camera position
     const oldVB = loadJSON<{ x: number; y: number; width?: number; height?: number } | null>('viewBox', null);
@@ -449,6 +448,15 @@ export default function RelationsCanvas({
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
     return new Set(loadJSON<string[]>('expanded', []));
   });
+  // A person's SHEET is an overlay card (Mike 2026-10-17): "expanded" = her
+  // sheet is open, at its OWN world position — moving it never moves her
+  // token, never enters a folder, never re-parents anything.
+  const [cardPositions, setCardPositions] = useState<Map<string, { x: number; y: number }>>(() =>
+    new Map(loadJSON<[string, { x: number; y: number }][]>('cardPositions', [])));
+  const [cardDrag, setCardDrag] = useState<{ id: string; dx: number; dy: number } | null>(null);
+  // Open PLACE cards (folder ids) — a tap on a place's header opens its card (2026-10-17).
+  const [openPlaces, setOpenPlaces] = useState<Set<string>>(() => new Set(loadJSON<string[]>('openPlaces', [])));
+  const folderDragMovedRef = useRef(false);
 
   // Recursive folder containment (world-recursive design): a parent
   // folder's area must encompass its CHILD FOLDERS, whose location-
@@ -491,6 +499,24 @@ export default function RelationsCanvas({
     }
     return rects;
   }, [folders, nodes, nodePositions, dragOffsets, expandedNodes, zoom]);
+
+  /** Open/close a PLACE's card (overlay), first placed just right of the place's header. */
+  const PLACE_CARD_W = 480;
+  const PLACE_CARD_H = 700;
+  const togglePlaceCard = useCallback((folderId: string) => {
+    setOpenPlaces(prev => {
+      const next = new Set(prev);
+      if (next.has(folderId)) next.delete(folderId); else next.add(folderId);
+      return next;
+    });
+    const key = `place:${folderId}`;
+    setCardPositions(prev => {
+      if (prev.has(key)) return prev;
+      const r = folderRectById.get(folderId.replace(/^auto-/, ''));
+      if (!r) return prev;
+      return new Map(prev).set(key, { x: r.x + r.width + 60 + PLACE_CARD_W / 2, y: r.y + PLACE_CARD_H / 2 });
+    });
+  }, [folderRectById]);
 
   // ── Levels (the map, 2026-10-16): one story at a time ──
   // A place's level = its footprint's; without one it inherits the nearest
@@ -589,6 +615,19 @@ export default function RelationsCanvas({
     return new Map(stored);
   });
   const MAX_TETHER_DISTANCE = 2000;
+  // The open sheet's layout box (center-anchored; matches renderCharacterCard).
+  const SHEET_CARD_W = 1920;
+  const SHEET_CARD_H = 500;
+  /** People and things open as OVERLAY cards beside their token (2026-10-17). */
+  const isOverlayType = (type: string) => type === 'character' || type === 'item';
+  const overlayBox = (type: string) => type === 'item'
+    ? { w: 420, h: 600, tok: TOKEN_DIAMETER }
+    : { w: SHEET_CARD_W, h: SHEET_CARD_H, tok: CHARACTER_TOKEN_DIAMETER };
+  /** Default overlay center: just right of and above the token. */
+  const defaultOverlayCenter = (type: string, tok: { x: number; y: number }) => {
+    const b = overlayBox(type);
+    return { x: tok.x + b.tok / 2 + 60 + b.w / 2, y: tok.y - b.tok / 2 - 60 + b.h / 2 };
+  };
   const EMPTY_PANEL_SET = useRef(new Set<string>()).current;
 
   // Cached circle positions: measured once from DOM, stored as card-relative offsets (dx, dy from card center)
@@ -652,9 +691,11 @@ export default function RelationsCanvas({
       saveJSON('inventoryOffsets', [...inventoryOffsets.entries()]);
       saveJSON('panelOpen', [...panelOpenNodes.entries()].map(([id, s]) => [id, [...s]]));
       saveJSON('panelOffsets', [...panelOffsets.entries()]);
+      saveJSON('cardPositions', [...cardPositions.entries()]);
+      saveJSON('openPlaces', [...openPlaces]);
     }, 300);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camera, zoom, nodePositions, nodeZIndices, expandedNodes, inventoryOpenNodes, inventoryOffsets, panelOpenNodes, panelOffsets]);
+  }, [camera, zoom, nodePositions, nodeZIndices, expandedNodes, inventoryOpenNodes, inventoryOffsets, panelOpenNodes, panelOffsets, cardPositions, openPlaces]);
 
   useEffect(() => {
     persistState();
@@ -677,8 +718,13 @@ export default function RelationsCanvas({
       rects.push({ x: p.x - d.width / 2, y: p.y - d.topH, width: d.width, height: d.topH + d.bottomH });
     }
     for (const r of folderRectById.values()) rects.push(r);
+    // Open sheets are overlays at their own position — the camera may reach them.
+    for (const [id, c] of cardPositions) {
+      if (!expandedNodes.has(id)) continue;
+      rects.push({ x: c.x - SHEET_CARD_W / 2, y: c.y - SHEET_CARD_H / 2, width: SHEET_CARD_W, height: SHEET_CARD_H + 400 });
+    }
     return rects;
-  }, [nodes, nodePositions, expandedNodes, folderRectById]);
+  }, [nodes, nodePositions, expandedNodes, folderRectById, cardPositions]);
   const contentBox = useMemo(() => contentBoxOf(contentRects), [contentRects]);
   useLayoutEffect(() => {
     const ceil = maxZoomForContent(contentBox, BASE_WIDTH, BASE_HEIGHT, CAMERA_PAD);
@@ -853,9 +899,15 @@ export default function RelationsCanvas({
     const isCollapsing = expandedNodes.has(nodeId);
     const node = nodes.find(n => n.id === nodeId);
 
+    // A person's sheet / a thing's card opens as an overlay beside its token; the token never moves.
+    if (node && isOverlayType(node.type) && !isCollapsing && !cardPositions.has(nodeId)) {
+      const tok = nodePositions.get(nodeId) ?? { x: node.x, y: node.y };
+      setCardPositions(prev => new Map(prev).set(nodeId, defaultOverlayCenter(node.type, tok)));
+    }
+
     // Shift center so left edge stays pinned when card width changes
     // cardWidth values must match those in the render section
-    if (node) {
+    if (node && !isOverlayType(node.type)) {
       // [expandedW, compactW, expandedH, compactH]
       const sizes: Record<string, [number, number, number, number]> = {
         character: [1920, 520, 500, 240],
@@ -883,7 +935,7 @@ export default function RelationsCanvas({
 
     // When EXPANDING a card inside a party folder, push all folder nodes up
     // if the expanded card's bottom edge would cross the KRMA line (y=0)
-    if (!isCollapsing && node) {
+    if (!isCollapsing && node && !isOverlayType(node.type)) {
       const partyFolder = foldersRef.current.find(f => f.type === 'party' && f.nodeIds.includes(nodeId));
       if (partyFolder) {
         setNodePositions((positions) => {
@@ -930,7 +982,7 @@ export default function RelationsCanvas({
         return next;
       });
     }
-  }, [nodes, expandedNodes]);
+  }, [nodes, expandedNodes, cardPositions, nodePositions]);
 
   const toggleInventory = useCallback((nodeId: string) => {
     setInventoryOpenNodes((prev) => {
@@ -1830,9 +1882,10 @@ export default function RelationsCanvas({
     if (!node) return 260;
     const isExp = expandedNodes.has(nodeId);
     switch (node.type) {
-      case 'character': return isExp ? 960 : 260;
+      // People and things are map TOKENS (2026-10-17); a person's sheet is an overlay, not her footprint.
+      case 'character': return CHARACTER_TOKEN_DIAMETER / 2;
       case 'location':  return isExp ? 260 : 170;
-      case 'item':      return isExp ? 220 : 150;
+      case 'item':      return TOKEN_DIAMETER / 2;
       default:          return 200;
     }
   }, [nodes, expandedNodes]);
@@ -1843,13 +1896,13 @@ export default function RelationsCanvas({
     if (!partyFolder) return offsetY;
     const pos = nodePositionsRef.current.get(nodeId);
     if (!pos || pos.y >= 0) return offsetY; // only clamp nodes above line
-    // bottomH: how far below center the card extends (120 compact, 480 expanded)
-    const bottomH = expandedNodes.has(nodeId) ? 480 : 120;
+    // bottomH: how far below center the token (and its name) extends
+    const bottomH = getNodeDimensions(nodes.find(n => n.id === nodeId)?.type ?? 'character', expandedNodes.has(nodeId)).bottomH;
     const PARTY_LINE_BUFFER = 10;
     // Card bottom edge after drag: pos.y + offsetY + bottomH  must stay â‰¤ -PARTY_LINE_BUFFER
     const maxOffsetY = -PARTY_LINE_BUFFER - bottomH - pos.y;
     return Math.min(offsetY, maxOffsetY);
-  }, [expandedNodes]);
+  }, [nodes, expandedNodes]);
 
   // Check if a dragged node overlaps a folder and update drop target highlight
   /**
@@ -2300,6 +2353,7 @@ export default function RelationsCanvas({
         const current = clientToSvg(e.clientX, e.clientY);
         let dx = current.x - folderDragStartSvg.x;
         let dy = current.y - folderDragStartSvg.y;
+        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) folderDragMovedRef.current = true;
         const folder = foldersRef.current.find(f => f.id === dragFolderId);
         if (folder) {
           // Find the folder's current bottom edge (lowest node bottom + padding)
@@ -2534,6 +2588,11 @@ export default function RelationsCanvas({
       return;
     }
     // â”€â”€ Finish folder drag (moves all member nodes) â”€â”€
+    // A TAP on a place's header (no drag) opens its card as an overlay (2026-10-17).
+    if (dragFolderId && !folderDragMovedRef.current) {
+      const tapped = foldersRef.current.find(f => f.id === dragFolderId);
+      if (tapped?.locationInfo) togglePlaceCard(tapped.id);
+    }
     if (dragFolderId) {
       beginTx('move place'); // undo (2026-10-06)
       const folder = foldersRef.current.find(f => f.id === dragFolderId);
@@ -2771,7 +2830,7 @@ export default function RelationsCanvas({
     dropTargetRef.current = null;
     setIsPanning(false);
     setIsDragging(false);
-  }, [dragFolderId, folders, dragNodeId, dragOffsets, nodePositions, onNodePositionChange, onFoldersChange, marquee, nodes, commitPhysicsOffsets]);
+  }, [dragFolderId, folders, dragNodeId, dragOffsets, nodePositions, onNodePositionChange, onFoldersChange, marquee, nodes, commitPhysicsOffsets, togglePlaceCard]);
 
   // Global mouse listeners for pan / drag
   useEffect(() => {
@@ -3098,7 +3157,8 @@ export default function RelationsCanvas({
   /** Node card dimensions in SVG units. Mirrors the toggleExpand sizes map. */
   const nodeRect = (n: CanvasNode): { w: number; h: number } => {
     const expanded = expandedNodes.has(n.id);
-    if (n.type === 'character') return expanded ? { w: 1885, h: 833 } : { w: 500, h: 240 };
+    // A person is a TOKEN on the map; her sheet is an overlay (2026-10-17).
+    if (n.type === 'character') return { w: CHARACTER_TOKEN_DIAMETER, h: CHARACTER_TOKEN_DIAMETER };
     if (n.type === 'location')  return expanded ? { w: 480,  h: 700 } : { w: 320, h: 180 };
     // Items are map TOKENS (2026-10-16), not cards — the old 280×160 card
     // size put every tether end 140px left of its token (Mike 2026-10-17).
@@ -3136,10 +3196,10 @@ export default function RelationsCanvas({
     if (measured) return measured;
     // 2. Fallback approximation by layout formula. Uses visual (drag-aware)
     //    position so the fallback line follows the card during drag too.
-    const charPos = getVisualPosition(charNode.id, charNode.x, charNode.y);
-    const expanded = expandedNodes.has(charNode.id);
-    const cardWidth = expanded ? 1885 : 500;
-    const cardHeight = expanded ? 670 : 240;
+    // The possessions panel hangs off her open SHEET (an overlay at its own position).
+    const charPos = sheetCenter(charNode.id, charNode);
+    const cardWidth = SHEET_CARD_W;
+    const cardHeight = SHEET_CARD_H;
     const cardLeft = charPos.x - cardWidth / 2;
     const cardTop = charPos.y - cardHeight / 2;
     const cached = circleOffsetsRef.current.get('possessions');
@@ -3371,6 +3431,90 @@ export default function RelationsCanvas({
 
   // â”€â”€ Render character card (foreignObject with full CharacterCard) â”€â”€â”€â”€â”€â”€â”€â”€
 
+  // A person moved ON THE MAP — her TOKEN (2026-10-17; this was the card's
+  // drag before the sheet became an overlay). Settle-once + drop-into-room.
+  const commitCharacterMove = (nodeId: string, x: number, y: number) => {
+    beginTx('move'); // undo (2026-10-06)
+    commitGroupDrag(nodeId);
+    // Clamp party folder nodes above KRMA line
+    let clampedY = y;
+    const inParty = foldersRef.current.find(f => f.type === 'party' && f.nodeIds.includes(nodeId));
+    if (inParty && y >= 0) {
+      const bottomH = CHARACTER_TOKEN_DIAMETER / 2 + CHARACTER_TOKEN_LABEL;
+      clampedY = -(bottomH + 10);
+    }
+    setNodePositions((prev) => {
+      const next = new Map(prev);
+      next.set(nodeId, { x, y: clampedY, movedAt: Date.now() });
+      return next;
+    });
+    onNodePositionChange?.(nodeId, x, clampedY);
+    setPendingLayoutPass({ priority: { kind: 'node', id: nodeId } }); // settle-once (2026-10-01)
+    bringNodeToFront(nodeId);
+
+    // NOTE: Do NOT update folder posX/posY here. posX/posY are only set by
+    // explicit resize handles and folder drag â€” card movement within the folder
+    // is handled by auto-sizing in the bounds computation (content.x/content.y).
+
+    // Drop-into-location (SERVER-side — client nodeIds edits on
+    // auto folders were silently clobbered by the server merge;
+    // "unsure if that even works" was correct, it didn't):
+    // Drop-in adds; taking OUT is the right-click "take out"
+    // action, never a drag side-effect (Mike 2026-08-03).
+    const autoHit = pickAutoDropTarget(x, clampedY);
+    const curParent = membershipOf(nodeId);
+    if (autoHit && autoHit !== curParent) {
+      dropIntoLocation(nodeId, 'character', autoHit);
+    } else if (!autoHit) {
+      // Party/manual folders keep client-side membership.
+      const curFolders = foldersRef.current;
+      const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
+      for (const f of curFolders) {
+        if (f.id.startsWith('auto-')) continue;
+        if (f.nodeIds.includes(nodeId) || f.collapsed) continue;
+        const content = calcContentBounds(f, nodePositionsRef.current, new Map(), nodeTypesMap, expandedNodesRef.current);
+        if (!content) continue;
+        const w = Math.max(content.minWidth, f.userWidth || 0);
+        const h = Math.max(content.minHeight, f.userHeight || 0);
+        if (x >= content.x && x <= content.x + w && clampedY >= content.y && clampedY <= content.y + h) {
+          const updated = curFolders.map(ff =>
+            ff.id === f.id ? { ...ff, nodeIds: [...ff.nodeIds, nodeId] } : ff
+          );
+          onFoldersChange?.(updated);
+          break;
+        }
+      }
+    }
+  };
+  const dragCharacterOffset = (nodeId: string, offsetX: number, offsetY: number) => {
+    const clampedY = clampPartyDragY(nodeId, offsetY);
+    applyGroupDragOffset(nodeId, offsetX, clampedY);
+    checkFolderDropTarget(nodeId, offsetX, clampedY);
+  };
+  // The open SHEET moves only itself — never the token, never into a folder.
+  const commitSheetMove = (nodeId: string, x: number, y: number) => {
+    setCardDrag(null);
+    setCardPositions(prev => new Map(prev).set(nodeId, { x, y }));
+  };
+  const dragSheetOffset = (nodeId: string, offsetX: number, offsetY: number) => {
+    setCardDrag(offsetX === 0 && offsetY === 0 ? null : { id: nodeId, dx: offsetX, dy: offsetY });
+  };
+  /** Where a person's open sheet is drawn (its own position, live while dragged). */
+  const sheetCenter = (id: string, node?: { x: number; y: number; type?: string }): { x: number; y: number } => {
+    let p = cardPositions.get(id);
+    if (!p) p = defaultOverlayCenter(node?.type ?? 'character', getNodePosition(id, node?.x ?? 0, node?.y ?? 0));
+    const d = cardDrag?.id === id ? cardDrag : null;
+    return { x: p.x + (d?.dx ?? 0), y: p.y + (d?.dy ?? 0) };
+  };
+  /** Does a world point land on this person — her token, or her open sheet? */
+  const hitsCharacter = (n: CanvasNode, x: number, y: number, pad = 0): boolean => {
+    const tok = getNodePosition(n.id, n.x, n.y);
+    if (Math.hypot(x - tok.x, y - tok.y) <= CHARACTER_TOKEN_DIAMETER / 2 + pad) return true;
+    if (!expandedNodes.has(n.id)) return false;
+    const c = sheetCenter(n.id, n);
+    return Math.abs(x - c.x) < SHEET_CARD_W / 2 + pad && Math.abs(y - c.y) < SHEET_CARD_H / 2 + pad;
+  };
+
   const renderCharacterCard = (node: CanvasNode, visualX: number, visualY: number) => {
     const isNodeExpanded = expandedNodes.has(node.id);
     const isInventoryOpen = inventoryOpenNodes.has(node.id) && isNodeExpanded;
@@ -3456,22 +3600,6 @@ export default function RelationsCanvas({
     const showGlow = hasCrossed || isShimmering;
     const glowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
-    // Zoomed out: a person is a portrait chip with a name — legible at any distance.
-    if (lod !== 'near') {
-      const r = lod === 'far' ? 110 : 90;
-      const fs = lod === 'far' ? 44 : 30;
-      return (
-        <g key={`card-group-${node.id}`} style={{ pointerEvents: 'none' }}>
-          <circle cx={visualX} cy={visualY} r={r} fill="#0d0d1a" stroke="var(--krma-gold)" strokeWidth={6} />
-          {node.portrait ? (
-            <image href={node.portrait} x={visualX - r + 6} y={visualY - r + 6} width={2 * r - 12} height={2 * r - 12} preserveAspectRatio="xMidYMid slice" style={{ clipPath: `circle(${r - 6}px at 50% 50%)` }} />
-          ) : (
-            <text x={visualX} y={visualY + r * 0.38} textAnchor="middle" fontSize={r * 1.05} fontWeight={700} fill="var(--krma-gold)" fontFamily="var(--font-bebas-neue), Bebas Neue, sans-serif">{node.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}</text>
-          )}
-          <text x={visualX} y={visualY + r + fs} textAnchor="middle" fontSize={fs} fontWeight={700} fill="#CBD9E8" fontFamily="var(--font-terminal), Consolas, monospace" letterSpacing="0.08em">{node.name.toUpperCase()}</text>
-        </g>
-      );
-    }
     return (
       <g key={`card-group-${node.id}`}>
         {/* Soft pulsing backlight glow when card has crossed the KRMA line */}
@@ -3557,64 +3685,8 @@ export default function RelationsCanvas({
             }}
             onInventoryToggle={toggleInventory}
             onPanelToggle={togglePanel}
-            onPositionChange={(nodeId, x, y) => {
-              beginTx('move'); // undo (2026-10-06)
-              commitGroupDrag(nodeId);
-              // Clamp party folder nodes above KRMA line
-              let clampedY = y;
-              const inParty = foldersRef.current.find(f => f.type === 'party' && f.nodeIds.includes(nodeId));
-              if (inParty && y >= 0) {
-                const bottomH = expandedNodes.has(nodeId) ? 480 : 120;
-                clampedY = -(bottomH + 10);
-              }
-              setNodePositions((prev) => {
-                const next = new Map(prev);
-                next.set(nodeId, { x, y: clampedY, movedAt: Date.now() });
-                return next;
-              });
-              onNodePositionChange?.(nodeId, x, clampedY);
-              setPendingLayoutPass({ priority: { kind: 'node', id: nodeId } }); // settle-once (2026-10-01)
-              bringNodeToFront(nodeId);
-
-              // NOTE: Do NOT update folder posX/posY here. posX/posY are only set by
-              // explicit resize handles and folder drag â€” card movement within the folder
-              // is handled by auto-sizing in the bounds computation (content.x/content.y).
-
-              // Drop-into-location (SERVER-side — client nodeIds edits on
-              // auto folders were silently clobbered by the server merge;
-              // "unsure if that even works" was correct, it didn't):
-              // Drop-in adds; taking OUT is the right-click "take out"
-              // action, never a drag side-effect (Mike 2026-08-03).
-              const autoHit = pickAutoDropTarget(x, clampedY);
-              const curParent = membershipOf(nodeId);
-              if (autoHit && autoHit !== curParent) {
-                dropIntoLocation(nodeId, 'character', autoHit);
-              } else if (!autoHit) {
-                // Party/manual folders keep client-side membership.
-                const curFolders = foldersRef.current;
-                const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
-                for (const f of curFolders) {
-                  if (f.id.startsWith('auto-')) continue;
-                  if (f.nodeIds.includes(nodeId) || f.collapsed) continue;
-                  const content = calcContentBounds(f, nodePositionsRef.current, new Map(), nodeTypesMap, expandedNodesRef.current);
-                  if (!content) continue;
-                  const w = Math.max(content.minWidth, f.userWidth || 0);
-                  const h = Math.max(content.minHeight, f.userHeight || 0);
-                  if (x >= content.x && x <= content.x + w && clampedY >= content.y && clampedY <= content.y + h) {
-                    const updated = curFolders.map(ff =>
-                      ff.id === f.id ? { ...ff, nodeIds: [...ff.nodeIds, nodeId] } : ff
-                    );
-                    onFoldersChange?.(updated);
-                    break;
-                  }
-                }
-              }
-            }}
-            onDragOffsetChange={(nodeId, offsetX, offsetY) => {
-              const clampedY = clampPartyDragY(nodeId, offsetY);
-              applyGroupDragOffset(nodeId, offsetX, clampedY);
-              checkFolderDropTarget(nodeId, offsetX, clampedY);
-            }}
+            onPositionChange={commitSheetMove}
+            onDragOffsetChange={dragSheetOffset}
             onCharacterUpdate={onCharacterUpdate}
             onSkillCheck={onSkillCheck}
             onContestedCheck={onContestedCheck}
@@ -3782,14 +3854,7 @@ export default function RelationsCanvas({
 
                       // 2) Fallback: canvas-coord math for character cards (when DOM lookup misses)
                       if (!targetCharId) {
-                        const target = nodes.find(n => {
-                          if (n.type !== 'character') return false;
-                          const charPos = getNodePosition(n.id, n.x, n.y);
-                          const charExpanded = expandedNodes.has(n.id);
-                          const cw = charExpanded ? 1920 : 520;
-                          const ch = charExpanded ? 500 : 240;
-                          return Math.abs(drop.x - charPos.x) < cw / 2 + 80 && Math.abs(drop.y - charPos.y) < ch / 2 + 80;
-                        });
+                        const target = nodes.find(n => n.type === 'character' && hitsCharacter(n, drop.x, drop.y, 80));
                         if (target) targetCharId = target.id;
                       }
 
@@ -4409,6 +4474,7 @@ export default function RelationsCanvas({
               isDropTarget={dropTargetFolderId === folder.id}
               onFolderDragStart={(folderId, startSvg) => {
                 if (resizeActiveRef.current) return; // resize is resize, never a drag
+                folderDragMovedRef.current = false;
                 setDragFolderId(folderId);
                 setFolderDragStartSvg(startSvg);
               }}
@@ -4481,16 +4547,15 @@ export default function RelationsCanvas({
           .filter((n) => !folders.some(f => f.collapsed && f.nodeIds.includes(n.id)))
           .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
           .map((node) => {
+            // A person is a TOKEN on the map (2026-10-17). Her sheet is drawn in
+            // the overlay layer below, at its own position.
             const position = getNodePosition(node.id, node.x, node.y);
             const isSelected = selectedNode === node.id;
-            const isNodeExpanded = expandedNodes.has(node.id);
-            const cardWidth = isNodeExpanded ? 1920 : 520;
-            const cardHeight = isNodeExpanded ? 500 : 240;
+            const D = CHARACTER_TOKEN_DIAMETER;
+            const H = D + CHARACTER_TOKEN_LABEL;
 
-            // Viewport culling
-            // Margin scales with viewport so culling works at all zoom levels
-            const cullMarginX = viewBox.width * 0.5 + cardWidth;
-            const cullMarginY = viewBox.height * 0.5 + cardHeight;
+            const cullMarginX = viewBox.width * 0.5 + D;
+            const cullMarginY = viewBox.height * 0.5 + H;
             const isInViewport =
               position.x + cullMarginX > viewBox.x &&
               position.x - cullMarginX < viewBox.x + viewBox.width &&
@@ -4502,8 +4567,39 @@ export default function RelationsCanvas({
             const offset = dragOffsets.get(node.id) || { x: 0, y: 0 };
             const visualX = position.x + offset.x;
             const visualY = position.y + offset.y;
+            const isDraggingNode = dragOffsets.has(node.id);
 
-            return renderCharacterCard(node, visualX, visualY);
+            return (
+              <foreignObject
+                key={`char-token-${node.id}`}
+                opacity={carried?.kind === 'node' && carried.id === node.id ? 0.35 : undefined}
+                x={visualX - D / 2 - viewBox.width}
+                y={visualY - D / 2 - viewBox.height}
+                width={D + viewBox.width * 2}
+                height={H + viewBox.height * 2}
+                style={{ overflow: "visible", pointerEvents: "none" }}
+              >
+                <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
+                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", width: D }}>
+                  <CharacterToken
+                    id={node.id}
+                    name={node.name}
+                    portrait={node.portrait}
+                    status={node.status}
+                    data={(node.characterData ?? null) as GrowthCharacter | null}
+                    x={visualX}
+                    y={visualY}
+                    isOpen={expandedNodes.has(node.id)}
+                    isDraggingNode={isDraggingNode}
+                    isDropTarget={invDragHoverCharId === node.id}
+                    onOpen={(id) => { toggleExpand(id); bringNodeToFront(id); }}
+                    onPositionChange={commitCharacterMove}
+                    onDragOffsetChange={dragCharacterOffset}
+                  />
+                </div>
+                </div>
+              </foreignObject>
+            );
           })}
 
         {/* â”€â”€ Location nodes (foreignObject cards) â€” sorted by z-index â”€â”€ */}
@@ -4635,10 +4731,6 @@ export default function RelationsCanvas({
             const itemShowGlow = itemHasCrossed || isShimmering;
             const itemGlowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
-            // Zoomed far out: a token is a gold dot — the room keeps its texture without the noise.
-            if (lod === 'far') {
-              return <circle key={`item-dot-${node.id}`} cx={visualX} cy={visualY} r={14} fill="var(--krma-gold)" opacity={0.55} style={{ pointerEvents: 'none' }} />;
-            }
             return (
               <g key={`item-group-${node.id}`}>
               {itemShowGlow && (
@@ -4680,6 +4772,7 @@ export default function RelationsCanvas({
                     }}
                     isDraggingNode={isDraggingNode}
                     onDelete={onDeleteItem}
+                    onOpen={(id) => { toggleExpand(id); bringNodeToFront(id); }}
                     onPositionChange={(nodeId, x, y) => {
                       beginTx('move'); // undo (2026-10-06)
                       commitGroupDrag(nodeId);
@@ -4687,13 +4780,12 @@ export default function RelationsCanvas({
                       const itemHalf = getCardHalfWidth(nodeId);
                       const dropTarget = nodes.find(n => {
                         if (n.type !== 'character') return false;
-                        const charPos = getNodePosition(n.id, n.x, n.y);
+                        // Her token or her open sheet (2026-10-17).
+                        if (hitsCharacter(n, x, y, itemHalf)) return true;
                         const charExpanded = expandedNodes.has(n.id);
-                        const cw = charExpanded ? 1920 : 520;
-                        const ch = charExpanded ? 500 : 240;
-                        // Rect-vs-rect overlap with character card
-                        const inCharBox = Math.abs(x - charPos.x) < cw / 2 + itemHalf && Math.abs(y - charPos.y) < ch / 2 + itemHalf;
-                        if (inCharBox) return true;
+                        const charPos = sheetCenter(n.id, n);
+                        const cw = SHEET_CARD_W;
+                        const ch = SHEET_CARD_H;
                         // Rect-vs-rect overlap with open inventory panel
                         if (inventoryOpenNodes.has(n.id) && charExpanded) {
                           const cardLeft = charPos.x - cw / 2;
@@ -4842,6 +4934,109 @@ export default function RelationsCanvas({
                   {node.name.length > 12 ? `${node.name.substring(0, 12)}...` : node.name}
                 </text>
               </g>
+            );
+          })}
+
+        {/* ── OVERLAY CARDS (2026-10-17): open sheets float above the map at
+            their own position — "a pinned and movable overlay that won't go
+            inside folders or change things". Last in the world layer = on top. */}
+        {nodes
+          .filter((n) => n.type === "character" && expandedNodes.has(n.id) && !hiddenNodeIds.has(n.id))
+          .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
+          .map((node) => {
+            const c = sheetCenter(node.id, node);
+            return <React.Fragment key={`sheet-${node.id}`}>{renderCharacterCard(node, c.x, c.y)}</React.Fragment>;
+          })}
+        {nodes
+          .filter((n) => n.type === "item" && n.itemData && !n.holderId && expandedNodes.has(n.id) && !hiddenNodeIds.has(n.id))
+          .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
+          .map((node) => {
+            const c = sheetCenter(node.id, node);
+            const b = overlayBox('item');
+            return (
+              <foreignObject
+                key={`item-card-${node.id}`}
+                x={c.x - b.w / 2 - viewBox.width}
+                y={c.y - b.h / 2 - viewBox.height}
+                width={b.w + viewBox.width * 2}
+                height={b.h + viewBox.height * 2}
+                style={{ overflow: "visible", pointerEvents: "none" }}
+              >
+                <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
+                <div data-overlay-card={node.id} style={{ pointerEvents: "auto", width: b.w }}>
+                  <WorldItemCard
+                    node={{
+                      id: node.id,
+                      name: node.name,
+                      type: (node.itemType || 'misc') as WorldItemNodeData['type'],
+                      status: node.status || 'ACTIVE',
+                      data: node.itemData!,
+                      holderName: node.holderName,
+                      locationName: node.locationName,
+                      x: c.x,
+                      y: c.y,
+                    }}
+                    isExpanded
+                    onToggleExpand={toggleExpand}
+                    onDelete={onDeleteItem}
+                    onPositionChange={commitSheetMove}
+                    onDragOffsetChange={dragSheetOffset}
+                  />
+                </div>
+                </div>
+              </foreignObject>
+            );
+          })}
+        {visibleFolders
+          .filter((f) => openPlaces.has(f.id) && f.locationInfo)
+          .map((f) => {
+            const li = f.locationInfo!;
+            const key = `place:${f.id}`;
+            const base = cardPositions.get(key) ?? (() => {
+              const r = folderRectById.get(li.locationId);
+              return r ? { x: r.x + r.width + 60 + PLACE_CARD_W / 2, y: r.y + PLACE_CARD_H / 2 } : { x: 0, y: 0 };
+            })();
+            const drag = cardDrag?.id === key ? cardDrag : null;
+            const c = { x: base.x + (drag?.dx ?? 0), y: base.y + (drag?.dy ?? 0) };
+            return (
+              <foreignObject
+                key={`place-card-${f.id}`}
+                x={c.x - PLACE_CARD_W / 2 - viewBox.width}
+                y={c.y - PLACE_CARD_H / 2 - viewBox.height}
+                width={PLACE_CARD_W + viewBox.width * 2}
+                height={PLACE_CARD_H + viewBox.height * 2}
+                style={{ overflow: "visible", pointerEvents: "none" }}
+              >
+                <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
+                <div data-overlay-card={key} style={{ pointerEvents: "auto", width: PLACE_CARD_W }}>
+                  <LocationCard
+                    node={{
+                      id: li.locationId,
+                      name: f.name,
+                      type: (li.locationType || 'point_of_interest') as LocationNodeData['type'],
+                      status: li.status || 'ACTIVE',
+                      data: {
+                        description: li.description ?? '',
+                        environment: li.environment,
+                        population: li.population,
+                        dangerLevel: li.dangerLevel,
+                        controlledBy: li.controlledBy,
+                        notes: li.notes,
+                        tags: li.tags,
+                        krmaReserve: li.krmaReserve,
+                      },
+                      x: c.x,
+                      y: c.y,
+                    }}
+                    isExpanded
+                    onToggleExpand={() => togglePlaceCard(f.id)}
+                    onPositionChange={(_id, x, y) => commitSheetMove(key, x, y)}
+                    onDragOffsetChange={(_id, dx, dy) => dragSheetOffset(key, dx, dy)}
+                    onCreateChildCharacter={onCreateChildCharacterAtLocation}
+                  />
+                </div>
+                </div>
+              </foreignObject>
             );
           })}
 
@@ -5167,6 +5362,7 @@ export default function RelationsCanvas({
             onDrillIn={onDrillIn}
             onFolderDragStart={(folderId, startSvg) => {
               if (resizeActiveRef.current) return; // resize is resize, never a drag
+              folderDragMovedRef.current = false;
               setDragFolderId(folderId);
               setFolderDragStartSvg(startSvg);
             }}

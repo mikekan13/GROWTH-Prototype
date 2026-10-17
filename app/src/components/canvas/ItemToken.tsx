@@ -34,6 +34,8 @@ interface ItemTokenProps {
   onDelete?: (nodeId: string) => void;
   onPositionChange?: (nodeId: string, x: number, y: number) => void;
   onDragOffsetChange?: (nodeId: string, offsetX: number, offsetY: number) => void;
+  /** A tap opens the thing's card as an overlay (2026-10-17). Its contents stay on the right-click menu. */
+  onOpen?: (nodeId: string) => void;
 }
 
 interface ContentsRow {
@@ -143,7 +145,7 @@ function TokenContents({ rootId, rootName, anchor, onClose }: { rootId: string; 
   );
 }
 
-export default function ItemToken({ node, isDraggingNode = false, onDelete, onPositionChange, onDragOffsetChange }: ItemTokenProps) {
+export default function ItemToken({ node, isDraggingNode = false, onDelete, onPositionChange, onDragOffsetChange, onOpen }: ItemTokenProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
@@ -211,8 +213,11 @@ export default function ItemToken({ node, isDraggingNode = false, onDelete, onPo
       onDragOffsetChange(node.id, 0, 0);
       if (movedRef.current) {
         onPositionChange(node.id, dragStartPosRef.current.x + final.x - startSVGCoords.x, dragStartPosRef.current.y + final.y - startSVGCoords.y);
+      } else if (onOpen) {
+        // A tap (no drag) opens the thing's card (overlay, 2026-10-17).
+        onOpen(node.id);
       } else if (count > 0) {
-        // A tap (no drag) on a container opens what is inside.
+        // No card to open: a tap on a container opens what is inside.
         setContentsAnchor({ x: upEvent.clientX, y: upEvent.clientY });
       }
       setIsDragging(false);

@@ -1,42 +1,17 @@
 /**
- * Semantic zoom + depth encoding for the campaign canvas (Mike 2026-09-28:
- * "this is still hard for a human to interpret… Semantic zoom and encode
- * depth lets see it").
+ * Depth encoding for the campaign canvas (Mike 2026-09-28). Depth (0 = a root
+ * place, deeper = inside) steps the folder palette from deep Soul blue at the
+ * outside toward powder blue at the room, and prefixes the name with one ▸
+ * per level. Pure.
  *
- * The sim already runs on render distance; the screen now does too. Zoom is
- * the canvas's own scalar (1 = max zoom in, 6 = max zoom out):
- *   near  — today's full cards.
- *   mid   — items become name chips, characters become portrait chips.
- *   far   — items become dots (no text), characters stay portrait chips,
- *           description strips hide, folder names scale up to stay legible.
- * Depth (0 = a root place, deeper = inside) steps the folder palette from
- * deep Soul blue at the outside toward powder blue at the room, and prefixes
- * the name with one ▸ per level. Pure; thresholds are placeholders to tune.
+ * The SEMANTIC ZOOM that lived here (near/mid/far: chips, dots, growing
+ * labels) was REMOVED 2026-10-17 — Mike: "we currently have render zoom
+ * levels that change the chips size ect. I want to remove that." The canvas
+ * is the physical map; zoom only zooms.
  */
 
-export type CanvasLod = 'near' | 'mid' | 'far';
-
-export const LOD_TUNING = {
-  /** zoom ≥ this = far */
-  far: 3.2,
-  /** zoom ≥ this = mid */
-  mid: 1.9,
-  /** folder label grows with zoom so it stays readable when zoomed out */
-  labelBase: 36,
-  labelMaxScale: 3,
-} as const;
-
-export function lodForZoom(zoom: number): CanvasLod {
-  if (zoom >= LOD_TUNING.far) return 'far';
-  if (zoom >= LOD_TUNING.mid) return 'mid';
-  return 'near';
-}
-
-/** World-unit font size for a folder label at this zoom (screen size stays roughly constant once zoomed out). */
-export function folderLabelSize(zoom: number): number {
-  const scale = Math.max(1, Math.min(LOD_TUNING.labelMaxScale, zoom / 1.6));
-  return Math.round(LOD_TUNING.labelBase * scale);
-}
+/** Folder label size in world units (fixed — no zoom scaling). */
+export const FOLDER_LABEL_SIZE = 36;
 
 /** Header fill by depth: Soul blue (Chokmah) at the root, lightening toward the powder-blue surface. */
 export const DEPTH_HEADER = ['#002f6c', '#1c4784', '#3a649d', '#5b82b6', '#7d9fcb'] as const;

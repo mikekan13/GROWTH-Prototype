@@ -212,7 +212,7 @@ export const COMPLETION_STAGE_TOOLS: Record<GenesisPostSheetStage, readonly stri
   AGE: ['set_starting_age'],
   APPEARANCE: [],
   WORLD: [
-    'read_life_budget', 'stock_goods', 'stock_kit', 'search_catalog', 'pull_from_catalog', 'grant_possession', 'drop_possession', 'move_item', 'move_items', 'organize_place', 'propose_forge_blueprint', 'list_forge_drafts', 'read_forge_item',
+    'read_life_budget', 'stock_goods', 'stock_kit', 'search_catalog', 'pull_from_catalog', 'grant_possession', 'drop_possession', 'move_item', 'move_items', 'organize_place', 'draw_footprint', 'propose_forge_blueprint', 'list_forge_drafts', 'read_forge_item',
     'seed_location', 'create_location', 'read_location', 'seed_npc', 'establish_world_facts',
     'establish_currency', 'grant_cash', 'set_income',
   ],

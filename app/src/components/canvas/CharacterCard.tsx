@@ -1556,7 +1556,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           </div>
 
           {/* ── TKV Box (centered under portrait) ── */}
-          <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: '120px', top: '693px', border: '3px solid var(--krma-gold)', zIndex: 10 }}>
+          <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: '120px', top: '604px', border: '3px solid var(--krma-gold)', zIndex: 10 }}>
+            {/* Straddles the portrait frame's bottom edge (frame ends at 635px; Mike 2026-10-17: it floated below the card). */}
             <div className="w-full flex items-center justify-center" style={{ backgroundColor: 'var(--pillar-body)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: 'var(--krma-gold)', height: '28px' }}>T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V</div>
             <div className="w-full flex items-center justify-center" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '19px', color: '#8e7cc3', height: '34px' }}>{tkv}</div>
           </div>

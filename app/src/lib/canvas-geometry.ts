@@ -42,6 +42,10 @@ export const DEFAULT_LEVEL = 0;
 
 /** World-unit diameter of an item token (phone-first: ~1 cm at zoom 1.8). */
 export const TOKEN_DIAMETER = 72;
+/** World-unit diameter of a person's token on the map (2026-10-17: every entity is a token; the sheet opens as an overlay). */
+export const CHARACTER_TOKEN_DIAMETER = 120;
+/** Room under a person's token for the name label. */
+export const CHARACTER_TOKEN_LABEL = 34;
 /** Grid cell used by the auto-layout; a token plus breathing room. */
 export const TOKEN_CELL = 96;
 /** A compact location folder's header (FolderGroup: chrome 80 + gap 6 + details strip 44 + 12). The server-side auto-layout keeps tokens below it. */

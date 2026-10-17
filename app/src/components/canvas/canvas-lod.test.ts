@@ -1,19 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lodForZoom, folderLabelSize, depthHeaderFill, depthPrefix, locationDepths, LOD_TUNING, DEPTH_HEADER } from './canvas-lod';
-
-describe('semantic zoom levels', () => {
-  it('near when zoomed in, mid in the middle, far when zoomed out', () => {
-    expect(lodForZoom(1)).toBe('near');
-    expect(lodForZoom(LOD_TUNING.mid)).toBe('mid');
-    expect(lodForZoom(LOD_TUNING.far)).toBe('far');
-    expect(lodForZoom(6)).toBe('far');
-  });
-  it('folder labels grow with zoom and cap', () => {
-    expect(folderLabelSize(1)).toBe(LOD_TUNING.labelBase);
-    expect(folderLabelSize(3.2)).toBe(72);
-    expect(folderLabelSize(6)).toBe(LOD_TUNING.labelBase * LOD_TUNING.labelMaxScale);
-  });
-});
+import { depthHeaderFill, depthPrefix, locationDepths, DEPTH_HEADER } from './canvas-lod';
 
 describe('depth encoding', () => {
   it('roots are deep blue with no prefix; rooms lighten and gain one ▸ per level', () => {

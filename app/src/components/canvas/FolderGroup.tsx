@@ -3,11 +3,11 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import RestPanel from './RestPanel';
 import type { CanvasFolder } from '@/types/canvas';
-import { lodForZoom, folderLabelSize, depthHeaderFill, depthBodyFill, depthPrefix } from './canvas-lod';
+import { FOLDER_LABEL_SIZE, depthHeaderFill, depthBodyFill, depthPrefix } from './canvas-lod';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { locationTitleTooltip, countTooltip, characterChipTooltip, detailsTooltip, memberNames, subLocationNames } from './folder-tooltips';
 import type { GrowthCharacter } from '@/types/growth';
-import { TOKEN_DIAMETER, isRectangular, fitPolygonToRect, polygonPointsAttr, footprintSizeLabel, levelLabel } from '@/lib/canvas-geometry';
+import { TOKEN_DIAMETER, CHARACTER_TOKEN_DIAMETER, CHARACTER_TOKEN_LABEL, isRectangular, fitPolygonToRect, polygonPointsAttr, footprintSizeLabel, levelLabel } from '@/lib/canvas-geometry';
 
 interface NodePosition {
   x: number;
@@ -26,7 +26,11 @@ interface NodeDimensions {
 // topH/bottomH are measured from the node's center point.
 // Character cards overflow downward (portrait, TKV badge use negative margins).
 const CARD_SIZES: Record<string, { compact: NodeDimensions; expanded: NodeDimensions }> = {
-  character: { compact: { width: 520, topH: 120, bottomH: 120 }, expanded: { width: 1920, topH: 250, bottomH: 643 } }, // +163: the 400×600 portrait frame (2026-10-17)
+  // A person is a TOKEN on the map; her sheet opens as an overlay and takes no room in a place (2026-10-17).
+  character: {
+    compact: { width: CHARACTER_TOKEN_DIAMETER, topH: CHARACTER_TOKEN_DIAMETER / 2, bottomH: CHARACTER_TOKEN_DIAMETER / 2 + CHARACTER_TOKEN_LABEL },
+    expanded: { width: CHARACTER_TOKEN_DIAMETER, topH: CHARACTER_TOKEN_DIAMETER / 2, bottomH: CHARACTER_TOKEN_DIAMETER / 2 + CHARACTER_TOKEN_LABEL },
+  },
   location:  { compact: { width: 340, topH: 90, bottomH: 90 },   expanded: { width: 500, topH: 350, bottomH: 350 } },
   // Things are TOKENS on the map (2026-10-16), never expanded cards.
   item:      { compact: { width: TOKEN_DIAMETER, topH: TOKEN_DIAMETER / 2, bottomH: TOKEN_DIAMETER / 2 }, expanded: { width: TOKEN_DIAMETER, topH: TOKEN_DIAMETER / 2, bottomH: TOKEN_DIAMETER / 2 } },
@@ -288,7 +292,7 @@ export function FolderGroupRect({
   } | null>(null);
 
   const content = useMemo(
-    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, folderLabelSize(zoom) + 16),
+    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, FOLDER_LABEL_SIZE + 16),
     [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, zoom]
   );
 
@@ -418,10 +422,8 @@ export function FolderGroupRect({
 
   const color = folder.type === 'party' ? SOUL_BLUE : (folder.color || SOUL_BLUE);
   const collapsed = !!folder.collapsed;
-  // Semantic zoom + depth encoding (Mike 2026-09-28): a place's palette steps
-  // by how deep it sits; labels grow as the Watcher zooms out.
+  // Depth encoding (Mike 2026-09-28): a place's palette steps by how deep it sits.
   const depth = folder.locationInfo?.depth;
-  const lod = lodForZoom(zoom);
   const headerFill = folder.locationInfo ? depthHeaderFill(depth) : color;
   const bodyFill = folder.locationInfo ? depthBodyFill(depth) : '#19191930';
   const btnW = 160;
@@ -433,13 +435,12 @@ export function FolderGroupRect({
   const folderChars = characters.filter(c => folder.nodeIds.includes(c.id));
 
   // Title lives INSIDE the header bar (Mike 2026-10-06: "the title should be
-  // within the header bar"). Near: a tidy first row beside the portrait, with
-  // the action row under it. Mid/far: the action row hides (unreadable that
-  // small anyway) and the title scales up with zoom, centred on the bar, so a
-  // place stays legible zoomed out. Width is capped so it never runs into the
-  // who-is-here chips or the collapse toggle; overflow ellipsises.
-  const showActionRow = !!folder.locationInfo && lod === 'near';
-  const showPortrait = !!folder.locationInfo && lod !== 'far';
+  // within the header bar"): a tidy first row beside the portrait, with the
+  // action row under it — the same at every zoom (no zoom levels, Mike
+  // 2026-10-17). Width is capped so it never runs into the who-is-here chips
+  // or the collapse toggle; overflow ellipsises.
+  const showActionRow = !!folder.locationInfo;
+  const showPortrait = !!folder.locationInfo;
   const chipCount = (!collapsed && folder.locationInfo && folderChars.length > 0)
     ? Math.min(folderChars.length, 6) + (folderChars.length > 6 ? 1 : 0) : 0;
   const titleLeft = showPortrait ? 84 : folder.type === 'party' ? btnW + 24 : 16;
@@ -450,7 +451,7 @@ export function FolderGroupRect({
   // (#002f6c) badge that hugs the text like a tape strip (VISUAL-DESIGN-SPEC §5).
   const TITLE_PAD_X = 12;
   const titleChars = folder.name.length + (depth ?? 0) + String(folder.nodeIds.length).length + (folder.type === 'party' ? 7 : 4);
-  const titleMax = lod === 'near' ? 32 : lod === 'mid' ? Math.min(folderLabelSize(zoom), 60) : folderLabelSize(zoom);
+  const titleMax = 32;
   // Bebas Neue is condensed: ~0.5em per char including the tracking.
   const titleFont = Math.max(18, Math.min(titleMax, Math.floor((titleAvailW - 2 * TITLE_PAD_X) / (titleChars * 0.5))));
   const titleLineH = Math.ceil(titleFont * 1.1) + 4;
@@ -575,7 +576,7 @@ export function FolderGroupRect({
         </foreignObject>
       )}
       {/* Map caption (2026-10-16): story · size in feet · passage links. Near only. */}
-      {!collapsed && mapCaption && lod === 'near' && (
+      {!collapsed && mapCaption && (
         <text
           x={bounds.x + 14}
           y={bounds.y + displayHeight - 12}
@@ -1338,7 +1339,7 @@ export default function FolderGroup({
   }, [folder.id]);
 
   const content = useMemo(
-    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, folderLabelSize(zoom) + 16),
+    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, FOLDER_LABEL_SIZE + 16),
     [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, zoom]
   );
 

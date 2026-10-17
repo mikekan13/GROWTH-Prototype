@@ -71,6 +71,7 @@ Each later test adds one of the excluded pieces.
 | B3 | **The legacy body map sits beside the new anatomy.** `vitals.bodyParts` coexists with `bodyAnatomy`. Pick one; the new one is canon. | cleanup |
 | B4 | **Her wealth lines are on the old scale.** Her root/branch `accumulatedWealth` and cash rate predate the regrade, and the currency ruling (17 Oct: a dollar is belief, not stored KRMA) changes what accumulatedWealth means. Not needed for an ordinary-life scene; needed before anyone counts money. | decision pending |
 | B5 | **Rosemary Marsh** (her grandmother) is a DRAFT NPC with no AI-being record, and isn't marked `tableHidden`. Seeding her memory would bounce (`daya/authoring.ts:278`). Is she dead? If so, she's a memory and not a seat: mark her deceased/retired. If alive, make her an AI being. | decision |
+| B7 | **TKV is wrong.** The card shows 244, but her blocks sum to 408 (−79 thorns) and her items count 0. Mike, 17 Oct: "TKV should be everything. Everything she owns, her, all of it." Canon check in progress, then fix `calculateCharacterTKV` / facts to count traits, owned and held things, and whatever else canon says. The box position was fixed 17 Oct (now straddles the portrait's bottom edge). | in progress |
 | B6 | **Her character KRMA wallet is 0** (the campaign wallet holds 100,000). Check that nothing in play (Burns, Frequency spends) needs her wallet. | check |
 
 ## C. The table loop: what works vs what's missing
