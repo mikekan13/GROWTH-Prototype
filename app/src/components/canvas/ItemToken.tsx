@@ -295,7 +295,7 @@ export default function ItemToken({ node, isDraggingNode = false, onDelete, onPo
             height: d,
             borderRadius: '50%',
             background: 'radial-gradient(circle at 35% 30%, #1b1b2e 0%, #0d0d1a 70%)',
-            border: `4px solid ${ring}`,
+            border: `${Math.max(2, Math.round(d / 18))}px solid ${ring}`,
             boxShadow: dragging
               ? `0 0 0 3px rgba(255,204,120,0.5), 0 10px 18px rgba(0,0,0,0.7)`
               : `0 0 10px ${ring}66, 0 3px 8px rgba(0,0,0,0.6)`,
@@ -304,7 +304,7 @@ export default function ItemToken({ node, isDraggingNode = false, onDelete, onPo
             justifyContent: 'center',
             color: GOLD,
             fontFamily: 'var(--font-header), "Bebas Neue", sans-serif',
-            fontSize: 30,
+            fontSize: Math.round(d * 0.42),
             letterSpacing: '0.04em',
             lineHeight: 1,
             transform: dragging ? 'scale(1.08)' : 'scale(1)',
@@ -318,9 +318,9 @@ export default function ItemToken({ node, isDraggingNode = false, onDelete, onPo
         <div
           data-token-count
           style={{
-            position: 'absolute', top: -6, right: -6, minWidth: 26, height: 26, padding: '0 6px', borderRadius: 13,
-            background: GOLD, color: '#0a0a0a', border: '2px solid #0a0a0a',
-            fontFamily: 'var(--font-header), "Bebas Neue", sans-serif', fontSize: 16, lineHeight: '22px', textAlign: 'center',
+            position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, padding: '0 3px', borderRadius: 8,
+            background: GOLD, color: '#0a0a0a', border: '1px solid #0a0a0a',
+            fontFamily: 'var(--font-header), "Bebas Neue", sans-serif', fontSize: 11, lineHeight: '14px', textAlign: 'center',
             pointerEvents: 'none',
           }}
         >

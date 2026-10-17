@@ -40,8 +40,8 @@ export interface TokenPosition { x: number; y: number }
 export const DEFAULT_SCALE_FT_PER_UNIT = 0.05; // 20 units ≈ 1 ft — a 560-wide tile reads as a 28 ft room
 export const DEFAULT_LEVEL = 0;
 
-/** World-unit diameter of an item token (phone-first: ~1 cm at zoom 1.8). */
-export const TOKEN_DIAMETER = 72;
+/** World-unit diameter of a THING's marker = 2 ft on the 5-ft grid (2026-10-17: at 72 = 3.6 ft a galley's ten things could not fit). */
+export const TOKEN_DIAMETER = 40;
 /** A person's token = ONE 5-ft square (Mike 2026-10-17: "normal 5 foot space rules for a token like in typical trpgs"; 20 units = 1 ft). */
 export const CHARACTER_TOKEN_DIAMETER = 100;
 /** Room under a person's token for the name label. */
@@ -275,6 +275,26 @@ export function autoLayoutGrid(count: number, area: Rect, cell = TOKEN_CELL): Po
     const c = i % cols;
     const r = Math.floor(i / cols);
     out.push({ x: area.x + c * cell + cell / 2, y: area.y + r * cell + cell / 2 });
+  }
+  return out;
+}
+
+/** Marker grid cell for things inside a drawn room (2.5 ft). */
+export const ITEM_CELL = 50;
+
+/** A grid that never leaves the area: past the last row it wraps, offset a third of a cell (things pile, they never spill). */
+export function clampedLayoutGrid(count: number, area: Rect, cell = ITEM_CELL): Point[] {
+  const cols = Math.max(1, Math.floor(area.width / cell));
+  const rows = Math.max(1, Math.floor(area.height / cell));
+  const out: Point[] = [];
+  for (let i = 0; i < count; i++) {
+    const layer = Math.floor(i / (cols * rows));
+    const j = i % (cols * rows);
+    const off = (layer * cell) / 3;
+    out.push({
+      x: Math.min(area.x + area.width - cell / 4, area.x + (j % cols) * cell + cell / 2 + off),
+      y: Math.min(area.y + area.height - cell / 4, area.y + Math.floor(j / cols) * cell + cell / 2 + off),
+    });
   }
   return out;
 }

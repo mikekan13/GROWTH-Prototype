@@ -78,7 +78,7 @@ export async function setLocationGeometry(
   const data = parseData(loc.data);
   const merged: Record<string, unknown> = {
     ...data,
-    ...(parsed.data.footprint ? { footprint: parsed.data.footprint } : {}),
+    ...(parsed.data.footprint ? { footprint: parsed.data.footprint, footprintAt: Date.now() } : {}),
     ...(parsed.data.connects ? { connects: parsed.data.connects } : {}),
   };
   await updateLocation(locationId, campaignId, userId, userRole, { data: merged });

@@ -562,10 +562,13 @@ export function FolderGroupRect({
                 <div data-bg="place" style={{ width: bounds.width, height: bounds.height }} />
               </ComplexTooltip>
             )}
+            {/* A root place's name sits ABOVE its outline; a room's, small, inside its top-left corner. */}
             <div style={{
-              position: 'absolute', left: 14, top: 8, pointerEvents: 'none', whiteSpace: 'nowrap',
-              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: 26, letterSpacing: '0.08em',
-              color: 'rgba(203,217,232,0.6)',
+              position: 'absolute', left: (li.depth ?? 0) === 0 ? 0 : 6, top: (li.depth ?? 0) === 0 ? -24 : 4,
+              pointerEvents: 'none', whiteSpace: 'nowrap', maxWidth: (li.depth ?? 0) === 0 ? undefined : bounds.width - 10,
+              overflow: 'hidden', textOverflow: 'ellipsis',
+              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: (li.depth ?? 0) === 0 ? 20 : 14, letterSpacing: '0.08em',
+              color: (li.depth ?? 0) === 0 ? 'rgba(255,204,120,0.75)' : 'rgba(203,217,232,0.55)',
             }}>
               {folder.name}{li.status && li.status !== 'ACTIVE' ? ' · planning' : ''}
             </div>

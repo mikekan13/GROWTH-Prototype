@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import CampaignCanvas from '@/components/CampaignCanvas';
 import { locationDepths } from '@/components/canvas/canvas-lod';
-import { parseFootprint, parsePassageLinks, parseOpenings, parseTokenPosition, footprintBounds, fractionToWorld, tokenArea, autoLayoutGrid, LOCATION_HEADER_ESTIMATE, TOKEN_CELL } from '@/lib/canvas-geometry';
+import { parseFootprint, parsePassageLinks, parseOpenings, parseTokenPosition, footprintBounds, fractionToWorld, tokenArea, autoLayoutGrid, clampedLayoutGrid, LOCATION_HEADER_ESTIMATE, TOKEN_CELL } from '@/lib/canvas-geometry';
 import { recomputeAugments } from '@/lib/character-actions';
 import { warmLocalLane } from '@/lib/local-warm';
 import { canEnterAdultCampaign } from '@/lib/permissions';
@@ -183,6 +183,8 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
   //    room has one), else the token grid near the room anchor.
   const itemIdSet = new Set(campaign.campaignItems.map(i => i.id));
   const locFootprintById = new Map(locationNodes.map(n => [n.id, parseFootprint((n.locationData as { footprint?: unknown } | null)?.footprint)]));
+  // When each place was last drawn — a layout it produces beats an older browser-stored drag.
+  const locFootprintAtById = new Map(locationNodes.map(n => [n.id, typeof (n.locationData as { footprintAt?: unknown } | null)?.footprintAt === 'number' ? (n.locationData as { footprintAt: number }).footprintAt : undefined]));
   const parentEdgeByChild = new Map<string, { id: string; targetId: string; data: string | null }>();
   const containsCountByItem = new Map<string, number>();
   for (const r of relationshipRows) {
@@ -213,18 +215,24 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     const storedAt = typeof itemData?.placedAt === 'number' ? itemData.placedAt as number : 0;
 
     let x: number | null = null, y: number | null = null, placedAt: number | undefined;
+    // A drawn room ignores an old canvas point that is not inside it (pre-map
+    // coordinates spilled things below the apartment, 2026-10-17).
+    const fpBox = footprint ? footprintBounds(footprint.points) : null;
+    const storedInRoom = storedX != null && storedY != null && (!fpBox
+      || (storedX >= fpBox.x && storedX <= fpBox.x + fpBox.width && storedY >= fpBox.y && storedY <= fpBox.y + fpBox.height));
     if (footprint && tokenPos && positionAt >= storedAt) {
       const p = fractionToWorld(tokenPos, footprintBounds(footprint.points));
       x = p.x; y = p.y; placedAt = positionAt;
-    } else if (storedX != null && storedY != null) {
+    } else if (storedX != null && storedY != null && storedInRoom) {
       x = storedX; y = storedY; placedAt = storedAt || undefined;
     } else if (roomId) {
       const idx = perRoomItemIndex.get(roomId) ?? 0;
       perRoomItemIndex.set(roomId, idx + 1);
       if (footprint) {
-        const area = tokenArea(footprintBounds(footprint.points), LOCATION_HEADER_ESTIMATE);
-        const p = autoLayoutGrid(idx + 1, area)[idx];
-        x = p.x; y = p.y;
+        // Inside a drawn room: a tight marker grid that never leaves the room.
+        const area = tokenArea(footprintBounds(footprint.points), 24, 8);
+        const p = clampedLayoutGrid(idx + 1, area)[idx];
+        x = p.x; y = p.y; placedAt = locFootprintAtById.get(roomId!);
       } else if (locPosById.has(roomId)) {
         // No footprint yet: a token grid near the room anchor (4 across).
         const base = locPosById.get(roomId)!;
