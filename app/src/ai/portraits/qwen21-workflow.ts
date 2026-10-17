@@ -205,15 +205,26 @@ export function buildQwen21StylePrompt(styleRefCount: number, styleLine: string 
   );
 }
 
-const DEFAULT_UNDERCLOTHING = 'simple neutral underclothing with a clean minimal cut';
+/**
+ * The body step is ALWAYS underwear only (Mike 2026-10-17: "every body step is rendered just in
+ * underwear"). The old default "simple neutral underclothing" painted Kristopher in a tee, jeans and
+ * sneakers, so the default names the garments and the bare skin around them outright.
+ */
+export function defaultUnderwear(gender?: string): string {
+  const g = (gender ?? '').trim().toLowerCase();
+  if (/^(m|male|man)$/.test(g)) return 'plain fitted grey boxer briefs';
+  if (/^(f|female|woman)$/.test(g)) return 'a plain grey bra and plain grey briefs';
+  return 'a plain grey bandeau top and plain grey briefs';
+}
 
-/** Full body from the styled bust (<image1>). Underclothing = character data. MEDIUM + MOOD + studio wall. */
-export function buildQwen21BodyPrompt(underclothing?: string, mood?: string): string {
-  const under = (underclothing?.trim() || DEFAULT_UNDERCLOTHING).replace(/[.\s]+$/, '');
+/** Full body from the styled bust (<image1>), in underwear only. Underclothing = character data. MEDIUM + MOOD + studio wall. */
+export function buildQwen21BodyPrompt(underclothing?: string, mood?: string, gender?: string): string {
+  const under = (underclothing?.trim() || defaultUnderwear(gender)).replace(/[.\s]+$/, '');
   return (
     'A full-length front view of the person in <image1> standing in a relaxed A-pose, arms at the sides, feet visible, ' +
     'with clear margin above the head and below the feet. ' +
-    `Wearing ${under}; keep the face and hair of <image1> exactly. ` +
+    `Wearing only ${under} and nothing else: no shirt, no trousers, no shoes, no socks; bare arms, bare legs, bare feet. ` +
+    'Keep the face and hair of <image1> exactly. ' +
     `${getQwen21StyleLine(mood)} ` +
     getFlux2Backdrop('studio')
   );

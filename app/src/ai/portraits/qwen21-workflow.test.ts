@@ -83,12 +83,19 @@ describe('qwen21 prompt builders', () => {
     const p = buildQwen21BodyPrompt('a grey linen shift.');
     expect(p).toContain('relaxed A-pose');
     expect(p).toContain('feet visible');
-    expect(p).toContain('Wearing a grey linen shift; keep the face and hair of <image1> exactly.');
+    expect(p).toContain('Wearing only a grey linen shift and nothing else: no shirt, no trousers, no shoes, no socks; bare arms, bare legs, bare feet.');
+    expect(p).toContain('Keep the face and hair of <image1> exactly.');
     expect(p.endsWith(getFlux2Backdrop('studio'))).toBe(true);
     expect(p).toContain(GROWTH_MEDIUM);
     expect(p).toContain(getCampaignMood('growth'));
     expect(buildQwen21BodyPrompt(undefined, 'western')).toContain(getCampaignMood('western'));
-    expect(buildQwen21BodyPrompt()).toContain('simple neutral underclothing');
+  });
+
+  it('body prompt: always underwear only — the default names the garments (Kristopher came out in a tee and jeans, 2026-10-17)', () => {
+    expect(buildQwen21BodyPrompt(undefined, undefined, 'Male')).toContain('Wearing only plain fitted grey boxer briefs and nothing else');
+    expect(buildQwen21BodyPrompt(undefined, undefined, 'female')).toContain('Wearing only a plain grey bra and plain grey briefs and nothing else');
+    expect(buildQwen21BodyPrompt()).toContain('Wearing only a plain grey bandeau top and plain grey briefs and nothing else');
+    expect(buildQwen21BodyPrompt()).not.toContain('underclothing with a clean minimal cut');
   });
 
   it('edit prompt: instruction + one-clause medium reminder + mood + "Change nothing else."', () => {

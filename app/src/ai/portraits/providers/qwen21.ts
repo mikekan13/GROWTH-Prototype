@@ -464,9 +464,9 @@ export class Qwen21Provider extends ServerlessProvider {
   }
 
   /** Full body from the styled bust (portrait canvas via EmptyLatentImage). Pass the RAW bust buffer or a stored path. */
-  async generateBody(characterId: string, styledBust: Qwen21Image, seed: number, underclothing?: string, mood?: string): Promise<Qwen21StepResult> {
+  async generateBody(characterId: string, styledBust: Qwen21Image, seed: number, underclothing?: string, mood?: string, gender?: string): Promise<Qwen21StepResult> {
     const bustName = await this.uploadImage(styledBust, `qwen21-bust-${seed}`);
-    const prompt = buildQwen21BodyPrompt(underclothing, mood);
+    const prompt = buildQwen21BodyPrompt(underclothing, mood, gender);
     return this.runStep(characterId, 'bodies', 'body', prompt, [bustName], seed, { ...QWEN21_BODY_SIZE }, mood);
   }
 
@@ -629,7 +629,7 @@ export class Qwen21Provider extends ServerlessProvider {
       const mood = resolveMoodKey({ styleMood: input.campaignStyle?.styleMood });
 
       if (input.overrides?.composition === 'full_body') {
-        const body = await this.generateBody(input.characterId, refs[0], seed, input.characterData?.identity?.underclothing, mood);
+        const body = await this.generateBody(input.characterId, refs[0], seed, input.characterData?.identity?.underclothing, mood, input.characterData?.identity?.sex);
         return this.toResult(body, Date.now() - startTime, `qwen21 body: bust=${refs[0]} mood=${mood}`);
       }
 
