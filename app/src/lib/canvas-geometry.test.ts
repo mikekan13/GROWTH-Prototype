@@ -177,3 +177,16 @@ describe('grid snapping + walls (2026-10-17)', () => {
     expect(snapped.to.x).toBe(5);
   });
 });
+
+describe('openings sized to the grid (2026-10-17)', () => {
+  it('a 2-ft door becomes one 5-ft square, kept on its wall; an opening never outgrows its wall', async () => {
+    const { gridSizedOpening } = await import('./canvas-geometry');
+    const wall = { owner: 'Bathroom', a: { x: 0, y: 15 }, b: { x: 5, y: 15 } };
+    const d = gridSizedOpening('door', { x: 4, y: 15 }, { x: 6, y: 15 }, wall);
+    expect(Math.hypot(d.to.x - d.from.x, d.to.y - d.from.y)).toBe(5);
+    expect(d.from.x).toBeGreaterThanOrEqual(0);
+    expect(d.to.x).toBeLessThanOrEqual(5);
+    const w = gridSizedOpening('window', { x: 2, y: 0 }, { x: 4, y: 0 }, { owner: 'Main', a: { x: 0, y: 0 }, b: { x: 20, y: 0 } });
+    expect(Math.hypot(w.to.x - w.from.x, w.to.y - w.from.y)).toBe(2.5);
+  });
+});

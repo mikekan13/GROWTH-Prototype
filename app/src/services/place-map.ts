@@ -19,7 +19,7 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
-import { DEFAULT_LEVEL, DEFAULT_SCALE_FT_PER_UNIT, GRID_FT, HALF_GRID_FT, cellCentre, footprintBounds, openingSides, parseFootprint, parseOpenings, pointInPolygon, snapOpeningToWall, snapOutline, snapTo, wallEdges, worldToFraction, type DoorState, type Opening, type Point } from '@/lib/canvas-geometry';
+import { DEFAULT_LEVEL, DEFAULT_SCALE_FT_PER_UNIT, GRID_FT, HALF_GRID_FT, cellCentre, footprintBounds, gridSizedOpening, openingSides, parseFootprint, parseOpenings, pointInPolygon, snapOpeningToWall, snapOutline, snapTo, wallEdges, worldToFraction, type DoorState, type Opening, type Point } from '@/lib/canvas-geometry';
 import { updateLocation } from './location';
 import { setLocationGeometry, setTokenPosition } from './placement-geometry';
 import { moveCharacterToLocation } from './character-location';
@@ -213,7 +213,8 @@ export async function drawPlaceMap(
     const edges = wallEdges([...roomsFt, ...(homeFt ? [{ owner: home.name, points: homeFt }] : [])]);
     const roomNames = new Set(roomPolys.map(r => r.name.toLowerCase()));
     const openings: Opening[] = plan.openings.map((o, i) => {
-      const snapped = snapOpeningToWall(o.fromFt, o.toFt, edges);
+      const onWall = snapOpeningToWall(o.fromFt, o.toFt, edges);
+      const snapped = { ...gridSizedOpening(o.kind, onWall.from, onWall.to, onWall.wall), wall: onWall.wall };
       const sides = openingSides(snapped.from, snapped.to, roomsFt, homeFt);
       const exteriorLabel = o.between.find(b => !roomNames.has(b.toLowerCase()) && b.toLowerCase() !== 'outside');
       const between = sides.map(sd => (sd === 'outside' && exteriorLabel ? exteriorLabel : sd));

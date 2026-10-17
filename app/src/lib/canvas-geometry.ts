@@ -419,6 +419,35 @@ export function snapOpeningToWall(from: Point, to: Point, edges: WallEdge[]): { 
 }
 
 /**
+ * Size an opening to the grid along its wall (Mike 2026-10-17: "if violet
+ * takes up a 5 by 5 foot space then the doors in her apartment are extremely
+ * small"): a door / archway spans whole 5-ft squares (at least one), a window
+ * half-squares (at least 2.5 ft); centred where it was put, kept on the wall.
+ * Feet. Pure.
+ */
+export function gridSizedOpening(kind: OpeningKind, from: Point, to: Point, wall: WallEdge | null): { from: Point; to: Point } {
+  const step = kind === 'window' ? HALF_GRID_FT : GRID_FT;
+  const len = Math.hypot(to.x - from.x, to.y - from.y);
+  const wallLen = wall ? Math.hypot(wall.b.x - wall.a.x, wall.b.y - wall.a.y) : Infinity;
+  // Never longer than the wall it sits on.
+  const want = Math.min(wallLen, Math.max(step, Math.round(len / step) * step));
+  const ux = len > 0 ? (to.x - from.x) / len : (wall ? (wall.b.x - wall.a.x) / Math.max(1e-9, Math.hypot(wall.b.x - wall.a.x, wall.b.y - wall.a.y)) : 1);
+  const uy = len > 0 ? (to.y - from.y) / len : (wall ? (wall.b.y - wall.a.y) / Math.max(1e-9, Math.hypot(wall.b.x - wall.a.x, wall.b.y - wall.a.y)) : 0);
+  let mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+  if (wall) {
+    // Keep the whole opening on the wall: slide the middle inward if it would overhang a corner.
+    const wl = Math.hypot(wall.b.x - wall.a.x, wall.b.y - wall.a.y);
+    const t = wl > 0 ? ((mid.x - wall.a.x) * (wall.b.x - wall.a.x) + (mid.y - wall.a.y) * (wall.b.y - wall.a.y)) / (wl * wl) : 0.5;
+    const half = Math.min(want, wl) / 2 / Math.max(wl, 1e-9);
+    const tc = Math.max(half, Math.min(1 - half, t));
+    mid = { x: wall.a.x + tc * (wall.b.x - wall.a.x), y: wall.a.y + tc * (wall.b.y - wall.a.y) };
+  }
+  const h = want / 2;
+  const r = (v: number) => Math.round(v * 2) / 2;
+  return { from: { x: r(mid.x - ux * h), y: r(mid.y - uy * h) }, to: { x: r(mid.x + ux * h), y: r(mid.y + uy * h) } };
+}
+
+/**
  * What an opening really joins, from the walls it sits on: every ROOM whose
  * wall carries it; if only one room does and the HOME outline carries it
  * too, the other side is outside. Pure.

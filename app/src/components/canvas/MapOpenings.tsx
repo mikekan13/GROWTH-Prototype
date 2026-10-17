@@ -56,33 +56,33 @@ export default function MapOpenings({ campaignId, homeId, openings, canEdit }: P
         const mid = { x: (o.a.x + o.b.x) / 2, y: (o.a.y + o.b.y) / 2 };
         const leafEnd = { x: o.a.x + nx * len, y: o.a.y + ny * len };
         const label = o.name ?? `${o.kind[0].toUpperCase()}${o.kind.slice(1)}`;
-        const hit = 44;
+        const hit = Math.max(44, len * 0.8);
         return (
           <g key={o.id} data-opening={o.id}>
             {/* the wall cut */}
-            <line x1={o.a.x} y1={o.a.y} x2={o.b.x} y2={o.b.y} stroke={CUT} strokeWidth={9} strokeLinecap="butt" />
+            <line x1={o.a.x} y1={o.a.y} x2={o.b.x} y2={o.b.y} stroke={CUT} strokeWidth={16} strokeLinecap="butt" />
             {o.kind === 'door' && (state === 'open' ? (
               <>
-                <line x1={o.a.x} y1={o.a.y} x2={leafEnd.x} y2={leafEnd.y} stroke={GOLD} strokeWidth={5} strokeLinecap="round" />
-                <path d={`M ${o.b.x} ${o.b.y} A ${len} ${len} 0 0 ${nx * dy - ny * dx > 0 ? 0 : 1} ${leafEnd.x} ${leafEnd.y}`} fill="none" stroke={GOLD} strokeWidth={2} strokeDasharray="6 5" opacity={0.7} />
+                <line x1={o.a.x} y1={o.a.y} x2={leafEnd.x} y2={leafEnd.y} stroke={GOLD} strokeWidth={10} strokeLinecap="round" />
+                <path d={`M ${o.b.x} ${o.b.y} A ${len} ${len} 0 0 ${nx * dy - ny * dx > 0 ? 0 : 1} ${leafEnd.x} ${leafEnd.y}`} fill="none" stroke={GOLD} strokeWidth={3} strokeDasharray="10 8" opacity={0.75} />
               </>
             ) : (
-              <line x1={o.a.x} y1={o.a.y} x2={o.b.x} y2={o.b.y} stroke={state === 'locked' ? '#e8585a' : GOLD} strokeWidth={6} strokeLinecap="round" />
+              <line x1={o.a.x} y1={o.a.y} x2={o.b.x} y2={o.b.y} stroke={state === 'locked' ? '#e8585a' : GOLD} strokeWidth={12} strokeLinecap="round" />
             ))}
             {o.kind === 'window' && (
               <>
-                <line x1={o.a.x + nx * 4} y1={o.a.y + ny * 4} x2={o.b.x + nx * 4} y2={o.b.y + ny * 4} stroke={PANE} strokeWidth={2.5} />
-                <line x1={o.a.x - nx * 4} y1={o.a.y - ny * 4} x2={o.b.x - nx * 4} y2={o.b.y - ny * 4} stroke={PANE} strokeWidth={2.5} />
+                <line x1={o.a.x + nx * 6} y1={o.a.y + ny * 6} x2={o.b.x + nx * 6} y2={o.b.y + ny * 6} stroke={PANE} strokeWidth={4} />
+                <line x1={o.a.x - nx * 6} y1={o.a.y - ny * 6} x2={o.b.x - nx * 6} y2={o.b.y - ny * 6} stroke={PANE} strokeWidth={4} />
               </>
             )}
             {(o.kind === 'archway' || o.kind === 'opening') && (
               <>
-                <line x1={o.a.x - nx * 8} y1={o.a.y - ny * 8} x2={o.a.x + nx * 8} y2={o.a.y + ny * 8} stroke="rgba(203,217,232,0.7)" strokeWidth={3} />
-                <line x1={o.b.x - nx * 8} y1={o.b.y - ny * 8} x2={o.b.x + nx * 8} y2={o.b.y + ny * 8} stroke="rgba(203,217,232,0.7)" strokeWidth={3} />
+                <line x1={o.a.x - nx * 8} y1={o.a.y - ny * 8} x2={o.a.x + nx * 8} y2={o.a.y + ny * 8} stroke="rgba(203,217,232,0.8)" strokeWidth={6} />
+                <line x1={o.b.x - nx * 8} y1={o.b.y - ny * 8} x2={o.b.x + nx * 8} y2={o.b.y + ny * 8} stroke="rgba(203,217,232,0.8)" strokeWidth={6} />
               </>
             )}
             {state === 'locked' && (
-              <text x={mid.x + nx * 22} y={mid.y + ny * 22 + 8} textAnchor="middle" fontSize={22} fill="#e8585a" style={{ pointerEvents: 'none' }}>🔒</text>
+              <text x={mid.x + nx * 22} y={mid.y + ny * 22 + 8} textAnchor="middle" fontSize={34} fill="#e8585a" style={{ pointerEvents: 'none' }}>🔒</text>
             )}
             <foreignObject x={mid.x - hit / 2} y={mid.y - hit / 2} width={hit} height={hit} style={{ overflow: 'visible' }}>
               <div
