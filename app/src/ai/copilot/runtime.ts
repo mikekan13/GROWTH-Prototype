@@ -30,9 +30,11 @@ import {
   REQUEST_TOOL,
   isTickSource,
   lightToolsFor,
+  CANON_REWRITE_TOOLS,
   type DispatchKind,
   type ToolProfile,
 } from './tool-profiles';
+import { CANON_REWRITE_NOTE, canonRewriteActive } from '@/services/canon-rewrite';
 import {
   tableChatHistory,
   rollSummary,
@@ -517,7 +519,10 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   // Built from DB content (table state, sheets, locations, memories): on a
   // cloud lane it crosses only as the prompt does — table-marked lines
   // withheld, the rest through the awaited tone filter (contextForLane).
+  // CANON REWRITE MODE (2026-10-17, temporary): the ADMIN-as-GM's play rewrites traits + memories.
+  const canonOn = isTableChat && await canonRewriteActive(prompt.campaignId, prompt.actorId, prompt.actorRole).catch(() => false);
   const rawContextBlock = [
+    canonOn ? CANON_REWRITE_NOTE : '',
     timeBlock,
     '',
     '=== CAMPAIGN DATA ===',
@@ -555,7 +560,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     && requestableTools(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools, tick).includes(proposed)) {
     grants = [proposed];
   }
-  const profileFor = (g: string[]): ToolProfile => ({ kind, granted: g, tick });
+  const profileFor = (g: string[]): ToolProfile => ({ kind, granted: canonOn ? [...new Set([...g, ...CANON_REWRITE_TOOLS])] : g, tick });
   let tools = buildToolSpecs(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools, profileFor(grants));
 
   // Budget (2026-10-12): log the dispatch's size by part and hold it to the

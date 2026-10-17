@@ -40,6 +40,13 @@ export const TABLE_CHAT_TOOLS: readonly string[] = [
   'ask_terminal',
 ];
 
+/**
+ * CANON REWRITE MODE (2026-10-17, temporary): offered on table chat only when
+ * the mode is open to the actor (runtime checks canonRewriteActive). Kept out
+ * of TABLE_CHAT_TOOLS so other campaigns never carry their specs.
+ */
+export const CANON_REWRITE_TOOLS: readonly string[] = ['read_canon', 'rewrite_trait', 'rewrite_memory', 'undo_canon_rewrite'];
+
 /** Added on top of TABLE_CHAT_TOOLS for system wakes + canvas gestures. */
 export const TICK_EXTRA_TOOLS: readonly string[] = [
   'place_item',
