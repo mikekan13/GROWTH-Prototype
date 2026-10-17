@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
+import { seatLabel, seatLabelsFor } from '@/services/seat-labels';
 import type {
   GrowthCharacter,
   GrowthAttribute,
@@ -19,7 +20,6 @@ export async function buildEntityContext(entityId: string): Promise<string> {
   const character = await prisma.character.findUnique({
     where: { id: entityId },
     include: {
-      user: { select: { username: true, role: true } },
       campaign: { select: { id: true, name: true } },
       goals: {
         where: { status: 'ACTIVE' },
@@ -56,7 +56,8 @@ export async function buildEntityContext(entityId: string): Promise<string> {
   lines.push(`=== ${character.name} (${character.entityType}) ===`);
   lines.push(`ID: ${character.id}`);
   lines.push(`Status: ${character.status}`);
-  lines.push(`Owner: ${character.user.username} (${character.user.role})`);
+  // A seat label, never the account name (anonymity ruling 2026-10-16).
+  if (character.campaignId) lines.push(`Played by: ${seatLabel(await seatLabelsFor(character.campaignId), character.userId)}`);
   if (character.campaign) {
     lines.push(`Campaign: ${character.campaign.name} [${character.campaign.id}]`);
   }

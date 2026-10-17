@@ -18,6 +18,7 @@ vi.mock('@/services/seed-pick', async () => {
 vi.mock('@/services/portrait-brief', async () => {
   const { ValidationError } = await import('@/lib/errors');
   return {
+    DRESS_FIRST_MESSAGE: 'Nothing is equipped. Dress the character first.',
     readPortraitRefs: vi.fn(async () => { if (!h.refs) throw new ValidationError('Approve the face and render the body before painting the portrait.'); return h.refs; }),
     buildPortraitBrief: vi.fn(async (id: string, opts: unknown) => {
       h.briefCalls.push(opts);
@@ -42,7 +43,8 @@ vi.mock('@/ai/portraits/providers', () => ({
   }),
 }));
 
-const { POST, DRESS_FIRST_MESSAGE } = await import('./route');
+const { POST } = await import('./route');
+const { DRESS_FIRST_MESSAGE } = await import('@/services/portrait-brief');
 const req = (body: unknown) => new Request('http://x/api/portraits/paint', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }) as unknown as Parameters<typeof POST>[0];
 
 beforeEach(() => { h.seedSet = true; h.refs = { face: '/portraits/ch1/faces/p.png', body: '/portraits/ch1/bodies/b.png' }; h.equipped = 1; h.painted = []; h.briefCalls = []; h.lawful = []; });

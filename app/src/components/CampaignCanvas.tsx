@@ -1040,7 +1040,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       const res = await fetch('/api/characters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), campaignId: campaign.id, parentLocationId, canvasX: worldX, canvasY: worldY }),
+        body: JSON.stringify({ name: name.trim(), campaignId: campaign.id, parentLocationId, canvasX: worldX, canvasY: worldY, entityType: 'NPC' }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

@@ -29,5 +29,8 @@ export interface EntityIndex {
   forgeItems: { id: string; name: string; type: string }[];
   locations: { id: string; name: string; type: string }[];
   campaignItems: { id: string; name: string; type: string }[];
-  members: { username: string }[];
+  /** Seat labels ("Player 1"), never usernames — anonymity ruling 2026-10-16. */
+  members: { label: string }[];
+  /** userId → seat label ("the Watcher", "Player 1"…). */
+  seats: Map<string, string>;
 }

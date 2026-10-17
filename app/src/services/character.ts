@@ -17,6 +17,8 @@ export const createCharacterSchema = z.object({
   /** When set, the new character is wired as a child of this Location via a
    *  located_at relationship. Used by the "Create NPC here" gesture on Location cards. */
   parentLocationId: z.string().optional(),
+  /** "Create NPC here" sends NPC; the schema default is PLAYER_CHARACTER. */
+  entityType: z.enum(['PLAYER_CHARACTER', 'NPC']).optional(),
   /** Canvas world coords (SVG units) to stamp on the new character so its
    *  card renders exactly where the GM placed it. Supplied by the right-click
    *  gesture; if omitted, no canvas position is stamped and the character
@@ -99,6 +101,7 @@ export async function createCharacter(userId: string, input: z.infer<typeof crea
         name: input.name,
         userId,
         campaignId: input.campaignId,
+        ...(input.entityType ? { entityType: input.entityType } : {}),
         data: JSON.stringify(defaultData),
       },
     });

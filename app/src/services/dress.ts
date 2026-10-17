@@ -156,6 +156,20 @@ export function sharedRegion(a: string, b: string): string | null {
   return out.length ? out.join('/') : null;
 }
 
+/** One piece that covers BOTH legs (never one side). */
+const SPANNING_GARMENT = /\b(jeans|trousers|pants|slacks|shorts|skirt|leggings|tights|stockings)\b/;
+
+/**
+ * The region a worn piece goes on: the named one when it is hers — EXCEPT a
+ * spanning garment, which always sits on the region both legs share (Violet's
+ * jeans landed on "Left Upper Leg" because JEWL's region beat the rule,
+ * 2026-10-16). Pure.
+ */
+export function resolveRegion(name: string, given: string | null | undefined, regions: string[]): string | null {
+  if (SPANNING_GARMENT.test(name.toLowerCase())) return guessRegion(name, regions);
+  return given && regions.includes(given) ? given : guessRegion(name, regions);
+}
+
 export function guessRegion(name: string, regions: string[]): string | null {
   if (regions.length === 0) return null;
   const n = name.toLowerCase();
@@ -178,7 +192,7 @@ export function guessRegion(name: string, regions: string[]): string | null {
   };
   if (/\b(boots?|shoes?|sneakers|trainers|sandals|heels|socks?|slippers?)\b/.test(n)) return oneSide(/foot$/i) ?? root;
   if (/\b(gloves?|mittens?)\b/.test(n)) return oneSide(/hand$/i) ?? root;
-  if (/\b(jeans|trousers|pants|slacks|shorts|skirt|leggings|tights|stockings)\b/.test(n)) return spanning(/upper leg$/i) ?? find(/^(legs?|hips|waist)$/i) ?? root;
+  if (SPANNING_GARMENT.test(n)) return spanning(/upper leg$/i) ?? find(/^(legs?|hips|waist)$/i) ?? root;
   if (/\bring\b/.test(n)) return find(/^left ring finger$/i) ?? find(/hand$/i) ?? root;
   if (/\b(watch|bracelet)\b/.test(n)) return find(/^left lower arm$/i) ?? find(/hand$/i) ?? root;
   if (/\b(necklace|choker|pendant|collar|tie)\b/.test(n)) return find(/^neck$/i) ?? find(/^torso$/i) ?? root;
@@ -231,7 +245,7 @@ export function parseOutfitAnswer(text: string, wardrobe: Wardrobe): OutfitPiece
       if (left == null || value > left + 1e-9) continue;
       kitLeft.set(k.holderId, left - value);
       const n = out.filter(o => o.fromKit).length;
-      const region = p.region && wardrobe.regions.includes(p.region) ? p.region : guessRegion(k.archetype, wardrobe.regions);
+      const region = resolveRegion(k.archetype, p.region, wardrobe.regions);
       out.push({
         itemId: `kit:${k.holderId}:${n}`, name: k.archetype, state: 'worn', region,
         fromKit: { holderId: k.holderId, archetype: k.archetype, primaryMaterial: k.primaryMaterial ?? 'Cotton', weightLbs: k.weightLbs ?? 0.5, value },
@@ -245,7 +259,7 @@ export function parseOutfitAnswer(text: string, wardrobe: Wardrobe): OutfitPiece
     seen.add(item.id);
     const state: 'worn' | 'carried' = p.state ?? (item.garment ? 'worn' : 'carried');
     const region = state === 'worn'
-      ? (p.region && wardrobe.regions.includes(p.region) ? p.region : guessRegion(item.name, wardrobe.regions))
+      ? resolveRegion(item.name, p.region, wardrobe.regions)
       : null;
     out.push({ itemId: item.id, name: item.name, state, region, why: (p.why ?? '').trim().slice(0, 240) });
   }
@@ -256,7 +270,7 @@ export function parseOutfitAnswer(text: string, wardrobe: Wardrobe): OutfitPiece
 export function draftOutfit(wardrobe: Wardrobe): OutfitPiece[] {
   const byRegion = new Map<string, WardrobeItem>();
   for (const g of wardrobe.garments) {
-    const region = g.region && wardrobe.regions.includes(g.region) ? g.region : guessRegion(g.name, wardrobe.regions);
+    const region = resolveRegion(g.name, g.region, wardrobe.regions);
     if (!region) continue;
     // Keep what she already wears on a region; else the first garment named for it.
     const cur = byRegion.get(region);
@@ -381,7 +395,7 @@ async function writeState(
   let d: Record<string, unknown> = {};
   try { d = JSON.parse(item.data) as Record<string, unknown>; } catch { d = {}; }
   if (state === 'worn') {
-    const r = region && regions.includes(region) ? region : guessRegion(item.name, regions);
+    const r = resolveRegion(item.name, region, regions);
     if (!r) throw new ValidationError(`No body region to wear "${item.name}" over — her anatomy has none`);
     if (region && !regions.includes(region)) throw new ValidationError(`"${region}" is not one of her body regions: ${regions.join(', ')}`);
     d.equippedTo = r; d.equipped = true;

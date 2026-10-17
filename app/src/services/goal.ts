@@ -8,7 +8,8 @@ import { applyDispositionEvent } from './daya-affect';
 
 // ── Constants ────────────────────────────────────────────────────────────
 
-export const MAX_ACTIVE_GOALS = 5;
+export { MAX_ACTIVE_GOALS } from '@/lib/vine-slots';
+import { MAX_ACTIVE_GOALS } from '@/lib/vine-slots';
 export const GOAL_STATUSES = ['ACTIVE', 'DORMANT', 'COMPLETED', 'FAILED', 'ABANDONED'] as const;
 export const PILLARS = ['MERCY', 'BALANCE', 'SEVERITY'] as const;
 

@@ -33,7 +33,7 @@ import {
   type GmWorldMessage,
 } from '@/lib/genesis-stages';
 import type { GrowthCharacter } from '@/types/growth';
-import { vineSlotsForCharacter } from './genesis-vines';
+import { vineSlotsForCharacter } from './vine-slots';
 
 export * from '@/lib/genesis-stages';
 

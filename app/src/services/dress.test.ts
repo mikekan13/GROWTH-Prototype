@@ -62,7 +62,7 @@ vi.mock('@/ai/network', () => ({
   routedChatText: vi.fn(async () => { h.calls++; if (h.fail) throw new Error('cold'); return { text: h.answer, model: 'm', usage: {}, lane: {} }; }),
 }));
 
-const { applyOutfit, draftOutfit, guessRegion, isGarment, listWardrobe, parseOutfitAnswer, proposeOutfit, setDressState, WARDROBE_EMPTY_LINE } = await import('./dress');
+const { applyOutfit, draftOutfit, guessRegion, resolveRegion, isGarment, listWardrobe, parseOutfitAnswer, proposeOutfit, setDressState, WARDROBE_EMPTY_LINE } = await import('./dress');
 
 const player = { id: 'u_violet', role: 'TRAILBLAZER' };
 const stranger = { id: 'u_x', role: 'TRAILBLAZER' };
@@ -93,6 +93,12 @@ describe('pure', () => {
     expect(isGarment('Her grey coat', null, {})).toBe(true);
     expect(isGarment('Keepsake', 'Hoodie', {})).toBe(true);
     expect(isGarment('Laptop', null, { tags: ['tech'] })).toBe(false);
+  });
+  it('resolveRegion: a spanning garment never sits on one leg, whatever region was named (Violet\'s jeans, 2026-10-17)', () => {
+    const legs = ['Body', 'Body/Torso', 'Body/Legs', 'Body/Legs/Left Upper Leg', 'Body/Legs/Right Upper Leg'];
+    expect(resolveRegion('Good jeans', 'Body/Legs/Left Upper Leg', legs)).toBe('Body/Legs');
+    expect(resolveRegion('Big cardigan', 'Body/Torso', legs)).toBe('Body/Torso');
+    expect(resolveRegion('Big cardigan', 'Nowhere', legs)).toBe('Body/Torso');
   });
   it('guessRegion: outfit → root, coat → torso, hat → head, else torso then root', () => {
     const regions = ['Body', 'Body/Head', 'Body/Torso'];

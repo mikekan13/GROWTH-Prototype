@@ -35,6 +35,9 @@ import { clothesClause, marksClause, readPose, viewBody, type Camera, type Visib
 export type PortraitFrame = 'bust' | 'figure';
 
 export const PORTRAIT_BRIEF_TIMEOUT_MS = 25_000;
+
+/** Refusal when nothing is equipped — the portrait paints what is worn. (Lives here: a Next route file may export only handlers.) */
+export const DRESS_FIRST_MESSAGE = 'Nothing is equipped. Dress the character first (or let JEWL dress her) — the portrait paints what is worn.';
 const BACKSTORY_CHARS = 700;
 const MAX_FACT_LINES = 10;
 

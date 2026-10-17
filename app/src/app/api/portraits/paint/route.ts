@@ -5,11 +5,9 @@ import { assertLawfulImageJob, resolvePortraitMood } from '@/ai/portraits/portra
 import { AppError, PortraitEndpointError, ValidationError, WithheldContentError } from '@/lib/errors';
 import { errorResponse } from '@/lib/api';
 import { assertSeedSetForPortrait } from '@/services/seed-pick';
-import { buildPortraitBrief, readPortraitRefs } from '@/services/portrait-brief';
+import { buildPortraitBrief, readPortraitRefs, DRESS_FIRST_MESSAGE } from '@/services/portrait-brief';
 
 export const maxDuration = 600;
-
-export const DRESS_FIRST_MESSAGE = 'Nothing is equipped. Dress the character first (or let JEWL dress her) — the portrait paints what is worn.';
 
 /**
  * POST /api/portraits/paint — THE PORTRAIT (Mike, 16 Oct 2026; plan §4 C).

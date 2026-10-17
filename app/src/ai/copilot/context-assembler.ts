@@ -3,10 +3,11 @@ import { prisma } from '@/lib/db';
 import type { EntityIndex, CopilotContext } from './types';
 import { getDisposition, renderDispositionLine } from '@/services/daya-affect';
 import { searchRules } from './rules-search';
+import { labelSeats, seatLabel, seatLabelsFor } from '@/services/seat-labels';
 
 // Build a lightweight index of all entity names in the campaign
 export async function buildEntityIndex(campaignId: string): Promise<EntityIndex> {
-  const [characters, forgeItems, locations, campaignItems, members] = await Promise.all([
+  const [characters, forgeItems, locations, campaignItems, members, campaign] = await Promise.all([
     prisma.character.findMany({
       where: { campaignId },
       select: { id: true, name: true },
@@ -25,16 +26,21 @@ export async function buildEntityIndex(campaignId: string): Promise<EntityIndex>
     }),
     prisma.campaignMember.findMany({
       where: { campaignId },
-      include: { user: { select: { username: true } } },
+      orderBy: { joinedAt: 'asc' },
+      select: { userId: true },
     }),
+    prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true } }),
   ]);
 
+  // Seats, never usernames (anonymity ruling 2026-10-16).
+  const seats = labelSeats(campaign?.gmUserId, members.map(m => m.userId));
   return {
     characters,
     forgeItems,
     locations,
     campaignItems,
-    members: members.map(m => ({ username: m.user.username })),
+    members: members.filter(m => m.userId !== campaign?.gmUserId).map(m => ({ label: seatLabel(seats, m.userId) })),
+    seats,
   };
 }
 
@@ -55,18 +61,17 @@ function findMentions(message: string, index: EntityIndex): {
 }
 
 // Fetch full details for mentioned entities
-async function fetchMentionedEntities(mentions: ReturnType<typeof findMentions>): Promise<string> {
+async function fetchMentionedEntities(mentions: ReturnType<typeof findMentions>, seats: EntityIndex['seats']): Promise<string> {
   const parts: string[] = [];
 
   if (mentions.characterIds.length > 0) {
     const chars = await prisma.character.findMany({
       where: { id: { in: mentions.characterIds } },
-      include: { user: { select: { username: true } } },
     });
     for (const c of chars) {
       try {
         const data = JSON.parse(c.data) as Record<string, unknown>;
-        parts.push(`[Character: ${c.name}] Player: ${c.user.username}, Status: ${c.status}, Seed: ${data.seed || 'unknown'}, Level: ${data.level ?? 1}`);
+        parts.push(`[Character: ${c.name}] Player: ${seatLabel(seats, c.userId)}, Status: ${c.status}, Seed: ${data.seed || 'unknown'}, Level: ${data.level ?? 1}`);
         if (data.attributes && typeof data.attributes === 'object') {
           const attrs = data.attributes as Record<string, unknown>;
           const summary = Object.entries(attrs).map(([pillar, pData]) => {
@@ -134,11 +139,13 @@ const TABLE_STATE_MAX_CHARACTERS = 15; // soft cap; overflow is announced, never
 const TRAIT_PROSE_CAP = 220;
 
 export async function buildTableState(campaignId: string): Promise<string> {
-  const characters = await prisma.character.findMany({
-    where: { campaignId, status: { notIn: ['DRAFT'] } },
-    orderBy: { updatedAt: 'desc' },
-    include: { user: { select: { username: true } } },
-  });
+  const [characters, seats] = await Promise.all([
+    prisma.character.findMany({
+      where: { campaignId, status: { notIn: ['DRAFT'] } },
+      orderBy: { updatedAt: 'desc' },
+    }),
+    seatLabelsFor(campaignId),
+  ]);
   if (characters.length === 0) return '';
 
   const shown = characters.slice(0, TABLE_STATE_MAX_CHARACTERS);
@@ -199,7 +206,7 @@ export async function buildTableState(campaignId: string): Promise<string> {
       continue;
     }
 
-    lines.push(`■ ${c.name} [${c.entityType} ${c.status}] player:${c.user?.username ?? '—'}`);
+    lines.push(`■ ${c.name} [${c.entityType} ${c.status}] player:${seatLabel(seats, c.userId)}`);
 
     const attrs = data.attributes as Record<string, { level?: number; current?: number }> | undefined;
     if (attrs) {
@@ -295,7 +302,7 @@ export async function assembleContext(
     campaign?.description ? `Description: ${campaign.description}` : null,
     campaign?.worldContext ? `World: ${campaign.worldContext}` : null,
     `Characters: ${index.characters.map(c => c.name).join(', ') || 'none'}`,
-    `Players: ${index.members.map(m => m.username).join(', ') || 'none'}`,
+    `Players: ${index.members.map(m => m.label).join(', ') || 'none'}`,
     index.forgeItems.length > 0 ? `Forge items: ${index.forgeItems.map(i => `${i.name} (${i.type})`).join(', ')}` : null,
     index.locations.length > 0 ? `Locations: ${index.locations.map(l => l.name).join(', ')}` : null,
     index.campaignItems.length > 0 ? `World items: ${index.campaignItems.map(i => i.name).join(', ')}` : null,
@@ -306,7 +313,7 @@ export async function assembleContext(
 
   // 3. Fetch details for mentioned entities
   const mentions = findMentions(userMessage, index);
-  const retrievedData = await fetchMentionedEntities(mentions);
+  const retrievedData = await fetchMentionedEntities(mentions, index.seats);
 
   // 4. Rules context (only if relevant)
   let rulesContext = '';
