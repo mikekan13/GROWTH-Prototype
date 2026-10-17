@@ -5,7 +5,6 @@ import CampaignCanvas from '@/components/CampaignCanvas';
 import { locationDepths } from '@/components/canvas/canvas-lod';
 import { parseFootprint, parsePassageLinks, parseOpenings, parseTokenPosition, footprintBounds, fractionToWorld, tokenArea, autoLayoutGrid, clampedLayoutGrid, LOCATION_HEADER_ESTIMATE, TOKEN_CELL } from '@/lib/canvas-geometry';
 import { recomputeAugments } from '@/lib/character-actions';
-import { warmLocalLane } from '@/lib/local-warm';
 import { canEnterAdultCampaign } from '@/lib/permissions';
 import { REMOVED_STATUS } from '@/services/maturity';
 import { getCampaignCompletions, isAwaitingImage } from '@/services/character-completion';
@@ -69,8 +68,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
 
   if (!isAdmin && !isGM && !isMember) redirect('/terminal');
 
-  // Watcher opening the table: wake the scale-to-zero local lane (fire-and-forget, deduped).
-  if (isGM || isAdmin) warmLocalLane(campaign.id);
+  // No lane wake on open (2026-10-17, cost): warm only while a session is live (daya/l1-keepalive).
 
   // Trailblazer roster for the canvas card's controller dropdown. Filter out
   // people who haven't joined yet (INTERESTED/REJECTED). The GM is offered

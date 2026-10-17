@@ -22,7 +22,6 @@ import { feedViewerFor, type FeedViewer } from '@/services/perceived-feed';
 import { perceptionFeedOn } from '@/lib/perception-feed';
 import { prisma } from '@/lib/db';
 import { canManageCampaign } from '@/lib/permissions';
-import { warmLocalLane } from '@/lib/local-warm';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -86,12 +85,9 @@ export async function GET(
       // idled while nobody was connected become runnable again.
       kickWorkLoop();
 
-      // The Watcher (GM/ADMIN) connected: wake the scale-to-zero local lane.
-      // Fire-and-forget + deduped per campaign; never blocks the stream.
-      prisma.campaign
-        .findUnique({ where: { id: campaignId }, select: { gmUserId: true } })
-        .then(c => { if (c && canManageCampaign(user.id, user.role, c)) warmLocalLane(campaignId); })
-        .catch(() => {});
+      // NO lane wake on connect (2026-10-17): every reconnect woke an 80 GB GPU
+      // for its idle tail — the canvas left open kept it billing all day. The
+      // lane is kept warm ONLY while a session is live (daya/l1-keepalive).
     },
 
     cancel() {
