@@ -32,7 +32,7 @@ import type { GrowthLocation } from "@/types/location";
 import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
 import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/ContextMenu";
-import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight } from "./FolderGroup";
+import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight, drawnPlaceRect } from "./FolderGroup";
 import { settle, packFolder, pickRoomAt, type SettleNode, type SettleFolder, type SettlePriority } from "./canvas-settle";
 import CharacterToken from "./CharacterToken";
 import { clampCameraToContent, contentBoxOf, maxZoomForContent, type Rect as WorldRect } from "./camera-bounds";
@@ -481,6 +481,8 @@ export default function RelationsCanvas({
       for (const f of folders) {
         if (!f.id.startsWith('auto-')) continue;
         const locId = f.id.slice('auto-'.length);
+        const drawn = drawnPlaceRect(f);
+        if (drawn) { rects.set(locId, drawn); continue; } // drawn to scale = its footprint (2026-10-17)
         const content = calcContentBounds(f, nodePositions, dragOffsets, nodeTypesMap, expandedNodes, rects, CHILD_LABEL_ALLOWANCE);
         let rect: { x: number; y: number; width: number; height: number };
         if (!content) {
@@ -583,6 +585,8 @@ export default function RelationsCanvas({
       for (const f of folders) {
         if (!f.id.startsWith('auto-')) continue;
         const locId = f.id.slice('auto-'.length);
+        const drawn = drawnPlaceRect(f);
+        if (drawn) { rects.set(locId, drawn); continue; }
         const content = calcContentBounds(f, nodePositions, emptyOffsets, nodeTypesMap, expandedNodes, rects, CHILD_LABEL_ALLOWANCE);
         let rect: { x: number; y: number; width: number; height: number };
         if (!content) {
@@ -1228,6 +1232,7 @@ export default function RelationsCanvas({
         collapsed: f.collapsed,
         drafting: !!f.locationInfo && f.locationInfo.status !== 'ACTIVE',
         headerH: locationHeaderHeight(f),
+        drawn: drawnPlaceRect(f) ?? undefined,
       };
     });
     return { sNodes, sFolders };
@@ -2303,6 +2308,8 @@ export default function RelationsCanvas({
         target === svgRef.current ||
         target.closest('rect[data-bg="grid"]') !== null ||
         target.closest('rect[data-bg="circuits"]') !== null ||
+        // A place's body is ground: drag across it pans / selects (map mode, 2026-10-17).
+        target.closest('[data-bg="place"]') !== null ||
         target.tagName === "svg";
 
       if (isBackground) {
@@ -4403,7 +4410,8 @@ export default function RelationsCanvas({
         {connections.filter(c => !unrenderedNodeIds.has(c.from) && !unrenderedNodeIds.has(c.to)).map((c) => renderConnection(c))}
 
         {/* â”€â”€ Folder backgrounds (behind cards) â”€â”€ */}
-        {visibleFolders.map(folder => {
+        {/* Parents first, so a room's hover/tap layer sits above its building's (map mode, 2026-10-17). */}
+        {[...visibleFolders].sort((a, b) => (a.locationInfo?.depth ?? 0) - (b.locationInfo?.depth ?? 0)).map(folder => {
           const nodeTypes = new Map(nodes.map(n => [n.id, n.type]));
           const folderChars = nodes
             .filter(n => folder.nodeIds.includes(n.id) && n.type === 'character' && n.characterData)
@@ -4415,6 +4423,7 @@ export default function RelationsCanvas({
             }));
           return (
             <FolderGroupRect
+              onPlaceTap={togglePlaceCard}
               key={`folder-bg-${folder.id}`}
               folder={folder}
               nodeNames={nodeNamesById}
@@ -5009,6 +5018,28 @@ export default function RelationsCanvas({
               >
                 <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
                 <div data-overlay-card={key} style={{ pointerEvents: "auto", width: PLACE_CARD_W }}>
+                  {/* The old header's actions live on the card now (places have no header, 2026-10-17). */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 6 }} onPointerDown={(e) => e.stopPropagation()}>
+                    {li.status === 'PLANNING' && (
+                      <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('growth:crystallize-location', { detail: { locationId: li.locationId, locationName: f.name, krmaReserve: li.krmaReserve, contentCounts: li.contentCounts } }))}
+                        title="Crystallize: commit this place and its subtree to the active world"
+                        style={{ padding: '5px 10px', background: 'linear-gradient(135deg, var(--krma-gold), #d09f55)', border: '1px solid var(--krma-gold)', color: '#000', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: 12, letterSpacing: '0.12em', fontWeight: 700, cursor: 'pointer' }}
+                      >◆ CRYSTALLIZE</button>
+                    )}
+                    {onDrillIn && (
+                      <button
+                        onClick={() => onDrillIn(li.locationId)}
+                        title="Enter: focus the canvas on this place's interior"
+                        style={{ padding: '5px 10px', background: '#000', border: '1px solid var(--krma-gold)', color: 'var(--krma-gold)', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: 12, letterSpacing: '0.08em', cursor: 'pointer' }}
+                      >▸ ENTER</button>
+                    )}
+                    <button
+                      onClick={() => window.dispatchEvent(new CustomEvent('growth:ai-generate-image', { detail: { entityType: 'location', entityId: li.locationId, target: 'portrait' } }))}
+                      title="Generate this place's image"
+                      style={{ padding: '5px 10px', background: '#000', border: '1px solid var(--terminal-prime)', color: 'var(--terminal-prime)', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: 12, letterSpacing: '0.08em', cursor: 'pointer' }}
+                    >✨ GENERATE</button>
+                  </div>
                   <LocationCard
                     node={{
                       id: li.locationId,

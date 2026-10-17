@@ -114,6 +114,20 @@ function useCoarsePointer(): boolean {
   );
 }
 
+/** Places render as MAP shapes, no header (2026-10-17). */
+const MAP_MODE = true;
+/** Room a place keeps at its top for its faint map label. */
+export const MAP_LABEL_H = 44;
+
+/** A place DRAWN to scale: its footprint points are absolute map coords, and the place is drawn AT them. */
+export function drawnPlaceRect(folder: CanvasFolder): { x: number; y: number; width: number; height: number } | null {
+  const fp = folder.locationInfo?.footprint;
+  if (!fp || folder.collapsed) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of fp.points) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+  return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+
 /** Compact details strip: one-line essence + the expand affordance. */
 const COMPACT_DETAILS_H = 44;
 
@@ -123,6 +137,9 @@ const COMPACT_DETAILS_H = 44;
  *  Plain folders keep 80px. */
 export function locationHeaderHeight(folder: CanvasFolder): number {
   if (!folder.locationInfo) return HEADER_HEIGHT;
+  // Places have NO header (Mike 2026-10-17: "get rid of the headers… hover
+  // tooltip and click to open a card") — only a small map label inside.
+  if (MAP_MODE) return MAP_LABEL_H;
   if (!folder.detailsOpen) return CHROME_HEIGHT + PANEL_GAP + COMPACT_DETAILS_H + 12;
   return CHROME_HEIGHT + PANEL_GAP + locationDetailsPanelHeight(folder.locationInfo) + 12;
 }
@@ -248,7 +265,10 @@ export function FolderGroupRect({
   isDropTarget = false,
   onDrillIn,
   zoom = 1,
+  onPlaceTap,
 }: {
+  /** A tap (no drag) on a place opens its card (2026-10-17: places have no header). */
+  onPlaceTap?: (folderId: string) => void;
   folder: CanvasFolder;
   nodePositions: Map<string, NodePosition>;
   dragOffsets: Map<string, { x: number; y: number }>;
@@ -310,6 +330,8 @@ export function FolderGroupRect({
   const MIN_FOLDER_H = isTile ? TILE_H : 120;
 
   const bounds = useMemo(() => {
+    const drawn = drawnPlaceRect(folder);
+    if (drawn) return drawn;
     if (!content) {
       // Empty folder — show a minimum-sized box at folder position
       const w = Math.max(MIN_FOLDER_W, folder.userWidth || 0);
@@ -488,6 +510,70 @@ export function FolderGroupRect({
   const mapCaption = footprint
     ? `${levelLabel(footprint.level)} · ${footprintSizeLabel(footprint)}${li?.connects && li.connects.length > 0 ? ` · ⇅ ${li.connects.map(c => levelLabel(c.level)).join(' ')}` : ''}`
     : li?.connects && li.connects.length > 0 ? `⇅ ${li.connects.map(c => levelLabel(c.level)).join(' ')}` : null;
+
+  // ── MAP MODE (Mike 2026-10-17): a place is its SHAPE on the map — no header.
+  // Hover = its tooltip; a tap (no drag) = its card; a drag across it pans /
+  // selects like empty canvas (data-bg="place"). A faint name sits inside.
+  if (MAP_MODE && li && folder.type !== 'party') {
+    const drawnPts = drawnPlaceRect(folder) ? footprint!.points : shapedPoints;
+    const tapStart = (e: React.PointerEvent) => {
+      if (e.button !== 0 || !onPlaceTap) return;
+      const sx = e.clientX, sy = e.clientY;
+      const up = (ue: PointerEvent) => {
+        window.removeEventListener('pointerup', up);
+        if (Math.abs(ue.clientX - sx) < 5 && Math.abs(ue.clientY - sy) < 5) onPlaceTap(folder.id);
+      };
+      window.addEventListener('pointerup', up);
+    };
+    const stroke = isDropTarget ? '#22ab94cc' : 'rgba(203,217,232,0.55)';
+    return (
+      <g data-map-place={li.locationId}>
+        {drawnPts ? (
+          <polygon
+            points={polygonPointsAttr(drawnPts)}
+            fill={isDropTarget ? '#22ab9440' : bodyFill}
+            stroke={stroke}
+            strokeWidth={isDropTarget ? 5 : 4}
+            strokeLinejoin="miter"
+            data-footprint-polygon={li.locationId}
+            style={{ pointerEvents: 'none' }}
+          />
+        ) : (
+          <rect
+            x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height}
+            fill={isDropTarget ? '#22ab9440' : bodyFill}
+            stroke={stroke} strokeWidth={isDropTarget ? 5 : 3} strokeDasharray={footprint ? undefined : '14 8'}
+            style={{ pointerEvents: 'none' }}
+          />
+        )}
+        <foreignObject x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height} style={{ overflow: 'visible' }}>
+          <div data-bg="place" onPointerDown={tapStart} style={{ width: bounds.width, height: bounds.height, pointerEvents: 'auto', position: 'relative' }}>
+            {titleTip && (
+              <ComplexTooltip
+                title={titleTip.title}
+                modifiers={titleTip.modifiers}
+                totalValue={0}
+                totalLabel={titleTip.totalLabel}
+                totalText={titleTip.totalText}
+                hideTotal={titleTip.hideTotal}
+                disabled={isFolderDragging}
+                triggerStyle={{ display: 'block', width: bounds.width, height: bounds.height }}
+              >
+                <div data-bg="place" style={{ width: bounds.width, height: bounds.height }} />
+              </ComplexTooltip>
+            )}
+            <div style={{
+              position: 'absolute', left: 14, top: 8, pointerEvents: 'none', whiteSpace: 'nowrap',
+              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: 26, letterSpacing: '0.08em',
+              color: 'rgba(203,217,232,0.6)',
+            }}>
+              {folder.name}{li.status && li.status !== 'ACTIVE' ? ' · planning' : ''}
+            </div>
+          </div>
+        </foreignObject>
+      </g>
+    );
+  }
 
   // Drag handler for header
   const handleHeaderDrag = (e: React.MouseEvent) => {

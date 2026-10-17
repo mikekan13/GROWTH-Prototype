@@ -59,6 +59,9 @@ export interface SettleFolder {
   /** Non-ACTIVE location: lives below the crystallization line (y ≥ 0). */
   drafting: boolean;
   headerH: number;
+  /** A place DRAWN to scale (2026-10-17): its rect is its footprint, fixed —
+   *  settle never moves it, its contents, or its sub-rooms. */
+  drawn?: Rect;
 }
 
 export type SettlePriority = { kind: 'node'; id: string } | { kind: 'folder'; id: string } | null;
@@ -149,6 +152,7 @@ export function deriveFolderRects(nodes: SettleNode[], folders: SettleFolder[], 
 
   for (const id of order) {
     const f = byId.get(id)!;
+    if (f.drawn && !f.collapsed) { rects.set(id, { ...f.drawn }); continue; }
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, has = false;
     for (const n of membersOf.get(id) ?? []) {
       const r = nodeRect(n); has = true;
@@ -300,7 +304,20 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
       fixedFolders.add(folderId);
       folderId = folderById.get(folderId)!.parentId;
     }
+    // Drawn places are the map: they never yield.
+    for (const f of folders) if (f.drawn) fixedFolders.add(f.id);
   }
+  // Inside a drawn place nothing is shoved: things stand where they were put.
+  const insideDrawn = (id: string): boolean => {
+    let cur: string | null = id;
+    const seen = new Set<string>();
+    while (cur && folderById.has(cur) && !seen.has(cur)) {
+      seen.add(cur);
+      if (folderById.get(cur)!.drawn) return true;
+      cur = folderById.get(cur)!.parentId;
+    }
+    return false;
+  };
 
   const shiftSubtree = (folderId: string, dx: number, dy: number) => {
     const stack = [folderId];
@@ -342,6 +359,7 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
     for (const parent of order) {
       const ids = groups.get(parent)!;
       if (ids.length < 2) continue;
+      if (parent !== '__root__' && insideDrawn(parent)) continue;
       const fixed = new Set<string>([...fixedNodes, ...fixedFolders]);
       const movedHere = resolveGroup(
         ids,
