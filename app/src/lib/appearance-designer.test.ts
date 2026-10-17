@@ -251,3 +251,13 @@ describe('error line', () => {
     expect(designerErrorLine(null, fallback)).toBe('plain:');
   });
 });
+
+describe('status: a body changed after approval reopens APPROVE (Mike 2026-10-17: "I can\'t lock in body")', () => {
+  const base: DesignerState = { baseImagePath: '/f.png', layers: [{ imagePath: '/f.png', text: 'b', kind: 'base', seed: 1, at: '2026-10-17T12:00:00.000Z' }], approvedImagePath: '/f.png', approvedAt: '2026-10-17T12:10:00.000Z' };
+  it('a body from before the approval stays approved', () => {
+    expect(deriveDesignerStatus({ ...base, bodyImagePath: '/b.png', bodyLayers: [{ imagePath: '/b.png', text: BODY_BASE_TEXT, kind: 'base', seed: 2, at: '2026-10-17T12:05:00.000Z' }] })).toBe('approved');
+  });
+  it('a body re-rendered after it is locked, not approved', () => {
+    expect(deriveDesignerStatus({ ...base, bodyImagePath: '/b2.png', bodyLayers: [{ imagePath: '/b2.png', text: BODY_BASE_TEXT, kind: 'base', seed: 3, at: '2026-10-17T12:20:00.000Z' }] })).toBe('locked');
+  });
+});

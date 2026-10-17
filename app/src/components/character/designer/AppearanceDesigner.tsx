@@ -367,6 +367,8 @@ export default function AppearanceDesigner({
         setError(`Face approved. The body render failed: ${b.line}`);
       }
     }
+    // Approved AFTER the body landed, so the body counts as approved too (deriveDesignerStatus).
+    if (bodyOut) commit({ type: 'approved', imagePath: bust, at: now() });
     setBusy(null);
     setView(bodyOut ? 'body' : 'face');
     newLayerLanded();

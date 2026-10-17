@@ -567,8 +567,12 @@ export type DesignerStatus = 'awaiting' | 'locked' | 'approved';
 export function deriveDesignerStatus(s: DesignerState): DesignerStatus {
   const top = currentLayer(s);
   if (!top) return 'awaiting';
-  if (s.approvedImagePath && s.approvedImagePath === top.imagePath) return 'approved';
-  return 'locked';
+  if (!s.approvedImagePath || s.approvedImagePath !== top.imagePath) return 'locked';
+  // A body rendered or edited after the approval is not approved yet: APPROVE opens again so it can be
+  // locked in (Mike 2026-10-17: "I can't lock in body" — the button stayed BASE APPROVED).
+  const bodyTop = s.bodyLayers?.[s.bodyLayers.length - 1];
+  if (bodyTop?.at && s.approvedAt && bodyTop.at > s.approvedAt) return 'locked';
+  return 'approved';
 }
 
 export const STATUS_LABEL: Record<DesignerStatus, string> = {
