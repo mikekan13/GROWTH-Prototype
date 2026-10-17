@@ -30,6 +30,20 @@ async function hasActiveSession(campaignId: string): Promise<boolean> {
   return !!active;
 }
 
+/** No table activity for this long → the keep-alive lets the lane sleep (it re-arms when the TABLE tab loads). */
+export const KEEPALIVE_IDLE_MS = Number(process.env.DAYA_L1_KEEPALIVE_IDLE_MS ?? 20 * 60_000);
+
+/** How long since anything happened at this table (feed event or JEWL chat), or since the session began. */
+async function quietMs(campaignId: string): Promise<number> {
+  const [ev, msg, sess] = await Promise.all([
+    prisma.campaignEvent.findFirst({ where: { campaignId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+    prisma.copilotMessage.findFirst({ where: { campaignId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+    prisma.gameSession.findFirst({ where: { campaignId, endedAt: null }, select: { startedAt: true } }),
+  ]);
+  const last = Math.max(ev?.createdAt.getTime() ?? 0, msg?.createdAt.getTime() ?? 0, sess?.startedAt.getTime() ?? 0);
+  return last ? Date.now() - last : 0;
+}
+
 async function tick(campaignId: string) {
   const entry = registry.get(campaignId);
   if (!entry) return;
@@ -37,6 +51,21 @@ async function tick(campaignId: string) {
     if (!(await hasActiveSession(campaignId))) {
       stopKeepalive(campaignId);
       console.log(`[l1-keepalive] session over for ${campaignId} — lane released`);
+      return;
+    }
+    // Spend guard (Mike 2026-10-17: "I have left the app open for days. It was
+    // just eating gpus doing nothing"): release the lane when the day's GPU
+    // budget is spent, or when the table has been quiet for KEEPALIVE_IDLE_MS.
+    const { gpuStatus } = await import('@/services/gpu-budget');
+    if (!(await gpuStatus()).allowed) {
+      stopKeepalive(campaignId);
+      console.warn(`[l1-keepalive] GPU budget reached — lane released for ${campaignId}`);
+      return;
+    }
+    const quietFor = await quietMs(campaignId);
+    if (quietFor > KEEPALIVE_IDLE_MS) {
+      stopKeepalive(campaignId);
+      console.log(`[l1-keepalive] table quiet ${Math.round(quietFor / 60000)} min — lane released for ${campaignId}`);
       return;
     }
     const status = await warmL1();

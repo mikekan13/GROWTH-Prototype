@@ -15,6 +15,7 @@ import 'server-only';
  * Selected by getLocalProvider() whenever RUNPOD_ENDPOINT_ID is set.
  */
 
+import { assertGpuBudget } from '@/services/gpu-budget';
 import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
@@ -109,6 +110,7 @@ export class ServerlessProvider extends LocalProvider {
   }
 
   protected override async queuePrompt(workflow: object, _clientId: string): Promise<ComfyUIQueueResponse> {
+    await assertGpuBudget('portrait job'); // the GPU spend guard (2026-10-17)
     const images = [...this.pendingImages].map(([name, image]) => ({ name, image }));
     this.pendingImages.clear();
 

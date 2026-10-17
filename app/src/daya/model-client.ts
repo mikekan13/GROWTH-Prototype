@@ -21,6 +21,7 @@
  * configuration throws DayaTierUnavailableError; this client never silently
  * falls back to a different tier.
  */
+import { assertGpuBudget } from '@/services/gpu-budget';
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { AppError } from '@/lib/errors';
@@ -475,6 +476,8 @@ export async function chat(
   const fetchImpl: DayaFetch = overrides.fetchImpl ?? ((url, init) => fetch(url, init) as unknown as Promise<DayaFetchResponse>);
 
   const viaAnthropic = params.tier === 'C' || tierProvider(params.tier) === 'anthropic';
+  // A being's call on the company GPU asks the spend guard first (2026-10-17).
+  if (!viaAnthropic && !overrides.fetchImpl) await assertGpuBudget(`being ${params.tier}`);
   const startedAt = Date.now();
   let ttftMs: number | undefined;
   let stopped: boolean | undefined;

@@ -25,6 +25,18 @@ export class LocalLaneError extends AppError {
   }
 }
 
+/**
+ * The day's GPU budget is spent (Mike 2026-10-17: "We can't have this happen
+ * again"). A LocalLaneError so the table shows its plain line, not a 500.
+ */
+export class GpuBudgetError extends LocalLaneError {
+  constructor(message: string, userMessage: string) {
+    super(message, userMessage, 402);
+    this.status = 429;
+    this.name = 'GpuBudgetError';
+  }
+}
+
 export class ValidationError extends AppError {
   constructor(message: string) {
     super(message, 400);

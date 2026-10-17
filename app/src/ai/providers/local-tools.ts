@@ -13,6 +13,7 @@
  * - Image blocks are dropped with a placeholder (text-only lane).
  */
 
+import { assertGpuBudget } from '@/services/gpu-budget';
 import 'server-only';
 import { screenModelOutput } from '@/lib/lawfulness-hooks';
 import { LocalLaneError } from '@/lib/errors';
@@ -116,6 +117,7 @@ let toolUseCounter = 0;
 export async function callLocalWithTools(
   opts: CallLocalWithToolsOptions,
 ): Promise<ClaudeToolUseResult> {
+  await assertGpuBudget('local-lane JEWL'); // the GPU spend guard (2026-10-17)
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (opts.apiKey) headers.Authorization = `Bearer ${opts.apiKey}`;
 

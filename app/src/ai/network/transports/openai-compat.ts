@@ -7,6 +7,7 @@
  * company-controlled compute — it is the inner face of the wall.
  */
 
+import { assertGpuBudget } from '@/services/gpu-budget';
 import 'server-only';
 import type { AiUsage } from '../types';
 import { LocalLaneError } from '@/lib/errors';
@@ -42,6 +43,7 @@ export interface OpenAiCompatChatResult {
 }
 
 export async function openAiCompatChat(opts: OpenAiCompatChatOptions): Promise<OpenAiCompatChatResult> {
+  await assertGpuBudget('local-lane chat'); // the GPU spend guard (2026-10-17)
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (opts.apiKey) headers.Authorization = `Bearer ${opts.apiKey}`;
 
