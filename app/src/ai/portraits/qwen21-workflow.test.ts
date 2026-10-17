@@ -95,7 +95,8 @@ describe('qwen21 prompt builders', () => {
   it('body prompt: always underwear only — the default names the garments (Kristopher came out in a tee and jeans, 2026-10-17)', () => {
     expect(buildQwen21BodyPrompt(undefined, undefined, 'Male')).toContain('Bare-chested: bare torso, bare shoulders, bare arms, bare legs and bare feet, wearing only plain fitted grey boxer briefs.');
     expect(buildQwen21BodyPrompt(undefined, undefined, 'female')).toContain('Bare midriff, bare shoulders, bare arms, bare legs and bare feet, wearing only a plain grey bra and plain grey briefs.');
-    expect(buildQwen21BodyPrompt()).toContain('wearing only a plain grey bandeau top and plain grey briefs.');
+    expect(buildQwen21BodyPrompt()).toContain('wearing only plain grey briefs and a plain grey bandeau bra.');
+    expect(buildQwen21BodyPrompt()).not.toMatch(/\btop\b/);
     expect(buildQwen21BodyPrompt()).not.toContain('underclothing with a clean minimal cut');
   });
 

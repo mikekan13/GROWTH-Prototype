@@ -213,7 +213,8 @@ export function buildQwen21StylePrompt(styleRefCount: number, styleLine: string 
 export function defaultUnderwear(gender?: string): string {
   return isMale(gender) ? 'plain fitted grey boxer briefs'
     : isFemale(gender) ? 'a plain grey bra and plain grey briefs'
-      : 'a plain grey bandeau top and plain grey briefs';
+      // No sex on the sheet: underwear nouns only — "bandeau top" painted Kristopher a tee (17 Oct).
+      : 'plain grey briefs and a plain grey bandeau bra';
 }
 const isMale = (g?: string) => /^(m|male|man)$/i.test((g ?? '').trim());
 const isFemale = (g?: string) => /^(f|female|woman)$/i.test((g ?? '').trim());
