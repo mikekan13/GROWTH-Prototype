@@ -185,3 +185,13 @@ describe('parseTableProse — the GM writes a roster character\'s action (hello 
     expect(p.quotes[0]).toMatchObject({ speakerId: 'kris' });
   });
 });
+
+describe('an unterminated quote (HW3, Mike 2026-10-24: the closing mark was missing and the words became narration)', () => {
+  const table = [{ id: 'kris', name: 'Kristopher', sex: 'Male' }];
+  it('runs to the end of the line and is his speech, on his card with his action', () => {
+    const p = parseTableProse('He stands in the hallway with the empty pizza bag... "Please lady... Just pay the pizza. You don\'t even have to tip me... please.', table, { lastActor: table[0] });
+    expect(p.actions).toEqual([{ text: 'Stands in the hallway with the empty pizza bag', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    expect(p.quotes).toEqual([expect.objectContaining({ speakerId: 'kris', text: "Please lady... Just pay the pizza. You don't even have to tip me... please." })]);
+    expect(p.narration).toBeNull();
+  });
+});

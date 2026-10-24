@@ -42,6 +42,8 @@ import {
   buildSpiritListeningPrompt,
   buildSpiritAnsweringPrompt,
   splitImpulse,
+  isEcho,
+  SPIRIT_ECHO_HINT,
   type ListenImpulse,
   LISTENING_MAX_TOKENS,
   ANSWERING_MAX_TOKENS,
@@ -1227,6 +1229,22 @@ export async function answerAsk(
     // The stop sequence can swallow a reply that opens with a line break: ask once more without it.
     const sealed = await enforceSeal((await answerCall({ stop: false })).text, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
     line = sealed.usedFallback ? { kind: 'rest', content: '' } : readLine(sealed.text);
+    revoiced = true;
+  }
+  // AN ECHO IS NOT AN ANSWER (HW3 2026-10-24: "Just pay the pizza." back at the man who said it).
+  // One second take in her own words; a second echo, or nothing, and she lets the moment sit.
+  const heardTexts = [...heard, ...(ask.kind === 'spoken' ? [ask.text, `${ask.by}: ${ask.text}`] : [])];
+  if (line.kind === 'speak' && isEcho(line.content, heardTexts)) {
+    console.warn(`[daya/ensemble] echo for ${ctx.name} — revoicing: "${line.content.slice(0, 80)}"`);
+    if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'echo', rule: 'echo' });
+    try {
+      const sealed = await enforceSeal((await answerCall({ hint: SPIRIT_ECHO_HINT, stop: false })).text, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
+      const second = sealed.usedFallback ? { kind: 'rest' as GateKind, content: '' } : readLine(sealed.text);
+      line = second.kind === 'speak' && isEcho(second.content, heardTexts) ? { kind: 'rest', content: '' } : second;
+    } catch (err) {
+      console.warn('[daya/ensemble] echo revoice failed; the moment sits (non-fatal):', err);
+      line = { kind: 'rest', content: '' };
+    }
     revoiced = true;
   }
   const lineMs = Date.now() - t0;

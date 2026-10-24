@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildDesiresBlock, parseSpiritOutput, buildSpiritListeningPrompt, buildSpiritAnsweringPrompt,
   SPIRIT_TENETS_BLOCK, LISTENING_MAX_TOKENS, ANSWERING_MAX_TOKENS, type DesireSourceItem,
-  capSpeech, splitImpulse, NEVER_GUESS_BLOCK,
+  capSpeech, splitImpulse, NEVER_GUESS_BLOCK, isEcho,
 } from './spirit';
 import { sealLint, hasHardHit } from '../../seal';
 
@@ -210,5 +210,19 @@ describe('the answer never guesses (Mike 2026-10-24: "the LLM should almost neve
     expect(p).toContain('Nothing in particular comes to mind.');
     expect(p).toContain('you carry nothing you know of');
     expect(p).toContain('(none that bear on this)');
+  });
+});
+
+describe('an echo is not an answer (HW3 2026-10-24)', () => {
+  const heard = ['Kristopher: Please lady... Just pay the pizza. You don\'t even have to tip me... please.'];
+  it('catches the line that only repeats what was heard', () => {
+    expect(isEcho('Just pay the pizza.', heard)).toBe(true);
+    expect(isEcho('You don\'t even have to tip me.', heard)).toBe(true);
+    expect(isEcho('Pay the pizza, lady.', heard)).toBe(true);
+  });
+  it('lets her own words through', () => {
+    expect(isEcho("It's by the door. Give me a second.", heard)).toBe(false);
+    expect(isEcho('Go away.', heard)).toBe(false);
+    expect(isEcho('I paid. Check your bag.', heard)).toBe(false);
   });
 });

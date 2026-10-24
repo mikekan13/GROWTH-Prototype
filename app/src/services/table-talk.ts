@@ -329,7 +329,8 @@ function readQuote(raw: ProseQuote, names: NameIndex, present: ProseRosterEntry[
 // ── segmentation ─────────────────────────────────────────────────────────────
 
 // Mirrors table-prose's quote pattern (not exported there) so speech and narration keep their order.
-const QUOTE_RE = /["“]([^"”]+)["”]/g;
+// An unterminated quote runs to the end of the line (HW3, Mike 2026-10-24: a line without its closing mark lost its speech).
+const QUOTE_RE = /["“]([^"”]+)(?:["”]|$)/g;
 
 export { splitSentences };
 

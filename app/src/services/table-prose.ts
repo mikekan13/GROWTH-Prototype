@@ -57,7 +57,8 @@ export interface ParsedProse {
   actions?: ProseAction[];
 }
 
-const QUOTE_RE = /["“]([^"”]+)["”]/g;
+// An unterminated quote runs to the end of the line (HW3, Mike 2026-10-24: a line without its closing mark lost its speech).
+const QUOTE_RE = /["“]([^"”]+)(?:["”]|$)/g;
 // `::Kristopher knocks twice::` — the AOL-RP action marker (lib/feed-segments), on the GM's own line.
 const ACTION_SPAN_RE = /::\s*([^:][\s\S]*?)\s*::/g;
 const HE_RE = /\b(?:he|him|his|himself)\b/i;

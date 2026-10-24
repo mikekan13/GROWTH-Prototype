@@ -164,6 +164,34 @@ export interface SpiritAnsweringArgs {
 
 export const ANSWERING_MAX_TOKENS = 60;
 
+/** The hint for a second take when the first line only repeated what was heard. */
+export const SPIRIT_ECHO_HINT = 'Your first line only repeated what you had just heard. Those were his words, not yours. Answer again as yourself, in your own words — what YOU say or do about it.';
+
+const ECHO_STOP = new Set(['the', 'a', 'an', 'to', 'of', 'and', 'or', 'you', 'i', 'it', 'is', 'me', 'my', 'your', 'just', 'please', 'even', 'have', 'dont', "don't", 'not', 'for', 'in', 'on', 'at']);
+const echoTokens = (s: string) => new Set((s.toLowerCase().match(/[a-z']+/g) ?? []).filter((w) => !ECHO_STOP.has(w)));
+
+/**
+ * Did the being merely repeat what it heard? (HW3 2026-10-24: "Just pay the
+ * pizza." back at the man who said it.) True when the line is a substring of
+ * a heard text, or when nearly all its content words came from one. Pure.
+ */
+export function isEcho(line: string, heard: string[]): boolean {
+  const l = line.trim().toLowerCase().replace(/[.!?…"“”]+$/g, '').trim();
+  if (l.length < 6) return false;
+  const lt = echoTokens(l);
+  for (const h of heard) {
+    const hl = h.toLowerCase();
+    if (hl.includes(l)) return true;
+    if (lt.size >= 2) {
+      const ht = echoTokens(hl);
+      let shared = 0;
+      for (const w of lt) if (ht.has(w)) shared += 1;
+      if (shared / lt.size >= 0.8) return true;
+    }
+  }
+  return false;
+}
+
 /** The standing law of every answer (Mike 2026-10-24: "the LLM should almost never guess"). */
 export const NEVER_GUESS_BLOCK = `What you know is below: your senses, your memory, your own things, the
 world's facts. Say only what you know. Where a thing is, what was said, what
