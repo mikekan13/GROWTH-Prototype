@@ -14,6 +14,7 @@
  * The orchestration that calls the models lives in ensemble.ts.
  */
 import { sealLint, hasHardHit } from './seal';
+import { stripSpeechQuotes } from './speech-quotes';
 import type { BeingSpeakingPhase } from '@/types/campaign-events';
 
 // ── Tunables ─────────────────────────────────────────────────────────────────
@@ -269,7 +270,8 @@ export function createSpeechGate(onSpeech: (delta: string, whole: string) => voi
     },
     end(): GateResult {
       if (mode !== 'closed') recompute(true);
-      const content = kind === 'speak' ? shown.trim() : kind === 'rest' ? '' : body.trim();
+      // The words alone: a wrapper of quote marks is the model's, not the being's (HW3 2026-10-24).
+      const content = kind === 'speak' ? stripSpeechQuotes(shown) : kind === 'rest' ? '' : body.trim();
       // A line that says nothing is the being letting it pass.
       const settled: GateKind = kind === 'speak' && !content && !retracted ? 'rest' : kind;
       return { kind: settled, content, raw, retracted, shown: shown.length > 0 };

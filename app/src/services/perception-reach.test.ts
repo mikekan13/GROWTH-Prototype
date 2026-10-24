@@ -96,4 +96,14 @@ describe('recall surfacing', () => {
     expect(visibleToRecall(rows, false).map((r) => r.id)).toEqual(['a', 'c']);
     expect(visibleToRecall(rows, true).map((r) => r.id)).toEqual(['a', 'b', 'c']);
   });
+
+  it('never offers a failed-recall row as a memory of the world (HW3 2026-10-24)', () => {
+    const rows = [
+      { id: 'a', noticed: true, classification: '{"rationaleTag":"failed recall attempt"}' },
+      { id: 'b', noticed: true, classification: '{"rationaleTag":"scene"}' },
+      { id: 'c', noticed: false, classification: '{"rationaleTag":"failed recall attempt"}' },
+    ];
+    expect(visibleToRecall(rows, false).map((r) => r.id)).toEqual(['b']);
+    expect(visibleToRecall(rows, true).map((r) => r.id)).toEqual(['b']);
+  });
 });

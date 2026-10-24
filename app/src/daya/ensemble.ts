@@ -807,6 +807,8 @@ export interface ListenResult {
   timings: ListenTimings;
   /** The being's own say on breaking in (the monologue's last line); 'stay' when it said nothing or could not be read. */
   impulse: ListenImpulse;
+  /** This stretch's monologue as kept (sealed), for the Watcher's audit record; absent when the call failed or the seal held it. */
+  thought?: string;
 }
 
 const FELT_FALLBACK = 'Right now, in your body and mood: steady, holding your own.';
@@ -951,6 +953,7 @@ export async function listenStimulus(
     memoryEntryId: ingest.memoryEntryId,
     innerUpdated,
     impulse,
+    ...(innerUpdated ? { thought: innerState } : {}),
     timings: { perceiveMs: tPerceived - t0, ingestMs: tIngested - tPerceived, recallMs: tRecalled - tIngested, soulMs, spiritMs: tDone - tSpirit, totalMs: tDone - t0, standing },
   };
 }

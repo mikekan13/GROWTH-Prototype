@@ -53,6 +53,8 @@ import { ensureKeepalive } from '@/daya/l1-keepalive';
 import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, type ReconTicket } from '@/services/reconciliation';
 import { advanceClockForLine } from '@/services/table-clock';
 import type { ListenImpulse } from '@/daya/prompts/roles/spirit';
+import { recordBeingThought } from '@/services/being-thought';
+import { resolveIntent } from '@/daya/adjudicator';
 
 export interface TableActor {
   userId: string;
@@ -411,6 +413,7 @@ export async function speakProse(
       feed: { via: 'typed', raw: message, narration: parsed.narration, speech: parsed.quotes, actions: parsed.actions },
     });
     canonEventId = declared.event.id;
+    narratedActs(campaignId, parsed.actions);
   }
   for (const q of parsed.quotes) {
     try {
@@ -541,6 +544,17 @@ async function runBeats(
           return;
         }
         reportTiming({ kind: 'listen', characterId: listenerId, outcome: outcome.listened ? outcome.listened.status : 'taken_over', timings: outcome.listened?.timings, impulse: outcome.listened?.impulse });
+        // The Watcher can read a silence: what went through it and its own say, on the record (not a memory).
+        if (outcome.listened?.status === 'listened') {
+          void recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
+            characterId: listenerId,
+            characterName: listeners.find((l) => l.id === listenerId)?.name ?? listenerId,
+            heard: stimulus.content,
+            thought: outcome.listened.thought,
+            impulse: outcome.listened.impulse,
+            canonEventId: truth.primary,
+          });
+        }
         // null = an answer took this stretch over; that answer stores it and points it at the truth.
         if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId);
         if (reached && outcome.listened?.memoryEntryId) {
@@ -570,13 +584,18 @@ async function runBeats(
     for (const id of ids) { const s = stimulusFor(utterances, id); if (s) stims.set(id, s); }
     if (!stims.size) return;
     const delivered = new Set<string>();
+    const nameOf = (id: string) => listeners.find((l) => l.id === id)?.name ?? id;
     const deliver = (id: string, verdict: ReachVerdict | null, source: ReachJudgement['source']) => {
       if (delivered.has(id)) return;
       delivered.add(id);
       const stim = stims.get(id)!;
-      if (!verdict) { hear(id, stim, undefined, askFor); return; }
-      if (!verdict.reaches) return;
-      if (!verdict.noticed) { void storeUnnoticedAtTable(campaignId, id, stim, verdict, truth.primary); return; }
+      // Every verdict on the record (HW3 2026-10-24: Violet had no row for "Kristopher begins to cry" and
+      // nothing said why — a man crying softly beyond a locked door did not reach her, correctly, invisibly).
+      const what = `"${stim.content.slice(0, 60).replace(/\s+/g, ' ')}${stim.content.length > 60 ? '…' : ''}"`;
+      if (!verdict) { console.log(`[perception-reach] ${nameOf(id)}: no verdict (${source}) → heard as before ${what}`); hear(id, stim, undefined, askFor); return; }
+      if (!verdict.reaches) { console.log(`[perception-reach] ${nameOf(id)}: NOT REACHED (${source}) — nothing stored ${what}`); return; }
+      if (!verdict.noticed) { console.log(`[perception-reach] ${nameOf(id)}: reached via ${verdict.via.join('+')}, UNNOTICED (${source}) — stored noticed=false ${what}`); void storeUnnoticedAtTable(campaignId, id, stim, verdict, truth.primary); return; }
+      console.log(`[perception-reach] ${nameOf(id)}: reached via ${verdict.via.join('+')}, noticed (${source}, salience ${verdict.salience.toFixed(2)}) ${what}`);
       hear(id, stim, { verdict, source }, askFor);
     };
     for (const id of stims.keys()) waiting.set(id, [...(waiting.get(id) ?? []), () => deliver(id, null, 'stub')]);
@@ -705,6 +724,7 @@ async function speakProseSplit(
       feed: { via: 'typed', raw: message, narration: narrated ? parsed.narration : null, speech: parsed.quotes, actions: parsed.actions },
     });
     canonEventId = declared.event.id;
+    narratedActs(campaignId, parsed.actions);
   }
   for (const q of parsed.quotes) {
     try {
@@ -749,6 +769,27 @@ async function speakProseSplit(
 // While a session is live the GM's transcript chunks are table talk too: read
 // with the same detector, played to the beings by the same beats. Nothing here
 // waits on a being — the GM is still talking.
+
+/**
+ * THE MAP STAYS TRUE UNDER THE WATCHER'S VOICE (HW3 2026-10-24: "He walks slowly down the hall" was
+ * his card, and Kristopher stayed located_at the landing — only a being's own Do: went through the
+ * adjudicator). Each `::action::` the Watcher wrote for a roster character is read once, as narrated:
+ * no check, the words stand, the model names what it did to doors, hands and rooms, and world-apply
+ * lands it. Fire-and-forget: the table never waits on it; what the map refuses is logged.
+ */
+function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined): void {
+  for (const a of actions ?? []) {
+    if (!a.actorId || !a.text.trim()) continue;
+    void feedCycle(campaignId)
+      .then((cycle) => resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: a.text, cycle: cycle ?? 0, narrated: true }))
+      .then((r) => {
+        const applied = r.effects?.applied ?? [];
+        const refused = r.effects?.refused ?? [];
+        if (applied.length || refused.length) console.log(`[table-speak] narrated act by ${a.actorLabel}: ${applied.join('; ') || 'nothing moved'}${refused.length ? ` · refused: ${refused.join('; ')}` : ''}`);
+      })
+      .catch((err) => console.warn(`[table-speak] narrated act by ${a.actorLabel} not read by the world (non-fatal):`, err instanceof Error ? err.message : err));
+  }
+}
 
 /** After this long with nothing said, an unfinished sentence is not glued onto the next chunk. [PLACEHOLDER] */
 const SPOKEN_FRAGMENT_KEEP_MS = 20_000;

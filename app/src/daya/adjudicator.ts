@@ -29,6 +29,13 @@ export interface ResolveIntentInput {
   entityCharacterId: string;
   intent: string;
   cycle: number;
+  /**
+   * The Watcher VOICED this act (HW3 2026-10-24: "He walks slowly down the hall" left Kristopher on the
+   * landing). It happened as written: no check, no roll, the words stand as the outcome — the model only
+   * reads what it did to doors, hands and rooms, and the map takes it. The locked-door pre-check is
+   * skipped (the Watcher is the authority on what was said); the map still refuses what it cannot do.
+   */
+  narrated?: boolean;
 }
 
 export interface ExperienceEvent {
@@ -140,12 +147,13 @@ export async function resolveIntent(
 ): Promise<AdjudicationResult> {
   const { campaignId, entityCharacterId, intent, cycle } = input;
 
+  // Each lookup starts inside its own promise: one that throws on the way in cannot leave another dangling unhandled.
   const [allFacts, character, others, map, heldRows] = await Promise.all([
-    currentFacts(campaignId),
-    prisma.character.findUnique({ where: { id: entityCharacterId }, select: { id: true, name: true, data: true } }),
-    prisma.character.findMany({ where: { campaignId, id: { not: entityCharacterId }, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { name: true } }),
-    actorMap(entityCharacterId).catch(() => null),
-    prisma.campaignItem.findMany({ where: { holderId: entityCharacterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 }).catch(() => []),
+    Promise.resolve().then(() => currentFacts(campaignId)),
+    Promise.resolve().then(() => prisma.character.findUnique({ where: { id: entityCharacterId }, select: { id: true, name: true, data: true } })),
+    Promise.resolve().then(() => prisma.character.findMany({ where: { campaignId, id: { not: entityCharacterId }, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { name: true } })),
+    Promise.resolve().then(() => actorMap(entityCharacterId)).catch(() => null),
+    Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: entityCharacterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 })).catch((): Array<{ name: string; data: string | null }> => []),
   ]);
 
   if (!character) {
@@ -161,7 +169,7 @@ export async function resolveIntent(
 
   // THE MAP RESOLVES WHAT IT PLAINLY FORBIDS (Mike 2026-10-17): a locked door
   // does not open because a being said "push the door open". No model call.
-  const blockedBy = lockedDoorInTheWay(intent, map);
+  const blockedBy = input.narrated ? null : lockedDoorInTheWay(intent, map);
   if (blockedBy) {
     const outcome = `${character.name} tries the ${blockedBy.name}; it is locked and does not give.`;
     return {
@@ -196,8 +204,15 @@ export async function resolveIntent(
     `Carrying: ${held.carrying.length ? held.carrying.join(', ') : 'nothing'}`,
     `(The entity has ONLY what is listed. No jacket, pocket, bag or tool exists for it unless named here or in the facts.)`,
     '',
-    `## Declared Intent`,
+    input.narrated ? `## Narrated by the Watcher (it HAPPENED exactly as written)` : `## Declared Intent`,
     intent,
+    ...(input.narrated ? [
+      '',
+      'This is not an attempt: the Watcher has told the table what happened. "check" MUST be null and',
+      '"outcome" MUST be the sentence as written. Your work is only "effects" (every change it makes to',
+      'doors, hands and rooms — a walk down the hall into another room is a move; a knock, a tear, a look',
+      'is nothing: []) and the physical facts it establishes or supersedes.',
+    ] : []),
   ].join('\n');
 
   // FIX-2 (entityId convention): resolve Character id -> DayaEntity.id here,
@@ -250,10 +265,10 @@ export async function resolveIntent(
     }
   }
 
-  let outcome = parsed.outcome;
+  let outcome = input.narrated ? intent : parsed.outcome;
   let roll: RollOutcome | undefined;
 
-  if (parsed.check) {
+  if (parsed.check && !input.narrated) {
     const hookResult = mechanicsHook
       ? await mechanicsHook({ characterId: entityCharacterId, intent, attribute: parsed.check.attribute, dr: parsed.check.dr, cycle }).catch((err) => {
           console.error('[daya/adjudicator] mechanicsHook failed (falling back to placeholder roll):', err);

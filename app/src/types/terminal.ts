@@ -16,7 +16,8 @@ export type TerminalEventType =
   | 'chat'           // Player/GM messages
   | 'command'        // Command execution + result
   | 'ai_message'     // AI copilot messages (future)
-  | 'game_event';    // Narrative/system events (session start, combat begin, etc.)
+  | 'game_event'     // Narrative/system events (session start, combat begin, etc.)
+  | 'being_thought'; // A being's listening monologue + impulse per line — the Watcher's audit record, never the feed (HW3 2026-10-24)
 
 export type TerminalActor = 'player' | 'gm' | 'ai_copilot' | 'system';
 
@@ -132,13 +133,31 @@ export interface GameEventPayload extends TableFeedFields {
   encounterName?: string;
 }
 
+/**
+ * What went through a being while someone else had the floor, and its own say on breaking in
+ * (HW3 2026-10-24: Mike asked "did Violet choose not to pay him" and her four silences had no
+ * recorded why). A debug record for the Watcher, not a memory and not a feed row: the table
+ * ignores the kind; it is read from the record.
+ */
+export interface BeingThoughtPayload extends TableFeedFields {
+  kind: 'being_thought';
+  /** What the being heard this stretch (the stimulus as handed to it). */
+  heard: string;
+  /** Its monologue as kept (sealed); '' when the call failed or the seal held it back. */
+  thought: string;
+  impulse: 'speak' | 'act' | 'stay';
+  /** The truth event this stretch was about, when known. */
+  canonEventId?: string | null;
+}
+
 export type TerminalPayload =
   | ChangeLogPayload
   | DiceRollPayload
   | ChatPayload
   | CommandPayload
   | AIMessagePayload
-  | GameEventPayload;
+  | GameEventPayload
+  | BeingThoughtPayload;
 
 // ── Unified Event ──────────────────────────────────────────────────────────
 

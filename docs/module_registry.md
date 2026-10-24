@@ -734,3 +734,17 @@ Item data fields (shared with the stock content pass): `value` (KRMA, decimal), 
 | `src/services/table-prose.ts` | `sentenceActor`, `actionBody`: prose sentences about a roster character become his `actions` (name stripped, bare speech tags dropped); frozen fixtures re-frozen 2026-10-24. |
 | `src/services/scene-readiness.ts` | Seats = every wrapped character (ACTIVE or DORMANT being) + PCs. |
 | `src/components/terminal/TableSpeakBar.tsx` | Beings toggle REMOVED (ruling: no control toggles). |
+
+## Hello world 3 fixes — the map under the Watcher's voice, the silence on the record (2026-10-24)
+
+| Module | Purpose |
+|---|---|
+| `src/daya/adjudicator.ts` | `ResolveIntentInput.narrated` — the Watcher voiced the act: no locked-door pre-check, `check` forced null, outcome = the sentence as written; the model reads only `effects` + facts and world-apply lands them. |
+| `src/services/table-speak.ts` | `narratedActs(campaignId, parsed.actions)` fire-and-forget after `declareCanon` on both typed paths (serial + split): one narrated adjudication per `::action::` the Watcher wrote for a roster character. `gatedHear.deliver` logs every reach verdict per being (`[perception-reach] <name>: reached/UNNOTICED/NOT REACHED`). `hear` writes a `being_thought` record per listened stretch. |
+| `src/services/being-thought.ts` | `recordBeingThought(campaignId, by, {characterId, heard, thought, impulse, canonEventId})` → CampaignEvent `type: 'being_thought'` (never broadcast; the feed drops the kind). Read with `scripts/being-thoughts.ts` or `GET /events?types=being_thought`. |
+| `src/types/terminal.ts` | `TerminalEventType` + `'being_thought'`; `BeingThoughtPayload`. |
+| `src/daya/ensemble.ts` | `ListenResult.thought` — this stretch's sealed monologue when it was kept. |
+| `src/daya/speech-quotes.ts` | Pure `stripSpeechQuotes(text)`: one wrapping pair of quote marks comes off a spoken line (a lone unclosed opener too); a line quoting inside itself is left alone. Applied in `createSpeechGate.end()` and `parseSpiritOutput`. |
+| `src/daya/recall.ts` | `visibleToRecall` also drops `failed recall attempt` rows: the row stays (Ruling 5), it is never a candidate. |
+| `src/components/terminal/table-feed/styles.ts` | Narration rows heavier (Mike: "make the GM narrated lines stand out more"): 6px Soul-blue bar, gradient wash, 17px reading size. |
+| `scripts/being-thoughts.ts` | `npx tsx scripts/being-thoughts.ts [campaignId] [--session id] [--being Violet]` — prints the thought records of a session. |

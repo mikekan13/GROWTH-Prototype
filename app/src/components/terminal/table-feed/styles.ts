@@ -21,8 +21,9 @@ export const TABLE_FEED_CSS = `
 .tf .line{font:700 14px/22px var(--font-terminal);color:#000;overflow-wrap:anywhere;margin:0}
 
 /* narration: the manual's ordered reading text (pp 21-22), no label, no chip */
-.tf .row.nx{margin-top:14px;padding:6px 0 6px 10px;background:rgba(0,47,108,0.06);box-shadow:inset 3px 0 0 #002f6c}
-.tf .nx .line{font:400 16px/1.65 var(--font-comfortaa),Comfortaa,sans-serif;padding-right:6px;color:#0b1a33}
+/* Mike (HW2 2026-10-23): "make the GM narrated lines stand out more" — a heavier Soul-blue bar, a deeper wash, the manual's larger reading size */
+.tf .row.nx{margin-top:18px;padding:10px 0 10px 14px;background:linear-gradient(90deg,rgba(0,47,108,0.14),rgba(0,47,108,0.05) 70%,rgba(0,47,108,0) 100%);box-shadow:inset 6px 0 0 #002f6c;border-radius:0 3px 3px 0}
+.tf .nx .line{font:400 17px/1.7 var(--font-comfortaa),Comfortaa,sans-serif;padding-right:6px;color:#071427;letter-spacing:0.01em}
 
 /* portrait chip + p10 <Name>: tag flush under it, right-aligned */
 .tf .chip{width:80px;cursor:pointer;display:block;outline:none}

@@ -64,8 +64,12 @@ export interface RecallRequest {
 }
 
 /** Drop sensed-but-unnoticed rows unless asked for. Rows without the column (pre-migration mocks) count as noticed. Pure. */
-export function visibleToRecall<T extends { noticed?: boolean | null }>(rows: T[], includeUnnoticed: boolean): T[] {
-  return includeUnnoticed ? rows : rows.filter((r) => r.noticed !== false);
+export function visibleToRecall<T extends { noticed?: boolean | null; classification?: string | null }>(rows: T[], includeUnnoticed: boolean): T[] {
+  // A failed reach is a feeling about a memory, not a memory of the world (HW3 2026-10-24: "Something in
+  // you reaches for it and finds only its edge." was coming back as a perception). The row stays
+  // (Ruling 5: the failed attempt is lived); it is never a candidate.
+  const lived = rows.filter((r) => !(r.classification ?? '').includes('failed recall attempt'));
+  return includeUnnoticed ? lived : lived.filter((r) => r.noticed !== false);
 }
 
 export interface SurfacedMemory {

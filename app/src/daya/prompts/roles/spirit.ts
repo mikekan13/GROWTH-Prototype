@@ -1,3 +1,5 @@
+import { stripSpeechQuotes } from '@/daya/speech-quotes';
+
 /**
  * Spirit Core role prompt — the entity's voice and will (tier L1, subsystem
  * `spirit`). This is the only role that speaks AS the entity; every other
@@ -340,7 +342,7 @@ export function parseSpiritOutput(raw: string): SpiritAction {
     // Lenient fallback: no recognized directive line — the reply is speech,
     // but only as much of it as a person says aloud; the rest is thought.
     const { spoken, rest } = capSpeech(text);
-    return { kind: 'speak', content: spoken || text, monologue: rest ? `${text.slice(0, text.length - rest.length).trim()}\n${rest}`.trim() : text };
+    return { kind: 'speak', content: stripSpeechQuotes(spoken || text), monologue: rest ? `${text.slice(0, text.length - rest.length).trim()}\n${rest}`.trim() : text };
   }
 
   const [, verb, rest] = match;
@@ -349,7 +351,7 @@ export function parseSpiritOutput(raw: string): SpiritAction {
 
   if (verbLower === 'say') {
     const capped = capSpeech(rest);
-    return { kind: 'speak', content: capped.spoken || rest.trim(), monologue: capped.rest ? [monologue, capped.rest].filter(Boolean).join('\n') : monologue };
+    return { kind: 'speak', content: stripSpeechQuotes(capped.spoken || rest.trim()), monologue: capped.rest ? [monologue, capped.rest].filter(Boolean).join('\n') : monologue };
   }
   if (verbLower === 'do') return { kind: 'act', content: rest.trim(), monologue };
   if (verbLower === 'attend') return { kind: 'attend', content: rest.trim(), monologue };

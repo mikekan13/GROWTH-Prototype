@@ -10,6 +10,17 @@ Last updated: 2026-10-24
 > rule (speech with one other present is to them), prose about a character is his card, GM narration rows
 > stand out, seats include GM-voiced characters, the beings toggle is gone (ruling: no control toggles — GM
 > voicing is the override), Kristopher's being awake again. NEXT: hello world 3 with the watcher on.
+>
+> 2026-10-24 (hello world 3 → fixes): HW3 ran (rewound once over a hallucinated "it's already in the bag" →
+> the never-guess law: the answer checks memory, its own things and the facts first). Impulse worked, lone
+> listener worked, echo guard + unterminated quote + recent-actors pronouns + possessive-part cards built live.
+> Fixed after: the Watcher's voiced acts move the map (narrated adjudication → world-apply), every reach
+> verdict is logged, the listening monologue + impulse go on a Watcher-only `being_thought` record
+> (scripts/being-thoughts.ts), spoken lines lose their wrapping quote marks, failed-recall rows are never
+> recall candidates, narration rows heavier. GPU: HW3 cost $8.57 on a $3 cap ($6 in session) — RunPod billing
+> lags ~1 h, so the guard trips late. OPEN: pizza holder canon (Kristopher per the items; Violet per her
+> memories), Kristopher still on the landing ("He leaves" has nowhere to go on the map), stale-repeat display
+> unconfirmed. NEXT: hello world 4 (watcher on; cap decision first).
 
 > 2026-10-23 (hello world 2 prep): the 17 Oct hello-world hiccups ironed out in three commits on
 > merge/fork-portrait-pipeline — sheet edits no longer wake JEWL (and can't become damage); the tagger stops
