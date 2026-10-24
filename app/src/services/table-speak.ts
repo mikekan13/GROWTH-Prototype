@@ -51,6 +51,8 @@ import {
 import { parseTableProse, type ProseQuote, type ProseRosterEntry } from '@/services/table-prose';
 import { ensureKeepalive } from '@/daya/l1-keepalive';
 import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, type ReconTicket } from '@/services/reconciliation';
+import { advanceClockForLine } from '@/services/table-clock';
+import type { ListenImpulse } from '@/daya/prompts/roles/spirit';
 
 export interface TableActor {
   userId: string;
@@ -255,6 +257,11 @@ export async function lastTableActor(campaignId: string, roster: ProseRosterEntr
   return null;
 }
 
+/** Every being the Watcher voiced in this message: the actors of its `::actions::` and the speakers of its quotes. */
+function voicedIn(parsed: { actions?: Array<{ actorId: string }>; quotes: Array<{ speakerId: string | null }> }): string[] {
+  return [...new Set([...(parsed.actions ?? []).map((a) => a.actorId), ...parsed.quotes.map((q) => q.speakerId).filter((id): id is string => !!id)])];
+}
+
 /** The one actor every `::action::` in the message belongs to, when there is exactly one — the canon row's actorId. */
 function soleActor(parsed: { actions?: Array<{ actorId: string }> }): string | null {
   const ids = new Set((parsed.actions ?? []).map((a) => a.actorId));
@@ -323,6 +330,7 @@ async function deliverToTable(
     if (result.status === 'ok' && result.action) {
       const line = actionToTableLine(listener.name, result.action);
       if (line) {
+        if (result.action.kind === 'speak' || result.action.kind === 'act') await advanceClockForLine(campaignId, result.action.kind === 'speak' ? 'being-speech' : 'being-act', result.action.content ?? line);
         await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(result.action) });
       }
     }
@@ -381,8 +389,10 @@ export async function speakProse(
   //    live it through the mirror below, not as a raw witness row.
   let canonEventId: string | null = null;
   const dialogue: TableProseResult['dialogue'] = [];
-  const soloAttributed = parsed.narration === null && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
-  if (parsed.narration !== null || parsed.quotes.length !== 1) {
+  const hasActions = (parsed.actions?.length ?? 0) > 0;
+  const soloAttributed = parsed.narration === null && !hasActions && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
+  await advanceClockForLine(campaignId, 'gm-line', message);
+  if (parsed.narration !== null || hasActions || parsed.quotes.length !== 1) {
     const declared = await declareCanon(campaignId, actor, {
       narration: parsed.full,
       kind: 'narration',
@@ -451,7 +461,7 @@ async function markDropped(campaignId: string, actor: TableActor, kind: string, 
  * thought or said — so it is safe in a log and in a report.
  */
 export type TableTiming =
-  | { kind: 'listen'; characterId: string; outcome: 'listened' | 'not_lived' | 'taken_over' | ConverseStatus; timings?: ListenTimings }
+  | { kind: 'listen'; characterId: string; outcome: 'listened' | 'not_lived' | 'taken_over' | ConverseStatus; timings?: ListenTimings; impulse?: ListenImpulse }
   | { kind: 'answer'; characterId: string; outcome: ConverseStatus; action?: string; timings?: AnswerTimings };
 
 const timingWatchers = new Set<(timing: TableTiming) => void>();
@@ -497,14 +507,22 @@ async function runBeats(
   actor: TableActor,
   beats: TableBeat[],
   listeners: Array<{ id: string; name: string }>,
-  truth: { primary: string | null; extra: string[] },
+  truth: {
+    primary: string | null;
+    extra: string[];
+    /** Beings the Watcher voiced in THIS message (its actor/speaker): the voicing is their act this beat — no impulse turn on top of it (Mike 2026-10-24). */
+    voicedIds?: string[];
+  },
   opts: { waitForAnswers: boolean; answerAfterWorldOnly: boolean },
 ): Promise<Map<string, ListenerResponse>> {
   const since = new Date();
   const pointAtTruth = async (listenerId: string, memoryEntryId: string | undefined) => {
     if (truth.primary) await attachTruth(listenerId, memoryEntryId, truth.primary, truth.extra, since);
   };
-  const hear = (listenerId: string, stimulus: PlannedStimulus | null, reached?: { verdict: ReachVerdict; source: ReachJudgement['source'] }) => {
+  // One answer turn per being per message, whoever grants it: the ask (named / party) or the being's own impulse.
+  const granted = new Set<string>();
+  const voiced = new Set(truth.voicedIds ?? []);
+  const hear = (listenerId: string, stimulus: PlannedStimulus | null, reached?: { verdict: ReachVerdict; source: ReachJudgement['source'] }, askFor?: TableAsk) => {
     if (!stimulus) return;
     void listenToTable(listenerId, actor.role, stimulus)
       .then(async (outcome) => {
@@ -513,13 +531,19 @@ async function runBeats(
           reportTiming({ kind: 'listen', characterId: listenerId, outcome: outcome.status });
           return;
         }
-        reportTiming({ kind: 'listen', characterId: listenerId, outcome: outcome.listened ? outcome.listened.status : 'taken_over', timings: outcome.listened?.timings });
+        reportTiming({ kind: 'listen', characterId: listenerId, outcome: outcome.listened ? outcome.listened.status : 'taken_over', timings: outcome.listened?.timings, impulse: outcome.listened?.impulse });
         // null = an answer took this stretch over; that answer stores it and points it at the truth.
         if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId);
         if (reached && outcome.listened?.memoryEntryId) {
           await stampPerception(outcome.listened.memoryEntryId, reached.verdict, reached.source);
           // Introductions teach names (this stretch's row, once it points at the truth and carries its senses).
           await learnIntroductions(campaignId, [{ characterId: listenerId, memoryIds: [outcome.listened.memoryEntryId] }], undefined, { canonEventId: truth.primary });
+        }
+        // THE BEING'S OWN SAY (Mike 2026-10-24: "the entities themselves should have a say if they
+        // want to answer"): a listen that ends in "speak" or "act" earns the turn the ask did not give.
+        const impulse = outcome.listened?.impulse;
+        if (askFor && (impulse === 'speak' || impulse === 'act') && !granted.has(listenerId) && !voiced.has(listenerId)) {
+          await answer(listenerId, askFor);
         }
       })
       .catch((err) => console.error('[table-speak] listening failed (non-fatal):', err));
@@ -531,8 +555,8 @@ async function runBeats(
   // to answer before its verdict is in takes the waiting stretches as heard (flushed below), as before.
   const reachOn = perceptionReachOn();
   const waiting = new Map<string, Array<() => void>>();
-  const gatedHear = (utterances: TableUtterance[], ids: string[]) => {
-    if (!reachOn) { for (const id of ids) hear(id, stimulusFor(utterances, id)); return; }
+  const gatedHear = (utterances: TableUtterance[], ids: string[], askFor?: TableAsk) => {
+    if (!reachOn) { for (const id of ids) hear(id, stimulusFor(utterances, id), undefined, askFor); return; }
     const stims = new Map<string, PlannedStimulus>();
     for (const id of ids) { const s = stimulusFor(utterances, id); if (s) stims.set(id, s); }
     if (!stims.size) return;
@@ -541,10 +565,10 @@ async function runBeats(
       if (delivered.has(id)) return;
       delivered.add(id);
       const stim = stims.get(id)!;
-      if (!verdict) { hear(id, stim); return; }
+      if (!verdict) { hear(id, stim, undefined, askFor); return; }
       if (!verdict.reaches) return;
       if (!verdict.noticed) { void storeUnnoticedAtTable(campaignId, id, stim, verdict, truth.primary); return; }
-      hear(id, stim, { verdict, source });
+      hear(id, stim, { verdict, source }, askFor);
     };
     for (const id of stims.keys()) waiting.set(id, [...(waiting.get(id) ?? []), () => deliver(id, null, 'stub')]);
     const judged = judgeCanonReach(campaignId, reachEventOf(utterances, truth.primary), [...stims.keys()]);
@@ -572,7 +596,8 @@ async function runBeats(
   const answered = new Map<string, ListenerResponse>();
   const answer = async (listenerId: string, ask: TableAsk) => {
     const listener = listeners.find((l) => l.id === listenerId);
-    if (!listener) return;
+    if (!listener || granted.has(listenerId)) return;
+    granted.add(listenerId);
     for (const flush of waiting.get(listenerId) ?? []) flush();
     waiting.delete(listenerId);
     const outcome = await answerAtTable(listenerId, actor.role, ask, {
@@ -583,6 +608,8 @@ async function runBeats(
     reportTiming({ kind: 'answer', characterId: listenerId, outcome: outcome.status, action: action?.kind, timings: outcome.answer?.timings });
     if (outcome.status !== 'ok' || !outcome.answer || !action) return;
     const line = actionToTableLine(listener.name, action);
+    // The being's line costs the world its seconds (table-clock) before it is on the record.
+    if (line && (action.kind === 'speak' || action.kind === 'act')) await advanceClockForLine(campaignId, action.kind === 'speak' ? 'being-speech' : 'being-act', action.content ?? line);
     if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(action) });
     void outcome.answer.after.then(async (stored) => {
       await pointAtTruth(listenerId, stored.memoryEntryId);
@@ -601,12 +628,15 @@ async function runBeats(
   const askOf = (beat: Extract<TableBeat, { type: 'turn' | 'spoken' }>): TableAsk =>
     beat.type === 'spoken' ? { kind: 'spoken', by: beat.utterance.speaker?.label ?? 'someone present', text: beat.utterance.text } : { kind: 'turn' };
 
+  // What a listener who was not asked could answer to, should its own impulse say so: the spoken
+  // line it overheard, or the turn the world's beat implies.
+  const impulseAskFor = (beat: TableBeat): TableAsk => (beat.type === 'spoken' ? askOf(beat) : { kind: 'turn' });
   for (const beat of beats) {
     if (beat.type === 'hear') {
-      gatedHear(beat.utterances, listeners.map((l) => l.id));
+      gatedHear(beat.utterances, listeners.map((l) => l.id), impulseAskFor(beat));
       continue;
     }
-    if (beat.type === 'spoken') gatedHear([beat.utterance], overhearers(beat, listeners));
+    if (beat.type === 'spoken') gatedHear([beat.utterance], overhearers(beat, listeners), impulseAskFor(beat));
     await answerAll(answerers(beat, listeners), askOf(beat));
   }
   if (opts.answerAfterWorldOnly && beats.length > 0 && beats.every((b) => b.type === 'hear')) {
@@ -650,13 +680,17 @@ async function speakProseSplit(
     if (held) return { held, canonEventId: null, dialogue: [], narration: parsed.narration, responses: [] };
   }
 
+  // 0b. TIME — the line costs the world what it states, else what it plausibly takes (table-clock).
+  if (plan.world.length) await advanceClockForLine(campaignId, 'gm-line', message);
+
   // 1. TRUTH — as speakProse writes it, minus what was not part of the world.
   const narration = canonNarration(parsed.full, plan);
   const narrated = plan.world.some((u) => u.kind !== 'dialogue');
+  const hasActions = (parsed.actions?.length ?? 0) > 0;
   let canonEventId: string | null = null;
   const dialogue: TableProseResult['dialogue'] = [];
-  const soloAttributed = !narrated && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
-  if (narration !== null && (narrated || parsed.quotes.length !== 1)) {
+  const soloAttributed = !narrated && !hasActions && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
+  if (narration !== null && (narrated || hasActions || parsed.quotes.length !== 1)) {
     const declared = await declareCanon(campaignId, actor, {
       narration, kind: 'narration', actorId: soleActor(parsed), locationId: input.locationId ?? null, witnessIds: [],
       feed: { via: 'typed', raw: message, narration: narrated ? parsed.narration : null, speech: parsed.quotes, actions: parsed.actions },
@@ -678,7 +712,7 @@ async function speakProseSplit(
   // 2. LISTEN and ANSWER, beat by beat.
   const truthPrimary = canonEventId ?? dialogue[0]?.canonEventId ?? null;
   const truthExtra = dialogue.map((d) => d.canonEventId).filter((id) => id !== truthPrimary);
-  const answered = await runBeats(campaignId, actor, plan.beats, listeners, { primary: truthPrimary, extra: truthExtra }, {
+  const answered = await runBeats(campaignId, actor, plan.beats, listeners, { primary: truthPrimary, extra: truthExtra, voicedIds: voicedIn(parsed) }, {
     waitForAnswers: true,
     answerAfterWorldOnly: BEINGS_ANSWER === 'always',
   });
@@ -788,10 +822,12 @@ async function hearSpokenChunk(campaignId: string, actor: TableActor, transcript
   table.lastAt = now;
 
   const plan = planTableTalk(reading.utterances, 'spoken');
+  if (plan.world.length) await advanceClockForLine(campaignId, 'gm-line', plan.world.map((u) => u.text).join(' '));
   const truth = await recordSpoken(campaignId, actor, plan, table.beatId, heard);
   table.beatId = truth.beatId;
   for (const u of plan.ignored) await markDropped(campaignId, actor, u.kind, u.rule, u.text);
-  await runBeats(campaignId, actor, plan.beats, listeners, truth, { waitForAnswers: false, answerAfterWorldOnly: BEINGS_ANSWER === 'always' });
+  const voicedIds = [...new Set(reading.utterances.map((u) => u.speaker?.id).filter((id): id is string => !!id))];
+  await runBeats(campaignId, actor, plan.beats, listeners, { ...truth, voicedIds }, { waitForAnswers: false, answerAfterWorldOnly: BEINGS_ANSWER === 'always' });
   const asked = plan.beats.filter((b) => b.type !== 'hear').length;
   // The table builds on what was said when it hands the turn over: that is when improvisations can settle.
   if (asked > 0) { try { await cementCheck(campaignId, actor.userId); } catch (err) { console.warn('[table-speak] cement check failed', err); } }
@@ -900,7 +936,6 @@ export async function getTableRoster(campaignId: string, actorRole: string) {
     select: { characterId: true, status: true },
   });
   const activeIds = new Set(entities.filter((e) => e.status === 'ACTIVE').map((e) => e.characterId));
-  const wrappedIds = new Set(entities.map((e) => e.characterId));
   const isTableHidden = (raw: string | null) => {
     try {
       return raw ? JSON.parse(raw).tableHidden === true : false;
@@ -918,15 +953,6 @@ export async function getTableRoster(campaignId: string, actorRole: string) {
       .filter((c) => c.entityType === 'NPC' && !isTableHidden(c.data))
       .map((c) => ({ id: c.id, name: c.name })),
     dayaActive: characters.filter((c) => activeIds.has(c.id)).map((c) => ({ id: c.id, name: c.name })),
-    /**
-     * Everyone at the table and who plays them (hello world 2026-10-17: genesis
-     * woke Kristopher's being and the AI played a character Mike voices).
-     * `awake` = the being runs the loop; a wrapped, dormant one is voiced by
-     * the Watcher and can be woken from the table; unwrapped ones have no being.
-     */
-    beings: characters
-      .filter((c) => (c.entityType === 'NPC' || c.entityType === 'PLAYER_CHARACTER') && !isTableHidden(c.data))
-      .map((c) => ({ id: c.id, name: c.name, awake: activeIds.has(c.id), wrapped: wrappedIds.has(c.id) })),
     /** The rollout switch, for the recorder: shorter chunks only make sense when the mic feeds the table. */
     splitLoop: tableSplitLoop(),
   };

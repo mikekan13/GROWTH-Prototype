@@ -207,11 +207,22 @@ describe('speakProse — switch ON: listen while the GM has the floor, answer at
     expect(w.attached).toEqual(expect.arrayContaining([{ memoryId: 'ask-mem-mara', canonEventId: 'canon-1' }, { memoryId: 'listen-mem-oren', canonEventId: 'canon-1' }]));
   });
 
-  it('a being voiced by the GM does not hear its own line', async () => {
+  it('a being voiced by the GM does not hear its own line; with one other present, that one is spoken TO and answers', async () => {
     w.npcs = [{ id: 'tess', name: 'Tess' }, { id: 'oren', name: 'Oren' }];
     await speakProse('camp', actor, { message: 'Oren: "Leave it."' });
-    expect(w.listen.mock.calls.map((c) => c[0])).toEqual(['mara']);
+    expect(w.listen.mock.calls.map((c) => c[0])).toEqual([]);
+    expect(w.answer.mock.calls.map((c) => [c[0], (c[2] as { kind: string }).kind])).toEqual([['mara', 'spoken']]);
     w.npcs = [{ id: 'tess', name: 'Tess' }];
+  });
+
+  it("a being's own impulse earns it the turn the ask did not give (Mike 2026-10-24)", async () => {
+    w.listen.mockImplementation(async (id: string) => ({ status: 'ok', listened: { status: 'listened', memoryEntryId: `listen-mem-${id}`, impulse: id === 'mara' ? 'speak' : 'stay' } }));
+    answerWith({ mara: { kind: 'speak', content: 'Who is it?' } });
+    await speakProse('camp', actor, { message: 'Three knocks on the door, slow and even.' });
+    await flush(); await flush();
+    expect(w.listen.mock.calls.map((c) => c[0]).sort()).toEqual(['mara', 'oren']);
+    expect(w.answer.mock.calls.map((c) => [c[0], (c[2] as { kind: string }).kind])).toEqual([['mara', 'turn']]);
+    expect(w.chats.some((c) => c.characterId === 'mara' && c.message === 'Who is it?')).toBe(true);
   });
 
   it('out-of-character talk and check calls are not recorded, not heard, listed back, and marked in the ambient log', async () => {
@@ -385,11 +396,13 @@ describe('hearSpoken — switch ON, session live: the mic is table talk', () => 
 describe('the TABLE feed fields (ruling-feed-segment-colours-pillars, 2026-10-07)', () => {
   it('typed prose: the declaration carries the raw message and the preprocessor split', async () => {
     await speakProse('camp', actor, { message: 'Tess sets the lamp down.  "Sit."' });
+    // Prose about a roster character is her act (Mike 2026-10-24): the declaration carries it, not narration.
     expect(w.feeds[0]).toEqual({
       via: 'typed',
       raw: 'Tess sets the lamp down.  "Sit."',
-      narration: 'Tess sets the lamp down.',
+      narration: null,
       speech: [{ text: 'Sit.', speakerId: 'tess', speakerLabel: 'Tess', context: 'Tess sets the lamp down.' }],
+      actions: [{ text: 'Sets the lamp down', actorId: 'tess', actorLabel: 'Tess' }],
     });
   });
 

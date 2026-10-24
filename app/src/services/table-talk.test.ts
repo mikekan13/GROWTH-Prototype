@@ -25,7 +25,8 @@ describe('readTableTalk — Mike\'s example', () => {
     expect(utterances[1]).toMatchObject({
       text: 'Hey scruffy, you gonna order something?',
       speaker: { id: null, label: 'a bright eyed lass behind the bar' },
-      to: { scope: 'unspecified' },
+      // Violet is the only one at the table: the barmaid is talking to her (lone-listener rule, 2026-10-24).
+      to: { scope: 'named', ids: ['violet'] },
       expectsReply: true,
     });
     expect(addressees(utterances[1], present)).toEqual(['violet']);
@@ -136,10 +137,18 @@ describe('readTableTalk — dialogue', () => {
     expect(utterances[1]).toMatchObject({ speaker: { id: 'carr', label: 'Mr. Carrasco' }, to: { scope: 'named', ids: ['danny'] } });
     expect(addressees(utterances[1], present)).toEqual([]);
   });
-  it('a line thrown at nobody does not expect a reply', () => {
+  it('with one other person present, a line with no name is to them (HW2, Mike 2026-10-24)', () => {
     const { utterances } = read('Ruth sets down the tray. "Eat."');
+    expect(utterances[1]).toMatchObject({ kind: 'dialogue', to: { scope: 'named', ids: ['violet'] }, expectsReply: true, rule: 'dialogue:lone-listener' });
+    expect(addressees(utterances[1], present)).toEqual(['violet']);
+    const spoken = read(`Kristopher stands at the door. "Ma'am... you didn't pay!"`);
+    expect(spoken.utterances.at(-1)).toMatchObject({ kind: 'dialogue', to: { scope: 'named', ids: ['violet'] }, expectsReply: true, rule: 'dialogue:lone-listener-addressed' });
+  });
+  it('with several present, a line thrown at nobody still asks nobody', () => {
+    const many = [...present, { id: 'oren', name: 'Oren' }];
+    const { utterances } = readTableTalk('Ruth sets down the tray. "Eat."', { ...ctx, present: many });
     expect(utterances[1]).toMatchObject({ kind: 'dialogue', to: { scope: 'unspecified' }, expectsReply: false });
-    expect(addressees(utterances[1], present)).toEqual([]);
+    expect(addressees(utterances[1], many)).toEqual([]);
   });
   it('the sentence that introduced the quote can carry the address', () => {
     const { utterances } = read('Ruth turns to Violet. "What did you see?"');
@@ -151,7 +160,7 @@ describe('readTableTalk — dialogue', () => {
     expect(addressees(u, present)).toEqual([]);
   });
   it('speech with no quote marks (a transcript) is still the named speaker talking', () => {
-    expect(only('Ruth says, sit down.')).toMatchObject({ kind: 'dialogue', text: 'sit down.', speaker: { id: 'ruth', label: 'Ruth' }, expectsReply: false, rule: 'dialogue+unquoted' });
+    expect(only('Ruth says, sit down.')).toMatchObject({ kind: 'dialogue', text: 'sit down.', speaker: { id: 'ruth', label: 'Ruth' }, expectsReply: true, rule: 'dialogue:lone-listener+unquoted' });
     expect(only('Ruth asks, what did you see?')).toMatchObject({ kind: 'dialogue', speaker: { id: 'ruth' }, expectsReply: true });
     expect(only('Ruth says, Violet, sit down.')).toMatchObject({ kind: 'dialogue', to: { scope: 'named', ids: ['violet'] }, expectsReply: true });
     expect(only('Danny says he never touched it.').kind).toBe('narration');

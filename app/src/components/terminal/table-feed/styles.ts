@@ -21,7 +21,8 @@ export const TABLE_FEED_CSS = `
 .tf .line{font:700 14px/22px var(--font-terminal);color:#000;overflow-wrap:anywhere;margin:0}
 
 /* narration: the manual's ordered reading text (pp 21-22), no label, no chip */
-.tf .nx .line{font:400 15px/1.6 var(--font-comfortaa),Comfortaa,sans-serif;padding-right:6px}
+.tf .row.nx{margin-top:14px;padding:6px 0 6px 10px;background:rgba(0,47,108,0.06);box-shadow:inset 3px 0 0 #002f6c}
+.tf .nx .line{font:400 16px/1.65 var(--font-comfortaa),Comfortaa,sans-serif;padding-right:6px;color:#0b1a33}
 
 /* portrait chip + p10 <Name>: tag flush under it, right-aligned */
 .tf .chip{width:80px;cursor:pointer;display:block;outline:none}

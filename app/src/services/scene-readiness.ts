@@ -73,18 +73,18 @@ async function placeChainUp(locationId: string): Promise<Array<{ id: string; nam
 }
 
 /**
- * Who is seated at the table: every character with an ACTIVE being, plus the
- * player characters (the party is at the table whether or not the AI plays
- * them). A GM-voiced NPC (DORMANT being) is seated only if it stands in one
- * of those places — it's read through the places, not listed here.
+ * Who is seated at the table: every character with a being (awake or voiced
+ * by the Watcher — HW2 2026-10-24: Kristopher's landing was missed because
+ * his dormant being did not count), plus the player characters (the party is
+ * at the table whether or not the AI plays them).
  */
 async function seatsOf(campaignId: string): Promise<Array<{ id: string; name: string; status: string; locationId: string | null }>> {
   const chars = await prisma.character.findMany({
     where: { campaignId, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } },
     select: { id: true, name: true, status: true, entityType: true },
   });
-  const awake = new Set((await prisma.dayaEntity.findMany({ where: { characterId: { in: chars.map((c) => c.id) }, status: 'ACTIVE' }, select: { characterId: true } })).map((e) => e.characterId));
-  const seated = chars.filter((c) => awake.has(c.id) || c.entityType === 'PLAYER_CHARACTER');
+  const wrapped = new Set((await prisma.dayaEntity.findMany({ where: { characterId: { in: chars.map((c) => c.id) }, status: { in: ['ACTIVE', 'DORMANT'] } }, select: { characterId: true } })).map((e) => e.characterId));
+  const seated = chars.filter((c) => wrapped.has(c.id) || c.entityType === 'PLAYER_CHARACTER');
   const rels = await prisma.entityRelationship.findMany({ where: { sourceId: { in: seated.map((c) => c.id) }, relationshipType: REL }, select: { sourceId: true, targetId: true } });
   const where = new Map(rels.map((r) => [r.sourceId, r.targetId]));
   return seated.map((c) => ({ id: c.id, name: c.name, status: c.status, locationId: where.get(c.id) ?? null }));

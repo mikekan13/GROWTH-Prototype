@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildDesiresBlock, parseSpiritOutput, buildSpiritListeningPrompt, buildSpiritAnsweringPrompt,
   SPIRIT_TENETS_BLOCK, LISTENING_MAX_TOKENS, ANSWERING_MAX_TOKENS, type DesireSourceItem,
-  capSpeech,
+  capSpeech, splitImpulse,
 } from './spirit';
 import { sealLint, hasHardHit } from '../../seal';
 
@@ -80,7 +80,7 @@ describe('buildSpiritListeningPrompt — thoughts only, nothing said', () => {
     expect(hasHardHit(sealLint(prompt))).toBe(false);
   });
   it('stays a short call', () => {
-    expect(LISTENING_MAX_TOKENS).toBeLessThanOrEqual(120);
+    expect(LISTENING_MAX_TOKENS).toBeLessThanOrEqual(140); // thoughts + the one impulse line
   });
 });
 
@@ -171,5 +171,21 @@ describe('Say is speech, not a monologue (hello world 2026-10-17)', () => {
     const { spoken, rest } = capSpeech(long);
     expect(spoken.length).toBeLessThanOrEqual(360);
     expect(rest.length).toBeGreaterThan(0);
+  });
+});
+
+describe('the impulse line — the being\'s own say on breaking in (Mike 2026-10-24)', () => {
+  it('splits the last line off and keeps only the thought', () => {
+    expect(splitImpulse('The knocking again. He sounds young.\nImpulse: speak')).toEqual({ thought: 'The knocking again. He sounds young.', impulse: 'speak' });
+    expect(splitImpulse('Let him wait.\n**Impulse:** stay')).toEqual({ thought: 'Let him wait.', impulse: 'stay' });
+    expect(splitImpulse('The bill is by the door. I could slide it under.\nImpulse — act.')).toEqual({ thought: 'The bill is by the door. I could slide it under.', impulse: 'act' });
+  });
+  it('no marker means stay, and the text is untouched', () => {
+    expect(splitImpulse('Just the dust and the hum of the fridge.')).toEqual({ thought: 'Just the dust and the hum of the fridge.', impulse: 'stay' });
+  });
+  it('the listening prompt asks for it and tells the being how long it has let things sit', () => {
+    const p = buildSpiritListeningPrompt({ name: 'Violet', identityNarrative: 'x', voiceNotes: 'y', feltStateBrief: 'z', standingScene: 's', recallBlock: 'r', desiresBlock: 'd', innerSoFar: '', heard: 'A knock.', sinceOwn: 'about two minutes' });
+    expect(p).toContain('Impulse: speak');
+    expect(p).toContain('it has been about two minutes since you last said or did anything');
   });
 });

@@ -30,6 +30,8 @@ import { senseProfileFromSheet, type SenseKind } from '@/sim/senses/field';
 import type { DayaClientOverrides } from './model-client';
 import type { GrowthLocation } from '@/types/location';
 import { splitHeld, heldLines } from './facts-for-actor';
+import { clockNow, hourInWords, sinceOwnInWords } from '@/services/table-clock';
+import { resolveDayaEntityId } from './entity';
 
 export interface PerceiveResult {
   /** What the being actually perceived — the stimulus content to ingest. */
@@ -102,6 +104,8 @@ export interface SceneInput {
   senses: { canSee: boolean; canHear: boolean; effectiveness?: Partial<Record<SenseKind, number>> };
   /** The being's own body as the inventory has it (facts-for-actor): what it wears, what it carries. Absent = not told. */
   held?: { wearing: string[]; carrying: string[] };
+  /** Time as the being feels it (table-clock): the hour of day in words, and how long since it last spoke or acted. */
+  time?: { hour: string; sinceOwn: string | null };
 }
 
 /**
@@ -168,6 +172,11 @@ function composeUndimmed(input: SceneInput): SceneTruth {
   // The being's own body needs no sense to know (hello world 2026-10-17: a
   // receipt went "in the pocket of my jacket" with no jacket on the sheet).
   if (input.held) for (const text of heldLines(input.held)) lines.push({ text, salience: 0.3, kind: 'self' });
+  // Time passes and the being feels it (Mike 2026-10-24): the hour, and how long it has let things sit.
+  if (input.time) {
+    lines.push({ text: `It is ${input.time.hour}.`, salience: 0.25, kind: 'self' });
+    if (input.time.sinceOwn) lines.push({ text: `It has been ${input.time.sinceOwn} since you last said or did anything.`, salience: 0.45, kind: 'self' });
+  }
   return { headline: input.headline, lines };
 }
 
@@ -314,11 +323,19 @@ export async function composeSceneTruth(
     }
   }
 
+  // The world's clock, as this being feels it.
+  let time: SceneInput['time'];
+  try {
+    const [{ localHour }, entityDaId] = await Promise.all([clockNow(campaignId), resolveDayaEntityId(characterId)]);
+    time = { hour: hourInWords(localHour), sinceOwn: await sinceOwnInWords(campaignId, entityDaId) };
+  } catch { time = undefined; }
+
   const truth = composeSceneLines({
     headline: source === 'perception' ? stimulus : null,
     speech: source === 'dialogue' ? [stimulus] : [],
     place, parent, present, items, facts, parentFacts, senses,
     held: splitHeld(held),
+    time,
   });
   const roll = sceneRoll({ placed: place !== null, present: present.map((p) => p.name), items, senses });
   return { truth, locationId, roll };

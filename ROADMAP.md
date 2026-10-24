@@ -1,6 +1,15 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-10-23
+Last updated: 2026-10-24
+
+> 2026-10-24 (hello world 2 → fixes): HW2 ran on the split loop (TABLE_SPLIT_LOOP=on). Violet listened to every
+> line and never answered: the ask reader needed a name, and the clock never moved (cycle 0.0022 all session).
+> Built the same night: table-clock (every GM line / being act advances the clock — stated span wins, else the
+> sim's estimate; encounters keep their rounds), beings feel the hour and how long they have let things sit,
+> the listening monologue ends with an Impulse (speak/act/stay) that earns the answer turn, the lone-listener
+> rule (speech with one other present is to them), prose about a character is his card, GM narration rows
+> stand out, seats include GM-voiced characters, the beings toggle is gone (ruling: no control toggles — GM
+> voicing is the override), Kristopher's being awake again. NEXT: hello world 3 with the watcher on.
 
 > 2026-10-23 (hello world 2 prep): the 17 Oct hello-world hiccups ironed out in three commits on
 > merge/fork-portrait-pipeline — sheet edits no longer wake JEWL (and can't become damage); the tagger stops

@@ -93,6 +93,34 @@ export function pronounActor(window: string, recent: ProseRosterEntry[]): ProseR
 function lastRosterName(window: string, roster: ProseRosterEntry[]): ProseRosterEntry | null {
   return findRosterName(window, roster);
 }
+
+const SUBJECT_PRONOUN_RE = /^(he|she)\b/i;
+const BARE_TAG_RE = /^(?:says|asks|shouts|whispers|yells|replies|calls out|mutters|growls|snaps|said|asked)\s*[,:]?\s*$/i;
+
+/** "Kristopher knocks twice." → "Knocks twice"; "Ruth says," → null (a bare speech tag). Pure. */
+export function actionBody(sentence: string, actor: ProseRosterEntry): string | null {
+  let s = sentence.trim().replace(/[.]+$/, '').trim();
+  const name = actor.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  s = s.replace(new RegExp(`^(?:${name}|he|she)\\b[,]?\\s*`, 'i'), '');
+  if (!s || BARE_TAG_RE.test(s)) return null;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * The actor a prose sentence is ABOUT, when it opens with one: a roster name
+ * ("Kristopher knocks twice.") or a bare he/she that the table resolves. A
+ * possessive opener ("Kristopher's door creaks") is not his act. Pure.
+ */
+export function sentenceActor(sentence: string, roster: ProseRosterEntry[], recent: ProseRosterEntry[]): ProseRosterEntry | null {
+  const s = sentence.trim();
+  for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
+    const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!name) continue;
+    if (new RegExp(`^${name}(?!['’]s\\b)(?=$|[^\\w])`, 'i').test(s)) return entry;
+  }
+  if (SUBJECT_PRONOUN_RE.test(s)) return pronounActor(s.split(/\s+/)[0]!, recent);
+  return null;
+}
 const SCRIPT_PREFIX_RE = /^\s*([A-Z][\w.'’-]*(?:\s+[A-Z][\w.'’-]*){0,3}):\s*(.+)$/;
 // Verbs that end the noun phrase introducing a speaker ("A lass behind the bar GIVES you a wink").
 const INTRO_VERB_RE = /\s+(?:gives|give|says|say|asks|ask|looks|look|turns|turn|leans|lean|nods|nod|smiles|smile|winks|wink|shouts|shout|calls|call|whispers|whisper|grins|grin|laughs|laugh|steps|step|walks|walk|stands|stand|sits|sit|is|are|was|were|has|have|does|do|comes|come|glances|glance|raises|raise|slams|slam|pounds|pound|waves|wave|points|point|mutters|mutter|growls|growl|snaps|snap|sighs|sigh|frowns|frown|shrugs|shrug|beckons|beckon|watches|watch|stares|stare|eyes|reaches|reach|pushes|push|sets|set|puts|put|drops|drop|holds|hold|offers|offer|hands|hand|sneers|sneer|barks|bark|hisses|hiss|replies|reply|answers|answer|adds|add|continues|continue|pauses|pause|hesitates|hesitate|tries|try|starts|start|begins|begin|keeps|keep|moves|move|approaches|approach|enters|enter|appears|appear|emerges|emerge)\b/i;
@@ -195,6 +223,24 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
     if (i >= 0) recent.splice(i, 1);
     recent.unshift(entry);
   };
+  // Prose about a roster character is HIS act, not narration (HW2, Mike
+  // 2026-10-24: "He knocks on the door again" belongs on Kristopher's card
+  // with his words). Only prose about no one stays the Watcher's narration.
+  const keepNarration = (text: string) => {
+    if (roster.length === 0) { narrationParts.push(text); return; }
+    const rest: string[] = [];
+    for (const sentence of splitSentences(text)) {
+      const actor = sentenceActor(sentence, roster, recent);
+      if (!actor) { rest.push(sentence); continue; }
+      noteActor(actor);
+      // The card carries the name: "Kristopher knocks twice." → ::Knocks twice::.
+      const body = actionBody(sentence, actor);
+      // A bare speech tag ("Ruth says,") is neither narration nor an act — the quote beside it is the record.
+      if (body) actions.push({ text: body, actorId: actor.id, actorLabel: actor.name });
+    }
+    const kept = rest.join(' ').trim();
+    if (kept) { narrationParts.push(kept); noteActor(lastRosterName(kept, roster)); }
+  };
 
   for (const rawLine of lines) {
     // -1. Action spans for a roster character: `::Kristopher knocks::`, or
@@ -228,7 +274,7 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
       if (said.some(Boolean)) {
         for (const q of said) if (q) { quotes.push(q); noteActor(roster.find((r) => r.id === q.speakerId) ?? null); }
         const kept = sentences.filter((_, i) => !said[i]).join(' ').trim();
-        if (kept) narrationParts.push(kept);
+        if (kept) keepNarration(kept);
         continue;
       }
     }
@@ -279,10 +325,7 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
     }
     stripped += line.slice(cursor);
     const cleaned = stripped.replace(/\s{2,}/g, ' ').trim();
-    if (cleaned) {
-      narrationParts.push(cleaned);
-      if (roster.length > 0) noteActor(lastRosterName(cleaned, roster));
-    }
+    if (cleaned) keepNarration(cleaned);
   }
 
   const narration = narrationParts.join('\n').trim() || null;

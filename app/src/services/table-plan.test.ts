@@ -72,10 +72,18 @@ describe('stimulusFor — what one listener is handed for a run', () => {
     expect(stimulusFor(run('Tess: "Eat."'), 'mara')).toEqual({ source: 'dialogue', content: 'Tess: Eat.' });
   });
   it('a being is never handed its own line as something heard', () => {
-    const lines = run('Oren: "Eat."\nTess: "No."');
+    // Three at the table, so a line with no name is thrown at nobody and stays in the run
+    // (with one other present it would be TO them — the lone-listener rule, 2026-10-24).
+    const three = [...listeners, { id: 'pim', name: 'Pim' }];
+    const run3 = (text: string) => {
+      const b = planTableTalk(readTableTalk(text, { present: three, npcs }).utterances, 'typed').beats[0];
+      if (b.type !== 'hear') throw new Error('not a run');
+      return b.utterances;
+    };
+    const lines = run3('Oren: "Eat."\nTess: "No."');
     expect(stimulusFor(lines, 'oren')).toEqual({ source: 'dialogue', content: 'Tess: No.' });
     expect(stimulusFor(lines, 'mara')).toEqual({ source: 'dialogue', content: 'Oren: Eat.\nTess: No.' });
-    expect(stimulusFor(run('Oren: "Eat."'), 'oren')).toBeNull();
+    expect(stimulusFor(run3('Oren: "Eat."'), 'oren')).toBeNull();
   });
   it('speech with no known speaker is still heard', () => {
     expect(stimulusFor(run('"Eat."'), 'mara')).toEqual({ source: 'dialogue', content: 'someone present: Eat.' });

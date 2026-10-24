@@ -29,13 +29,15 @@ describe('parseTableProse — attribution', () => {
     const p = parseTableProse('Mr. Carrasco pounds on the door from the landing. "Open this door, Danny. You owe me rent."', roster);
     expect(p.quotes[0].speakerId).toBe('carr');
     expect(p.quotes[0].speakerLabel).toBe('Mr. Carrasco');
-    expect(p.narration).toBe('Mr. Carrasco pounds on the door from the landing.');
+    // Prose about a roster character is HIS act (Mike 2026-10-24), not narration.
+    expect(p.narration).toBeNull();
+    expect(p.actions).toEqual([{ text: 'Pounds on the door from the landing', actorId: 'carr', actorLabel: 'Mr. Carrasco' }]);
   });
   it('a speech tag after the quote also attributes', () => {
     const p = parseTableProse('"Get out of my kitchen," Ruth says without turning around.', roster);
     expect(p.quotes[0].speakerId).toBe('ruth');
-    expect(p.narration).toBe(', Ruth says without turning around.'.replace(/^,\s*/, '') === 'Ruth says without turning around.' ? p.narration : p.narration);
-    expect(p.narration).toContain('Ruth says without turning around.');
+    expect(p.narration).toBeNull();
+    expect(p.actions).toEqual([{ text: 'Says without turning around', actorId: 'ruth', actorLabel: 'Ruth' }]);
   });
   it('script prefix — `Ruth: "…"` and `Ruth: …` are pure speech, no narration', () => {
     const a = parseTableProse('Ruth: "Sit down."', roster);
@@ -56,7 +58,8 @@ describe('parseTableProse — attribution', () => {
   it('curly quotes and several quotes in one message each get their own speaker', () => {
     const p = parseTableProse('Ruth sets down the tray. “Eat.” Danny pushes it away. “Not hungry.”', roster);
     expect(p.quotes.map(q => q.speakerId)).toEqual(['ruth', 'danny']);
-    expect(p.narration).toBe('Ruth sets down the tray. Danny pushes it away.');
+    expect(p.narration).toBeNull();
+    expect(p.actions?.map((a) => [a.actorId, a.text])).toEqual([['ruth', 'Sets down the tray'], ['danny', 'Pushes it away']]);
   });
   it('plain narration with no quotes has no speech', () => {
     const p = parseTableProse('The light over the door flickers once.', roster);
@@ -102,13 +105,20 @@ describe('parseTableProse — unquoted speech (a transcript has no quote marks)'
     expect(p.quotes.map((q) => [q.speakerId, q.text])).toEqual([['ruth', 'sit down.'], ['danny', 'in a minute.']]);
   });
   it.each([
-    'Danny says he never touched it.',
-    'Ruth says nothing and goes back to the dishes.',
     'The stranger says, sit down.',
     'You wonder what Ruth says, if anything.',
-    'Ruth looks up, says nothing.',
-  ])('not speech — narration is left exactly as written: %s', (text) => {
+  ])('not speech, about no one at the table — narration is left exactly as written: %s', (text) => {
     expect(parseTableProse(text, roster)).toEqual({ full: text, narration: text, quotes: [] });
+  });
+  it.each([
+    ['Danny says he never touched it.', 'danny', 'Says he never touched it'],
+    ['Ruth says nothing and goes back to the dishes.', 'ruth', 'Says nothing and goes back to the dishes'],
+    ['Ruth looks up, says nothing.', 'ruth', 'Looks up, says nothing'],
+  ])('not speech, but about a roster character — his act, not narration (Mike 2026-10-24): %s', (text, actorId, body) => {
+    const p = parseTableProse(text, roster);
+    expect(p.quotes).toEqual([]);
+    expect(p.narration).toBeNull();
+    expect(p.actions).toEqual([{ text: body, actorId, actorLabel: roster.find((r) => r.id === actorId)!.name }]);
   });
   it('a line that has quote marks anywhere takes the quoted path only', () => {
     const p = parseTableProse('Ruth says, sit down. "Now," she adds.', roster);

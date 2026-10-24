@@ -40,6 +40,8 @@ export interface ListeningState {
   recallBlock: string;
   desiresBlock: string;
   updatedAt: number;
+  /** The campaign clock (cycles) when the being itself last spoke or acted; the scene tells it how long it has let things sit. */
+  lastOwnCycle?: number;
 }
 
 // In-process, per being. A restart means the next listen starts a fresh state.

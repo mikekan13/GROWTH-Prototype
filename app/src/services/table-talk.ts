@@ -148,6 +148,8 @@ const CONTEXT_ADDRESS = new RegExp(`\\b(?:to|at|toward|towards)\\s+(${NAME_LIST}
 
 const PARTY_RE = /\b(?:everyone|everybody|anyone|anybody|all of you|you all|y'all|you guys|you two|you three|both of you|each of you|the rest of you|the party|the group)\b/i;
 const SECOND_PERSON_RE = /\b(?:you|your|yours|yourself|yourselves|y'all)\b/i;
+// "Ma'am… you didn't pay!" — an honorific aimed at whoever is there.
+const HONORIFIC_RE = /\b(?:ma'?am|madam|sir|miss|mister|mr|mrs|ms|lady|son|kid|friend|buddy|pal|neighbou?r|hey you|hello\??|anyone (?:there|home))\b/i;
 const QUESTION_RE = /\?["”')\]]*\s*$/;
 const TERMINAL_RE = /[.!?…]["”')\]]*\s*$/;
 
@@ -305,13 +307,19 @@ function readQuote(raw: ProseQuote, names: NameIndex, present: ProseRosterEntry[
   }
   named = named.filter((id) => id !== quote.speakerId);
   const question = sentences.some((s) => QUESTION_RE.test(s));
+  // The scene decides the rest (HW2, Mike 2026-10-24: Kristopher spoke to Violet
+  // through her door with no name and she never got a turn). With one other
+  // person present, words are to them — "ma'am", "you", or nothing at all.
+  const others = present.filter((p) => p.id !== quote.speakerId);
+  const lone = named.length === 0 && !PARTY_RE.test(quote.text) && others.length === 1 ? others[0] : null;
+  if (lone) { named = [lone.id]; rule = HONORIFIC_RE.test(quote.text) || SECOND_PERSON_RE.test(quote.text) ? 'dialogue:lone-listener-addressed' : 'dialogue:lone-listener'; }
   const to: TalkTarget = named.length ? { scope: 'named', ids: named } : PARTY_RE.test(quote.text) ? { scope: 'party' } : { scope: 'unspecified' };
   return {
     text: quote.text,
     kind: 'dialogue',
     to,
     speaker: { id: quote.speakerId, label: quote.speakerLabel },
-    // Direct address is an ask (design §1); an open question is one too. A line thrown at nobody is not.
+    // Direct address is an ask (design §1); an open question is one too; so is anything said to the one other person there.
     expectsReply: named.length > 0 || question,
     ambiguous: false,
     rule: named.length ? rule : question ? 'dialogue:question' : 'dialogue',
@@ -333,9 +341,12 @@ function segmentLine(line: string, roster: ProseRosterEntry[]): Segment[] {
   // sentence by sentence by the caller — with table-prose's own reader — so it keeps its place.
   if (!matches.length && !isScriptLine(line)) return [{ gm: line }];
   const parsed = parseTableProse(line, roster);
-  // No narration left = a script line (`Ruth: …`) or nothing but quotes.
-  if (parsed.narration === null) return parsed.quotes.map((quote) => ({ quote }));
-  if (matches.length !== parsed.quotes.length) return [{ gm: parsed.narration }, ...parsed.quotes.map((quote) => ({ quote }))];
+  // The GM's prose here is everything outside the quotes — narration AND the sentences table-prose
+  // files as a character's actions (those are the feed's business; the table still hears them).
+  const outsideQuotes = line.replace(QUOTE_RE, ' ').replace(/\s+/g, ' ').trim();
+  // Nothing outside the quotes = a script line (`Ruth: …`) or nothing but quotes.
+  if (parsed.narration === null && !parsed.actions?.length) return parsed.quotes.map((quote) => ({ quote }));
+  if (matches.length !== parsed.quotes.length) return [...(outsideQuotes ? [{ gm: outsideQuotes }] : []), ...parsed.quotes.map((quote) => ({ quote }))];
   const out: Segment[] = [];
   let cursor = 0;
   matches.forEach((m, i) => {

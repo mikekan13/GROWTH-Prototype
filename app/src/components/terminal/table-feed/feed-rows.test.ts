@@ -52,11 +52,9 @@ describe('the Watcher\'s narration — the preprocessor\'s split', () => {
 
   it('an old row falls back to the same preprocessor over the description', () => {
     const rows = eventRows(ev({ kind: 'game_event', eventType: 'declaration', description: 'Warden sets the lamp down. "Sit down."' }), roster);
-    expect(rows.map((r) => [r.type, r.type === 'narration' ? r.text : r.type === 'character' ? r.name : ''])).toEqual([
-      ['narration', 'Warden sets the lamp down.'],
-      ['character', 'Warden'],
-    ]);
-    expect(rows[0]).toMatchObject({ via: 'typed', raw: 'Warden sets the lamp down. "Sit down."' });
+    // Prose about a roster character is his act (Mike 2026-10-24): one card, action then speech.
+    expect(rows.map((r) => r.type)).toEqual(['character']);
+    expect(rows[0]).toMatchObject({ name: 'Warden', via: 'typed', raw: 'Warden sets the lamp down. "Sit down."', segments: [{ kind: 'action', text: 'Sets the lamp down' }, { kind: 'speech', text: 'Sit down.' }] });
   });
 
   it('a GM chat with no character is narration', () => {

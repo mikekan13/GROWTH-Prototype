@@ -17,6 +17,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { currentCycleOf } from '@/services/history';
+import { sinceOwnInWords } from '@/services/table-clock';
 import { refreshFamiliarityByThought } from '@/services/familiarity-thought';
 import { parseSegments } from '@/lib/feed-segments';
 import type { GrowthCharacter } from '@/types/growth';
@@ -40,6 +41,8 @@ import {
   parseSpiritOutput,
   buildSpiritListeningPrompt,
   buildSpiritAnsweringPrompt,
+  splitImpulse,
+  type ListenImpulse,
   LISTENING_MAX_TOKENS,
   ANSWERING_MAX_TOKENS,
   type DesireSourceItem,
@@ -800,6 +803,8 @@ export interface ListenResult {
   /** false when the monologue call failed or tripped the seal; the earlier inner state stands. */
   innerUpdated: boolean;
   timings: ListenTimings;
+  /** The being's own say on breaking in (the monologue's last line); 'stay' when it said nothing or could not be read. */
+  impulse: ListenImpulse;
 }
 
 const FELT_FALLBACK = 'Right now, in your body and mood: steady, holding your own.';
@@ -853,7 +858,7 @@ export async function listenStimulus(
   const tIngested = Date.now();
   if (!ingest.persisted) {
     const soul = soulPending ? await soulPending : null;
-    return { status: 'not_lived', innerUpdated: false, timings: { perceiveMs: tPerceived - t0, ingestMs: tIngested - tPerceived, recallMs: 0, soulMs: soul?.ms ?? null, spiritMs: 0, totalMs: Date.now() - t0, standing } };
+    return { status: 'not_lived', innerUpdated: false, impulse: 'stay', timings: { perceiveMs: tPerceived - t0, ingestMs: tIngested - tPerceived, recallMs: 0, soulMs: soul?.ms ?? null, spiritMs: 0, totalMs: Date.now() - t0, standing } };
   }
 
   // Thorns and recall react to what was PERCEIVED, exactly as in the serial pipeline.
@@ -900,6 +905,9 @@ export async function listenStimulus(
   const fullTake = standing === 'full' || !prior?.standingScene;
   let innerState = prior?.innerState ?? '';
   let innerUpdated = false;
+  let impulse: ListenImpulse = 'stay';
+  // How long it has let things sit, in the world's time (table-clock): part of what it feels.
+  const sinceOwn = ctx.campaignId ? await sinceOwnInWords(ctx.campaignId, ctx.entityDaId, prior?.lastOwnCycle ?? null).catch(() => null) : null;
   try {
     const prompt = buildSpiritListeningPrompt({
       name: ctx.name,
@@ -911,9 +919,13 @@ export async function listenStimulus(
       desiresBlock,
       innerSoFar: innerState,
       heard: fullTake ? 'You are only now taking in where you are.' : content,
+      sinceOwn,
     });
     const raw = (await chat({ tier: 'L1', subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS }, overrides)).text.trim();
-    const sealed = omniscient ? { text: raw, usedFallback: false } : await enforceSeal(raw, { entityId: ctx.entityDaId, subsystem: 'spirit_listen', fallback: '' });
+    // The last line is the being's own say on breaking in; only the thought is kept as its inner state.
+    const split = splitImpulse(raw);
+    impulse = split.impulse;
+    const sealed = omniscient ? { text: split.thought, usedFallback: false } : await enforceSeal(split.thought, { entityId: ctx.entityDaId, subsystem: 'spirit_listen', fallback: '' });
     if (!sealed.usedFallback && sealed.text) {
       innerState = sealed.text;
       innerUpdated = true;
@@ -936,6 +948,7 @@ export async function listenStimulus(
     status: 'listened',
     memoryEntryId: ingest.memoryEntryId,
     innerUpdated,
+    impulse,
     timings: { perceiveMs: tPerceived - t0, ingestMs: tIngested - tPerceived, recallMs: tRecalled - tIngested, soulMs, spiritMs: tDone - tSpirit, totalMs: tDone - t0, standing },
   };
 }
@@ -1139,6 +1152,7 @@ export async function answerAsk(
     innerState: state.innerState,
     heard,
     ask: askArg,
+    sinceOwn: ctx.campaignId ? await sinceOwnInWords(ctx.campaignId, ctx.entityDaId, state.lastOwnCycle ?? null).catch(() => null) : null,
   });
   const answerCall = (extra: { hint?: string; stream?: (delta: string) => boolean | void; stop?: boolean }) =>
     chat(
@@ -1197,11 +1211,16 @@ export async function answerAsk(
   // What it just did is part of what it carries into the next stretch.
   const own = line.kind === 'speak' ? `You said: "${line.content}"` : line.kind === 'act' ? `You: ${line.content}` : null;
   const carried = [...heard, ...(spokenHeard ? [spokenHeard] : []), ...(own ? [own] : [])].slice(-HEARD_KEEP);
-  setListening(characterId, { ...(getListening(characterId) ?? state), heard: carried, updatedAt: Date.now() });
+  // The clock as it stands when the line goes out: from here the being feels how long it lets things sit.
+  const nowCycle = own && ctx.campaignId ? await currentCycleOf(ctx.campaignId).catch(() => ctx.cycle) : undefined;
+  setListening(characterId, { ...(getListening(characterId) ?? state), heard: carried, updatedAt: Date.now(), ...(nowCycle !== undefined ? { lastOwnCycle: nowCycle } : {}) });
 
   // Everything behind the line happens after it is out.
   const after = (async () => {
     const out: AnswerAfter = {};
+    // The clock has moved since this turn's context was loaded (every line costs seconds): stamp what follows with now.
+    const cycleNow = ctx.campaignId ? await currentCycleOf(ctx.campaignId).catch(() => ctx.cycle) : ctx.cycle;
+    const nowCtx: EntityContext = { ...ctx, cycle: cycleNow };
     try {
       const unstored = [...takenBackHeard, ...(spoken ? [spoken] : [])];
       for (const h of unstored) {
@@ -1212,7 +1231,7 @@ export async function answerAsk(
       if (line.kind === 'speak') {
         const memory = await writeMemoryEntry({
           entityId: ctx.entityDaId,
-          narrativeCycle: ctx.cycle,
+          narrativeCycle: cycleNow,
           source: 'dialogue',
           content: line.content,
           valence: 0,
@@ -1222,7 +1241,7 @@ export async function answerAsk(
         });
         out.spokenMemoryId = memory.id;
       } else if (line.kind === 'act') {
-        const adjudication = await actOnIntent(ctx, line.content, overrides);
+        const adjudication = await actOnIntent(nowCtx, line.content, overrides);
         if (adjudication) {
           out.outcome = adjudication.outcome;
           out.outcomeDiffers = adjudication.mapBlocked === true || (adjudication.roll ? !adjudication.roll.success : false);

@@ -79,9 +79,25 @@ export interface SpiritListeningArgs {
   innerSoFar: string;
   /** What just reached it — already through the mirror. */
   heard: string;
+  /** How long it has been since the being itself last spoke or acted, in its own words ("about two minutes"), or null when unknown. */
+  sinceOwn?: string | null;
 }
 
-export const LISTENING_MAX_TOKENS = 120;
+export const LISTENING_MAX_TOKENS = 140;
+
+export type ListenImpulse = 'speak' | 'act' | 'stay';
+
+/**
+ * The last line of a listening monologue is the being's own say on whether it
+ * breaks in (Mike 2026-10-24: "the entities themselves should have a say if
+ * they want to answer"). Split it off; the thought alone is what is kept.
+ * No marker → 'stay' (today's behaviour). Pure.
+ */
+export function splitImpulse(raw: string): { thought: string; impulse: ListenImpulse } {
+  const m = raw.match(/\n?\s*\**\s*impulse\s*\**\s*[:—–-]\s*\**\s*(speak|act|stay)\b\W*$/i);
+  if (!m) return { thought: raw.trim(), impulse: 'stay' };
+  return { thought: raw.slice(0, m.index).trim(), impulse: m[1].toLowerCase() as ListenImpulse };
+}
 
 export function buildSpiritListeningPrompt(args: SpiritListeningArgs): string {
   return `You are ${args.name}. Not playing ${args.name} — you are her, from the inside.
@@ -108,11 +124,16 @@ ${args.innerSoFar || 'Nothing yet — you have only just started paying attentio
 
 What just reached you:
 ${args.heard}
-
+${args.sinceOwn ? `\nTime, as you feel it: it has been ${args.sinceOwn} since you last said or did anything.\n` : ''}
 Nobody is waiting on you; the moment is still unfolding. Take it in. Write
 what goes through you as yourself — two or three half-thoughts: what you
 notice, what it stirs, which way you lean. What you don't know, you don't know.
-Do not speak aloud and do not act. Thoughts only, under sixty words.`;
+Do not speak aloud and do not act. Thoughts only, under sixty words.
+Then, on its own last line, your impulse — whether you would break in now,
+as yourself, given who you are and how long you have let this sit:
+Impulse: speak   (you would say something now)
+Impulse: act     (you would do something now)
+Impulse: stay    (you let it sit)`;
 }
 
 /** What turned the moment to the being: the table waiting on it, or someone speaking to it. */
@@ -131,6 +152,8 @@ export interface SpiritAnsweringArgs {
   /** What has reached it since it last spoke, oldest first. */
   heard: string[];
   ask: SpiritAsk;
+  /** How long since the being itself last spoke or acted, in words; null when unknown. */
+  sinceOwn?: string | null;
 }
 
 export const ANSWERING_MAX_TOKENS = 60;
@@ -152,6 +175,7 @@ ${args.standingScene}
 
 What has just happened:
 ${args.heard.length ? args.heard.join('\n') : 'Nothing you have not already taken in.'}
+${args.sinceOwn ? `\nTime, as you feel it: it has been ${args.sinceOwn} since you last said or did anything.` : ''}
 
 What has been going through your mind:
 ${args.innerState || 'You have not had time to think.'}

@@ -720,3 +720,17 @@ Item data fields (shared with the stock content pass): `value` (KRMA, decimal), 
 | `src/daya/memory.ts` | A withheld tagger answer returns neutral tags once (no repeat call); `rationaleTag` is a fixed list. |
 | `src/components/terminal/TableSpeakBar.tsx` | Beings strip: ● awake / ○ voiced by you — toggles DayaEntity ACTIVE ↔ DORMANT via `POST /api/characters/[id]/daya/enable`. |
 | `src/components/terminal/CampaignTerminal.tsx` | ⚔ Encounter header button opens `EncounterPanel mode="create"` as a sheet; the feed slot exists only while an encounter is live. Session start handles 409 → confirm → `crystallize: true`. |
+
+## Hello world 2 findings — the clock, the being's say, the lone listener (2026-10-24)
+
+| Module | Purpose |
+|---|---|
+| `src/lib/stated-duration.ts` | Pure. `statedDurationSeconds(text, {localHour})` reads the span the GM states ("two hours pass", "an hour later", "the next morning"); `plausibleActSeconds(kind, text)` is the sim's estimate when none is stated (speech ≈ 2 s + 0.4 s/word, quick act seconds, a walk ~1 min, slow acts minutes; cap `PLAUSIBLE_CAP_SECONDS` 30 min); `lineDuration` picks stated over plausible for GM lines. |
+| `src/services/table-clock.ts` | `advanceClockForLine(campaignId, kind, text)` → `advanceClockBySim` (skipped while an encounter is ACTIVE; a stated jump ≥ 60 s flushes). `clockNow`, `cyclesToSeconds`, `lastOwnCycle(entityDaId)` (newest own dialogue/action/adjudication memory), `sinceOwnInWords`, `spanInWords`, `hourInWords`. Called from table-speak on every GM line (typed serial/split, spoken) and every being line. |
+| `src/daya/prompts/roles/spirit.ts` | `ListenImpulse`, `splitImpulse(raw)` — the listening monologue's last line `Impulse: speak | act | stay`; `LISTENING_MAX_TOKENS` 140; `sinceOwn` in both prompts. |
+| `src/daya/ensemble.ts` | `ListenResult.impulse`; `lastOwnCycle` on the listening state when the being's own line goes out; the after-block stamps memory rows and the act with the clock as it stands. |
+| `src/services/table-speak.ts` | `runBeats`: one answer turn per being per message (`granted`); `hear(…, askFor)` grants a turn on impulse speak/act unless the Watcher voiced that being in the message (`truth.voicedIds`, `voicedIn(parsed)`); clock advances before declarations and being lines. |
+| `src/services/table-talk.ts` | `readQuote`: lone-listener rule (one other present → `to: named`, rules `dialogue:lone-listener[-addressed]`, `HONORIFIC_RE`); `segmentLine` keeps actor sentences as GM prose for the table's reading. |
+| `src/services/table-prose.ts` | `sentenceActor`, `actionBody`: prose sentences about a roster character become his `actions` (name stripped, bare speech tags dropped); frozen fixtures re-frozen 2026-10-24. |
+| `src/services/scene-readiness.ts` | Seats = every wrapped character (ACTIVE or DORMANT being) + PCs. |
+| `src/components/terminal/TableSpeakBar.tsx` | Beings toggle REMOVED (ruling: no control toggles). |
