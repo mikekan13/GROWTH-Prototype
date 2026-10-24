@@ -126,6 +126,14 @@ export function sentenceActor(sentence: string, roster: ProseRosterEntry[], rece
     if (new RegExp(`^${name}(?!['’]s\\b)(?=$|[^\\w])`, 'i').test(s)) return entry;
   }
   if (SUBJECT_PRONOUN_RE.test(s)) return pronounActor(s.split(/\s+/)[0]!, recent);
+  // "A tear falls from his eye." / "Kristopher's hand drops." — about a part or thing of his: his
+  // card (HW3, Mike 2026-10-24: "didn't end up as proper cards").
+  for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
+    const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (name && new RegExp(`\\b${name}['’]s\\b`, 'i').test(s)) return entry;
+  }
+  const possessive = s.match(/\b(his|her)\b/i);
+  if (possessive) return pronounActor(possessive[1], recent);
   return null;
 }
 const SCRIPT_PREFIX_RE = /^\s*([A-Z][\w.'’-]*(?:\s+[A-Z][\w.'’-]*){0,3}):\s*(.+)$/;

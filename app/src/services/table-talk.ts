@@ -20,7 +20,7 @@
  * — come from services/table-prose.ts, so canon and the beings agree on who spoke.
  * Pure functions, no I/O — unit-tested on their own.
  */
-import { parseTableProse, splitSentences, unquotedSpeech, isScriptLine, type ProseQuote, type ProseRosterEntry } from './table-prose';
+import { parseTableProse, splitSentences, unquotedSpeech, isScriptLine, type ProseQuote, type ProseRosterEntry, type ProseContext } from './table-prose';
 
 export const TABLE_TALK_KINDS = ['narration', 'dialogue', 'ask-to-party', 'ask-to-name', 'check-call', 'result', 'ooc'] as const;
 export type TableTalkKind = (typeof TABLE_TALK_KINDS)[number];
@@ -62,6 +62,12 @@ export interface TableTalkContext {
   state?: TableTalkState;
   /** Streaming transcripts: keep a trailing sentence with no end punctuation back as `pending` instead of classifying half a thought. */
   holdTrailingFragment?: boolean;
+  /**
+   * What the prose parser knows about the table (recent actors): without it a quote after
+   * "A tear falls from his eye" has no speaker here, so he counts as an "other" and the
+   * lone-listener rule never fires (HW3 2026-10-24: Violet was never asked).
+   */
+  prose?: ProseContext;
 }
 
 export interface TableTalkReading {
@@ -336,12 +342,12 @@ export { splitSentences };
 
 type Segment = { gm: string } | { quote: ProseQuote };
 
-function segmentLine(line: string, roster: ProseRosterEntry[]): Segment[] {
+function segmentLine(line: string, roster: ProseRosterEntry[], prose?: ProseContext): Segment[] {
   const matches = [...line.matchAll(QUOTE_RE)];
   // Prose with no quote marks: any speech in it is unquoted (`Ruth says, …`) and is read
   // sentence by sentence by the caller — with table-prose's own reader — so it keeps its place.
   if (!matches.length && !isScriptLine(line)) return [{ gm: line }];
-  const parsed = parseTableProse(line, roster);
+  const parsed = parseTableProse(line, roster, prose);
   // The GM's prose here is everything outside the quotes — narration AND the sentences table-prose
   // files as a character's actions (those are the feed's business; the table still hears them).
   const outsideQuotes = line.replace(QUOTE_RE, ' ').replace(/\s+/g, ' ').trim();
@@ -380,7 +386,7 @@ export function readTableTalk(text: string, ctx: TableTalkContext): TableTalkRea
   let pending: string | null = null;
   const utterances: TableUtterance[] = [];
 
-  const segments = text.split(/\r?\n/).flatMap((line) => (line.trim() ? segmentLine(line, speakers) : []));
+  const segments = text.split(/\r?\n/).flatMap((line) => (line.trim() ? segmentLine(line, speakers, ctx.prose) : []));
   segments.forEach((segment, at) => {
     if ('quote' in segment) {
       if (resultNarrated) awaitingResult = false;

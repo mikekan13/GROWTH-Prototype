@@ -208,3 +208,20 @@ describe('a pronoun walks back through the recent actors (HW3 2026-10-24)', () =
     expect(p.actions?.[0]).toMatchObject({ actorId: 'violet', text: 'Does not move' });
   });
 });
+
+describe('a sentence about a part or thing of his is his card (HW3 2026-10-24)', () => {
+  const table = [{ id: 'kris', name: 'Kristopher', sex: 'Male' }, { id: 'violet', name: 'Violet', sex: 'Female' }];
+  it('"A tear falls from his eye." is Kristopher\'s, and the quote after it is his too', () => {
+    const p = parseTableProse('A tear falls from his eye. "Please lady I am having the worst week of my life."', table, { recentActors: [table[1], table[0]] });
+    expect(p.actions).toEqual([{ text: 'A tear falls from his eye', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    expect(p.quotes[0]).toMatchObject({ speakerId: 'kris' });
+    expect(p.narration).toBeNull();
+  });
+  it("Kristopher's hand drops is his; her coffee goes cold is hers", () => {
+    expect(parseTableProse("Kristopher's hand drops to his side.", table).actions?.[0]).toMatchObject({ actorId: 'kris' });
+    expect(parseTableProse('Her coffee goes cold on the counter.', table, { recentActors: [table[0], table[1]] }).actions?.[0]).toMatchObject({ actorId: 'violet' });
+  });
+  it('prose about no one and nothing of theirs stays narration', () => {
+    expect(parseTableProse('The radiator ticks. Rain on the window.', table, { recentActors: [table[0]] }).narration).toBe('The radiator ticks. Rain on the window.');
+  });
+});

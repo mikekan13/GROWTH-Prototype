@@ -673,7 +673,7 @@ async function speakProseSplit(
   let roster = await npcRoster();
   const proseCtx = { recentActors: await recentTableActors(campaignId, roster) };
   let parsed = parseTableProse(message, roster, proseCtx);
-  const planFor = (npcs: typeof roster) => planTableTalk(readTableTalk(message, { present: listeners, npcs }).utterances, 'typed');
+  const planFor = (npcs: typeof roster) => planTableTalk(readTableTalk(message, { present: listeners, npcs, prose: proseCtx }).utterances, 'typed');
   let plan = planFor(roster);
 
   // 0. JEWL's read still comes BEFORE anything is written on this path (U2c-5 moves it beside the listening).
@@ -825,7 +825,7 @@ async function hearSpokenChunk(campaignId: string, actor: TableActor, transcript
     prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { id: true, name: true } }),
   ]);
   const heard = `${carried}${transcript}`.trim();
-  const reading = readTableTalk(heard, { present: listeners, npcs, state: table.talk, holdTrailingFragment: true });
+  const reading = readTableTalk(heard, { present: listeners, npcs, state: table.talk, holdTrailingFragment: true, prose: { recentActors: await recentTableActors(campaignId, npcs) } });
   table.talk = reading.state;
   table.pending = reading.pending;
   table.lastAt = now;
