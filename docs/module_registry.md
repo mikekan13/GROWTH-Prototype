@@ -749,6 +749,15 @@ Item data fields (shared with the stock content pass): `value` (KRMA, decimal), 
 | `src/components/terminal/table-feed/styles.ts` | Narration rows heavier (Mike: "make the GM narrated lines stand out more"): 6px Soul-blue bar, gradient wash, 17px reading size. |
 | `scripts/being-thoughts.ts` | `npx tsx scripts/being-thoughts.ts [campaignId] [--session id] [--being Violet]` — prints the thought records of a session. |
 
+## Hello world 4 fixes — who is where, the subject pronoun (2026-10-24)
+
+| Module | Purpose |
+|---|---|
+| `src/services/world-apply.ts` | `passageGraph(openings)` (doors/archways/openings, not windows), `routeBetween(graph, from, to)` (BFS by room name; [] same room, null no way), `passageInWords`, `whereOthersStand(campaignId, actorId, map)` → `Whereabouts[]`, `whereaboutsLines(actorRoom, rows)` ("Kristopher: in Fourth-floor landing, beyond Kitchenette opening (open archway) then Entry door (locked) — out of sight and out of reach from here."). `give` refuses when the receiver is not in the actor's room. |
+| `src/daya/adjudicator.ts` | Prompt block `## Who Is Where (authoritative — nobody else is in the room unless listed HERE)`; narrated mode writes facts only for what the sentence itself states. |
+| `src/daya/prompts/roles/adjudicator.ts` | Rule 0: beyond a closed/locked door = not seen, touched or handed; an act that needs someone present reaches no one. |
+| `src/services/table-prose.ts` | `pronounActor`: the FIRST pronoun is the subject ("He … her …" is about him). Post-pass per line: an unclaimed `someone present` quote on a line whose prose acts are all one character's, with no other mouth on the line, is his speech. |
+
 ## Time jumps are lived (Mike 2026-10-24: "time jumps require simulation for all characters")
 
 | Module | Purpose |

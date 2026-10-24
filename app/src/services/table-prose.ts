@@ -347,10 +347,14 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
     if (cleaned) keepNarration(cleaned);
     // A quote nobody claimed, on a line whose prose actions are all one character's, is his
     // (HW4 2026-10-24: "He stops… He turns around… "Please can you pay…"" went to "someone present").
+    // Only when no other mouth is on the line: a quote already someone else's, or one whose sentence
+    // introduced its own speaker ("A bright eyed lass… 'Hey scruffy?'"), means the bare quote stays vague.
     const lineActors = new Set(actions.slice(actionsBefore).map((a) => a.actorId));
     if (lineActors.size === 1) {
       const only = roster.find((r) => r.id === [...lineActors][0]);
-      if (only) for (const q of quotes.slice(quotesBefore)) if (!q.speakerId) { q.speakerId = only.id; q.speakerLabel = only.name; }
+      const lineQuotes = quotes.slice(quotesBefore);
+      const otherMouth = lineQuotes.some((q) => (q.speakerId && q.speakerId !== only?.id) || (!q.speakerId && q.speakerLabel !== 'someone present'));
+      if (only && !otherMouth) for (const q of lineQuotes) if (!q.speakerId) { q.speakerId = only.id; q.speakerLabel = only.name; }
     }
   }
 
