@@ -6,10 +6,11 @@ import {
   applyOutfit, loadWardrobe, proposeOutfit, setDressState,
   type OutfitPieceView, type OutfitProposalView, type PaintBrief, type WardrobeRow, type WardrobeView,
 } from './api';
+import { pronounsFor, type Pronouns } from '@/lib/appearance-designer';
 
 /** Mirrors services/dress WARDROBE_EMPTY_LINE (that module is server-only). */
-export const WARDROBE_EMPTY_LINE = 'Her wardrobe is empty — her life is built in the WORLD stage first.';
-export const DRESS_FIRST_LINE = 'Nothing is worn yet. Wear something from her things, or let JEWL dress her.';
+export const WARDROBE_EMPTY_LINE = 'The wardrobe is empty — a life is built in the WORLD stage first.';
+export const dressFirstLine = (p: Pronouns) => `Nothing is worn yet. Wear something from ${p.possessive} things, or let JEWL dress ${p.object}.`;
 
 const STATE_LABEL: Record<WardrobeRow['state'], string> = { worn: 'WORN', carried: 'CARRIED', owned: 'AT HOME' };
 const stateTone = (s: WardrobeRow['state']) => (s === 'worn' ? 'spirit' : s === 'carried' ? 'ink' : 'ink') as 'spirit' | 'ink';
@@ -23,10 +24,12 @@ const regionLabel = (key: string | null) => (key ? (key.split('/').filter(Boolea
  * at once; LET JEWL DRESS HER returns a proposal from the same things that
  * the player or GM approves (JEWL never approves).
  */
-export function DressSection({ characterId, editable, disabled, onWardrobe }: {
+export function DressSection({ characterId, editable, disabled, onWardrobe, pronouns: p = pronounsFor(null) }: {
   characterId: string;
   editable: boolean;
   disabled: boolean;
+  /** The character's pronouns (from the sheet's sex); they/them when unknown. */
+  pronouns?: Pronouns;
   /** Fires after every load / change so the parent can gate the paint on what is worn. */
   onWardrobe: (w: WardrobeView) => void;
 }) {
@@ -82,25 +85,25 @@ export function DressSection({ characterId, editable, disabled, onWardrobe }: {
   };
 
   const worn = wardrobe ? wardrobe.garments.filter(g => g.state === 'worn').length : 0;
-  const hint = !wardrobe ? 'reading her things…' : wardrobe.empty ? 'nothing to wear' : `${worn} worn · ${wardrobe.garments.length} garment${wardrobe.garments.length === 1 ? '' : 's'} · ${wardrobe.things.length} thing${wardrobe.things.length === 1 ? '' : 's'}`;
+  const hint = !wardrobe ? `reading ${p.possessive} things…` : wardrobe.empty ? 'nothing to wear' : `${worn} worn · ${wardrobe.garments.length} garment${wardrobe.garments.length === 1 ? '' : 's'} · ${wardrobe.things.length} thing${wardrobe.things.length === 1 ? '' : 's'}`;
 
   return (
     <section className="space-y-2" data-testid="designer-dress">
       <SectionBar n={1} title="Dress" hint={hint} right={wardrobe && !wardrobe.empty ? <GhostButton label={open ? 'hide' : 'show'} onClick={() => setOpen(o => !o)} testId="designer-dress-toggle" /> : undefined} />
       {line && <Readout tone={line === WARDROBE_EMPTY_LINE ? 'note' : 'error'} testId="designer-dress-line">{line}</Readout>}
-      {busy === 'load' && !wardrobe && <Readout>[ reading her wardrobe… ]</Readout>}
+      {busy === 'load' && !wardrobe && <Readout>[ reading {p.possessive} wardrobe… ]</Readout>}
       {wardrobe?.empty && <Readout tone="note" testId="designer-wardrobe-empty">{WARDROBE_EMPTY_LINE}</Readout>}
 
       {wardrobe && !wardrobe.empty && open && (
         <>
           {editable && (
-            <ActionBar label="LET JEWL DRESS HER" onClick={() => { void propose(); }} disabled={off} busy={busy === 'propose'} tone="spirit" testId="designer-dress-propose" />
+            <ActionBar label={`LET JEWL DRESS ${p.object.toUpperCase()}`} onClick={() => { void propose(); }} disabled={off} busy={busy === 'propose'} tone="spirit" testId="designer-dress-propose" />
           )}
 
           {proposal && (
             <div className="space-y-1" data-testid="designer-outfit-proposal" style={{ border: `1px solid ${C.spirit}`, padding: 6 }}>
               <div style={{ fontFamily: F.mono, fontSize: 11, color: C.spirit, letterSpacing: '0.06em' }}>
-                {proposal.byJewl ? 'JEWL PROPOSES, FROM HER OWN THINGS' : 'A PLAIN TAKE (JEWL did not answer) FROM HER OWN THINGS'}
+                {proposal.byJewl ? `JEWL PROPOSES, FROM ${p.possessive.toUpperCase()} OWN THINGS` : `A PLAIN TAKE (JEWL did not answer) FROM ${p.possessive.toUpperCase()} OWN THINGS`}
               </div>
               {proposal.pieces.map(p => <ProposalRow key={p.itemId} piece={p} />)}
               {proposal.pieces.length === 0 && <Readout tone="note">Nothing proposed.</Readout>}
@@ -117,7 +120,7 @@ export function DressSection({ characterId, editable, disabled, onWardrobe }: {
               <WardrobeLine key={g.id} row={g} regions={wardrobe.regions} off={off} editable={editable} onSet={set} />
             ))}
             {wardrobe.things.length > 0 && (
-              <div style={{ fontFamily: F.mono, fontSize: 11, color: C.soul, marginTop: 6 }}>THE REST · what she carries</div>
+              <div style={{ fontFamily: F.mono, fontSize: 11, color: C.soul, marginTop: 6 }}>THE REST · what {p.subject} {p.has === 'has' ? 'carries' : 'carry'}</div>
             )}
             {wardrobe.things.map(t => (
               <WardrobeLine key={t.id} row={t} regions={wardrobe.regions} off={off} editable={editable} onSet={set} />
@@ -178,14 +181,14 @@ function WardrobeLine({ row, regions, off, editable, onSet }: {
 }
 
 /** 2 · PAINT — what the last brief said (JEWL's words), and the gate line when nothing is worn. */
-export function BriefReadout({ brief, worn, hasPaint }: { brief: PaintBrief | null; worn: boolean | null; hasPaint: boolean }) {
+export function BriefReadout({ brief, worn, hasPaint, pronouns: p = pronounsFor(null) }: { brief: PaintBrief | null; worn: boolean | null; hasPaint: boolean; pronouns?: Pronouns }) {
   const rows: Array<[string, string]> = brief
     ? [['setting', brief.setting], ['bearing', brief.pose], ['expression', brief.expression], ['clothes', brief.clothes], ['marks', brief.marks], ['light', brief.light]].filter((r): r is [string, string] => !!r[1])
     : [];
   return (
     <section className="space-y-2" data-testid="designer-paint-section">
       <SectionBar n={2} title="Paint" hint={hasPaint ? 'REGENERATE re-rolls the seed · APPROVE PORTRAIT makes it the canvas image' : 'JEWL writes the brief from everything known, then paints from the face and body'} />
-      {worn === false && <Readout tone="note" testId="designer-dress-first">{DRESS_FIRST_LINE}</Readout>}
+      {worn === false && <Readout tone="note" testId="designer-dress-first">{dressFirstLine(p)}</Readout>}
       {rows.length > 0 && (
         <div data-testid="designer-brief" style={{ border: `1px solid rgba(20,20,19,0.35)`, padding: 6 }}>
           <div style={{ fontFamily: F.mono, fontSize: 11, color: C.spirit, letterSpacing: '0.06em', marginBottom: 2 }}>

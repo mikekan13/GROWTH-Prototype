@@ -91,8 +91,13 @@ describe('seed_npc — a shell, no model call', () => {
     expect(spawn).not.toHaveBeenCalled();
   });
 
-  it('refuses to seed the character herself', async () => {
-    await expect(seedNpc('c1', { characterId: 'v', name: 'Violet', relation: 'self', valence: 0 })).rejects.toThrow(/herself/);
+  it('refuses to seed the character themself — in the pronoun the sheet gives', async () => {
+    db.character.findUnique.mockResolvedValue({ id: 'v', name: 'Violet', campaignId: 'c1', data: JSON.stringify({ identity: { sex: 'female' } }) });
+    await expect(seedNpc('c1', { characterId: 'v', name: 'Violet', relation: 'self', valence: 0 })).rejects.toThrow(/herself — seed the people around her/);
+    db.character.findUnique.mockResolvedValue({ id: 'k', name: 'Kristopher', campaignId: 'c1', data: JSON.stringify({ identity: { physicalDescription: { gender: 'male' } } }) });
+    await expect(seedNpc('c1', { characterId: 'k', name: 'Kristopher', relation: 'self', valence: 0 })).rejects.toThrow(/himself — seed the people around him/);
+    db.character.findUnique.mockResolvedValue({ id: 'v', name: 'Violet', campaignId: 'c1' });
+    await expect(seedNpc('c1', { characterId: 'v', name: 'Violet', relation: 'self', valence: 0 })).rejects.toThrow(/themself/);
   });
 });
 

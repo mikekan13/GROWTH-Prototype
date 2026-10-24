@@ -125,6 +125,6 @@ describe('spawnSeedGenesis', () => {
     expect(r.spawned).toBe(false);
     expect(r.reason).toMatch(/wallet/);
     expect(complete).not.toHaveBeenCalled();
-    expect(updateWorkSession).toHaveBeenCalledWith({ sessionId: 's1', progressNote: expect.stringMatching(/^\[swarm\] Violet's seed got no genesis of her own — The campaign wallet/) });
+    expect(updateWorkSession).toHaveBeenCalledWith({ sessionId: 's1', progressNote: expect.stringMatching(/^\[swarm\] Violet's seed got no genesis of their own — The campaign wallet/) });
   });
 });

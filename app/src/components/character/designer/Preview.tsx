@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { C, F, Chip, FrameButton, GlitchVeil, PortraitVeil, Readout } from './parts';
-import type { DesignerLayer } from '@/lib/appearance-designer';
+import { pronounsFor, type DesignerLayer, type Pronouns } from '@/lib/appearance-designer';
 
 export type PreviewView = 'face' | 'body' | 'portrait';
 const VIEWS: PreviewView[] = ['face', 'body', 'portrait'];
@@ -17,10 +17,12 @@ const VIEWS: PreviewView[] = ['face', 'body', 'portrait'];
  */
 export function Preview({
   view, onView, layer, bodyImagePath, portraitImagePath, portraitLocked, busyLine, busySub, error, note, peekLine, onRegenerate, canRegenerate, glitchKey,
-  onPaint, canPaint, portraitEmpty,
+  onPaint, canPaint, portraitEmpty, pronouns = pronounsFor(null),
 }: {
   /** PORTRAIT waits until the face is approved AND the body exists (Mike 2026-10-15). */
   portraitLocked: boolean;
+  /** The character's pronouns (from the sheet's sex); they/them when unknown. */
+  pronouns?: Pronouns;
   /** A second line under the stage line on the portrait veil (what JEWL is doing, in words). */
   busySub?: string | null;
   /** Set while an older stack layer is being looked at. */
@@ -51,7 +53,7 @@ export function Preview({
   const empty = view === 'body'
     ? '[ BODY · made when you approve the base ]'
     : view === 'portrait'
-      ? '[ PORTRAIT · dress her below, then PAINT PORTRAIT ]'
+      ? `[ PORTRAIT · dress ${pronouns.object} below, then PAINT PORTRAIT ]`
       : '[ NO IDENTITY LOCKED ]';
   const paintFrame = view === 'portrait' && !!portraitEmpty;
 

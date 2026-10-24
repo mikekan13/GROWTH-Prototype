@@ -28,6 +28,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { createDefaultCharacter } from '@/lib/defaults';
+import { pronounsForSheet } from '@/lib/appearance-designer';
 import { createLocation } from './location';
 import { DEED_RELATIONSHIP, findCampaignLocation } from './genesis-possessions';
 import { findGenesisSession } from './block-attachment';
@@ -41,8 +42,8 @@ export const SEED_PERSON_RELATIONSHIP = 'knows';
 export const seedNpcSchema = z.object({
   characterId: z.string().min(1).max(64).describe('The character whose backstory names this person.'),
   name: z.string().min(1).max(100).describe('The person as the backstory names them.'),
-  relation: z.string().min(1).max(60).describe('Who they are to her ("grandmother", "landlord", "first editor").'),
-  valence: z.number().min(-1).max(1).describe('How she holds them, -1 (hostile/painful) … 0 … +1 (beloved).'),
+  relation: z.string().min(1).max(60).describe('Who they are to the character ("grandmother", "landlord", "first editor").'),
+  valence: z.number().min(-1).max(1).describe('How the character holds them, -1 (hostile/painful) … 0 … +1 (beloved).'),
   note: z.string().max(400).optional().describe('What the backstory and settled answers SAY about them — facts only, nothing invented.'),
   openThread: z.string().max(400).optional().describe('The unresolved tension between them, for the Watcher — only what the story already holds open.'),
   openThreadProdId: z.string().max(64).optional().describe('A prod the GM LEFT OPEN that this person carries — recorded verbatim as unknown. Never pass openThread with it.'),
@@ -54,7 +55,7 @@ export const seedLocationSchema = z.object({
   relation: z.enum(PLACE_RELATIONS).describe('home | hometown | workplace | frequents | origin'),
   type: z.enum(['settlement', 'building', 'region', 'point_of_interest', 'wilderness']).optional(),
   description: z.string().min(1).max(1200).describe('The short essence of the place from the sources — no invention past them.'),
-  owned: z.boolean().optional().describe('She holds the deed (adds an owns edge). Renting is not owning.'),
+  owned: z.boolean().optional().describe('The character holds the deed (adds an owns edge). Renting is not owning.'),
   sourceMessageIds: z.array(z.string().max(64)).max(10).optional().describe('Ids of the GM WORLD MESSAGES this seed draws on.'),
 });
 
@@ -89,7 +90,10 @@ export async function seedNpc(campaignId: string, input: unknown, opts: { noSpaw
   const bearer = await prisma.character.findUnique({ where: { id: p.characterId }, select: { id: true, name: true, campaignId: true, data: true } });
   if (!bearer || bearer.campaignId !== campaignId) throw new NotFoundError('Character not found in this campaign');
   const name = p.name.trim();
-  if (name.toLowerCase() === bearer.name.toLowerCase()) throw new ValidationError('That is the character herself — seed the people around her.');
+  if (name.toLowerCase() === bearer.name.toLowerCase()) {
+    const who = pronounsForSheet(bearer.data);
+    throw new ValidationError(`That is the character ${who.reflexive} — seed the people around ${who.object}.`);
+  }
 
   let prod: { status: string; question: string } | null = null;
   if (p.openThreadProdId) {

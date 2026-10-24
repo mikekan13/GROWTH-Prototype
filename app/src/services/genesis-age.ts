@@ -27,9 +27,9 @@ export const ROOT_MAX_YEARS = 25;
 export const setStartingAgeSchema = z.object({
   characterId: z.string().min(1).max(64),
   years: z.array(z.object({
-    block: z.string().min(1).max(200).describe('Root/branch: block id, link id, archetype name or her local name.'),
-    ageAdded: z.number().int().min(0).max(1000).describe('Calendar years SHE spent in it (a duration, not an age).'),
-  })).max(20).optional().describe('Her years per root/branch. Omit when the blocks already sum to the brief\'s AGE.'),
+    block: z.string().min(1).max(200).describe('Root/branch: block id, link id, archetype name or the character\'s local name for it.'),
+    ageAdded: z.number().int().min(0).max(1000).describe('Calendar years THE CHARACTER spent in it (a duration, not an age).'),
+  })).max(20).optional().describe('The character\'s years per root/branch. Omit when the blocks already sum to the brief\'s AGE.'),
 });
 
 function archetypeYears(link: LinkWithBlock): number | null {
@@ -79,7 +79,7 @@ export function planStartingAge(links: LinkWithBlock[], assign: Array<{ block: s
   })));
   if (target != null && timed.length > 0 && age !== target) {
     throw new ValidationError(
-      `Her years sum to ${age}, but the brief's AGE is ${target}. Assign her years per block so they sum to ${target}: ` +
+      `The years sum to ${age}, but the brief's AGE is ${target}. Assign the years per block so they sum to ${target}: ` +
       years.map(y => `${y.type} "${y.block}"${y.localName ? ` (${y.localName})` : ''} = ${y.years}`).join('; '),
     );
   }

@@ -26,9 +26,9 @@ import type { JewlTool, JewlToolHandlerResult } from './types';
 export const setStartingAgeTool: JewlTool = {
   name: 'set_starting_age',
   description:
-    'Genesis AGE stage. Age is additive: her starting age = the sum of the years she spent in each root and branch ' +
-    '(seeds add 0) and must equal the brief\'s AGE exactly. Give her years per block where the archetype\'s ' +
-    'default does not fit her story (instance years — the archetype is untouched). Stamps her age, birthCycle and fatedAge.',
+    'Genesis AGE stage. Age is additive: the starting age = the sum of the years the character spent in each root and branch ' +
+    '(seeds add 0) and must equal the brief\'s AGE exactly. Give the years per block where the archetype\'s ' +
+    'default does not fit the character\'s story (instance years — the archetype is untouched). Stamps the age, birthCycle and fatedAge.',
   inputSchema: setStartingAgeSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const r = await setStartingAge(ctx.campaignId, input);
@@ -40,11 +40,11 @@ export const setStartingAgeTool: JewlTool = {
 export const grantPossessionTool: JewlTool = {
   name: 'grant_possession',
   description:
-    'Genesis POSSESSIONS stage. Give her a thing her story grants: CATALOG FIRST — an existing campaign or stock ' +
-    'item archetype by exact name (stock is pulled free), painted for her (localName + story). tier: equipped (worn ' +
-    'on a body region of HER anatomy — slot), carried (on her), owned (the deed only — a house, a car, a box in ' +
+    'Genesis POSSESSIONS stage. Give the character a thing their story grants: CATALOG FIRST — an existing campaign or stock ' +
+    'item archetype by exact name (stock is pulled free), painted for them (localName + story). tier: equipped (worn ' +
+    'on a body region of THIS CHARACTER\'s anatomy — slot), carried (on their person), owned (the deed only — a house, a car, a box in ' +
     'storage; optionally where it is). Weight in real lbs. A thing no archetype fits → propose_forge_blueprint ' +
-    'type "item" (agnostic archetype + her paint), then grant it after approval.',
+    'type "item" (agnostic archetype + the character\'s paint), then grant it after approval.',
   inputSchema: grantPossessionSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const r = await grantPossession(ctx.campaignId, { id: ctx.actorId, role: ctx.actorRole }, input);
@@ -57,8 +57,8 @@ export const grantPossessionTool: JewlTool = {
 export const dropPossessionTool: JewlTool = {
   name: 'drop_possession',
   description:
-    'Genesis WORLD stage. Take back a thing YOU granted her — granted twice, over budget, or cut by the GM. ' +
-    'By her local name (exact) or the item id; it and its deed are removed. Only things she holds or owns.',
+    'Genesis WORLD stage. Take back a thing YOU granted the character — granted twice, over budget, or cut by the GM. ' +
+    'By its local name (exact) or the item id; it and its deed are removed. Only things the character holds or owns.',
   inputSchema: dropPossessionSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const r = await dropPossession(ctx.campaignId, { id: ctx.actorId, role: ctx.actorRole }, input);
@@ -71,8 +71,8 @@ export const dropPossessionTool: JewlTool = {
 export const seedNpcTool: JewlTool = {
   name: 'seed_npc',
   description:
-    'Genesis SEEDS stage. Every person her backstory names becomes an NPC SEED — a shell for the Watcher: name, who ' +
-    'they are to her, valence (-1..+1), what the story says of them, and the open thread between them. No sheet, no ' +
+    'Genesis SEEDS stage. Every person the character\'s backstory names becomes an NPC SEED — a shell for the Watcher: name, who ' +
+    'they are to the character, valence (-1..+1), what the story says of them, and the open thread between them. No sheet, no ' +
     'portrait, no invention. A thread the GM LEFT OPEN rides as openThreadProdId alone — never answer it.',
   inputSchema: seedNpcSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
@@ -84,9 +84,9 @@ export const seedNpcTool: JewlTool = {
 export const seedLocationTool: JewlTool = {
   name: 'seed_location',
   description:
-    'Genesis SEEDS stage. Her home / hometown / workplace becomes a Location seed (places are not forged — be as ' +
+    'Genesis SEEDS stage. The character\'s home / hometown / workplace becomes a Location seed (places are not forged — be as ' +
     'specific as the sources). Draw it from the GM WORLD MESSAGES and the backstory and cite the message ids you used. ' +
-    'owned = she holds the deed (renting is not owning).',
+    'owned = the character holds the deed (renting is not owning).',
   inputSchema: seedLocationSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const r = await seedLocation(ctx.campaignId, { id: ctx.actorId, role: ctx.actorRole }, input);
@@ -97,9 +97,9 @@ export const seedLocationTool: JewlTool = {
 export const authorVineGoalTool: JewlTool = {
   name: 'author_vine_goal',
   description:
-    'Genesis VINES stage. Choose the GOALS of her GRO.vines — what she wants, in her terms, from who she is — one in ' +
-    'every slot her seed gives (the result reports slots and used). Goal only: Resistance is the Watcher\'s, Opportunity the godhead\'s — never write either. ' +
-    'Marked AI-chosen; a Trailblazer seated in her overwrites them.',
+    'Genesis VINES stage. Choose the GOALS of the character\'s GRO.vines — what they want, in their terms, from who they are — one in ' +
+    'every slot the seed gives (the result reports slots and used). Goal only: Resistance is the Watcher\'s, Opportunity the godhead\'s — never write either. ' +
+    'Marked AI-chosen; a Trailblazer seated in the character overwrites them.',
   inputSchema: authorVineGoalSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const r = await authorVineGoals(ctx.campaignId, input);
@@ -115,8 +115,8 @@ export const authorVineGoalTool: JewlTool = {
 export const readLifeBudgetTool: JewlTool = {
   name: 'read_life_budget',
   description:
-    'Genesis POSSESSIONS stage. Her LIFE BUDGET: Σ accumulated wealth over her roots and branches, minus the KV of the ' +
-    'things she already holds or owns, minus her cash. Read it before building her life and again before you exchange ' +
+    'Genesis POSSESSIONS stage. The character\'s LIFE BUDGET: Σ accumulated wealth over their roots and branches, minus the KV of the ' +
+    'things they already hold or own, minus their cash. Read it before building their life and again before you exchange ' +
     'the remainder into cash. Also lists the campaign\'s currencies.',
   inputSchema: z.object({ characterId: z.string().min(1).max(64) }),
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
@@ -144,8 +144,8 @@ export const establishCurrencyTool: JewlTool = {
 export const grantCashTool: JewlTool = {
   name: 'grant_cash',
   description:
-    'Genesis POSSESSIONS stage. Give her cash in a campaign currency — what remains of her accumulated wealth once her ' +
-    'things are placed, or what her life plainly leaves her holding (a checking account, the tin on the shelf). ' +
+    'Genesis POSSESSIONS stage. Give the character cash in a campaign currency — what remains of their accumulated wealth once their ' +
+    'things are placed, or what their life plainly leaves them holding (a checking account, the tin on the shelf). ' +
     'Negative amounts take. Read read_life_budget first: cash counts against the budget at the currency\'s rate.',
   inputSchema: grantCashSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
@@ -158,8 +158,8 @@ export const grantCashTool: JewlTool = {
 export const setIncomeTool: JewlTool = {
   name: 'set_income',
   description:
-    'Genesis POSSESSIONS stage. What she brings in per campaign year, in a campaign currency, and from what ("barista, ' +
-    'Midtown Grounds"). From her current branch and the backstory only. 0 removes the line.',
+    'Genesis POSSESSIONS stage. What the character brings in per campaign year, in a campaign currency, and from what ("barista, ' +
+    'Midtown Grounds"). From their current branch and the backstory only. 0 removes the line.',
   inputSchema: setIncomeSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const r = await setIncome(ctx.campaignId, { id: ctx.actorId, role: ctx.actorRole }, input);

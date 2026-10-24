@@ -119,7 +119,7 @@ export const raiseProdSchema = z.object({
   kind: z.enum(PROD_KINDS),
   /** Who owns the answer (2026-10-16): gm (default) | player | player:<characterId>. */
   audience: z.string().regex(PROD_AUDIENCE_RE, 'audience = gm | player | player:<characterId>').default('gm')
-    .describe('gm (story fit, default) | player (her own life — the Trailblazer who plays her) | player:<characterId> (another player\'s character).'),
+    .describe('gm (story fit, default) | player (the character\'s own life — the Trailblazer who plays them) | player:<characterId> (another player\'s character).'),
 });
 
 /** JEWL raises one prod — at ANY genesis stage (2026-10-12: "Never should I
@@ -161,7 +161,7 @@ export async function raiseProd(input: unknown, campaignId: string): Promise<Gen
     if (namedId === parsed.characterId) audience = 'player';
     else {
       const named = await prisma.character.findUnique({ where: { id: namedId }, select: { campaignId: true } });
-      if (!named || named.campaignId !== campaignId) throw new ValidationError(`audience player:${namedId} is not a character of this campaign — use "player" for her own life, "gm" for the world.`);
+      if (!named || named.campaignId !== campaignId) throw new ValidationError(`audience player:${namedId} is not a character of this campaign — use "player" for the character's own life, "gm" for the world.`);
     }
   }
   const prod = await prisma.genesisProd.create({

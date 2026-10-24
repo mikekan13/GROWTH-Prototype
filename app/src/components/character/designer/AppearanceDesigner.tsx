@@ -15,8 +15,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, BODY_ONLY_NOTE, STATUS_LABEL, currentLayer, deriveDesignerStatus, designerReducer,
-  editScope, layersOf, possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE, NOT_LOCALIZED_NOTE, POLISH_TEXT, PORTRAIT_TEXT,
-  type DesignerAction, type DesignerState, type EditTarget, type LayerKind, type StackTarget,
+  editScope, layersOf, pronounsFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE, NOT_LOCALIZED_NOTE, POLISH_TEXT, PORTRAIT_TEXT,
+  type DesignerAction, type DesignerState, type EditTarget, type LayerKind, type Pronouns, type StackTarget,
 } from '@/lib/appearance-designer';
 import { C, F, ActionBar, DesignerStyles, Readout, SigilBorder } from './parts';
 
@@ -26,7 +26,7 @@ const SCOPE_LINES: ReadonlySet<string> = new Set([CLOTHING_NOTE, RESTRICTED_NOTE
 const BODY_NOT_YET = 'The body is made when you approve the base. Approve the face first, then shape the body here.';
 const PORTRAIT_APPROVED_NOTE = 'Portrait approved — it is the canvas image now.';
 /** The veil's sub line: the route writes the brief first (a local JEWL call), then paints; the clock decides the words. */
-const PAINT_SUB_BRIEF = 'JEWL is writing the brief — the place, her bearing, her mood, what she wears';
+const paintSubBrief = (p: Pronouns) => `JEWL is writing the brief — the place, ${p.possessive} bearing, ${p.possessive} mood, what ${p.subject} ${p.has === 'has' ? 'wears' : 'wear'}`;
 const PAINT_SUB_PAINT = 'painting from the face and body';
 const PAINT_SUB_SWITCH_MS = 9000;
 import { Preview, type PreviewView } from './Preview';
@@ -154,7 +154,8 @@ export default function AppearanceDesigner({
   const status = deriveDesignerStatus(designer);
   const top = currentLayer(designer);
   const locked = !!top;
-  const possessive = possessiveFor(getCharacterData().identity?.sex);
+  const who = pronounsFor(getCharacterData().identity?.sex);
+  const possessive = who.possessive;
   const working = busy !== null;
   const lockBlocked = !seedName
     ? 'No seed yet. Portraits wait for one: JEWL picks it when the story is submitted.'
@@ -251,9 +252,9 @@ export default function AppearanceDesigner({
    */
   const paint = async (mode: 'paint' | 'regen') => {
     if (!characterId || working || !designer.approvedImagePath || !bodyPath) return;
-    if (worn === false) { setNote('Nothing is worn — dress her first, or let JEWL dress her.'); return; }
+    if (worn === false) { setNote(`Nothing is worn — dress ${who.object} first, or let JEWL dress ${who.object}.`); return; }
     setBusy(mode === 'paint' ? 'portrait' : 'portraitRegen'); setError(null); setNote(null);
-    setPaintSub(PAINT_SUB_BRIEF);
+    setPaintSub(paintSubBrief(who));
     const t = setTimeout(() => setPaintSub(PAINT_SUB_PAINT), PAINT_SUB_SWITCH_MS);
     const r = await paintPortrait(characterId);
     clearTimeout(t);
@@ -382,7 +383,7 @@ export default function AppearanceDesigner({
     : null;
   const shownView: PreviewView = demoVeil === 'portrait' ? 'portrait' : view;
   const shownBusy = busy ? BUSY_LINE[busy] : demoVeil === 'portrait' ? '[ PAINTING THE PORTRAIT · preview ]' : demoVeil === 'face' ? '[ EDITING IN PLACE · preview ]' : null;
-  const shownSub = paintSub ?? (demoVeil === 'portrait' ? PAINT_SUB_BRIEF : null);
+  const shownSub = paintSub ?? (demoVeil === 'portrait' ? paintSubBrief(who) : null);
   const statusColor = status === 'awaiting' ? C.gold : C.teal;
   const startIsOpen = !locked || startOpen;
   const portraitApproved = !!portraitTop && designer.approvedPortraitPath === portraitTop.imagePath;
@@ -432,14 +433,15 @@ export default function AppearanceDesigner({
                 onRegenerate={regenerate}
                 canRegenerate={canRegenerate}
                 glitchKey={glitchKey}
+                pronouns={who}
               />
             </div>
 
             <div className="space-y-6 mt-5 md:mt-0">
               {view === 'portrait' && (
                 <>
-                  <DressSection characterId={characterId} editable={editable} disabled={working} onWardrobe={onWardrobe} />
-                  <BriefReadout brief={brief} worn={worn} hasPaint={!!portraitTop} />
+                  <DressSection characterId={characterId} editable={editable} disabled={working} onWardrobe={onWardrobe} pronouns={who} />
+                  <BriefReadout brief={brief} worn={worn} hasPaint={!!portraitTop} pronouns={who} />
                   <EditStack
                     key="portrait"
                     layers={stack}
@@ -515,7 +517,7 @@ export default function AppearanceDesigner({
                     testId="designer-approve"
                   />
                   <div style={{ fontFamily: F.mono, fontSize: 11, color: C.soul }}>
-                    Approving re-renders the face and body clean (seams and artifacts from the edits go, the look stays). Then the PORTRAIT tab: dress her from her own things and paint.
+                    Approving re-renders the face and body clean (seams and artifacts from the edits go, the look stays). Then the PORTRAIT tab: dress {who.object} from {who.possessive} own things and paint.
                   </div>
                 </div>
               )}

@@ -19,6 +19,7 @@ import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { emit as emitGodHeadEvent } from './godhead-dispatcher';
 import { MAX_ACTIVE_GOALS } from '@/lib/vine-slots';
+import { pronounsForSheet, withPronouns } from '@/lib/appearance-designer';
 import { vineSlotsForCharacter } from './vine-slots';
 
 export { DEFAULT_VINE_SLOTS, vineSlotsForSeed } from '@/lib/vine-slots';
@@ -28,7 +29,7 @@ export const AI_AUTHOR = 'ai';
 export const authorVineGoalSchema = z.object({
   characterId: z.string().min(1).max(64),
   goals: z.array(z.object({
-    description: z.string().min(3).max(300).describe('The want, in her own terms ("Finish the reincarnation book"). Goal only — no resistance, no opportunity.'),
+    description: z.string().min(3).max(300).describe('The want, in the character\'s own terms ("Finish the reincarnation book"). Goal only — no resistance, no opportunity.'),
     priority: z.number().int().min(1).max(5).optional(),
   })).min(1).max(MAX_ACTIVE_GOALS),
 });
@@ -42,7 +43,7 @@ export async function authorVineGoals(campaignId: string, input: unknown) {
   const active = await prisma.goal.findMany({ where: { characterId: p.characterId, status: 'ACTIVE' }, select: { description: true } });
   const free = slots - active.length;
   if (p.goals.length > free) {
-    throw new ValidationError(`Her seed gives ${slots} GRO.vine slot${slots === 1 ? '' : 's'}; ${active.length} in use — author at most ${Math.max(0, free)}.`);
+    throw new ValidationError(withPronouns(`{Possessive} seed gives ${slots} GRO.vine slot${slots === 1 ? '' : 's'}; ${active.length} in use — author at most ${Math.max(0, free)}.`, pronounsForSheet(character.data)));
   }
   const seen = new Set(active.map(a => a.description.trim().toLowerCase()));
   const created: Array<{ id: string; description: string }> = [];

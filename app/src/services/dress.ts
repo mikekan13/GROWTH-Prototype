@@ -49,7 +49,7 @@ export const DRESS_TIMEOUT_MS = 25_000;
 export const DRESS_STATES = ['worn', 'carried', 'owned'] as const;
 export type DressState = (typeof DRESS_STATES)[number];
 
-export const WARDROBE_EMPTY_LINE = 'Her wardrobe is empty — her life is built in the WORLD stage first.';
+export const WARDROBE_EMPTY_LINE = 'The wardrobe is empty — a life is built in the WORLD stage first.';
 
 // ── Types ───────────────────────────────────────────────────────────────
 

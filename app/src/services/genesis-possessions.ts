@@ -32,6 +32,7 @@ import { wearableRegions } from '@/lib/body-tree';
 import { HUMAN_BASELINE_ANATOMY } from '@/lib/body-damage';
 import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthWorldItem } from '@/types/item';
+import { pronounsForSheet } from '@/lib/appearance-designer';
 
 export const POSSESSION_TIERS = ['equipped', 'carried', 'owned'] as const;
 export type PossessionTier = (typeof POSSESSION_TIERS)[number];
@@ -45,14 +46,14 @@ export const grantPossessionSchema = z.object({
   characterId: z.string().min(1).max(64),
   item: z.string().min(1).max(200).describe('Forge item archetype: id or EXACT name (this campaign first, then stock — pulled free).'),
   tier: z.enum(POSSESSION_TIERS),
-  slot: z.string().max(120).optional().describe('equipped only: a body-region key from her anatomy (e.g. "Body/Torso").'),
-  localName: z.string().min(1).max(100).optional().describe('NARRATIVE PAINT: her name for it ("Rosemary\'s keepsake"). May carry proper nouns.'),
-  story: z.string().min(1).max(600).describe('NARRATIVE PAINT: this object\'s story with her — whose it was, how she came by it.'),
+  slot: z.string().max(120).optional().describe('equipped only: a body-region key from the character\'s anatomy (e.g. "Body/Torso").'),
+  localName: z.string().min(1).max(100).optional().describe('NARRATIVE PAINT: the character\'s name for it ("Rosemary\'s keepsake"). May carry proper nouns.'),
+  story: z.string().min(1).max(600).describe('NARRATIVE PAINT: this object\'s story with the character — whose it was, how they came by it.'),
   look: z.string().min(1).max(240).optional().describe('How THIS one looks, as a noun phrase the portrait paints (colour, marks, how it is worn): "a blue polo with the red, white and blue Chess Pizza logo", "a wool prayer rope wrapped five times around his left wrist". Worn things need it.'),
   concealed: z.boolean().optional().describe('Worn hidden, under the clothes, never seen (a cross under the shirt).'),
   weightLbs: z.number().min(0).max(1_000_000).optional().describe('Real pounds. Required for equipped/carried when the archetype has none.'),
   location: z.string().max(200).optional().describe('owned only: WHERE it sits — a room (Location name/id) or a CONTAINER item (its local name/id: a bookcase, a drawer, a closet). The world is a top-down map; everything has a place.'),
-  allowDuplicate: z.boolean().optional().describe('She already holds or owns an instance of this archetype → the grant is refused unless this is true (two mugs are fine; the same laptop twice is not).'),
+  allowDuplicate: z.boolean().optional().describe('The character already holds or owns an instance of this archetype → the grant is refused unless this is true (two mugs are fine; the same laptop twice is not).'),
 });
 
 export type GrantPossessionInput = z.infer<typeof grantPossessionSchema>;
@@ -99,6 +100,7 @@ export async function grantPossession(
   const p = grantPossessionSchema.parse(input);
   const character = await prisma.character.findUnique({ where: { id: p.characterId }, select: { campaignId: true, data: true, name: true } });
   if (!character || character.campaignId !== campaignId) throw new NotFoundError('Character not found in this campaign');
+  const who = pronounsForSheet(character.data);
 
   const found = await resolveArchetype(campaignId, p.item.trim(), actor);
   if (!found) {
@@ -106,7 +108,7 @@ export async function grantPossession(
       ok: false,
       reason: `No item archetype "${p.item}" in this campaign or the stock catalog (exact name). ` +
         'Draft it with propose_forge_blueprint type "item" — a campaign-agnostic archetype (no proper nouns), with characterId, ' +
-        'attachmentStory and localName for her instance — then grant it here once the GM approves it.',
+        `attachmentStory and localName for ${who.possessive} instance — then grant it here once the GM approves it.`,
     };
   }
   const { row, source } = found;
@@ -119,7 +121,7 @@ export async function grantPossession(
   const archetypeWeight = typeof forgeData.weightLbs === 'number' ? forgeData.weightLbs : null;
   const weightLbs = p.weightLbs ?? archetypeWeight;
   if (p.tier !== 'owned' && weightLbs == null) {
-    throw new ValidationError(`"${row.name}" has no weight — give weightLbs in real pounds for something she wears or carries.`);
+    throw new ValidationError(`"${row.name}" has no weight — give weightLbs in real pounds for something ${who.subject} ${who.has === 'has' ? 'wears or carries' : 'wear or carry'}.`);
   }
 
   let equippedTo: string | null = null;
@@ -127,12 +129,12 @@ export async function grantPossession(
     const sheet = JSON.parse(character.data) as Partial<GrowthCharacter>;
     const keys = regionKeys(sheet);
     if (!p.slot || !keys.includes(p.slot)) {
-      throw new ValidationError(`equipped needs slot = one of her body regions: ${keys.join(', ')}`);
+      throw new ValidationError(`equipped needs slot = one of ${who.possessive} body regions: ${keys.join(', ')}`);
     }
     equippedTo = p.slot;
   }
   if (p.tier !== 'owned' && p.location) {
-    throw new ValidationError('location is for owned things — what she wears or carries is with her.');
+    throw new ValidationError(`location is for owned things — what ${who.subject} ${who.has === 'has' ? 'wears or carries' : 'wear or carry'} is with ${who.object}.`);
   }
   // WHERE it sits (2026-10-16): a room, or inside a container item.
   let locationId: string | null = null;
@@ -171,7 +173,7 @@ export async function grantPossession(
       select: { id: true, name: true },
     });
     if (same) {
-      return { ok: false, reason: `She already has a "${row.name}" — "${same.name}" (${same.id}). Not granted again. If she truly owns two, pass allowDuplicate: true; to move or re-place it, use move_item.` };
+      return { ok: false, reason: `${character.name} already ${who.has} a "${row.name}" — "${same.name}" (${same.id}). Not granted again. If ${who.subject} truly ${who.has === 'has' ? 'owns' : 'own'} two, pass allowDuplicate: true; to move or re-place it, use move_item.` };
     }
   }
 
@@ -235,7 +237,7 @@ export async function grantPossession(
 // the deed to (and its edges); nothing else — never another character's.
 export const dropPossessionSchema = z.object({
   characterId: z.string().min(1).max(64),
-  item: z.string().min(1).max(200).describe('The CampaignItem: id or her local name for it (exact).'),
+  item: z.string().min(1).max(200).describe('The CampaignItem: id or the character\'s local name for it (exact).'),
   reason: z.string().min(1).max(200).describe('Why it goes ("granted twice", "over budget", "the GM cut it").'),
 });
 export type DropPossessionInput = z.infer<typeof dropPossessionSchema>;
@@ -262,7 +264,7 @@ export async function dropPossession(
     },
     select: { id: true, name: true },
   });
-  if (!item) return { ok: false, reason: `No "${p.item}" among the things she holds or owns (exact local name or id).` };
+  if (!item) return { ok: false, reason: `No "${p.item}" among the things the character holds or owns (exact local name or id).` };
   await prisma.entityRelationship.deleteMany({ where: { OR: [{ sourceId: item.id }, { targetId: item.id }] } });
   await prisma.campaignItem.delete({ where: { id: item.id } });
   return { ok: true, itemId: item.id, name: item.name };

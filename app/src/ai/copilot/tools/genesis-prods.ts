@@ -29,9 +29,9 @@ export const raiseProdTool: JewlTool = {
     'what hinges on it; kind = CREATIVE, or MECHANICAL_CHECK when a mechanic hinges on a creative ' +
     'fact only the GM can settle. Never stats/KV/catalog questions; never propose an answer in the ' +
     'question. At most 5 per round, most load-bearing first. After Build the session waits on the GM and resumes by itself once he decides. ' +
-    'audience = WHO OWNS THE ANSWER: "player" when it is her own life (home, what she lives on, who matters, keep/change/cut on a pass of her world) — ' +
-    'the Trailblazer who plays her is told and answers; "player:<characterId>" when the thing belongs to ANOTHER player\'s character ' +
-    '(their home, their shared history); "gm" (default) for story fit, the world beyond her, anything only the Watcher can settle. ' +
+    'audience = WHO OWNS THE ANSWER: "player" when it is the character\'s own life (home, what they live on, who matters, keep/change/cut on a pass of their world) — ' +
+    'the Trailblazer who plays the character is told and answers; "player:<characterId>" when the thing belongs to ANOTHER player\'s character ' +
+    '(their home, their shared history); "gm" (default) for story fit, the world beyond the character, anything only the Watcher can settle. ' +
     'A question about a Watcher-owned NPC goes to the GM either way.',
   inputSchema: raiseProdSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {

@@ -175,8 +175,8 @@ export async function spawnSeedGenesis(opts: {
     return { spawned: true, sessionId: walk.sessionId };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[genesis-spawn] ${npcId}: no genesis of her own — ${msg.slice(0, 200)}`);
-    await noteParent(`[swarm] ${opts.parent.name}'s seed got no genesis of her own — ${msg.slice(0, 160)}`);
+    console.warn(`[genesis-spawn] ${npcId}: no genesis of their own — ${msg.slice(0, 200)}`);
+    await noteParent(`[swarm] ${opts.parent.name}'s seed got no genesis of their own — ${msg.slice(0, 160)}`);
     return { spawned: false, reason: msg };
   }
 }

@@ -150,21 +150,21 @@ describe('Say is speech, not a monologue (hello world 2026-10-17)', () => {
   it('a long reply with no directive keeps the first sentences as speech and the rest as thought', () => {
     const action = parseSpiritOutput(monologue);
     expect(action.kind).toBe('speak');
-    expect(action.content!.length).toBeLessThanOrEqual(360);
-    expect(action.content!.split(/(?<=[.!?])\s+/).length).toBeLessThanOrEqual(3);
+    expect((action as { content: string }).content.length).toBeLessThanOrEqual(360);
+    expect((action as { content: string }).content.split(/(?<=[.!?])\s+/).length).toBeLessThanOrEqual(3);
     expect(action.monologue).toContain('Thought number 14');
   });
   it('`Say:` is capped the same way, the overflow kept as monologue', () => {
     const action = parseSpiritOutput(`I should answer.\nSay: ${monologue}`);
     expect(action.kind).toBe('speak');
-    expect(action.content!.startsWith('Thought number 1 ')).toBe(true);
-    expect(action.content!.length).toBeLessThanOrEqual(360);
+    expect((action as { content: string }).content.startsWith('Thought number 1 ')).toBe(true);
+    expect((action as { content: string }).content.length).toBeLessThanOrEqual(360);
     expect(action.monologue).toContain('I should answer.');
     expect(action.monologue).toContain('Thought number 14');
   });
   it('a short line is untouched', () => {
     expect(capSpeech("I'm coming.")).toEqual({ spoken: "I'm coming.", rest: '' });
-    expect(parseSpiritOutput('Say: Take your time.').content).toBe('Take your time.');
+    expect((parseSpiritOutput('Say: Take your time.') as { content: string }).content).toBe('Take your time.');
   });
   it('one sentence longer than the cap is cut at a clause break', () => {
     const long = 'A'.repeat(200) + ', ' + 'B'.repeat(200) + ' end.';

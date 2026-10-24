@@ -42,12 +42,12 @@ export const GENESIS_STAGES = [
   { key: 'mechanics', label: 'Translating to mechanics · catalog first' },
   { key: 'sheet', label: 'Writing the sheet' },
   // Completion stages (2026-10-12, reordered 2026-10-16): after the sheet, before Born.
-  { key: 'age', label: 'Settling her age' },
-  { key: 'appearance', label: 'Her look · at the designer' },
-  { key: 'world', label: 'Her world · home, things, people' },
+  { key: 'age', label: 'Settling the age' },
+  { key: 'appearance', label: 'The look · at the designer' },
+  { key: 'world', label: 'The world · home, things, people' },
   { key: 'memories', label: 'Memories of all of it' },
   { key: 'vines', label: 'Choosing GRO.vine goals' },
-  { key: 'portrait', label: 'Her portrait · at the designer' },
+  { key: 'portrait', label: 'The portrait · at the designer' },
   { key: 'born', label: 'Born' },
 ] as const;
 

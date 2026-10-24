@@ -121,7 +121,7 @@ describe('every stage opens with questions (Mike 2026-10-16: "He hasn\'t asked f
     const r = planWorkCycle({ ...base, stage: 'WORLD' }, [], '', []);
     expect(r.text).toMatch(/QUESTION ROUND/);
     expect(r.text).toMatch(/OPENING/);
-    expect(r.text).toMatch(/where she lives/);
+    expect(r.text).toMatch(/where the character lives/);
     expect(r.allowedTools).toContain('raise_prod');
     expect(r.allowedTools).not.toContain('grant_possession');
     expect(r.allowedTools).not.toContain('seed_location');

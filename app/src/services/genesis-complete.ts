@@ -22,6 +22,7 @@ import { openWorkSession } from './daya-work-session';
 import { buildGenesisPlan, buildProdSections, type PlanProd } from './character-genesis-plan';
 import { dedupeBlockLinks, syncCreationFromBlockLinks } from './genesis-sheet-sync';
 import { GENESIS_POST_SHEET_STAGES, detectMissingStages, isGateStage, type GenesisPostSheetStage } from './genesis-stages';
+import { pronounsForSheet } from '@/lib/appearance-designer';
 
 export const COMPLETION_HEADER = '== COMPLETION — this character is already BORN ==';
 
@@ -33,7 +34,7 @@ export function buildCompletionPlan(brief: string, prods: PlanProd[], stages: Ge
     '',
     COMPLETION_HEADER,
     `Run ONLY these stages, in order: ${stages.join(' → ')}. Each stage's cycle tells you its law and tools.`,
-    'Her genome, memories, blocks and sheet already stand — never redo or redraft them. Build only what these stages add.',
+    'The genome, memories, blocks and sheet already stand — never redo or redraft them. Build only what these stages add.',
   ].join('\n');
 }
 
@@ -90,8 +91,9 @@ export async function completeCharacter(characterId: string, actor: { id: string
     orderBy: { startedAt: 'desc' },
     select: { id: true, plan: true },
   });
+  const who = pronounsForSheet(character.data);
   if (!isBorn({ genesisTier: character.genesisTier, dayaStatus: character.daya?.status ?? null, finishedGenesis: !!lastDone })) {
-    throw new ValidationError('This character is not born yet — submit her genesis first.');
+    throw new ValidationError(`This character is not born yet — submit ${who.possessive} genesis first.`);
   }
 
   const { removed } = await dedupeBlockLinks(characterId);
@@ -121,12 +123,12 @@ export async function completeCharacter(characterId: string, actor: { id: string
   if (!brief) {
     let sheet: { backstory?: { backstory?: string; notes?: string }; identity?: { age?: number } } = {};
     try { sheet = JSON.parse(character.data); } catch { sheet = {}; }
-    const story = sheet.backstory?.backstory || sheet.backstory?.notes || '(no backstory recorded — work from her sheet and memories)';
+    const story = sheet.backstory?.backstory || sheet.backstory?.notes || `(no backstory recorded — work from ${who.possessive} sheet and memories)`;
     brief = buildGenesisPlan({ backstory: story, desiredAge: sheet.identity?.age }, character.name, characterId);
   }
 
   const spawnLine = opts.spawnedFrom
-    ? `SPAWNED GENESIS: ${character.name} is a person ${opts.spawnedFrom.name}'s genesis seeded. Keep her consistent with what ${opts.spawnedFrom.name}'s story already says of her; the people SHE names are seeds only (no further genesis).\n`
+    ? `SPAWNED GENESIS: ${character.name} is a person ${opts.spawnedFrom.name}'s genesis seeded. Keep ${who.object} consistent with what ${opts.spawnedFrom.name}'s story already says of ${who.object}; the people named in ${who.possessive.toUpperCase()} story are seeds only (no further genesis).\n`
     : '';
   const session = await openWorkSession({
     campaignId,

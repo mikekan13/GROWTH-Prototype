@@ -49,18 +49,18 @@ export interface WorldBriefInput {
 
 /** The WORLD cycle brief. Pure. */
 export function renderWorldBrief(w: WorldBriefInput): string {
-  const lines = ['HER WORLD SO FAR (build on it; never grant twice):', w.budgetLine];
+  const lines = ['THE WORLD SO FAR (build on it; never grant twice):', w.budgetLine];
   lines.push(w.wealth?.length ? `CASH + INCOME ON THE SHEET: ${w.wealth.join(' · ')}` : 'CASH + INCOME ON THE SHEET: none yet.');
-  lines.push(w.look.length ? `HER LOOK (approved): ${w.look.map(l => `${l.kind}: ${l.text}`).join(' · ')}` : 'HER LOOK: approved at the designer (no marks).');
-  lines.push(w.places.length ? `PLACES: ${w.places.map(p => `${p.name} (${p.relation})`).join(', ')}` : 'PLACES: none yet — seed her home first.');
+  lines.push(w.look.length ? `THE LOOK (approved): ${w.look.map(l => `${l.kind}: ${l.text}`).join(' · ')}` : 'THE LOOK: approved at the designer (no marks).');
+  lines.push(w.places.length ? `PLACES: ${w.places.map(p => `${p.name} (${p.relation})`).join(', ')}` : 'PLACES: none yet — seed the home first.');
   lines.push(w.items.length ? `THINGS (${w.items.length}): ${w.items.map(i => `${i.name}${i.archetype && i.archetype !== i.name ? ` [${i.archetype}]` : ''}${i.where ? ` @ ${i.where}` : ''} ${i.kv} KV${i.kit ? ` ${i.kit}` : ''}`).join('; ')}` : 'THINGS: none yet.');
   if (w.map?.length) lines.push(`THE MAP (top-down: ▣ room · thing; indented = inside):\n${w.map.join('\n')}`);
   const loose = w.items.filter(i => !i.where).length;
   if (loose) lines.push(`${loose} thing${loose === 1 ? ' has' : 's have'} no place — give each a room or a container (move_item).`);
   lines.push(w.people.length ? `PEOPLE: ${w.people.map(p => `${p.name} (${p.relation})`).join(', ')}` : 'PEOPLE: none seeded yet.');
   const wardrobeKits = w.items.filter(i => i.kit && WARDROBE_KIT_RE.test(i.kit));
-  if (wardrobeKits.length) lines.push(`WARDROBE KIT${wardrobeKits.length > 1 ? 'S' : ''}: ${wardrobeKits.map(i => `${i.name} ${i.kit}`).join(' · ')} — her clothes; the outfit is drawn from it at dress time.`);
-  if (w.garments && !(wardrobeKits.length && !w.garments.length)) lines.push(w.garments.length ? `WARDROBE (${w.garments.length} garments): ${w.garments.join(', ')}` : 'WARDROBE: EMPTY — she owns no clothes. Build her wardrobe this stage; the portrait can only dress her from it.');
+  if (wardrobeKits.length) lines.push(`WARDROBE KIT${wardrobeKits.length > 1 ? 'S' : ''}: ${wardrobeKits.map(i => `${i.name} ${i.kit}`).join(' · ')} — the character's clothes; the outfit is drawn from it at dress time.`);
+  if (w.garments && !(wardrobeKits.length && !w.garments.length)) lines.push(w.garments.length ? `WARDROBE (${w.garments.length} garments): ${w.garments.join(', ')}` : 'WARDROBE: EMPTY — the character owns no clothes. Build the wardrobe this stage; the portrait can only dress them from it.');
   return lines.join('\n');
 }
 

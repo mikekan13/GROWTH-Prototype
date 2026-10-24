@@ -38,6 +38,60 @@ export function possessiveFor(sex: string | null | undefined): Possessive {
   return 'their';
 }
 
+/** The full pronoun set a character's sheet implies (anything unclear → they). */
+export interface Pronouns {
+  subject: 'she' | 'he' | 'they';
+  object: 'her' | 'him' | 'them';
+  possessive: Possessive;
+  reflexive: 'herself' | 'himself' | 'themself';
+  /** The verb that agrees with the subject: she is / they are. */
+  is: 'is' | 'are';
+  /** she has / they have. */
+  has: 'has' | 'have';
+}
+
+const PRONOUNS: Record<Possessive, Pronouns> = {
+  her: { subject: 'she', object: 'her', possessive: 'her', reflexive: 'herself', is: 'is', has: 'has' },
+  his: { subject: 'he', object: 'him', possessive: 'his', reflexive: 'himself', is: 'is', has: 'has' },
+  their: { subject: 'they', object: 'them', possessive: 'their', reflexive: 'themself', is: 'are', has: 'have' },
+};
+
+/** she/her/her/herself · he/him/his/himself · they/them/their/themself from the sheet's sex field. Pure. */
+export function pronounsFor(sex: string | null | undefined): Pronouns {
+  return PRONOUNS[possessiveFor(sex)];
+}
+
+/**
+ * The sex a sheet records: identity.sex, else the designer's
+ * identity.physicalDescription.gender (Kristopher 2026-10-17: sex unset, gender
+ * set). Takes the parsed sheet or its JSON string; anything unreadable → null.
+ */
+export function sheetSex(sheet: unknown): string | null {
+  let s = sheet;
+  if (typeof s === 'string') { try { s = JSON.parse(s); } catch { return null; } }
+  const identity = (s as { identity?: { sex?: unknown; physicalDescription?: { gender?: unknown } } } | null | undefined)?.identity;
+  const sex = identity?.sex ?? identity?.physicalDescription?.gender;
+  return typeof sex === 'string' && sex.trim() ? sex : null;
+}
+
+/** pronounsFor(sheetSex(sheet)). */
+export function pronounsForSheet(sheet: unknown): Pronouns {
+  return pronounsFor(sheetSex(sheet));
+}
+
+/**
+ * Fill `{subject}` `{object}` `{possessive}` `{reflexive}` `{is}` `{has}` in a
+ * template; a capitalized key (`{Subject}`, `{Possessive}`…) capitalizes the word.
+ * Unknown keys are left as written.
+ */
+export function withPronouns(template: string, p: Pronouns): string {
+  return template.replace(/\{(subject|object|possessive|reflexive|is|has)\}/gi, (whole, key: string) => {
+    const word = p[key.toLowerCase() as keyof Pronouns];
+    if (!word) return whole;
+    return key[0] === key[0].toUpperCase() ? word[0].toUpperCase() + word.slice(1) : word;
+  });
+}
+
 export interface ShapePreset {
   label: string;
   /** The words that finish the category's sentence. */

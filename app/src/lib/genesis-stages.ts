@@ -151,8 +151,8 @@ export const GATE_BLOCKED_REASON = 'waiting at the designer —';
 
 export function gateBlockedReason(stage: GenesisGateStage): string {
   return stage === 'APPEARANCE'
-    ? `${GATE_BLOCKED_REASON} approve her face and body in the Tapestry (Appearance) to go on`
-    : `${GATE_BLOCKED_REASON} approve her portrait in the Tapestry to go on`;
+    ? `${GATE_BLOCKED_REASON} approve the face and body in the Tapestry (Appearance) to go on`
+    : `${GATE_BLOCKED_REASON} approve the portrait in the Tapestry to go on`;
 }
 
 export function isGateBlocked(reason: string | null | undefined): boolean {

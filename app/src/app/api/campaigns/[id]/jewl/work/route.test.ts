@@ -44,7 +44,8 @@ describe('GET /api/campaigns/[id]/jewl/work', () => {
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ sessions: [], needsYou: [], recentLog: [], cycling: false });
     }
-    expect(sessionsQuery).toHaveBeenCalledTimes(4); // work sessions + genesis births, per user
+    // Work sessions only: with no characters in the campaign the completion read skips its genesis-sessions query (2026-10-23).
+    expect(sessionsQuery).toHaveBeenCalledTimes(2);
   });
 
   it('a player, another Watcher and a stranger get 403 and nothing is read', async () => {
