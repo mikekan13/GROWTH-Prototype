@@ -584,7 +584,15 @@ async function runBeats(
     if (outcome.status !== 'ok' || !outcome.answer || !action) return;
     const line = actionToTableLine(listener.name, action);
     if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(action) });
-    void outcome.answer.after.then((stored) => pointAtTruth(listenerId, stored.memoryEntryId)).catch(() => {});
+    void outcome.answer.after.then(async (stored) => {
+      await pointAtTruth(listenerId, stored.memoryEntryId);
+      // The act line went out as the INTENT (everything behind the line happens after it is out). When the
+      // map refused it or its check failed, the table is told what actually happened (Mike 2026-10-17: a
+      // locked door was "pushed open" and nothing said otherwise).
+      if (action.kind === 'act' && stored.outcome && stored.outcomeDiffers) {
+        await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, `*${stored.outcome}*`, { via: 'being', raw: `Outcome: ${stored.outcome}` });
+      }
+    }).catch(() => {});
   };
   const answerAll = async (ids: string[], ask: TableAsk) => {
     const work = Promise.all(ids.map((id) => answer(id, ask))).catch((err) => console.error('[table-speak] answering failed (non-fatal):', err));

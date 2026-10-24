@@ -1005,12 +1005,21 @@ export interface AnswerResult {
   action: { kind: GateKind; content?: string };
   timings: AnswerTimings;
   /** Settles once the bookkeeping behind the line is done (memory rows, the act). Never rejects. */
-  after: Promise<{ memoryEntryId?: string; spokenMemoryId?: string }>;
+  after: Promise<AnswerAfter>;
+}
+
+export interface AnswerAfter {
+  memoryEntryId?: string;
+  spokenMemoryId?: string;
+  /** An act's adjudicated outcome — the line went out as the intent; this is what happened. */
+  outcome?: string;
+  /** The map refused the act (a locked door), or its check failed: the intent line misleads without a follow-up. */
+  outcomeDiffers?: boolean;
 }
 
 /** Same steps as the 'act' branch of runStimulusPipeline; fold the two together when the serial path is retired. */
-async function actOnIntent(ctx: EntityContext, intent: string, overrides: DayaClientOverrides): Promise<void> {
-  if (!ctx.campaignId) return;
+async function actOnIntent(ctx: EntityContext, intent: string, overrides: DayaClientOverrides): Promise<AdjudicationResult | null> {
+  if (!ctx.campaignId) return null;
   if (ctx.persona.omniscient === true) {
     const toolResult = await runJewlToolAction(ctx.entityDaId, ctx.campaignId, intent, overrides);
     const summary = toolResult.toolName
@@ -1026,7 +1035,7 @@ async function actOnIntent(ctx: EntityContext, intent: string, overrides: DayaCl
       salience: 0.3,
       classification: { contentCategory: 'reasoning', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'unrestricted action dispatch' },
     });
-    return;
+    return null;
   }
   const facts = await actorFacts(ctx, intent);
   const outward = await runBodyOutward(ctx, intent, facts, overrides);
@@ -1049,7 +1058,9 @@ async function actOnIntent(ctx: EntityContext, intent: string, overrides: DayaCl
     overrides,
     mechanicsHook,
   );
-  await wake({ kind: 'adjudication_result', entityId: ctx.characterId, payload: adjudication as unknown as Record<string, unknown> }, overrides);
+  // One hop only, as on the serial path (ACT_CHAIN_CAP): the turn this wakes cannot wake another.
+  await wake({ kind: 'adjudication_result', entityId: ctx.characterId, payload: { ...(adjudication as unknown as Record<string, unknown>), _depth: ACT_CHAIN_CAP } }, overrides);
+  return adjudication;
 }
 
 /** Read a finished (non-streamed) reply the way the stream is read: first line, label stripped. */
@@ -1190,7 +1201,7 @@ export async function answerAsk(
 
   // Everything behind the line happens after it is out.
   const after = (async () => {
-    const out: { memoryEntryId?: string; spokenMemoryId?: string } = {};
+    const out: AnswerAfter = {};
     try {
       const unstored = [...takenBackHeard, ...(spoken ? [spoken] : [])];
       for (const h of unstored) {
@@ -1211,7 +1222,11 @@ export async function answerAsk(
         });
         out.spokenMemoryId = memory.id;
       } else if (line.kind === 'act') {
-        await actOnIntent(ctx, line.content, overrides);
+        const adjudication = await actOnIntent(ctx, line.content, overrides);
+        if (adjudication) {
+          out.outcome = adjudication.outcome;
+          out.outcomeDiffers = adjudication.mapBlocked === true || (adjudication.roll ? !adjudication.roll.success : false);
+        }
       }
       // ((thought)) segments in its own line are thought: known subjects in them are refreshed (familiarity-thought).
       const thoughts = line.kind === 'rest' ? [] : parseSegments(line.content).filter((s) => s.kind === 'thought').map((s) => s.text);
