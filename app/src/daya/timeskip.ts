@@ -23,7 +23,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { currentCycleOf } from '@/services/history';
-import { wake, isDayaEnabled } from './events';
+import { wake, isDayaEnabled, type SkipFrame } from './events';
 import { resolveIntent, type AdjudicationResult } from './adjudicator';
 import { runDreamConsolidation } from './scheduler';
 import { DayaTierUnavailableError, type DayaClientOverrides } from './model-client';
@@ -49,6 +49,8 @@ export async function runTimeSkip(
   actorRole: string,
   overrides: DayaClientOverrides = {},
   alsoDream = false,
+  /** The stretch as the table stated it (table-timeskip); absent = WP12's unframed "weeks pass". */
+  frame?: SkipFrame,
 ): Promise<TimeSkipResult> {
   if (!isWatcherOrAbove(actorRole)) {
     throw new ForbiddenError('GM/ADMIN only — time-skip is a Godhead-framed Watcher-console-and-above action');
@@ -67,7 +69,7 @@ export async function runTimeSkip(
   if (!entity || entity.status !== 'ACTIVE') return { status: 'dormant' };
 
   try {
-    const vineResult = await wake({ kind: 'vine_tick', entityId: characterId }, overrides);
+    const vineResult = await wake({ kind: 'vine_tick', entityId: characterId, ...(frame ? { frame } : {}) }, overrides);
     if (!vineResult.ran || vineResult.action?.kind !== 'vine_summary' || !vineResult.action.content) {
       return { status: 'no_active_vine' };
     }

@@ -28,11 +28,21 @@ import type { DayaClientOverrides } from './model-client';
  * create the DayaEntity on first contact (create-if-missing, same pattern
  * as daya-affect's ensureDayaEntity).
  */
+/**
+ * How a skipped stretch is framed for the being (Mike 2026-10-24: "time jumps require simulation for
+ * all characters"): the span in words ("three days") and, when the Watcher said more, the narration
+ * that framed it. Absent = the WP12 default ("Weeks pass").
+ */
+export interface SkipFrame {
+  span: string;
+  narration?: string;
+}
+
 export type DayaTrigger =
   | { kind: 'stimulus'; entityId: string; source: string; content: string }
   | { kind: 'dream_tick'; entityId: string }
   | { kind: 'adjudication_result'; entityId: string; payload: Record<string, unknown> }
-  | { kind: 'vine_tick'; entityId: string }
+  | { kind: 'vine_tick'; entityId: string; frame?: SkipFrame }
   | { kind: 'gm_intervention'; entityId: string; content: string };
 
 export type DayaTriggerKind = DayaTrigger['kind'];

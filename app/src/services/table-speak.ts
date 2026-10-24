@@ -54,6 +54,7 @@ import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, type Re
 import { advanceClockForLine } from '@/services/table-clock';
 import type { ListenImpulse } from '@/daya/prompts/roles/spirit';
 import { recordBeingThought } from '@/services/being-thought';
+import { statedStretchOf, simulateStatedStretch } from '@/services/table-timeskip';
 import { resolveIntent } from '@/daya/adjudicator';
 
 export interface TableActor {
@@ -402,7 +403,7 @@ export async function speakProse(
   const dialogue: TableProseResult['dialogue'] = [];
   const hasActions = (parsed.actions?.length ?? 0) > 0;
   const soloAttributed = parsed.narration === null && !hasActions && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
-  await advanceClockForLine(campaignId, 'gm-line', message);
+  await liveStatedTime(campaignId, actor, await advanceClockForLine(campaignId, 'gm-line', message), message);
   if (parsed.narration !== null || hasActions || parsed.quotes.length !== 1) {
     const declared = await declareCanon(campaignId, actor, {
       narration: parsed.full,
@@ -709,7 +710,7 @@ async function speakProseSplit(
   }
 
   // 0b. TIME — the line costs the world what it states, else what it plausibly takes (table-clock).
-  if (plan.world.length) await advanceClockForLine(campaignId, 'gm-line', message);
+  if (plan.world.length) await liveStatedTime(campaignId, actor, await advanceClockForLine(campaignId, 'gm-line', message), message);
 
   // 1. TRUTH — as speakProse writes it, minus what was not part of the world.
   const narration = canonNarration(parsed.full, plan);
@@ -769,6 +770,22 @@ async function speakProseSplit(
 // While a session is live the GM's transcript chunks are table talk too: read
 // with the same detector, played to the beings by the same beats. Nothing here
 // waits on a being — the GM is still talking.
+
+/**
+ * TIME JUMPS REQUIRE SIMULATION FOR ALL CHARACTERS (Mike 2026-10-24): a GM line that stated a span
+ * long enough (table-timeskip) is lived by every being before the table goes on — the beings then
+ * listen to the jump line having lived the days. Never throws.
+ */
+async function liveStatedTime(campaignId: string, actor: TableActor, adv: Awaited<ReturnType<typeof advanceClockForLine>>, said: string): Promise<void> {
+  const stretch = statedStretchOf(adv);
+  if (!stretch) return;
+  try {
+    const outcomes = await simulateStatedStretch(campaignId, actor, stretch, said);
+    console.log(`[table-speak] ${stretch.span} lived by ${outcomes.length} being(s): ${outcomes.map((o) => `${o.name}=${o.status}`).join(', ')}`);
+  } catch (err) {
+    console.warn('[table-speak] living the stated stretch failed (non-fatal):', err instanceof Error ? err.message : err);
+  }
+}
 
 /**
  * THE MAP STAYS TRUE UNDER THE WATCHER'S VOICE (HW3 2026-10-24: "He walks slowly down the hall" was
@@ -872,7 +889,7 @@ async function hearSpokenChunk(campaignId: string, actor: TableActor, transcript
   table.lastAt = now;
 
   const plan = planTableTalk(reading.utterances, 'spoken');
-  if (plan.world.length) await advanceClockForLine(campaignId, 'gm-line', plan.world.map((u) => u.text).join(' '));
+  if (plan.world.length) { const said = plan.world.map((u) => u.text).join(' '); await liveStatedTime(campaignId, actor, await advanceClockForLine(campaignId, 'gm-line', said), said); }
   const truth = await recordSpoken(campaignId, actor, plan, table.beatId, heard);
   table.beatId = truth.beatId;
   for (const u of plan.ignored) await markDropped(campaignId, actor, u.kind, u.rule, u.text);

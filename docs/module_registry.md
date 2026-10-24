@@ -748,3 +748,13 @@ Item data fields (shared with the stock content pass): `value` (KRMA, decimal), 
 | `src/daya/recall.ts` | `visibleToRecall` also drops `failed recall attempt` rows: the row stays (Ruling 5), it is never a candidate. |
 | `src/components/terminal/table-feed/styles.ts` | Narration rows heavier (Mike: "make the GM narrated lines stand out more"): 6px Soul-blue bar, gradient wash, 17px reading size. |
 | `scripts/being-thoughts.ts` | `npx tsx scripts/being-thoughts.ts [campaignId] [--session id] [--being Violet]` — prints the thought records of a session. |
+
+## Time jumps are lived (Mike 2026-10-24: "time jumps require simulation for all characters")
+
+| Module | Purpose |
+|---|---|
+| `src/services/table-timeskip.ts` | `statedStretchOf(adv)` (pure: a STATED span ≥ `TIMESKIP_MIN_SECONDS` = 1 h → `{seconds, span}`); `simulateStatedStretch(campaignId, actor, stretch, narration)` — every wrapped being (ACTIVE or DORMANT) in parallel through `runTimeSkip(…, frame)`; each outcome posted as a `game_event` `eventType: 'timeskip'` row (`[TIMESKIP]` in the feed) and broadcast. DORMANT → "voiced by the Watcher — nothing lived"; no ACTIVE goal → "nothing lived". Loads daya/timeskip lazily. |
+| `src/services/table-speak.ts` | `liveStatedTime(campaignId, actor, adv, said)` after every GM-line clock advance (typed serial, typed split, spoken): the table WAITS for the stretch before the beings listen to the jump line. |
+| `src/daya/timeskip.ts` | `runTimeSkip(characterId, role, overrides, alsoDream, frame?)` — `frame: SkipFrame` passed into the `vine_tick` trigger. |
+| `src/daya/events.ts` | `SkipFrame {span, narration?}`; `vine_tick` trigger carries `frame?`. |
+| `src/daya/ensemble.ts` | `vineTickHandler`: the prompt opens with the framed span ("About 3 days pass. What is known of it: …") instead of "Weeks pass." when a frame is given. |

@@ -715,7 +715,12 @@ async function vineTickHandler(
   if (goals.length === 0) return {};
 
   const desire = toWantClause(goals[0].description);
-  const prompt = `Weeks pass. What did you find yourself doing about wanting to ${desire}? Answer in 2-3 sentences, first person, as a summary of time passing — no dialogue, no system terms.`;
+  // The stretch as the table framed it (a stated jump: "three days", with the Watcher's words), else WP12's "Weeks pass."
+  const frame = trigger.frame;
+  const opening = frame
+    ? `${frame.span.charAt(0).toUpperCase()}${frame.span.slice(1)} pass${/\b(a|an|one)\s+\S+$/i.test(frame.span.trim()) ? 'es' : ''}.${frame.narration ? ` What is known of it: ${frame.narration.trim()}` : ''}`
+    : 'Weeks pass.';
+  const prompt = `${opening} What did you find yourself doing about wanting to ${desire}, in that time? Answer in 2-3 sentences, first person, as a summary of time passing — only what you yourself did and where you were; no dialogue, no system terms.`;
 
   let raw: string;
   try {
