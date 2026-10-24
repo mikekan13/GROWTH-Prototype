@@ -29,7 +29,7 @@ import { ingestStimulus, writeMemoryEntry } from './memory';
 import { recall, stemmedJaccard } from './recall';
 import { render, type Observer, type BiasProfile, type VoiceParams, type AffectVector } from './renderer';
 import { currentFacts, type WorldFactRecord } from './world-ledger';
-import { factsForActor } from './facts-for-actor';
+import { factsForActor, splitHeld, heldLines } from './facts-for-actor';
 import { perceive } from './perceive';
 import { resolveIntent, type AdjudicationResult, type MechanicsRollHook } from './adjudicator';
 import { enforceSeal } from './seal';
@@ -1143,6 +1143,27 @@ export async function answerAsk(
   }
   const heard = [...state.heard, ...lateHeard, ...takenBackHeard.map((h) => h.prose)].filter(Boolean);
 
+  // NEVER GUESS (Mike 2026-10-24: "She should also have to check for a memory in that sort of
+  // situation. the LLM should almost never guess."): before it answers, the being checks its
+  // memory against the ask, what it has on it, and the facts the ask touches. All three are
+  // best-effort — a lookup that fails leaves the section empty, never stops the answer.
+  const cue = ask.kind === 'spoken' ? `${ask.by}: ${ask.text}` : (heard.at(-1) ?? state.standingScene ?? '');
+  const [answerRecall, heldRows, askFacts] = await Promise.all([
+    (async () => {
+      if (!cue.trim()) return state.recallBlock;
+      try {
+        const [thornBlocks, ruminationLockActive, goals] = await Promise.all([
+          loadActiveThornBlocks(ctx.entityDaId).catch(() => []),
+          isRuminationLockActive(ctx.entityDaId).catch(() => false),
+          prisma.goal.findMany({ where: { characterId, status: 'ACTIVE' }, select: { id: true, description: true } }).catch(() => []),
+        ]);
+        const r = await recall({ entityId: ctx.entityDaId, cue, mood: ctx.mood, soulState: ctx.soulState, thornBlocks, nowCycle: ctx.cycle, ruminationLockActive, goals, situation: { threatened: false, frequencyLow: false } }, overrides);
+        return r.prose ?? r.failedFeel ?? state.recallBlock;
+      } catch { return state.recallBlock; }
+    })(),
+    Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: characterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 })).catch((): Array<{ name: string; data: string | null }> => []),
+    actorFacts(ctx, cue).catch((): WorldFactRecord[] => []),
+  ]);
   const prompt = buildSpiritAnsweringPrompt({
     name: ctx.name,
     identityNarrative: ctx.persona.identityNarrative ?? `${ctx.name}, living her own life, day to day.`,
@@ -1153,6 +1174,9 @@ export async function answerAsk(
     heard,
     ask: askArg,
     sinceOwn: ctx.campaignId ? await sinceOwnInWords(ctx.campaignId, ctx.entityDaId, state.lastOwnCycle ?? null).catch(() => null) : null,
+    recallBlock: answerRecall,
+    held: heldLines(splitHeld(heldRows)),
+    facts: askFacts.slice(0, 10).map((f) => `${f.subjectKey}: ${f.fact.length > 200 ? `${f.fact.slice(0, 197)}…` : f.fact}`),
   });
   const answerCall = (extra: { hint?: string; stream?: (delta: string) => boolean | void; stop?: boolean }) =>
     chat(

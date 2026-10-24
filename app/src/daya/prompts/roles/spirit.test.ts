@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildDesiresBlock, parseSpiritOutput, buildSpiritListeningPrompt, buildSpiritAnsweringPrompt,
   SPIRIT_TENETS_BLOCK, LISTENING_MAX_TOKENS, ANSWERING_MAX_TOKENS, type DesireSourceItem,
-  capSpeech, splitImpulse,
+  capSpeech, splitImpulse, NEVER_GUESS_BLOCK,
 } from './spirit';
 import { sealLint, hasHardHit } from '../../seal';
 
@@ -187,5 +187,28 @@ describe('the impulse line — the being\'s own say on breaking in (Mike 2026-10
     const p = buildSpiritListeningPrompt({ name: 'Violet', identityNarrative: 'x', voiceNotes: 'y', feltStateBrief: 'z', standingScene: 's', recallBlock: 'r', desiresBlock: 'd', innerSoFar: '', heard: 'A knock.', sinceOwn: 'about two minutes' });
     expect(p).toContain('Impulse: speak');
     expect(p).toContain('it has been about two minutes since you last said or did anything');
+  });
+});
+
+describe('the answer never guesses (Mike 2026-10-24: "the LLM should almost never guess")', () => {
+  it('the answering prompt carries memory, what is on the being, the facts the ask touches, and the law', () => {
+    const p = buildSpiritAnsweringPrompt({
+      name: 'Violet', identityNarrative: 'x', voiceNotes: 'y', feltStateBrief: 'z', standingScene: 's', innerState: 'i',
+      heard: ['Kristopher: Please lady… just pay for the pizza.'], ask: { kind: 'spoken', heard: 'Kristopher: Please lady… just pay for the pizza.' },
+      recallBlock: 'The five is folded in your shirt pocket; you put it there this morning.',
+      held: ['You are wearing: The black tee.', 'You have on you: The cash in her wallet, Five-dollar bill with her number.'],
+      facts: ['violet_apartment.violet.five_dollar_bill: A folded five dollar bill is in the inside chest pocket of Violet\'s shirt.'],
+    });
+    expect(p).toContain(NEVER_GUESS_BLOCK);
+    expect(p).toContain('folded in your shirt pocket');
+    expect(p).toContain('Five-dollar bill with her number');
+    expect(p).toContain('inside chest pocket');
+    expect(p.indexOf(NEVER_GUESS_BLOCK)).toBeLessThan(p.indexOf('You are being spoken to'));
+  });
+  it('with nothing known, the sections say so rather than staying silent', () => {
+    const p = buildSpiritAnsweringPrompt({ name: 'V', identityNarrative: 'x', voiceNotes: 'y', feltStateBrief: 'z', standingScene: 's', innerState: '', heard: [], ask: { kind: 'turn' } });
+    expect(p).toContain('Nothing in particular comes to mind.');
+    expect(p).toContain('you carry nothing you know of');
+    expect(p).toContain('(none that bear on this)');
   });
 });

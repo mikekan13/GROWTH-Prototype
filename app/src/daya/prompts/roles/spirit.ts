@@ -154,9 +154,22 @@ export interface SpiritAnsweringArgs {
   ask: SpiritAsk;
   /** How long since the being itself last spoke or acted, in words; null when unknown. */
   sinceOwn?: string | null;
+  /** What memory gives back against the ask (a fresh recall on the heard line). */
+  recallBlock?: string;
+  /** What the being has on it (worn / carried), as the inventory has it. */
+  held?: string[];
+  /** The world's facts the ask touches (facts-for-actor by the heard line). */
+  facts?: string[];
 }
 
 export const ANSWERING_MAX_TOKENS = 60;
+
+/** The standing law of every answer (Mike 2026-10-24: "the LLM should almost never guess"). */
+export const NEVER_GUESS_BLOCK = `What you know is below: your senses, your memory, your own things, the
+world's facts. Say only what you know. Where a thing is, what was said, what
+happened — if it is not here and not in your memory, you do not know it: say
+so, or check (look, feel your pocket, ask) instead of inventing. You may be
+wrong or lie as yourself, but never fill a gap with a guess.`;
 
 export function buildSpiritAnsweringPrompt(args: SpiritAnsweringArgs): string {
   const turn = args.ask.kind === 'spoken'
@@ -179,6 +192,17 @@ ${args.sinceOwn ? `\nTime, as you feel it: it has been ${args.sinceOwn} since yo
 
 What has been going through your mind:
 ${args.innerState || 'You have not had time to think.'}
+
+What memory gives you, checked against this moment:
+${args.recallBlock || 'Nothing in particular comes to mind.'}
+
+What you have on you:
+${args.held?.length ? args.held.join('\n') : 'Nothing is listed; you carry nothing you know of.'}
+
+What the world holds true about this (facts you can act on):
+${args.facts?.length ? args.facts.join('\n') : '(none that bear on this)'}
+
+${NEVER_GUESS_BLOCK}
 
 ${turn}
 
