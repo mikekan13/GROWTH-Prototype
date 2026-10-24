@@ -703,3 +703,20 @@ Rulings: memory `ruling-passive-active-perception-familiarity-2026-10-08`. Unit 
 | `src/ai/copilot/tools/draw-from-kit.ts` | Extended: holder kits take `goods[]` → `drawFromHolderKit`; item-kit `declaredKv` now decimal. |
 
 Item data fields (shared with the stock content pass): `value` (KRMA, decimal), `volumeCuFt`, `capacityCuFt`, `capacityLbs` (holders), `weightLbs`, `kit = { kvBudget, contents, spentKv, resolvedItemIds }`.
+
+## Hello world fixes — the map is truth, play above the line (2026-10-23)
+
+| Module | Purpose |
+|---|---|
+| `src/services/world-apply.ts` | The engine keeps the map true. `actorMap(characterId)` → the room, its home and every door touching it; `mapFactLines` → `[map] door "Entry door" … LOCKED` lines for the adjudicator; `lockedDoorInTheWay(intent, map)` → a deterministic refusal (no model) when the intent opens/goes through a door and it is locked with no unlocking step; `applyActEffects(campaignId, actorId, effects)` applies a resolved act's `door / take / give / put / move` to Location.openings, CampaignItem.holderId + located_at, the character's located_at, then broadcasts `character_update` so canvases re-read. A locked door never goes straight to open. `parseActEffects` reads the adjudicator's list defensively. |
+| `src/daya/facts-for-actor.ts` | Pure. `factsForActor(all, {actorName, otherNames, intent})` — never another character's own facts (`kristopher.*` stays out of Violet's context), the intent's subjects first, newest next, cap 60 (was every fact: 300 rows / 35 KB a call). `splitHeld` / `heldLines` — what a being wears and carries, from one held-items query. |
+| `src/services/scene-readiness.ts` | Play only above the line. `sceneReadiness(campaignId)` reads the awake beings' + party's places (and every place above) and the table's characters; `assertSceneReady` throws `SceneNotReadyError` (409 with the list); `crystallizeScenePlaces` flips the fluid places ACTIVE (cascade) — called by `startSession(…, {crystallize, actor})` when the Watcher says yes. Items are counted, not gated [QUESTION]. |
+| `src/services/table-prose.ts` | `::Kristopher …::` → `ParsedProse.actions` (his own row, speech joined); bare he/she → `pronounActor` against the last-named actor whose sheet sex fits (`ProseRosterEntry.sex`, `ProseContext.lastActor`). |
+| `src/services/table-speak.ts` | `proseRoster` (NPC + PC, with sex), `lastTableActor` (read off the feed rows), `actionToTableLine` shows an act's adjudicated outcome; Attend under 3 words is no beat; `getTableRoster().beings` = who plays whom. |
+| `src/daya/adjudicator.ts` | Facts via facts-for-actor; `## The Map` + `## Entity` wearing/carrying in the user message; locked-door pre-check; `effects` applied after a successful act (`AdjudicationResult.effects`, `mapBlocked`). |
+| `src/daya/ensemble.ts` | `ACT_CHAIN_CAP = 1`: act → adjudication → new turn stops after one hop (`_depth` on the adjudication payload). `actorFacts(ctx, intent)` for body-outward. The act returns `outcome`. |
+| `src/daya/prompts/roles/spirit.ts` | `capSpeech` — Say is ≤ 3 sentences / 360 chars; the overflow is monologue. |
+| `src/app/api/campaigns/[id]/observation/route.ts` | `character-edit` → silent `[system]` note, no JEWL turn; remaining observation dispatches exclude the mutation tools. |
+| `src/daya/memory.ts` | A withheld tagger answer returns neutral tags once (no repeat call); `rationaleTag` is a fixed list. |
+| `src/components/terminal/TableSpeakBar.tsx` | Beings strip: ● awake / ○ voiced by you — toggles DayaEntity ACTIVE ↔ DORMANT via `POST /api/characters/[id]/daya/enable`. |
+| `src/components/terminal/CampaignTerminal.tsx` | ⚔ Encounter header button opens `EncounterPanel mode="create"` as a sheet; the feed slot exists only while an encounter is live. Session start handles 409 → confirm → `crystallize: true`. |

@@ -1,6 +1,18 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-10-09
+Last updated: 2026-10-23
+
+> 2026-10-23 (hello world 2 prep): the 17 Oct hello-world hiccups ironed out in three commits on
+> merge/fork-portrait-pipeline — sheet edits no longer wake JEWL (and can't become damage); the tagger stops
+> re-asking after a lawfulness block; `::Name …::` is the character's card and he/she resolves to the last actor;
+> the MAP resolves acts (a locked door refuses "push it open") and acts move the map (doors, hands, rooms →
+> services/world-apply); the adjudicator sees only the actor's facts (privacy + 35 KB → ~7 KB); beings know
+> what they wear/carry; Say is capped; act chains capped; JEWL's read sees the beings' own acts; sessions
+> refuse below the line (409 → crystallize the places → start); encounter create is a header button; who plays
+> whom is a toggle on the table bar; Tapestry entity click + slowness fixed; genesis texts pronoun-aware.
+> Entry door on the apartment map set LOCKED (facts said so; the map said closed).
+> NEXT: hello world 2 (decide TABLE_SPLIT_LOOP first), then the design talks (DAYA player layer, scale,
+> items-as-portrait-refs, JEWL control, possessions asked). See memory/STATE-OF-PLAY-2026-10-23.md.
 
 > 2026-10-09: canvas card controller pill (AI / GM / Trailblazer) REMOVED per table-rhythm ruling 3; `npc_speak`/`npc_act`
 > no longer gate on GodHead.aiActionMode. The being loop never read it (gate = DayaEntity.status ACTIVE). Schema untouched.
