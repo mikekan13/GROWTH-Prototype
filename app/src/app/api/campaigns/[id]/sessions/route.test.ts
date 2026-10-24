@@ -65,3 +65,18 @@ describe('POST /api/campaigns/[id]/sessions', () => {
     expect(startSession).not.toHaveBeenCalled();
   });
 });
+
+describe('POST start — the scene must be above the line (Mike 2026-10-17)', () => {
+  it('a fluid scene is 409 with the list; the Watcher can retry with crystallize', async () => {
+    const { SceneNotReadyError } = await import('@/services/scene-readiness');
+    const readiness = { ready: false, places: [{ id: 'a', name: 'Landing', status: 'PLANNING' }], characters: [], itemsInScene: 3, seats: [] };
+    startSession.mockImplementationOnce(async () => { throw new SceneNotReadyError(readiness); });
+    currentUser = { id: 'gm', role: 'WATCHER' };
+    const res = await post('c1', 'start');
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.readiness.places[0].name).toBe('Landing');
+    expect(body.error).toContain('Landing');
+    expect(startSession).toHaveBeenLastCalledWith('c1', undefined, { crystallize: false, actor: { userId: 'gm', role: 'WATCHER' } });
+  });
+});

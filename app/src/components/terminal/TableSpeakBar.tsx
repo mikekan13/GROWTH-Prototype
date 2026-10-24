@@ -12,11 +12,21 @@
  * same feed. Infra states (core warming/offline) show here for the GM
  * only, never in the record.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 interface RosterCharacter {
   id: string;
   name: string;
+}
+
+/** Everyone at the table and who plays them (GET /table `beings`). */
+interface TableBeing {
+  id: string;
+  name: string;
+  /** The being runs the loop (DayaEntity ACTIVE). Off = the Watcher voices it. */
+  awake: boolean;
+  /** Has a DayaEntity at all; only a wrapped character can be woken. */
+  wrapped: boolean;
 }
 
 interface ReconTicket {
@@ -60,6 +70,8 @@ export default function TableSpeakBar({
   onEvent?: () => void;
 }) {
   const [dayaActive, setDayaActive] = useState<RosterCharacter[]>([]);
+  const [beings, setBeings] = useState<TableBeing[]>([]);
+  const [toggling, setToggling] = useState<string | null>(null);
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
   const [coreStatus, setCoreStatus] = useState<CoreStatus>('unknown');
@@ -70,20 +82,36 @@ export default function TableSpeakBar({
   const [answering, setAnswering] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Roster on mount — only to know whom to warm and who is awake.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/campaigns/${campaignId}/table`);
-        if (!res.ok) return;
-        const data = (await res.json()) as { npcs: RosterCharacter[]; dayaActive: RosterCharacter[] };
-        if (cancelled) return;
-        setDayaActive(data.dayaActive);
-      } catch { /* silent */ }
-    })();
-    return () => { cancelled = true; };
+  // Roster on mount — whom to warm, who is awake, and who the Watcher voices.
+  const loadRoster = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/table`);
+      if (!res.ok) return;
+      const data = (await res.json()) as { npcs: RosterCharacter[]; dayaActive: RosterCharacter[]; beings?: TableBeing[] };
+      setDayaActive(data.dayaActive);
+      setBeings(data.beings ?? []);
+    } catch { /* silent */ }
   }, [campaignId]);
+  useEffect(() => { void loadRoster(); }, [loadRoster]);
+
+  /** Awake ↔ voiced by the Watcher: DayaEntity ACTIVE ↔ DORMANT, which is what the being loop reads. */
+  async function toggleBeing(b: TableBeing) {
+    if (!b.wrapped || toggling) return;
+    setToggling(b.id);
+    try {
+      const res = await fetch(`/api/characters/${b.id}/daya/enable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: b.awake ? 'DORMANT' : 'ACTIVE' }),
+      });
+      if (!res.ok) { const j = (await res.json().catch(() => ({}))) as { error?: string }; setNote(j.error ?? `Could not switch ${b.name}`); return; }
+      await loadRoster();
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : String(err));
+    } finally {
+      setToggling(null);
+    }
+  }
 
   // Warm the DAYA core as soon as the table opens — a serverless cold start
   // takes minutes; get it moving before the GM finishes typing.
@@ -232,6 +260,29 @@ export default function TableSpeakBar({
               {held.estimateKrma > 0 && ` · hold ${held.estimateKrma} of ${held.fluidKrma} fluid KRMA`}
             </div>
           )}
+        </div>
+      )}
+      {/* Who plays whom (Mike 2026-10-17: the AI played Kristopher, whom Mike voices).
+          ● awake = the being lives it; ○ voiced = the Watcher speaks for it. Tap to switch. */}
+      {beings.length > 0 && (
+        <div data-table-beings style={{ ...strip, display: 'flex', flexWrap: 'wrap', gap: '4px 8px', alignItems: 'center', color: '#393937' }}>
+          {beings.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              data-no-hold
+              disabled={!b.wrapped || toggling === b.id}
+              onClick={() => void toggleBeing(b)}
+              title={!b.wrapped ? `${b.name} has no being yet (wrap it first)` : b.awake ? `${b.name} is awake — the being plays it. Tap: you voice it.` : `You voice ${b.name}. Tap: wake the being.`}
+              style={{
+                fontFamily: mono, fontSize: 12, lineHeight: 1.4, padding: '1px 7px', border: 0, cursor: b.wrapped ? 'pointer' : 'default',
+                background: b.awake ? '#002f6c' : 'transparent', color: b.awake ? '#ffcc78' : '#002f6c',
+                boxShadow: b.awake ? undefined : 'inset 0 0 0 1.5px #002f6c', opacity: b.wrapped ? 1 : 0.45,
+              }}
+            >
+              {toggling === b.id ? '…' : b.awake ? '● ' : '○ '}{b.name}{!b.awake && b.wrapped ? ' · voiced by you' : ''}
+            </button>
+          ))}
         </div>
       )}
       {/* GM-only status strip — infra truth, never part of the table record */}

@@ -210,11 +210,17 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   // The character we actually render — selectedCharacterId override beats the
   // user's own PC. Lets the GM (or any user) view an arbitrary character in this
   // tab without navigating away.
-  const effectiveCharacter = overrideCharacter ?? userCharacter ?? null;
+  // While a selected character is still loading (or failed), render NOBODY —
+  // never the viewer's own PC in its place (Tapestry → Entities, Mike
+  // 2026-10-17: clicking Kristopher sometimes opened Violet).
+  const effectiveCharacter = selectedCharacterId
+    ? (overrideCharacter?.id === selectedCharacterId ? overrideCharacter : null)
+    : (userCharacter ?? null);
+  const [overrideError, setOverrideError] = useState<string | null>(null);
 
   // Fetch the override character whenever selectedCharacterId changes.
-  // On failure, leave overrideCharacter null and fall back to userCharacter.
   useEffect(() => {
+    setOverrideError(null);
     if (!selectedCharacterId) {
       setOverrideCharacter(null);
       return;
@@ -242,6 +248,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         if (cancelled) return;
         console.error('[CharacterTab] failed to load selected character', selectedCharacterId, err);
         setOverrideCharacter(null);
+        setOverrideError(err instanceof Error ? err.message : String(err));
       });
     return () => { cancelled = true; };
   }, [selectedCharacterId, overrideCharacter?.id]);
@@ -254,7 +261,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
       return;
     }
     let cancelled = false;
-    fetch(`/api/campaigns/${campaignId}/items`)
+    // Only this character's things — not every item in the campaign (98 rows with full data, Tapestry slowness 2026-10-17).
+    fetch(`/api/campaigns/${campaignId}/items?holderId=${encodeURIComponent(charId)}`)
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then(({ items }) => {
         if (cancelled || !Array.isArray(items)) return;
@@ -875,6 +883,12 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
 
   return (
     <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden" style={{ backgroundColor: '#0a0a1a' }}>
+      {/* A selected character still loading (or failed) shows as such — never as the viewer's own PC. */}
+      {selectedCharacterId && !effectiveCharacter && (
+        <div data-character-loading className="px-4 py-3 text-xs uppercase tracking-wider" style={{ color: overrideError ? '#E8585A' : '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+          {overrideError ? `Could not load this character: ${overrideError}` : 'Loading…'}
+        </div>
+      )}
       {showGenesisOverlay && (
         <GenesisLoadingOverlay
           progress={submittingGenesis ? null : genesis}
@@ -1720,7 +1734,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 border: 'none', borderLeft: '4px solid #D07818', cursor: completing ? 'default' : 'pointer',
                 opacity: completing ? 0.6 : 1, minHeight: 40,
               }}
-              title="Finish this born character: JEWL runs only the stages she still lacks (age, possessions, seeds, world facts, vines)."
+              title="Finish this born character: JEWL runs only the stages it still lacks (age, possessions, seeds, world facts, vines)."
             >
               {completing ? 'Completing…' : 'Complete'}
             </button>

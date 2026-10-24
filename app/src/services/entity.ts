@@ -13,7 +13,7 @@ import { crystallizeEntity as crystallizeKrma } from './krma/crystallization';
 import { calculateTKV } from './krma/evaluator';
 import { assignGoalCustodian } from './goal-custodian';
 import { emit as emitGodHeadEvent } from './godhead-dispatcher';
-import { getCampaignCompletions, isAwaitingImage } from './character-completion';
+import { getCampaignCompletions, isAwaitingImage, COMPLETION_CHARACTER_SELECT } from './character-completion';
 
 /**
  * Entity service — campaign entity listing and management.
@@ -41,10 +41,11 @@ export async function listCampaignEntities(
   userId: string,
   userRole: string,
 ): Promise<EntityListItem[]> {
-  // Verify campaign exists and user has access
+  // Verify campaign exists and user has access (one lookup — `name` rides
+  // along for the Prime check below).
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    select: { id: true, gmUserId: true, members: { select: { userId: true } } },
+    select: { id: true, name: true, gmUserId: true, members: { select: { userId: true } } },
   });
 
   if (!campaign) throw new NotFoundError('Campaign not found');
@@ -57,24 +58,20 @@ export async function listCampaignEntities(
 
   // Prime Campaign override: godheads ARE the party here, so don't filter them out.
   // For every other campaign, godheads remain hidden (they belong to Prime).
-  const campaignRow = await prisma.campaign.findUnique({
-    where: { id: campaignId },
-    select: { name: true },
-  });
-  const includeGodheads = isPrimeCampaign(campaignRow);
+  const includeGodheads = isPrimeCampaign(campaign);
 
+  // ONE read of every sheet's `data`: this select carries what the completion
+  // computation needs (genesisTier, personaLock) so it works from these rows
+  // instead of loading each character a second time.
   const characters = await prisma.character.findMany({
     where: {
       campaignId,
       ...(includeGodheads ? {} : { entityType: { not: 'GODHEAD' } }),
     },
     select: {
-      id: true,
-      name: true,
+      ...COMPLETION_CHARACTER_SELECT,
       entityType: true,
       status: true,
-      portrait: true,
-      data: true,
       userId: true,
       user: { select: { username: true } },
       goals: {
@@ -85,7 +82,7 @@ export async function listCampaignEntities(
     },
     orderBy: { createdAt: 'asc' },
   });
-  const completions = await getCampaignCompletions(campaignId);
+  const completions = await getCampaignCompletions(campaignId, { characters });
 
   return characters.map(c => {
     // Parse seed name and TKV from character JSON data

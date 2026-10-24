@@ -16,8 +16,16 @@ vi.mock('@/lib/db', () => ({
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => db.chars.find(c => c.id === where.id) ?? null),
     },
     dayaWorkSession: {
-      findMany: vi.fn(async ({ where }: { where: { goal: { contains?: string } } }) =>
-        where.goal.contains ? db.sessions.filter(s => s.goal.includes(where.goal.contains!)) : db.sessions),
+      findMany: vi.fn(async ({ where, take }: {
+        where: { goal: { contains?: string; startsWith?: string }; OR?: Array<{ goal: { contains: string } }> };
+        take?: number;
+      }) => {
+        let rows = db.sessions;
+        if (where.goal.startsWith) rows = rows.filter(s => s.goal.startsWith(where.goal.startsWith!));
+        if (where.goal.contains) rows = rows.filter(s => s.goal.includes(where.goal.contains!));
+        if (where.OR) rows = rows.filter(s => where.OR!.some(o => s.goal.includes(o.goal.contains)));
+        return take ? rows.slice(0, take) : rows;
+      }),
     },
   },
 }));
@@ -98,6 +106,44 @@ describe('getCampaignCompletions / getCharacterCompletion', () => {
 
     expect(await getCharacterCompletion('v1')).toEqual({ genesis: 'born', image: 'pending', done: false });
     await expect(getCharacterCompletion('nope')).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('pre-loaded rows: no Character query; sessions scoped to those characters only', async () => {
+    const { prisma } = await import('@/lib/db');
+    const findMany = prisma.character.findMany as unknown as ReturnType<typeof vi.fn>;
+    const sessionsFindMany = prisma.dayaWorkSession.findMany as unknown as ReturnType<typeof vi.fn>;
+    findMany.mockClear(); sessionsFindMany.mockClear();
+
+    const rows = [
+      { id: 'v1', name: 'Violet', portrait: null, data: '{}', genesisTier: null, personaLock: null },
+      { id: 'h1', name: 'Hand-built', portrait: null, data: '{}', genesisTier: null, personaLock: null },
+    ];
+    db.sessions = [
+      { goal: goal('Ghost', 'deleted1'), status: 'done' },   // character no longer exists
+      { goal: goal('Violet', 'v1'), status: 'done' },
+    ];
+    const m = await getCampaignCompletions('c1', { characters: rows });
+
+    expect(findMany).not.toHaveBeenCalled();
+    expect(sessionsFindMany).toHaveBeenCalledTimes(1);
+    const arg = sessionsFindMany.mock.calls[0][0] as { where: { OR: unknown[] }; take: number; select: unknown };
+    expect(arg.where.OR).toEqual([{ goal: { contains: '[v1]' } }, { goal: { contains: '[h1]' } }]);
+    expect(arg.take).toBeGreaterThanOrEqual(rows.length);
+    expect(arg.select).toEqual({ goal: true, status: true });
+
+    expect([...m.keys()]).toEqual(['v1', 'h1']);
+    expect(m.get('v1')?.genesis).toBe('born');
+    expect(m.get('h1')?.genesis).toBe('pending');
+    expect(m.has('deleted1')).toBe(false);
+  });
+
+  it('empty campaign: no sessions query at all', async () => {
+    const { prisma } = await import('@/lib/db');
+    const sessionsFindMany = prisma.dayaWorkSession.findMany as unknown as ReturnType<typeof vi.fn>;
+    sessionsFindMany.mockClear();
+    db.chars = [];
+    expect((await getCampaignCompletions('c1')).size).toBe(0);
+    expect(sessionsFindMany).not.toHaveBeenCalled();
   });
 });
 

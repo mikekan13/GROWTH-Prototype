@@ -29,6 +29,14 @@ export const updateCampaignItemSchema = z.object({
   status: z.enum(['ACTIVE', 'DESTROYED', 'CONSUMED', 'LOST']).optional(),
 });
 
+/** GET /items query: narrow the list to one holder and/or one location. */
+export const listCampaignItemsQuerySchema = z.object({
+  holderId: z.string().min(1).optional(),
+  locationId: z.string().min(1).optional(),
+});
+
+export type ListCampaignItemsFilter = z.infer<typeof listCampaignItemsQuerySchema>;
+
 // --- Default Data ---
 
 function createDefaultItem(): Record<string, unknown> {
@@ -43,9 +51,13 @@ function createDefaultItem(): Record<string, unknown> {
 
 // --- Service Functions ---
 
-export async function listCampaignItems(campaignId: string) {
+export async function listCampaignItems(campaignId: string, filter: ListCampaignItemsFilter = {}) {
   return prisma.campaignItem.findMany({
-    where: { campaignId },
+    where: {
+      campaignId,
+      ...(filter.holderId !== undefined && { holderId: filter.holderId }),
+      ...(filter.locationId !== undefined && { locationId: filter.locationId }),
+    },
     orderBy: { updatedAt: 'desc' },
   });
 }

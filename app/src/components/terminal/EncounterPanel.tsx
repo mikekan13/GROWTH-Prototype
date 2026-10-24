@@ -132,10 +132,16 @@ export default function EncounterPanel({
   campaignId,
   campaignCharacters,
   onEvent,
+  mode = 'live',
 }: {
   campaignId: string;
   campaignCharacters: Array<{ id: string; name: string }>;
   onEvent?: () => void;
+  /**
+   * 'live' (the feed's slot): the running encounter only — nothing when none is live.
+   * 'create' (the header's ⚔ sheet): the create form (Mike 2026-10-17: no create dialog in the feed).
+   */
+  mode?: 'live' | 'create';
 }) {
   const [list, setList] = useState<Array<{ id: string; name: string; status: string; round: number }>>([]);
   const [enc, setEnc] = useState<Encounter | null>(null);
@@ -198,6 +204,8 @@ export default function EncounterPanel({
 
   // ── Create ────────────────────────────────────────────────────────────
   if (!enc) {
+    // The feed's slot shows nothing while no encounter is live; the form lives in the header's sheet.
+    if (mode !== 'create') return null;
     const chosen = Object.entries(sides).filter(([, s]) => s);
     return (
       <div className="ep" data-encounter-panel="new">

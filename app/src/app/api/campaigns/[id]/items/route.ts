@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
-import { listCampaignItems, createCampaignItem, createCampaignItemSchema } from '@/services/campaign-item';
+import {
+  listCampaignItems, createCampaignItem, createCampaignItemSchema, listCampaignItemsQuerySchema,
+} from '@/services/campaign-item';
 
 export const dynamic = 'force-dynamic';
 
+/** GET ?holderId=&locationId= — optional filters; no params = every item (unchanged). */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -12,7 +15,8 @@ export async function GET(
   try {
     await requireAuth();
     const { id: campaignId } = await params;
-    const items = await listCampaignItems(campaignId);
+    const filter = listCampaignItemsQuerySchema.parse(Object.fromEntries(request.nextUrl.searchParams));
+    const items = await listCampaignItems(campaignId, filter);
     return NextResponse.json({ items });
   } catch (error) {
     return errorResponse(error);

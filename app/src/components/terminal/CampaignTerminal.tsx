@@ -698,14 +698,38 @@ export default function CampaignTerminal({
       const action = parts[1]?.toLowerCase();
       if (action === 'start' || action === 'end') {
         try {
-          const res = await fetch(`/api/campaigns/${campaignId}/sessions`, {
+          const sessionBody = {
+            action,
+            name: action === 'start' ? parts.slice(2).join(' ') || undefined : undefined,
+          };
+          let res = await fetch(`/api/campaigns/${campaignId}/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action,
-              name: action === 'start' ? parts.slice(2).join(' ') || undefined : undefined,
-            }),
+            body: JSON.stringify(sessionBody),
           });
+          // Below the line (409): the scene's places are still fluid. Ask, then
+          // start again with them crystallized (Mike 2026-10-17: play only above the line).
+          if (res.status === 409 && action === 'start') {
+            const j = (await res.json().catch(() => ({}))) as { error?: string; readiness?: { places: Array<{ name: string }>; characters: Array<{ name: string }> } };
+            const places = j.readiness?.places ?? [];
+            const drafts = j.readiness?.characters ?? [];
+            if (drafts.length) {
+              window.alert(`${j.error ?? 'The scene is not crystallized.'}\n\nCrystallize ${drafts.map((d) => d.name).join(', ')} on the canvas first (it costs KRMA), then start the session.`);
+              return;
+            }
+            const ok = places.length > 0 && window.confirm(`${j.error ?? 'The scene is not crystallized.'}\n\nCrystallize ${places.map((p) => p.name).join(', ')} now and start the session?`);
+            if (!ok) return;
+            res = await fetch(`/api/campaigns/${campaignId}/sessions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...sessionBody, crystallize: true }),
+            });
+            if (!res.ok) {
+              const k = (await res.json().catch(() => ({}))) as { error?: string };
+              window.alert(k.error ?? `Could not start the session (HTTP ${res.status}).`);
+              return;
+            }
+          }
           if (res.ok) {
             const sessionData = await res.json();
             await fetch(`/api/campaigns/${campaignId}/events`, {
@@ -940,10 +964,16 @@ export default function CampaignTerminal({
   }, [campaignId, tableAvailable]);
   useEffect(() => { void refreshEncounter(); }, [refreshEncounter]);
   const onEncounterEvent = useCallback(() => { void refreshEncounter(); void fetchEvents(); }, [refreshEncounter, fetchEvents]);
-  const encounter = useMemo(() => (tableAvailable ? {
+  // The feed carries an encounter slot ONLY while one is live (Mike 2026-10-17:
+  // "The encounter creation dialog needs to be removed and turned into a button
+  // or side menu because it makes the rolling chat awkward"). Starting one is
+  // the ⚔ button in the header, which opens the create sheet under it.
+  const encounter = useMemo(() => (tableAvailable && liveEncounter ? {
     live: liveEncounter,
     render: () => <EncounterPanel campaignId={campaignId} campaignCharacters={campaignCharacters || []} onEvent={onEncounterEvent} />,
   } : undefined), [tableAvailable, liveEncounter, campaignId, campaignCharacters, onEncounterEvent]);
+  const [encounterSheet, setEncounterSheet] = useState(false);
+  useEffect(() => { if (liveEncounter || !tableAvailable) setEncounterSheet(false); }, [liveEncounter, tableAvailable]);
 
   // No text input when no session is live (Mike 2026-10-08: "No need for
   // inputs when not in play… They work with JEWL for any of that"). The
@@ -1008,6 +1038,15 @@ export default function CampaignTerminal({
             {sessionBusy ? '…' : activeSession ? '■ End' : '▶ Session'}
           </button>
         )}
+        {isGM && tableAvailable && !liveEncounter && (
+          <button onClick={() => setEncounterSheet((v) => !v)} data-no-hold aria-expanded={encounterSheet} title={encounterSheet ? 'Close the encounter sheet' : 'Start an encounter'} style={{
+            fontFamily: bebas, fontSize: 16, letterSpacing: '0.06em', height: 36, minWidth: 36, padding: '2px 8px 0', border: 0, cursor: 'pointer', flex: 'none',
+            whiteSpace: 'nowrap', background: encounterSheet ? '#000' : 'none', color: encounterSheet ? '#f5f4ef' : '#002f6c',
+            boxShadow: encounterSheet ? undefined : 'inset 0 0 0 2px #002f6c', marginLeft: 4,
+          }}>
+            ⚔ Encounter
+          </button>
+        )}
         <span
           title={connected ? `Live${connectedUsers?.length ? ` — ${connectedUsers.map(u => u.username).join(', ')}` : ''}` : 'Disconnected (polling)'}
           style={{ fontFamily: mono, fontSize: 12, color: connected ? '#0f6e5e' : '#6b7380', whiteSpace: 'nowrap', flex: 'none', marginLeft: 6 }}
@@ -1018,6 +1057,13 @@ export default function CampaignTerminal({
           <button aria-label="Fold the terminal" data-no-hold onClick={onClose} style={{ width: 40, height: 36, flex: 'none', border: 0, background: 'none', color: '#002f6c', fontSize: 16, cursor: 'pointer' }}>{'▾'}</button>
         )}
       </div>
+
+      {/* The encounter create sheet: opened from the header's ⚔ button, never inline in the feed. */}
+      {encounterSheet && tableAvailable && !liveEncounter && (
+        <div data-encounter-sheet style={{ flex: 'none', maxHeight: '55%', display: 'flex', flexDirection: 'column', borderBottom: '3px solid #000' }}>
+          <EncounterPanel mode="create" campaignId={campaignId} campaignCharacters={campaignCharacters || []} onEvent={onEncounterEvent} />
+        </div>
+      )}
 
       {/* JEWL — his own tab (Mike 2026-10-08): the conversation, or the Log of mechanics. */}
       {terminalMode === 'copilot' && (

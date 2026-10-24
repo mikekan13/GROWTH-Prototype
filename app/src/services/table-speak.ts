@@ -888,10 +888,11 @@ export async function getTableRoster(campaignId: string, actorRole: string) {
     orderBy: { name: 'asc' },
   });
   const entities = await prisma.dayaEntity.findMany({
-    where: { characterId: { in: characters.map((c) => c.id) }, status: 'ACTIVE' },
-    select: { characterId: true },
+    where: { characterId: { in: characters.map((c) => c.id) } },
+    select: { characterId: true, status: true },
   });
-  const activeIds = new Set(entities.map((e) => e.characterId));
+  const activeIds = new Set(entities.filter((e) => e.status === 'ACTIVE').map((e) => e.characterId));
+  const wrappedIds = new Set(entities.map((e) => e.characterId));
   const isTableHidden = (raw: string | null) => {
     try {
       return raw ? JSON.parse(raw).tableHidden === true : false;
@@ -909,6 +910,15 @@ export async function getTableRoster(campaignId: string, actorRole: string) {
       .filter((c) => c.entityType === 'NPC' && !isTableHidden(c.data))
       .map((c) => ({ id: c.id, name: c.name })),
     dayaActive: characters.filter((c) => activeIds.has(c.id)).map((c) => ({ id: c.id, name: c.name })),
+    /**
+     * Everyone at the table and who plays them (hello world 2026-10-17: genesis
+     * woke Kristopher's being and the AI played a character Mike voices).
+     * `awake` = the being runs the loop; a wrapped, dormant one is voiced by
+     * the Watcher and can be woken from the table; unwrapped ones have no being.
+     */
+    beings: characters
+      .filter((c) => (c.entityType === 'NPC' || c.entityType === 'PLAYER_CHARACTER') && !isTableHidden(c.data))
+      .map((c) => ({ id: c.id, name: c.name, awake: activeIds.has(c.id), wrapped: wrappedIds.has(c.id) })),
     /** The rollout switch, for the recorder: shorter chunks only make sense when the mic feeds the table. */
     splitLoop: tableSplitLoop(),
   };

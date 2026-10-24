@@ -122,7 +122,22 @@ export async function queryCampaignEvents(params: QueryEventsParams) {
 /**
  * Start a new game session. Returns the session info.
  */
-export async function startSession(campaignId: string, name?: string): Promise<GameSessionInfo> {
+export async function startSession(
+  campaignId: string,
+  name?: string,
+  opts: {
+    /** Crystallize the scene's fluid places first (the Watcher said yes to the 409). Needs the actor. */
+    crystallize?: boolean;
+    actor?: { userId: string; role: string };
+  } = {},
+): Promise<GameSessionInfo> {
+  // PLAY ONLY ABOVE THE LINE (Mike 2026-10-17). The scene is read before the
+  // session row exists; what is still fluid is either crystallized now (the
+  // Watcher asked) or stops the start with the list (SceneNotReadyError → 409).
+  const { assertSceneReady, crystallizeScenePlaces } = await import('@/services/scene-readiness');
+  if (opts.crystallize && opts.actor) await crystallizeScenePlaces(campaignId, opts.actor);
+  await assertSceneReady(campaignId);
+
   // End any active session first
   const active = await prisma.gameSession.findFirst({
     where: { campaignId, endedAt: null },
