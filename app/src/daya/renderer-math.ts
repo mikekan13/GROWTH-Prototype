@@ -30,7 +30,7 @@ export interface SceneLine {
   text: string;
   /** 0..1 — how much this would draw notice; low lines are the first to blur. */
   salience: number;
-  kind: 'place' | 'present' | 'item' | 'fact' | 'speech' | 'sense';
+  kind: 'place' | 'present' | 'item' | 'fact' | 'speech' | 'sense' | 'self';
   /** 0..1 — how well the sense that carries this line works (organ condition, perception unit 5).
    *  Absent = 1. The line is judged at floor(level × clarity) instead of the scene's level. */
   clarity?: number;

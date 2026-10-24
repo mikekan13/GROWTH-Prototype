@@ -64,7 +64,7 @@ vi.mock('@/services/reconciliation', () => ({
   cementCheck: vi.fn(async () => {}),
 }));
 
-import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop } from './table-speak';
+import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine } from './table-speak';
 
 const actor = { userId: 'gm', username: 'watcher', role: 'WATCHER' };
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -417,5 +417,17 @@ describe('the TABLE feed fields (ruling-feed-segment-colours-pillars, 2026-10-07
       { via: 'spoken', raw: 'The door bangs open. Rain comes in with it.' },
       { via: 'spoken', raw: 'The door bangs open. Rain comes in with it.' },
     ]);
+  });
+});
+
+describe('actionToTableLine (hello world 2026-10-17)', () => {
+  it('an act shows what HAPPENED when the adjudicator has said, else the intent', () => {
+    expect(actionToTableLine('Violet', { kind: 'act', content: 'push the door open', outcome: 'Violet tries the Entry door; it is locked and does not give.' })).toBe('*Violet tries the Entry door; it is locked and does not give.*');
+    expect(actionToTableLine('Violet', { kind: 'act', content: 'steps back' })).toBe('*steps back*');
+  });
+  it('an empty Attend ("The dust") is no beat; a real one still is', () => {
+    expect(actionToTableLine('Violet', { kind: 'attend', content: 'The dust' })).toBeNull();
+    expect(actionToTableLine('Violet', { kind: 'attend', content: 'the folded bill by the door' })).toBe("*Violet's attention settles on the folded bill by the door*");
+    expect(actionToTableLine('Violet', { kind: 'attend' })).toBe('*Violet goes quiet, watching*');
   });
 });

@@ -23,10 +23,21 @@ Respond with STRICT JSON only — no prose outside the JSON object — in exactl
   "factsToWrite": [{ "subjectKey": string, "fact": string }],
   "factsToSupersede": [{ "id": string, "fact": string }],
   "check": { "attribute": string, "dr": number } | null,
-  "experienceEvent": { "content": string, "valence": number, "salience": number }
+  "experienceEvent": { "content": string, "valence": number, "salience": number },
+  "effects": [ { "op": "door", "door": <door name>, "state": "open"|"closed"|"locked" }
+             | { "op": "take", "item": <thing in the room> }
+             | { "op": "give", "item": <thing in hand>, "to": <person present> }
+             | { "op": "put", "item": <thing in hand>, "into": <room or container> }
+             | { "op": "move", "to": <room> } ]
 }
 
 Rules:
+0. THE MAP section is the authority on doors and rooms. A LOCKED door does
+   not open: it must be unlocked first (effects: door → "closed" means
+   unlocked-and-shut, then door → "open"); someone on the far side cannot
+   unlock it. The entity has ONLY what its Entity section lists — never
+   invent a jacket, a pocket, a bag, a key. "effects" lists every physical
+   change the outcome makes to doors, hands and rooms; [] when none.
 1. Facts are law. Never contradict one. If the action touches something with
    no established fact, establish it conservatively (boring, plausible,
    room-appropriate) via factsToWrite.

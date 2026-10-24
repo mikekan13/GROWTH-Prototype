@@ -165,15 +165,22 @@ async function postChat(
   return event;
 }
 
+/** An Attend worth a line names something: "The dust" is not a beat (hello world 2026-10-17). */
+const ATTEND_MIN_WORDS = 3;
+
 /** Render a DAYA action as a table-visible line, diegetic body language only. */
-function actionToTableLine(name: string, action: { kind: string; content?: string }): string | null {
+export function actionToTableLine(name: string, action: { kind: string; content?: string; outcome?: string }): string | null {
   switch (action.kind) {
     case 'speak':
       return action.content ?? null;
     case 'act':
-      return `*${action.content ?? 'moves'}*`;
-    case 'attend':
+      // What HAPPENED, when the adjudicator has said (the map may have refused the intent); else the intent.
+      return `*${action.outcome?.trim() || action.content || 'moves'}*`;
+    case 'attend': {
+      const words = (action.content ?? '').trim().split(/\s+/).filter(Boolean);
+      if (action.content && words.length < ATTEND_MIN_WORDS) return null;
       return action.content ? `*${name}'s attention settles on ${action.content}*` : `*${name} goes quiet, watching*`;
+    }
     case 'rest':
       return `*stays quiet*`;
     default:

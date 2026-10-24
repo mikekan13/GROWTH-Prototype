@@ -53,7 +53,12 @@ export interface HandlerResult {
    * `content` carries plain-language detail specific to `kind` (spoken
    * words, a physical intent, an attended subject, or a held/flagged
    * gm_intervention phrase); absent for `rest`. */
-  action?: { kind: string; content?: string };
+  action?: {
+    kind: string;
+    content?: string;
+    /** An `act`'s adjudicated outcome — what actually happened, which the table shows instead of the intent. */
+    outcome?: string;
+  };
 }
 
 /**

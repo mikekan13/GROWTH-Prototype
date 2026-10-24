@@ -29,6 +29,7 @@ import { currentFacts, type WorldFactRecord } from './world-ledger';
 import { senseProfileFromSheet, type SenseKind } from '@/sim/senses/field';
 import type { DayaClientOverrides } from './model-client';
 import type { GrowthLocation } from '@/types/location';
+import { splitHeld, heldLines } from './facts-for-actor';
 
 export interface PerceiveResult {
   /** What the being actually perceived — the stimulus content to ingest. */
@@ -99,6 +100,8 @@ export interface SceneInput {
   facts: WorldFactRecord[];
   parentFacts: WorldFactRecord[];
   senses: { canSee: boolean; canHear: boolean; effectiveness?: Partial<Record<SenseKind, number>> };
+  /** The being's own body as the inventory has it (facts-for-actor): what it wears, what it carries. Absent = not told. */
+  held?: { wearing: string[]; carrying: string[] };
 }
 
 /**
@@ -162,6 +165,9 @@ function composeUndimmed(input: SceneInput): SceneTruth {
     for (const f of input.parentFacts) lines.push({ text: f.fact, salience: 0.25, kind: 'fact' });
     if (input.items.length) lines.push({ text: `Around you: ${input.items.join(', ')}.`, salience: 0.3, kind: 'item' });
   }
+  // The being's own body needs no sense to know (hello world 2026-10-17: a
+  // receipt went "in the pocket of my jacket" with no jacket on the sheet).
+  if (input.held) for (const text of heldLines(input.held)) lines.push({ text, salience: 0.3, kind: 'self' });
   return { headline: input.headline, lines };
 }
 
@@ -312,6 +318,7 @@ export async function composeSceneTruth(
     headline: source === 'perception' ? stimulus : null,
     speech: source === 'dialogue' ? [stimulus] : [],
     place, parent, present, items, facts, parentFacts, senses,
+    held: splitHeld(held),
   });
   const roll = sceneRoll({ placed: place !== null, present: present.map((p) => p.name), items, senses });
   return { truth, locationId, roll };

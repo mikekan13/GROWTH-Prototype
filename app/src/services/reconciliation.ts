@@ -101,12 +101,25 @@ async function simStateSummary(campaignId: string, listeners: Array<{ id: string
   }
   const locations = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { name: true, status: true }, take: 60 });
   const npcs = await prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { name: true }, take: 60 });
-  const recent = await prisma.canonEvent.findMany({ where: { campaignId, kind: { in: ['narration', 'declaration'] } }, orderBy: { createdAt: 'desc' }, take: 6, select: { narration: true } });
+  const recent = await prisma.canonEvent.findMany({ where: { campaignId, kind: { in: ['narration', 'declaration', 'dialogue'] } }, orderBy: { createdAt: 'desc' }, take: 8, select: { narration: true } });
+  // What the beings themselves just did and said (their chat rows, via: being).
+  // Hello world 2026-10-17: JEWL asked to rewind "the door is open" when
+  // Violet's own last act was to shut it — he read the GM, not the beings.
+  const beingRows = await prisma.campaignEvent.findMany({
+    where: { campaignId, type: 'chat', actor: 'ai_copilot', payload: { contains: '"via":"being"' } },
+    orderBy: { createdAt: 'desc' }, take: 8, select: { characterName: true, payload: true, createdAt: true },
+  });
+  const acts = beingRows.reverse().map((r) => {
+    let message = '';
+    try { message = String((JSON.parse(r.payload) as { message?: string }).message ?? ''); } catch { message = ''; }
+    return message ? `- ${r.characterName ?? 'a being'}: ${message.slice(0, 200)}` : null;
+  }).filter((x): x is string => !!x);
   return {
     beings: lines.join('\n') || '(no awake beings at the table)',
     locations: locations.map((l) => `${l.name} [${l.status.toLowerCase()}]`).join('; ') || '(none)',
     npcs: npcs.map((n) => n.name).join(', ') || '(none)',
     recent: recent.reverse().map((r) => `- ${r.narration.slice(0, 200)}`).join('\n') || '(nothing yet)',
+    acts: acts.join('\n') || '(nothing yet)',
   };
 }
 
@@ -118,7 +131,7 @@ async function jewlRead(campaignId: string, message: string, listeners: Array<{ 
       tier: 'C', subsystem: 'reconciliation', contentClass: 'fiction',
       messages: [
         { role: 'system', content: `You are JEWL, the copilot running the table underneath a GROWTH Watcher (the GM). Before a line of narration becomes canon you read it against the simulated world. Decide whether it is DIFFERENT ENOUGH from the sim to stop and ask — the Watcher may have misspoken, or may be improvising somewhere new. Ordinary additive narration inside the current scene is NOT a discrepancy. Kinds: relocation (a being is narrated somewhere other than where the sim has it), new_presence (a person the roster lacks is here and matters), contradicted_fact (the narration contradicts what the world holds), contradiction (the Watcher contradicts his own recent narration), continuity (a jump the scene did not set up). Respond with ONLY JSON: {"discrepant": boolean, "kinds": string[], "summary": one plain sentence of what differs, "question": one or two sentences in JEWL's own voice to the Watcher — plain, unbothered, ending by asking whether it was a mistake or whether we are going somewhere new, "needs": [{"kind": "location"|"npc"|"item", "name": short name the narration implies, "description": what the narration says about it}], "relocate": boolean (true when the awake beings should now be at the narrated place)}. needs lists only what the world would have to HAVE for this narration to be true and does not already have.` },
-        { role: 'user', content: `AWAKE BEINGS AND WHERE THE SIM HAS THEM:\n${state.beings}\n\nPLACES THE CAMPAIGN HAS:\n${state.locations}\n\nPEOPLE THE CAMPAIGN HAS:\n${state.npcs}\n\nTHE WATCHER'S RECENT NARRATION:\n${state.recent}\n\nNEW NARRATION:\n${message}` },
+        { role: 'user', content: `AWAKE BEINGS AND WHERE THE SIM HAS THEM:\n${state.beings}\n\nPLACES THE CAMPAIGN HAS:\n${state.locations}\n\nPEOPLE THE CAMPAIGN HAS:\n${state.npcs}\n\nTHE WATCHER'S RECENT NARRATION:\n${state.recent}\n\nWHAT THE BEINGS THEMSELVES JUST DID AND SAID (these are canon too — the Watcher's next line is read as following them):\n${state.acts}\n\nNEW NARRATION:\n${message}` },
       ],
       maxTokens: 500, temperature: 0,
     });

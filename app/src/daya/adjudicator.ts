@@ -19,6 +19,8 @@ import { chat, type DayaClientOverrides } from './model-client';
 import { currentFacts, establishFact, supersede, type WorldFactRecord } from './world-ledger';
 import { buildAdjudicatorPrompt } from './prompts/roles/adjudicator';
 import { resolveDayaEntityId } from './entity';
+import { factsForActor, splitHeld } from './facts-for-actor';
+import { actorMap, mapFactLines, lockedDoorInTheWay, applyActEffects, parseActEffects, type ActEffect, type ApplyReport } from '@/services/world-apply';
 
 // ── Contract (Ruling 19 — swappable behind this shape) ─────────────────────
 
@@ -48,6 +50,10 @@ export interface AdjudicationResult {
   factsSuperseded: WorldFactRecord[];
   experienceEvent: ExperienceEvent;
   roll?: RollOutcome;
+  /** What the act did to the map (services/world-apply): doors, hands, rooms. */
+  effects?: ApplyReport;
+  /** The map refused the act outright (a locked door), no model asked. */
+  mapBlocked?: boolean;
 }
 
 /** Swappable resolution contract — a future physics engine implements this
@@ -80,6 +86,8 @@ interface AdjudicatorResponseShape {
   factsToSupersede?: Array<{ id: string; fact: string }>;
   check?: { attribute: string; dr: number } | null;
   experienceEvent: { content: string; valence: number; salience: number };
+  /** Physical effects on the map (door / take / give / put / move). */
+  effects?: ActEffect[];
 }
 
 function parseAdjudicatorResponse(text: string): AdjudicatorResponseShape {
@@ -105,6 +113,7 @@ function parseAdjudicatorResponse(text: string): AdjudicatorResponseShape {
       valence: obj.experienceEvent.valence ?? 0,
       salience: obj.experienceEvent.salience ?? 0,
     },
+    effects: parseActEffects(obj.effects),
   };
 }
 
@@ -131,9 +140,12 @@ export async function resolveIntent(
 ): Promise<AdjudicationResult> {
   const { campaignId, entityCharacterId, intent, cycle } = input;
 
-  const [facts, character] = await Promise.all([
+  const [allFacts, character, others, map, heldRows] = await Promise.all([
     currentFacts(campaignId),
     prisma.character.findUnique({ where: { id: entityCharacterId }, select: { id: true, name: true, data: true } }),
+    prisma.character.findMany({ where: { campaignId, id: { not: entityCharacterId }, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { name: true } }),
+    actorMap(entityCharacterId).catch(() => null),
+    prisma.campaignItem.findMany({ where: { holderId: entityCharacterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 }).catch(() => []),
   ]);
 
   if (!character) {
@@ -147,16 +159,42 @@ export async function resolveIntent(
     sheet = null;
   }
 
+  // THE MAP RESOLVES WHAT IT PLAINLY FORBIDS (Mike 2026-10-17): a locked door
+  // does not open because a being said "push the door open". No model call.
+  const blockedBy = lockedDoorInTheWay(intent, map);
+  if (blockedBy) {
+    const outcome = `${character.name} tries the ${blockedBy.name}; it is locked and does not give.`;
+    return {
+      outcome,
+      factsWritten: [],
+      factsSuperseded: [],
+      experienceEvent: { content: 'The door holds. Locked — it does not give under your hand.', valence: -0.2, salience: 0.4 },
+      mapBlocked: true,
+    };
+  }
+
+  // The actor's facts (facts-for-actor): never another character's own, the
+  // intent's subjects first, capped — not the whole campaign ledger.
+  const facts = factsForActor(allFacts, { actorName: character.name, otherNames: others.map((o) => o.name), intent });
+  const held = splitHeld(heldRows);
+
   const factsBlock = facts.length > 0
     ? facts.map(f => `[${f.id}] ${f.subjectKey}: ${f.fact}`).join('\n')
     : '(no established facts yet)';
+  const mapBlock = mapFactLines(map).join('\n') || '(the actor stands nowhere on the map)';
 
   const userMessage = [
     `## Current World Facts (campaign ${campaignId})`,
     factsBlock,
     '',
+    `## The Map (authoritative for doors and rooms)`,
+    mapBlock,
+    '',
     `## Entity`,
     `Name: ${character.name}`,
+    `Wearing: ${held.wearing.length ? held.wearing.join(', ') : 'nothing beyond underwear'}`,
+    `Carrying: ${held.carrying.length ? held.carrying.join(', ') : 'nothing'}`,
+    `(The entity has ONLY what is listed. No jacket, pocket, bag or tool exists for it unless named here or in the facts.)`,
     '',
     `## Declared Intent`,
     intent,
@@ -246,12 +284,25 @@ export async function resolveIntent(
     }
   }
 
+  // THE ENGINE KEEPS THE MAP TRUE: the act's physical effects land on the
+  // map's own tables (doors, hands, rooms). A failed check moves nothing.
+  let effects: ApplyReport | undefined;
+  const succeeded = !roll || roll.success;
+  if (succeeded && parsed.effects?.length) {
+    effects = await applyActEffects(campaignId, entityCharacterId, parsed.effects).catch((err) => {
+      console.error('[daya/adjudicator] applying act effects failed (non-fatal):', err);
+      return { applied: [], refused: [`apply failed: ${err instanceof Error ? err.message : String(err)}`] };
+    });
+    if (effects.refused.length) console.warn(`[daya/adjudicator] map refused: ${effects.refused.join('; ')}`);
+  }
+
   return {
     outcome,
     factsWritten,
     factsSuperseded,
     experienceEvent: parsed.experienceEvent,
     roll,
+    ...(effects ? { effects } : {}),
   };
 }
 

@@ -225,21 +225,56 @@ export type SpiritAction =
 // mistaken for the directive.
 const DIRECTIVE_LINE_PATTERN = /^(Say|Do|Attend|Rest)\b\s*:?\s*(.*)$/im;
 
+/** Speech aloud is a few sentences at most; what runs past that is thought, not said. */
+export const SPEECH_MAX_SENTENCES = 3;
+export const SPEECH_MAX_CHARS = 360;
+
+/**
+ * Cap what counts as spoken (hello world 2026-10-17: a 1,964-character inner
+ * monologue went out as `Say:`). The first sentences up to the cap are the
+ * words; the rest is kept as monologue. Pure.
+ */
+export function capSpeech(text: string): { spoken: string; rest: string } {
+  const t = text.trim();
+  if (!t) return { spoken: '', rest: '' };
+  const sentences = t.split(/(?<=[.!?…]["”')\]]*)\s+/).filter(Boolean);
+  let spoken = '';
+  let used = 0;
+  for (const s of sentences) {
+    const next = spoken ? `${spoken} ${s}` : s;
+    if (used > 0 && (used >= SPEECH_MAX_SENTENCES || next.length > SPEECH_MAX_CHARS)) break;
+    spoken = next;
+    used += 1;
+  }
+  if (spoken.length > SPEECH_MAX_CHARS) {
+    // One sentence longer than the cap: cut at the last clause break before it.
+    const cut = spoken.slice(0, SPEECH_MAX_CHARS);
+    const at = Math.max(cut.lastIndexOf(', '), cut.lastIndexOf('; '), cut.lastIndexOf(' — '), cut.lastIndexOf(' '));
+    spoken = (at > 40 ? cut.slice(0, at) : cut).trim();
+  }
+  const rest = t.slice(spoken.length).trim();
+  return { spoken, rest };
+}
+
 export function parseSpiritOutput(raw: string): SpiritAction {
   const text = raw.trim();
   const match = DIRECTIVE_LINE_PATTERN.exec(text);
 
   if (!match) {
-    // Lenient fallback: no recognized directive line — treat the whole
-    // reply as speech rather than failing the interaction outright.
-    return { kind: 'speak', content: text, monologue: text };
+    // Lenient fallback: no recognized directive line — the reply is speech,
+    // but only as much of it as a person says aloud; the rest is thought.
+    const { spoken, rest } = capSpeech(text);
+    return { kind: 'speak', content: spoken || text, monologue: rest ? `${text.slice(0, text.length - rest.length).trim()}\n${rest}`.trim() : text };
   }
 
   const [, verb, rest] = match;
   const monologue = text.slice(0, match.index).trim();
   const verbLower = verb.toLowerCase();
 
-  if (verbLower === 'say') return { kind: 'speak', content: rest.trim(), monologue };
+  if (verbLower === 'say') {
+    const capped = capSpeech(rest);
+    return { kind: 'speak', content: capped.spoken || rest.trim(), monologue: capped.rest ? [monologue, capped.rest].filter(Boolean).join('\n') : monologue };
+  }
   if (verbLower === 'do') return { kind: 'act', content: rest.trim(), monologue };
   if (verbLower === 'attend') return { kind: 'attend', content: rest.trim(), monologue };
   return { kind: 'rest', monologue };

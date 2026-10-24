@@ -56,7 +56,7 @@ describe('intact body — output pinned before unit 5', () => {
       {
         "distortions": [
           "scene:dropped=2",
-          "scene:kept=5/7",
+          "scene:kept=7/9",
           "unvoiced",
         ],
         "level": 4,
@@ -64,7 +64,9 @@ describe('intact body — output pinned before unit 5', () => {
       Danny is here — a wiry man in a grey coat
       You are in The Inn — Low beams, a long bar.
       Hearth: A fire burns low.
-      Around you: tankard, dice cup.",
+      Around you: tankard, dice cup.
+      You are wearing nothing but what is on your sheet as underwear.
+      You have on you: tankard, dice cup.",
       }
     `);
   });
@@ -75,7 +77,7 @@ describe('intact body — output pinned before unit 5', () => {
       {
         "distortions": [
           "scene:dropped=2",
-          "scene:kept=5/7",
+          "scene:kept=7/9",
           "unvoiced",
         ],
         "level": 4,
@@ -83,7 +85,9 @@ describe('intact body — output pinned before unit 5', () => {
       Danny is here — a wiry man in a grey coat
       You are in The Inn — Low beams, a long bar.
       Hearth: A fire burns low.
-      Around you: tankard, dice cup.",
+      Around you: tankard, dice cup.
+      You are wearing nothing but what is on your sheet as underwear.
+      You have on you: tankard, dice cup.",
       }
     `);
   });

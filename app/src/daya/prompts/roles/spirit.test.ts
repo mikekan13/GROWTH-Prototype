@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildDesiresBlock, parseSpiritOutput, buildSpiritListeningPrompt, buildSpiritAnsweringPrompt,
   SPIRIT_TENETS_BLOCK, LISTENING_MAX_TOKENS, ANSWERING_MAX_TOKENS, type DesireSourceItem,
+  capSpeech,
 } from './spirit';
 import { sealLint, hasHardHit } from '../../seal';
 
@@ -141,5 +142,34 @@ describe('parseSpiritOutput (lenient Say:/Do:/Attend:/Rest parsing)', () => {
   it('falls back to speak when no directive line is present', () => {
     const action = parseSpiritOutput('Just a stray thought, nothing more.');
     expect(action.kind).toBe('speak');
+  });
+});
+
+describe('Say is speech, not a monologue (hello world 2026-10-17)', () => {
+  const monologue = Array.from({ length: 14 }, (_, i) => `Thought number ${i + 1} runs on about the door and the chain and the eleven minutes.`).join(' ');
+  it('a long reply with no directive keeps the first sentences as speech and the rest as thought', () => {
+    const action = parseSpiritOutput(monologue);
+    expect(action.kind).toBe('speak');
+    expect(action.content!.length).toBeLessThanOrEqual(360);
+    expect(action.content!.split(/(?<=[.!?])\s+/).length).toBeLessThanOrEqual(3);
+    expect(action.monologue).toContain('Thought number 14');
+  });
+  it('`Say:` is capped the same way, the overflow kept as monologue', () => {
+    const action = parseSpiritOutput(`I should answer.\nSay: ${monologue}`);
+    expect(action.kind).toBe('speak');
+    expect(action.content!.startsWith('Thought number 1 ')).toBe(true);
+    expect(action.content!.length).toBeLessThanOrEqual(360);
+    expect(action.monologue).toContain('I should answer.');
+    expect(action.monologue).toContain('Thought number 14');
+  });
+  it('a short line is untouched', () => {
+    expect(capSpeech("I'm coming.")).toEqual({ spoken: "I'm coming.", rest: '' });
+    expect(parseSpiritOutput('Say: Take your time.').content).toBe('Take your time.');
+  });
+  it('one sentence longer than the cap is cut at a clause break', () => {
+    const long = 'A'.repeat(200) + ', ' + 'B'.repeat(200) + ' end.';
+    const { spoken, rest } = capSpeech(long);
+    expect(spoken.length).toBeLessThanOrEqual(360);
+    expect(rest.length).toBeGreaterThan(0);
   });
 });

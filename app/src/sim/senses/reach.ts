@@ -37,7 +37,9 @@ export function perceptionReachOn(): boolean {
 
 /** TUNING — placeholder. Off the answer clock, but a stretch waits on it before it is listened to. */
 export const REACH_TUNING = {
-  timeoutMs: Number(process.env.PERCEPTION_REACH_TIMEOUT_MS ?? 4000),
+  // 8 s (was 4 s): at 4 s the local lane timed out on every line of hello world
+  // 2026-10-17 and the stub judged reach instead. Off the answer clock anyway.
+  timeoutMs: Number(process.env.PERCEPTION_REACH_TIMEOUT_MS ?? 8000),
   /** Beings per call; more than this and the prompt outgrows the small model — the rest go in a second call. */
   maxBeingsPerCall: 12,
   maxTokensPerBeing: 40,

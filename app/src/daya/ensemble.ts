@@ -28,6 +28,7 @@ import { ingestStimulus, writeMemoryEntry } from './memory';
 import { recall, stemmedJaccard } from './recall';
 import { render, type Observer, type BiasProfile, type VoiceParams, type AffectVector } from './renderer';
 import { currentFacts, type WorldFactRecord } from './world-ledger';
+import { factsForActor } from './facts-for-actor';
 import { perceive } from './perceive';
 import { resolveIntent, type AdjudicationResult, type MechanicsRollHook } from './adjudicator';
 import { enforceSeal } from './seal';
@@ -340,6 +341,23 @@ async function renderAttention(ctx: EntityContext, attendContent: string, overri
 // parse the directive line -> Say:/Do:/Attend:/Rest branch.
 
 const ATTEND_DEPTH_CAP = 1;
+/** How many times one stimulus may chain act → adjudication → new turn before the outcome is only lived, not acted on again. */
+const ACT_CHAIN_CAP = 1;
+
+/**
+ * The facts a being acts against: its own, its place's and the things', never
+ * another character's (facts-for-actor). The intent picks what comes first.
+ */
+async function actorFacts(ctx: EntityContext, intent: string): Promise<WorldFactRecord[]> {
+  if (!ctx.campaignId) return [];
+  const [all, others] = await Promise.all([
+    currentFacts(ctx.campaignId),
+    Promise.resolve()
+      .then(() => prisma.character.findMany({ where: { campaignId: ctx.campaignId!, id: { not: ctx.characterId }, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { name: true } }))
+      .catch((): Array<{ name: string }> => []),
+  ]);
+  return factsForActor(all, { actorName: ctx.name, otherNames: others.map((o) => o.name), intent });
+}
 
 async function runStimulusPipeline(
   characterId: string,
@@ -524,7 +542,7 @@ async function runStimulusPipeline(
         return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content } };
       }
 
-      const facts = await currentFacts(ctx.campaignId);
+      const facts = await actorFacts(ctx, action.content);
       const outward = await runBodyOutward(ctx, action.content, facts, overrides);
 
       // WP8 mechanics coupling: motivated effort (Ruling 10) + skill-
@@ -551,11 +569,21 @@ async function runStimulusPipeline(
         overrides,
         mechanicsHook,
       );
-      await wake(
-        { kind: 'adjudication_result', entityId: characterId, payload: adjudication as unknown as Record<string, unknown> },
-        overrides,
-      );
-      return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content } };
+      // The chain act → adjudicate → sensation → pipeline → act… is capped
+      // (hello world 2026-10-17: one GM line ran 24 tagger calls). Past the
+      // cap the outcome is still lived (ingested below) but wakes no new turn.
+      if (depth < ACT_CHAIN_CAP) {
+        await wake(
+          { kind: 'adjudication_result', entityId: characterId, payload: { ...(adjudication as unknown as Record<string, unknown>), _depth: depth + 1 } },
+          overrides,
+        );
+      } else {
+        await ingestStimulus(
+          { entityId: ctx.entityDaId, cycle: ctx.cycle, source: 'adjudication', content: adjudication.experienceEvent.content },
+          overrides,
+        ).catch((err) => console.error('[daya/ensemble] capped act outcome ingest failed (non-fatal):', err));
+      }
+      return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content, outcome: adjudication.outcome } };
     }
 
     case 'attend': {
@@ -603,6 +631,8 @@ interface AdjudicationPayloadShape {
   outcome?: string;
   experienceEvent?: { content: string; valence: number; salience: number };
   roll?: { attribute: string; dr: number; total: number; success: boolean };
+  /** How deep in an act → adjudication chain this result sits (ensemble ACT_CHAIN_CAP). */
+  _depth?: number;
 }
 
 async function adjudicationResultHandler(
@@ -633,7 +663,8 @@ async function adjudicationResultHandler(
 
   const salience = ingest.persisted ? ingest.tags.salience : experienceEvent.salience;
   if (salience >= ADJUDICATION_WAKE_SALIENCE_THRESHOLD) {
-    return runStimulusPipeline(trigger.entityId, 'perception', sensation, 0, overrides);
+    // The turn this wakes inherits the chain's depth, so an act taken in it cannot wake another.
+    return runStimulusPipeline(trigger.entityId, 'perception', sensation, Math.max(0, payload._depth ?? 0), overrides);
   }
 
   return { memoryEntryId: ingest.persisted ? ingest.memoryEntryId : undefined };
@@ -997,7 +1028,7 @@ async function actOnIntent(ctx: EntityContext, intent: string, overrides: DayaCl
     });
     return;
   }
-  const facts = await currentFacts(ctx.campaignId);
+  const facts = await actorFacts(ctx, intent);
   const outward = await runBodyOutward(ctx, intent, facts, overrides);
   const care = await careScalarForCharacter(ctx.characterId, ctx.mood);
   const mechanicsHook: MechanicsRollHook = async (hookArgs) => {
