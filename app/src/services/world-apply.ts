@@ -102,6 +102,104 @@ export async function actorMap(characterId: string): Promise<ActorMap | null> {
   return { roomId: room.id, roomName: room.name, home, doors };
 }
 
+// ── Who is where (HW4 2026-10-24) ─────────────────────────────────────────────
+// The adjudicator let Violet hold a bill out "in the space between you" with a
+// locked door and two rooms between her and the man. It knew the doors of her
+// room; it did not know where he stood. Every other character is placed
+// relative to the actor: in this room, or beyond the openings on the way.
+
+export interface PassageEdge {
+  name: string;
+  kind: 'door' | 'archway' | 'opening';
+  state?: DoorState;
+  between: string[];
+}
+
+/** Rooms joined by passages (doors, archways, openings — not windows). Pure. */
+export function passageGraph(openings: Array<{ name?: string; kind: string; state?: DoorState; between: string[] }>): PassageEdge[] {
+  const out: PassageEdge[] = [];
+  for (const o of openings) {
+    if (o.kind !== 'door' && o.kind !== 'archway' && o.kind !== 'opening') continue;
+    if (!Array.isArray(o.between) || o.between.length < 2) continue;
+    out.push({ name: o.name ?? `${o.kind} between ${o.between.join(' and ')}`, kind: o.kind, state: o.state, between: o.between.map((b) => b.trim()) });
+  }
+  return out;
+}
+
+/** The passages on the shortest way from one room to another, by room name; null when none joins them. Pure. */
+export function routeBetween(graph: PassageEdge[], fromRoom: string, toRoom: string): PassageEdge[] | null {
+  const from = fromRoom.trim().toLowerCase();
+  const to = toRoom.trim().toLowerCase();
+  if (from === to) return [];
+  const prev = new Map<string, { room: string; edge: PassageEdge } | null>([[from, null]]);
+  const queue = [from];
+  while (queue.length) {
+    const room = queue.shift()!;
+    if (room === to) break;
+    for (const e of graph) {
+      const sides = e.between.map((b) => b.toLowerCase());
+      if (!sides.includes(room)) continue;
+      for (const next of sides) {
+        if (next === room || prev.has(next)) continue;
+        prev.set(next, { room, edge: e });
+        queue.push(next);
+      }
+    }
+  }
+  if (!prev.has(to)) return null;
+  const path: PassageEdge[] = [];
+  for (let cur = to; cur !== from;) { const p = prev.get(cur)!; path.unshift(p.edge); cur = p.room; }
+  return path;
+}
+
+/** "Entry door (locked)" / "Kitchenette opening (open archway)". Pure. */
+export function passageInWords(e: PassageEdge): string {
+  return e.kind === 'door' ? `${e.name} (${e.state ?? 'closed'})` : `${e.name} (open ${e.kind})`;
+}
+
+export interface Whereabouts {
+  id: string;
+  name: string;
+  roomName: string | null;
+  /** [] = in the actor's room; null = no way through on the map (or unplaced). */
+  route: PassageEdge[] | null;
+}
+
+/** Every other character placed relative to the actor's room. Never throws (→ []). */
+export async function whereOthersStand(campaignId: string, actorCharacterId: string, map: ActorMap | null): Promise<Whereabouts[]> {
+  try {
+    const [others, locs] = await Promise.all([
+      prisma.character.findMany({ where: { campaignId, id: { not: actorCharacterId }, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { id: true, name: true } }),
+      prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { id: true, name: true, data: true } }),
+    ]);
+    if (!others.length) return [];
+    const rels = await prisma.entityRelationship.findMany({ where: { sourceId: { in: others.map((o) => o.id) }, relationshipType: REL }, select: { sourceId: true, targetId: true } });
+    const roomOf = new Map(rels.map((r) => [r.sourceId, locs.find((l) => l.id === r.targetId)?.name ?? null]));
+    const graph = passageGraph(locs.flatMap((l) => parseOpenings(parseData(l.data).openings)));
+    return others.map((o) => {
+      const roomName = roomOf.get(o.id) ?? null;
+      const route = map && roomName ? routeBetween(graph, map.roomName, roomName) : null;
+      return { id: o.id, name: o.name, roomName, route };
+    });
+  } catch (err) {
+    console.warn('[world-apply] whereabouts unreadable (non-fatal):', err instanceof Error ? err.message : err);
+    return [];
+  }
+}
+
+/** The whereabouts as lines the adjudicator can treat as facts. Pure. */
+export function whereaboutsLines(actorRoom: string | null, rows: Whereabouts[]): string[] {
+  return rows.map((w) => {
+    if (!w.roomName) return `${w.name}: nowhere on the map — not here.`;
+    if (w.route && w.route.length === 0) return `${w.name}: HERE, in ${w.roomName} with the actor.`;
+    if (w.route) {
+      const sealed = w.route.some((e) => e.kind === 'door' && e.state !== 'open');
+      return `${w.name}: in ${w.roomName}, beyond ${w.route.map(passageInWords).join(' then ')}${sealed ? ' — out of sight and out of reach from here' : ' — within reach through the open way'}.`;
+    }
+    return `${w.name}: in ${w.roomName}, no way through from ${actorRoom ?? 'here'} on the map — out of reach.`;
+  });
+}
+
 /** The map as lines the adjudicator can treat as facts. Pure. */
 export function mapFactLines(map: ActorMap | null): string[] {
   if (!map) return [];
@@ -207,6 +305,8 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           const to = people.find((p) => p.id === e.to) ?? people.find((p) => p.name.toLowerCase() === e.to.trim().toLowerCase()) ?? people.find((p) => e.to.toLowerCase().includes(p.name.toLowerCase()));
           if (!to) { report.refused.push(`give "${item.name}": no one called "${e.to}" here`); break; }
           const toRel = await prisma.entityRelationship.findFirst({ where: { sourceId: to.id, relationshipType: REL }, select: { targetId: true } });
+          // A hand-over needs both in one room (HW4 2026-10-24: a five held out through a locked door).
+          if (map && toRel && toRel.targetId !== map.roomId) { report.refused.push(`give "${item.name}": ${to.name} is not in ${map.roomName}`); break; }
           await prisma.campaignItem.update({ where: { id: item.id }, data: { holderId: to.id, ...(toRel ? { locationId: toRel.targetId } : {}) } });
           report.applied.push(`"${item.name}" handed to ${to.name}`);
           break;

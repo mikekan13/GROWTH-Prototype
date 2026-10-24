@@ -225,3 +225,26 @@ describe('a sentence about a part or thing of his is his card (HW3 2026-10-24)',
     expect(parseTableProse('The radiator ticks. Rain on the window.', table, { recentActors: [table[0]] }).narration).toBe('The radiator ticks. Rain on the window.');
   });
 });
+
+describe('the subject pronoun wins; an unclaimed quote beside one character\'s prose acts is his (HW4 2026-10-24)', () => {
+  const table = [
+    { id: 'kris', name: 'Kristopher', sex: 'm' },
+    { id: 'violet', name: 'Violet', sex: 'f' },
+  ] as Parameters<typeof parseTableProse>[1];
+  it('"He … tries to get her …" is about him, and the quote beside his acts is his speech', () => {
+    const p = parseTableProse('He stops at the entryway to the landing. He turns around and tries to get her to come to the door one last time. "Please can you pay for the pizza..."', table, { recentActors: [table[0], table[1]] });
+    expect(p.actions?.map((a) => a.actorId)).toEqual(['kris', 'kris']);
+    expect(p.quotes[0]).toMatchObject({ speakerId: 'kris', speakerLabel: 'Kristopher', text: 'Please can you pay for the pizza...' });
+    expect(p.narration).toBeNull();
+  });
+  it('"She … tells him …" is about her', () => {
+    const p = parseTableProse('She tells him to go away. "Go."', table, { recentActors: [table[0], table[1]] });
+    expect(p.actions?.map((a) => a.actorId)).toEqual(['violet']);
+    expect(p.quotes[0]).toMatchObject({ speakerId: 'violet' });
+  });
+  it('a quote on a line with two different actors is left to the older rules (the name just before it)', () => {
+    const p = parseTableProse('Kristopher knocks. Violet freezes. "Who is it?"', table, { recentActors: [] });
+    expect(p.actions?.map((a) => a.actorId)).toEqual(['kris', 'violet']);
+    expect(p.quotes[0].speakerId).toBe('violet');
+  });
+});

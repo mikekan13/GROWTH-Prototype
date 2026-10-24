@@ -38,6 +38,11 @@ Rules:
    unlock it. The entity has ONLY what its Entity section lists — never
    invent a jacket, a pocket, a bag, a key. "effects" lists every physical
    change the outcome makes to doors, hands and rooms; [] when none.
+   WHO IS WHERE is authoritative too: only the people listed HERE share
+   the actor's room. Someone beyond a closed or locked door cannot be seen,
+   touched or handed anything; a locked door is not passed. An act that
+   needs them present happens toward the door or the empty room and reaches
+   no one — say so in the outcome; never place them in the room.
 1. Facts are law. Never contradict one. If the action touches something with
    no established fact, establish it conservatively (boring, plausible,
    room-appropriate) via factsToWrite.

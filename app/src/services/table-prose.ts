@@ -85,10 +85,12 @@ function sexOf(entry: ProseRosterEntry): Sex {
  * much better inference" — the scene, not the word next to the quote.
  */
 export function pronounActor(window: string, recent: ProseRosterEntry[]): ProseRosterEntry | null {
-  const he = HE_RE.test(window);
-  const she = SHE_RE.test(window);
-  if (he === she) return null;
-  const want: Sex = he ? 'm' : 'f';
+  // The FIRST pronoun is the subject ("He turns around and tries to get her to come to the door"
+  // is about him — HW4 2026-10-24: both pronouns present used to mean nobody).
+  const he = HE_RE.exec(window);
+  const she = SHE_RE.exec(window);
+  if (!he && !she) return null;
+  const want: Sex = he && (!she || he.index <= she.index) ? 'm' : 'f';
   for (const entry of recent) {
     const sex = sexOf(entry);
     if (sex === null || sex === want) return entry;
@@ -263,6 +265,8 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
     //     narration and becomes his own action; a span with no actor stays
     //     narration exactly as before.
     let line = rawLine;
+    const quotesBefore = quotes.length;
+    const actionsBefore = actions.length;
     // The actor of an action span on THIS line: a bare quote beside it is his
     // (`::Kristopher knocks twice:: "Hello?"`).
     let lineActor: ProseRosterEntry | null = null;
@@ -341,6 +345,13 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
     stripped += line.slice(cursor);
     const cleaned = stripped.replace(/\s{2,}/g, ' ').trim();
     if (cleaned) keepNarration(cleaned);
+    // A quote nobody claimed, on a line whose prose actions are all one character's, is his
+    // (HW4 2026-10-24: "He stops… He turns around… "Please can you pay…"" went to "someone present").
+    const lineActors = new Set(actions.slice(actionsBefore).map((a) => a.actorId));
+    if (lineActors.size === 1) {
+      const only = roster.find((r) => r.id === [...lineActors][0]);
+      if (only) for (const q of quotes.slice(quotesBefore)) if (!q.speakerId) { q.speakerId = only.id; q.speakerLabel = only.name; }
+    }
   }
 
   const narration = narrationParts.join('\n').trim() || null;

@@ -20,7 +20,7 @@ import { currentFacts, establishFact, supersede, type WorldFactRecord } from './
 import { buildAdjudicatorPrompt } from './prompts/roles/adjudicator';
 import { resolveDayaEntityId } from './entity';
 import { factsForActor, splitHeld } from './facts-for-actor';
-import { actorMap, mapFactLines, lockedDoorInTheWay, applyActEffects, parseActEffects, type ActEffect, type ApplyReport } from '@/services/world-apply';
+import { actorMap, mapFactLines, lockedDoorInTheWay, applyActEffects, parseActEffects, whereOthersStand, whereaboutsLines, type ActEffect, type ApplyReport } from '@/services/world-apply';
 
 // ── Contract (Ruling 19 — swappable behind this shape) ─────────────────────
 
@@ -185,6 +185,8 @@ export async function resolveIntent(
   // intent's subjects first, capped — not the whole campaign ledger.
   const facts = factsForActor(allFacts, { actorName: character.name, otherNames: others.map((o) => o.name), intent });
   const held = splitHeld(heldRows);
+  // Who is where (HW4 2026-10-24): the doors alone let a bill pass through a locked one.
+  const whereabouts = whereaboutsLines(map?.roomName ?? null, await whereOthersStand(campaignId, entityCharacterId, map));
 
   const factsBlock = facts.length > 0
     ? facts.map(f => `[${f.id}] ${f.subjectKey}: ${f.fact}`).join('\n')
@@ -197,6 +199,9 @@ export async function resolveIntent(
     '',
     `## The Map (authoritative for doors and rooms)`,
     mapBlock,
+    '',
+    `## Who Is Where (authoritative — nobody else is in the room unless listed HERE)`,
+    whereabouts.length ? whereabouts.join('\n') : '(no one else on the map)',
     '',
     `## Entity`,
     `Name: ${character.name}`,
@@ -211,7 +216,9 @@ export async function resolveIntent(
       'This is not an attempt: the Watcher has told the table what happened. "check" MUST be null and',
       '"outcome" MUST be the sentence as written. Your work is only "effects" (every change it makes to',
       'doors, hands and rooms — a walk down the hall into another room is a move; a knock, a tear, a look',
-      'is nothing: []) and the physical facts it establishes or supersedes.',
+      'is nothing: []) and the physical facts the sentence ITSELF states (a thing moved, a door changed,',
+      'a new position). Write no fact that interprets, infers, or says what the actor has or has not done',
+      'before; most narrated sentences write none: "factsToWrite": [].',
     ] : []),
   ].join('\n');
 
