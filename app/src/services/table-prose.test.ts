@@ -130,3 +130,48 @@ describe('introducedSubject', () => {
     expect(introducedSubject(null)).toBeNull();
   });
 });
+
+describe('parseTableProse — the GM writes a roster character\'s action (hello world 2026-10-17)', () => {
+  const table = [
+    { id: 'kris', name: 'Kristopher', sex: 'Male' },
+    { id: 'violet', name: 'Violet', sex: 'Female' },
+    { id: 'rosemary', name: 'Rosemary Marsh' },
+  ];
+  it('`::Kristopher begins to let his eyes wander::` is his action, not narration', () => {
+    const p = parseTableProse('::Kristopher begins to let his eyes wander around the hallway::', table);
+    expect(p.actions).toEqual([{ text: 'Kristopher begins to let his eyes wander around the hallway', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    expect(p.narration).toBeNull();
+    expect(p.quotes).toEqual([]);
+  });
+  it('a bare pronoun resolves to the character the table was just about, when the sex fits', () => {
+    const p = parseTableProse(':: His voice is warm and relaxed:: "Take your time."', table, { lastActor: table[0] });
+    expect(p.actions).toEqual([{ text: 'His voice is warm and relaxed', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    expect(p.quotes[0]).toMatchObject({ speakerId: 'kris', speakerLabel: 'Kristopher', text: 'Take your time.' });
+  });
+  it('a pronoun of the wrong sex does not pick the last actor', () => {
+    const p = parseTableProse('"Take your time," she says.', table, { lastActor: table[0] });
+    expect(p.quotes[0]).toMatchObject({ speakerId: null, speakerLabel: 'someone present' });
+  });
+  it('an unknown sex fits either pronoun', () => {
+    const p = parseTableProse('She sets the tray down. "Eat."', table, { lastActor: table[2] });
+    expect(p.quotes[0]).toMatchObject({ speakerId: 'rosemary' });
+  });
+  it('the actor named earlier in the same message is the referent of a later pronoun', () => {
+    const p = parseTableProse('::Kristopher knocks twice:: "Hello?" ::He waits::', table);
+    expect(p.actions?.map((a) => a.actorId)).toEqual(['kris', 'kris']);
+    expect(p.quotes[0]).toMatchObject({ speakerId: 'kris' });
+  });
+  it('an action span with no roster actor stays narration, as before', () => {
+    const p = parseTableProse('::The radiator ticks::', table);
+    expect(p.actions).toBeUndefined();
+    expect(p.narration).toBe('::The radiator ticks::');
+  });
+  it('without a roster nothing changes (no actions key)', () => {
+    const p = parseTableProse('::Kristopher knocks::');
+    expect(p).toEqual({ full: '::Kristopher knocks::', narration: '::Kristopher knocks::', quotes: [] });
+  });
+  it('a roster name in plain narration is the referent of the next line\'s pronoun', () => {
+    const p = parseTableProse('Kristopher shifts his weight on the landing.\n"You didn\'t pay," he says through the door.', table);
+    expect(p.quotes[0]).toMatchObject({ speakerId: 'kris' });
+  });
+});

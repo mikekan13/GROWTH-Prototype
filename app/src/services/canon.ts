@@ -241,6 +241,8 @@ export interface DeclarationFeed {
   raw?: string;
   narration?: string | null;
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
+  /** `::…::` actions the GM wrote for roster characters — the feed draws each as that character's own row. */
+  actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
 }
 
 /** The feed row's payload for a declaration: the canon text, its beat, the cycle it happened at, and what the table writer passed for the feed. Pure. */
@@ -254,6 +256,7 @@ export function declarationPayload(eventType: string, description: string, opts:
     ...(f.raw !== undefined && f.raw.trim() !== description.trim() ? { raw: f.raw } : {}),
     ...(f.narration !== undefined ? { narration: f.narration } : {}),
     ...(f.speech ? { speech: f.speech.map((s) => ({ speakerId: s.speakerId, speakerLabel: s.speakerLabel, text: s.text })) } : {}),
+    ...(f.actions?.length ? { actions: f.actions.map((a) => ({ actorId: a.actorId, actorLabel: a.actorLabel, text: a.text })) } : {}),
   };
 }
 

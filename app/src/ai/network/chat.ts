@@ -133,6 +133,7 @@ export async function routedChatText(
   // the caller has not written its row yet).
   const lawful = await screenModelOutput(res.text, {
     campaignId: task.campaignId ?? null,
+    site: task.caller,
     lane: lane.crossesWall ? 'cloud' : 'local',
     participantCharacterIds: input.participantCharacterIds,
   });

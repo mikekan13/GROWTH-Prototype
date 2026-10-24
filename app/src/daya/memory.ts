@@ -19,6 +19,7 @@ import { RECALL_TUNING } from './recall-tuning';
 import { classifyDomains, pillarOfDomain } from './domains';
 import { makeChain, type MemoryChain } from './chain';
 import { encodePerceivedVia } from './perceived-via';
+import { WITHHELD_STRING } from '@/lib/withheld';
 
 export type { TaggerRosterEntry };
 
@@ -38,6 +39,15 @@ export interface TaggerResult {
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** Withheld tagger answers per entity this process lifetime; a run of them is worth one loud line. */
+const withheldTagCounts = new Map<string, number>();
+function noteWithheldTag(entityId: string | undefined): void {
+  const key = entityId ?? '-';
+  const n = (withheldTagCounts.get(key) ?? 0) + 1;
+  withheldTagCounts.set(key, n);
+  if (n === 3) console.warn(`[daya/memory] tagger output withheld ${n}× for entity ${key} — the tagger's own wording is tripping the screen; check the rationale field`);
+}
 
 /** Neutral tags for when the tagger call/parse fails twice — ingest still records. */
 const NEUTRAL_FALLBACK: TaggerResult = {
@@ -134,6 +144,13 @@ export async function tagStimulusWithModel(
         { tier, subsystem: 'tagger', contentClass: 'fiction', entityId, messages, maxTokens: 400, temperature: attempt === 0 ? 0.2 : 0 },
         overrides,
       );
+      // The lawfulness screen withheld the tagger's answer. Asking the same
+      // question again costs a second cloud call and is withheld again (hello
+      // world 2026-10-17: 8 blocks, every one a repeat). Neutral tags, once.
+      if (result.text.trim() === WITHHELD_STRING) {
+        noteWithheldTag(entityId);
+        return { ...NEUTRAL_FALLBACK, classification: { ...NEUTRAL_FALLBACK.classification, rationaleTag: 'withheld' } };
+      }
       const parsed = parseTaggerJson(result.text);
       if (parsed) return parsed;
     } catch (err) {

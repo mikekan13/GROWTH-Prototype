@@ -29,9 +29,10 @@ const w = vi.hoisted(() => ({
 vi.mock('@/lib/db', () => ({
   prisma: {
     character: {
-      findMany: vi.fn(async (args: { where: { entityType?: string; id?: { not: string } } }) =>
-        args.where.entityType === 'NPC' ? w.npcs : w.characters.filter((c) => c.id !== args.where.id?.not)),
+      findMany: vi.fn(async (args: { where: { entityType?: string | { in: string[] }; id?: { not: string } } }) =>
+        args.where.entityType ? w.npcs : w.characters.filter((c) => c.id !== args.where.id?.not)),
     },
+    campaignEvent: { findMany: vi.fn(async () => []) },
     dayaEntity: { findMany: vi.fn(async () => w.active.map((characterId) => ({ characterId }))) },
     copilotMessage: { create: vi.fn(async (args: { data: { content: string; actions: string } }) => { w.dropped.push(args.data); return {}; }) },
     gameSession: { findFirst: vi.fn(async () => w.session) },

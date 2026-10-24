@@ -105,19 +105,37 @@ function declarationRows(e: TerminalEvent, p: GameEventPayload, roster: RosterNa
   const raw = p.raw ?? p.description;
   let narration: string | null;
   let speech: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
+  let actions: Array<{ actorId: string; actorLabel: string; text: string }>;
   if (Array.isArray(p.speech)) {
     speech = p.speech;
-    narration = p.narration !== undefined ? p.narration : (speech.length ? null : p.description);
+    actions = Array.isArray(p.actions) ? p.actions : [];
+    narration = p.narration !== undefined ? p.narration : (speech.length || actions.length ? null : p.description);
   } else {
     const parsed = parseTableProse(p.description, roster);
     speech = parsed.quotes;
+    actions = parsed.actions ?? [];
     narration = parsed.narration;
   }
   const rows: Array<NarrationRowModel | CharacterRowModel> = [];
   if (narration && narration.trim()) {
     rows.push({ type: 'narration', key: e.id, timestamp: e.timestamp, cycle: p.cycle, text: narration.trim(), raw, via, voicedBy: e.actorName || null });
   }
+  // A roster character's `::action::` is HIS row (Mike 2026-10-17: "it should
+  // have shown him as a card"), with or without speech, whoever perceived it.
+  // The speech that follows it from the same mouth joins the same row.
+  const taken = new Set<number>();
+  actions.forEach((a, i) => {
+    const segments: FeedSegment[] = [{ kind: 'action', text: a.text }];
+    const next = speech.findIndex((s, j) => !taken.has(j) && s.speakerId === a.actorId);
+    if (next >= 0) { taken.add(next); segments.push({ kind: 'speech', text: speech[next].text }); }
+    rows.push({
+      type: 'character', key: `${e.id}#a${i}`, timestamp: e.timestamp, cycle: p.cycle,
+      characterId: a.actorId, name: a.actorLabel, segments,
+      raw, via, voice: 'Watcher', voicedBy: e.actorName || null, fromNarration: true,
+    });
+  });
   speech.forEach((s, i) => {
+    if (taken.has(i)) return;
     rows.push({
       type: 'character', key: `${e.id}#${i}`, timestamp: e.timestamp, cycle: p.cycle,
       characterId: s.speakerId, name: s.speakerLabel, segments: [{ kind: 'speech', text: s.text }],

@@ -22,6 +22,18 @@ import { dispatchPrompt } from '@/ai/copilot/runtime';
 import { prisma } from '@/lib/db';
 import type { JewlPrompt, CanvasActionPayload } from '@/ai/copilot/prompts/types';
 
+/** Mutation kinds that are noted in JEWL's history, never dispatched as a turn. */
+const SILENT_MUTATION_KINDS: ReadonlySet<string> = new Set(['character-edit']);
+
+/** State-changing tools an observation dispatch never carries (it witnesses; it does not act). */
+const OBSERVATION_EXCLUDED_TOOLS: readonly string[] = [
+  'apply_attribute_damage',
+  'apply_condition',
+  'set_attribute_current',
+  'move_character_to_location',
+  'advance_clock',
+];
+
 interface ObservationBody {
   /** Short kebab verb identifying the mutation kind: 'damage', 'edit-location', 'advance-time'. */
   mutationKind?: string;
@@ -89,6 +101,26 @@ export async function POST(
       intent,
     };
 
+    // A sheet edit is a committed fact, not a question for JEWL (hello world,
+    // 2026-10-17: 8 edits → ~20 JEWL turns flooding the text lane, and one
+    // turn re-applied a pool correction as 14 bashing damage). It lands as a
+    // silent [system] note in his history, so his next real turn knows the
+    // sheet changed, and nothing is dispatched.
+    if (SILENT_MUTATION_KINDS.has(mutationKind)) {
+      await prisma.copilotMessage.create({
+        data: {
+          campaignId: id,
+          role: 'user',
+          content: intent,
+          userId: session.user.id,
+          username: '[system]',
+          actions: JSON.stringify({ source: 'GM_CANVAS_ACTION', canvasAction, silent: true }),
+          contentClass: 'fiction',
+        },
+      });
+      return NextResponse.json({ accepted: true, silent: true }, { status: 202 });
+    }
+
     const prompt: JewlPrompt = {
       source: 'GM_CANVAS_ACTION',
       campaignId: id,
@@ -97,6 +129,9 @@ export async function POST(
       actorRole: session.user.role,
       text: '',
       canvasAction,
+      // An observation witnesses a mutation that already happened. It never
+      // gets the tools to make another one.
+      excludedTools: [...OBSERVATION_EXCLUDED_TOOLS],
     };
 
     // Fire-and-forget. JEWL writes his reaction to the CopilotMessage log

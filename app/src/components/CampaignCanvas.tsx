@@ -952,6 +952,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
   // Debounced save: collect rapid changes and persist once after settling
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingChangesRef = useRef<Map<string, Set<string>>>(new Map());
 
   const handleCharacterUpdate = useCallback((nodeId: string, character: GrowthCharacter, changes: string[]) => {
     // Recompute augments from equipped items + traits before saving
@@ -970,12 +971,19 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       n.id === nodeId ? { ...n, characterData: charWithTKV } : n
     ));
 
-    // Debounce the API save (300ms) so rapid slider drags don't spam requests
+    // Debounce the API save (300ms) so rapid slider drags don't spam requests.
+    // Every change named while the timer runs is kept, so the note JEWL gets
+    // describes the whole edit, not the last pointer move.
     const existing = saveTimersRef.current.get(nodeId);
     if (existing) clearTimeout(existing);
+    const pending = pendingChangesRef.current.get(nodeId) ?? new Set<string>();
+    for (const c of changes) pending.add(c);
+    pendingChangesRef.current.set(nodeId, pending);
 
     saveTimersRef.current.set(nodeId, setTimeout(async () => {
       saveTimersRef.current.delete(nodeId);
+      const changes = [...(pendingChangesRef.current.get(nodeId) ?? [])];
+      pendingChangesRef.current.delete(nodeId);
       let saved = false;
       try {
         const res = await fetch(`/api/characters/${nodeId}`, {

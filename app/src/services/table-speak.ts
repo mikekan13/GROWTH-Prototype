@@ -48,7 +48,7 @@ import {
   recordDialogueCanon,
   recordUnattributedDialogueCanon,
 } from '@/services/canon';
-import { parseTableProse, type ProseQuote } from '@/services/table-prose';
+import { parseTableProse, type ProseQuote, type ProseRosterEntry } from '@/services/table-prose';
 import { ensureKeepalive } from '@/daya/l1-keepalive';
 import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, type ReconTicket } from '@/services/reconciliation';
 
@@ -194,6 +194,66 @@ export async function tableParticipantIds(campaignId: string): Promise<string[]>
   return (await activeListeners(campaignId)).map((c) => c.id);
 }
 
+/** The sheet's sex, from identity.sex or physicalDescription.gender (either may hold it). */
+function sexFromSheet(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const d = JSON.parse(raw) as { identity?: { sex?: string; physicalDescription?: { gender?: string } } };
+    return d.identity?.sex || d.identity?.physicalDescription?.gender || null;
+  } catch { return null; }
+}
+
+/**
+ * Everyone the GM's prose can name: NPCs AND player characters, each with the
+ * sex a pronoun has to match (hello world 2026-10-17: `::Kristopher …::` and
+ * "His voice is warm" both went unattributed because the roster was NPC-only
+ * and knew no sex).
+ */
+export async function proseRoster(campaignId: string): Promise<ProseRosterEntry[]> {
+  const rows = await prisma.character.findMany({
+    where: { campaignId, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } },
+    select: { id: true, name: true, data: true },
+  });
+  return rows.map((c) => ({ id: c.id, name: c.name, sex: sexFromSheet(c.data) }));
+}
+
+/**
+ * Who acted or spoke last at the table: the referent of a bare "he"/"she" in
+ * the GM's next line. Read off the feed's own rows, newest first — a being's
+ * chat line, or the last actor/speaker a declaration named.
+ */
+export async function lastTableActor(campaignId: string, roster: ProseRosterEntry[]): Promise<ProseRosterEntry | null> {
+  if (!roster.length) return null;
+  const rows = await prisma.campaignEvent.findMany({
+    where: { campaignId, type: { in: ['game_event', 'chat'] } },
+    orderBy: { createdAt: 'desc' },
+    take: 16,
+    select: { type: true, characterId: true, payload: true },
+  });
+  for (const row of rows) {
+    if (row.type === 'chat') {
+      const hit = row.characterId ? roster.find((r) => r.id === row.characterId) : null;
+      if (hit) return hit;
+      continue;
+    }
+    try {
+      const p = JSON.parse(row.payload) as { eventType?: string; actions?: Array<{ actorId: string }>; speech?: Array<{ speakerId: string | null }> };
+      if (p.eventType !== 'declaration') continue;
+      const ids = [...(p.actions ?? []).map((a) => a.actorId), ...(p.speech ?? []).map((s) => s.speakerId)].filter((x): x is string => !!x);
+      const last = ids.at(-1);
+      const hit = last ? roster.find((r) => r.id === last) : null;
+      if (hit) return hit;
+    } catch { /* not a payload we read */ }
+  }
+  return null;
+}
+
+/** The one actor every `::action::` in the message belongs to, when there is exactly one — the canon row's actorId. */
+function soleActor(parsed: { actions?: Array<{ actorId: string }> }): string | null {
+  const ids = new Set((parsed.actions ?? []).map((a) => a.actorId));
+  return ids.size === 1 ? [...ids][0] : null;
+}
+
 async function activeListeners(campaignId: string, excludeId?: string) {
   const characters = await prisma.character.findMany({
     where: { campaignId, ...(excludeId ? { id: { not: excludeId } } : {}) },
@@ -290,11 +350,9 @@ export async function speakProse(
   });
   if (tableSplitLoop()) return speakProseSplit(campaignId, actor, { ...input, message });
 
-  const roster = await prisma.character.findMany({
-    where: { campaignId, entityType: 'NPC' },
-    select: { id: true, name: true },
-  });
-  const parsed = parseTableProse(message, roster);
+  const roster = await proseRoster(campaignId);
+  const proseCtx = { lastActor: await lastTableActor(campaignId, roster) };
+  const parsed = parseTableProse(message, roster, proseCtx);
 
   // 0. JEWL reads it against the sim BEFORE it becomes canon (Mike 09-26,
   //    fluid-canon ruling). A confirmed ticket means the Watcher already
@@ -303,8 +361,9 @@ export async function speakProse(
   let ticketId: string | null = null;
   if (input.confirmTicketId) {
     ticketId = (await takeConfirmed(campaignId, input.confirmTicketId, message)).id;
-    const rosterNow = await prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { id: true, name: true } });
-    Object.assign(parsed, parseTableProse(message, rosterNow));
+    const rosterNow = await proseRoster(campaignId);
+    delete parsed.actions;
+    Object.assign(parsed, parseTableProse(message, rosterNow, proseCtx));
   } else {
     const held = await readNarration(campaignId, actor, message, parsed, listeners);
     if (held) return { held, canonEventId: null, dialogue: [], narration: parsed.narration, responses: [] };
@@ -320,9 +379,10 @@ export async function speakProse(
     const declared = await declareCanon(campaignId, actor, {
       narration: parsed.full,
       kind: 'narration',
+      actorId: soleActor(parsed),
       locationId: input.locationId ?? null,
       witnessIds: [],
-      feed: { via: 'typed', raw: message, narration: parsed.narration, speech: parsed.quotes },
+      feed: { via: 'typed', raw: message, narration: parsed.narration, speech: parsed.quotes, actions: parsed.actions },
     });
     canonEventId = declared.event.id;
   }
@@ -554,10 +614,11 @@ async function speakProseSplit(
   input: { message: string; locationId?: string | null; confirmTicketId?: string | null },
 ): Promise<TableProseResult> {
   const message = input.message;
-  const npcRoster = () => prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { id: true, name: true } });
+  const npcRoster = () => proseRoster(campaignId);
   const listeners = await activeListeners(campaignId);
   let roster = await npcRoster();
-  let parsed = parseTableProse(message, roster);
+  const proseCtx = { lastActor: await lastTableActor(campaignId, roster) };
+  let parsed = parseTableProse(message, roster, proseCtx);
   const planFor = (npcs: typeof roster) => planTableTalk(readTableTalk(message, { present: listeners, npcs }).utterances, 'typed');
   let plan = planFor(roster);
 
@@ -567,7 +628,7 @@ async function speakProseSplit(
   if (input.confirmTicketId) {
     ticketId = (await takeConfirmed(campaignId, input.confirmTicketId, message)).id;
     roster = await npcRoster();
-    parsed = parseTableProse(message, roster);
+    parsed = parseTableProse(message, roster, proseCtx);
     plan = planFor(roster);
   } else if (plan.world.length) {
     const held = await readNarration(campaignId, actor, message, parsed, listeners);
@@ -582,8 +643,8 @@ async function speakProseSplit(
   const soloAttributed = !narrated && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
   if (narration !== null && (narrated || parsed.quotes.length !== 1)) {
     const declared = await declareCanon(campaignId, actor, {
-      narration, kind: 'narration', locationId: input.locationId ?? null, witnessIds: [],
-      feed: { via: 'typed', raw: message, narration: narrated ? parsed.narration : null, speech: parsed.quotes },
+      narration, kind: 'narration', actorId: soleActor(parsed), locationId: input.locationId ?? null, witnessIds: [],
+      feed: { via: 'typed', raw: message, narration: narrated ? parsed.narration : null, speech: parsed.quotes, actions: parsed.actions },
     });
     canonEventId = declared.event.id;
   }

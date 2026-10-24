@@ -45,6 +45,8 @@ export interface HookResult {
 
 interface BaseHookContext {
   campaignId?: string | null;
+  /** Which caller asked the model (`daya:tagger`, `jewl:table`…) — for the block log only. */
+  site?: string;
   /** Who produced the content (the speaker; null for a model with no user). */
   userId?: string | null;
   /** Pointer to the stored row, when it exists — never a copy of the text. */
@@ -116,8 +118,11 @@ async function finish(
   } catch (err) {
     console.error('[lawfulness] flag write failed:', err instanceof Error ? err.message : err);
   }
+  // The site (which caller asked the model) and the text's size go in the
+  // log so a run of blocks can be traced to its source without storing the
+  // text (hello world 2026-10-17: 8 blocks, nothing said where they came from).
   console.warn(
-    `[lawfulness] blocked lane=${ctx.lane} source=${ctx.source} campaign=${ctx.campaignId ?? '-'} categories=${result.flags.join(',')} cues=${(result.cueWords ?? []).join('|') || '-'}`,
+    `[lawfulness] blocked lane=${ctx.lane} source=${ctx.source} site=${ctx.site ?? '-'} campaign=${ctx.campaignId ?? '-'} chars=${original.length} categories=${result.flags.join(',')} cues=${(result.cueWords ?? []).join('|') || '-'}`,
   );
   return { text: WITHHELD_STRING, blocked: true, categories: result.flags };
 }

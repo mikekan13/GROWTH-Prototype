@@ -17,7 +17,25 @@
  * Pure function, no I/O — unit-tested on its own.
  */
 
-export interface ProseRosterEntry { id: string; name: string }
+export interface ProseRosterEntry {
+  id: string;
+  name: string;
+  /** The sheet's sex (identity.sex / physicalDescription.gender), when the caller has it — a pronoun must match it. */
+  sex?: string | null;
+}
+
+/** `::Kristopher lets his eyes wander::` — an action the GM wrote for a roster character (hello world 2026-10-17). */
+export interface ProseAction {
+  text: string;
+  actorId: string;
+  actorLabel: string;
+}
+
+/** What the parser may know about the table beyond the message itself. */
+export interface ProseContext {
+  /** Who acted or spoke last at the table before this message — the referent of a bare "he"/"she". */
+  lastActor?: ProseRosterEntry | null;
+}
 
 export interface ProseQuote {
   text: string;
@@ -35,9 +53,46 @@ export interface ParsedProse {
   /** Narration only (quotes removed), null when the message was speech alone. */
   narration: string | null;
   quotes: ProseQuote[];
+  /** `::…::` spans the GM wrote for a roster character. Absent when there are none (the frozen fixtures predate it). */
+  actions?: ProseAction[];
 }
 
 const QUOTE_RE = /["“]([^"”]+)["”]/g;
+// `::Kristopher knocks twice::` — the AOL-RP action marker (lib/feed-segments), on the GM's own line.
+const ACTION_SPAN_RE = /::\s*([^:][\s\S]*?)\s*::/g;
+const HE_RE = /\b(?:he|him|his|himself)\b/i;
+const SHE_RE = /\b(?:she|her|hers|herself)\b/i;
+
+type Sex = 'm' | 'f' | null;
+function sexOf(entry: ProseRosterEntry): Sex {
+  const s = (entry.sex ?? '').trim().toLowerCase();
+  if (/^(f|female|woman|girl)\b/.test(s)) return 'f';
+  if (/^(m|male|man|boy)\b/.test(s)) return 'm';
+  return null;
+}
+
+/**
+ * "His voice is warm" → the last roster character named at the table whose sex
+ * fits the pronoun (an unknown sex fits either). Never when the window names
+ * both pronouns, never when it names neither. Mike (2026-10-17): "we need a
+ * much better inference" — the scene, not the word next to the quote.
+ */
+export function pronounActor(window: string, recent: ProseRosterEntry[]): ProseRosterEntry | null {
+  const he = HE_RE.test(window);
+  const she = SHE_RE.test(window);
+  if (he === she) return null;
+  const want: Sex = he ? 'm' : 'f';
+  for (const entry of recent) {
+    const sex = sexOf(entry);
+    if (sex === null || sex === want) return entry;
+  }
+  return null;
+}
+
+/** The roster character named LAST in a stretch of prose (for "who was just talked about"). */
+function lastRosterName(window: string, roster: ProseRosterEntry[]): ProseRosterEntry | null {
+  return findRosterName(window, roster);
+}
 const SCRIPT_PREFIX_RE = /^\s*([A-Z][\w.'’-]*(?:\s+[A-Z][\w.'’-]*){0,3}):\s*(.+)$/;
 // Verbs that end the noun phrase introducing a speaker ("A lass behind the bar GIVES you a wink").
 const INTRO_VERB_RE = /\s+(?:gives|give|says|say|asks|ask|looks|look|turns|turn|leans|lean|nods|nod|smiles|smile|winks|wink|shouts|shout|calls|call|whispers|whisper|grins|grin|laughs|laugh|steps|step|walks|walk|stands|stand|sits|sit|is|are|was|were|has|have|does|do|comes|come|glances|glance|raises|raise|slams|slam|pounds|pound|waves|wave|points|point|mutters|mutter|growls|growl|snaps|snap|sighs|sigh|frowns|frown|shrugs|shrug|beckons|beckon|watches|watch|stares|stare|eyes|reaches|reach|pushes|push|sets|set|puts|put|drops|drop|holds|hold|offers|offer|hands|hand|sneers|sneer|barks|bark|hisses|hiss|replies|reply|answers|answer|adds|add|continues|continue|pauses|pause|hesitates|hesitate|tries|try|starts|start|begins|begin|keeps|keep|moves|move|approaches|approach|enters|enter|appears|appear|emerges|emerge)\b/i;
@@ -125,13 +180,45 @@ export function unquotedSpeech(sentence: string, roster: ProseRosterEntry[]): Pr
   return null;
 }
 
-export function parseTableProse(message: string, roster: ProseRosterEntry[] = []): ParsedProse {
+export function parseTableProse(message: string, roster: ProseRosterEntry[] = [], ctx: ProseContext = {}): ParsedProse {
   const full = message.trim();
   const quotes: ProseQuote[] = [];
+  const actions: ProseAction[] = [];
   const lines = full.split(/\r?\n/);
   const narrationParts: string[] = [];
+  // Who a bare pronoun points at: most recent first — this message's own
+  // actors and speakers, then whoever acted last before it.
+  const recent: ProseRosterEntry[] = ctx.lastActor ? [ctx.lastActor] : [];
+  const noteActor = (entry: ProseRosterEntry | null) => {
+    if (!entry) return;
+    const i = recent.findIndex((r) => r.id === entry.id);
+    if (i >= 0) recent.splice(i, 1);
+    recent.unshift(entry);
+  };
 
-  for (const line of lines) {
+  for (const rawLine of lines) {
+    // -1. Action spans for a roster character: `::Kristopher knocks::`, or
+    //     `::He waits::` after Kristopher was named. The span leaves the
+    //     narration and becomes his own action; a span with no actor stays
+    //     narration exactly as before.
+    let line = rawLine;
+    // The actor of an action span on THIS line: a bare quote beside it is his
+    // (`::Kristopher knocks twice:: "Hello?"`).
+    let lineActor: ProseRosterEntry | null = null;
+    if (roster.length > 0 && line.includes('::')) {
+      line = line.replace(ACTION_SPAN_RE, (whole, inner: string) => {
+        const text = inner.trim();
+        if (!text) return whole;
+        const actor = firstRosterName(text, roster) ?? pronounActor(text, recent);
+        if (!actor) return whole;
+        actions.push({ text, actorId: actor.id, actorLabel: actor.name });
+        noteActor(actor);
+        lineActor = actor;
+        return ' ';
+      });
+      line = line.replace(/\s{2,}/g, ' ').trim();
+      if (!line) continue;
+    }
     // 0. Unquoted speech (`Ruth says, sit down.`) — only on a line with no quote
     //    marks, and only when a sentence of it really is one; every other line
     //    takes the paths below exactly as before.
@@ -139,7 +226,7 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
       const sentences = splitSentences(line);
       const said = sentences.map((s) => unquotedSpeech(s, roster));
       if (said.some(Boolean)) {
-        for (const q of said) if (q) quotes.push(q);
+        for (const q of said) if (q) { quotes.push(q); noteActor(roster.find((r) => r.id === q.speakerId) ?? null); }
         const kept = sentences.filter((_, i) => !said[i]).join(' ').trim();
         if (kept) narrationParts.push(kept);
         continue;
@@ -154,6 +241,7 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
       const inner = body.replace(/^["“]|["”]$/g, '').trim();
       if (inner) {
         quotes.push({ text: inner, speakerId: scriptSpeaker?.id ?? null, speakerLabel: scriptSpeaker?.name ?? script[1].trim(), context: null });
+        noteActor(scriptSpeaker);
         continue;
       }
     }
@@ -174,7 +262,11 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
       // by a capitalized new sentence ("Ruth sighs.") is a new beat, not a tag.
       const quoteText = m[1].trim();
       const runsOn = /,$/.test(quoteText) || !/[.!?…]$/.test(quoteText) || /^\s*[,a-z]/.test(afterAll);
-      const npc = findRosterName(beforeWindow.slice(-160), roster) ?? (runsOn ? firstRosterName(afterTag.slice(0, 120), roster) : null);
+      const named = findRosterName(beforeWindow.slice(-160), roster) ?? (runsOn ? firstRosterName(afterTag.slice(0, 120), roster) : null);
+      // No name by the quote: "His voice is warm. 'Take your time.'" → the
+      // man the table was just talking about, if the pronoun fits his sheet.
+      const byPronoun = named ? null : pronounActor(`${contextSentence ?? ''} ${runsOn ? afterTag.slice(0, 120) : ''}`, recent);
+      const npc = named ?? byPronoun ?? (contextSentence === null ? lineActor : null);
       const subject = npc ? null : introducedSubject(contextSentence);
       quotes.push({
         text: m[1].trim(),
@@ -182,13 +274,17 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
         speakerLabel: npc?.name ?? subject ?? 'someone present',
         context: contextSentence,
       });
+      noteActor(npc);
       cursor = start + m[0].length;
     }
     stripped += line.slice(cursor);
     const cleaned = stripped.replace(/\s{2,}/g, ' ').trim();
-    if (cleaned) narrationParts.push(cleaned);
+    if (cleaned) {
+      narrationParts.push(cleaned);
+      if (roster.length > 0) noteActor(lastRosterName(cleaned, roster));
+    }
   }
 
   const narration = narrationParts.join('\n').trim() || null;
-  return { full, narration, quotes };
+  return { full, narration, quotes, ...(actions.length ? { actions } : {}) };
 }

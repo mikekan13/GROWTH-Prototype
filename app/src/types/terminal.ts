@@ -125,6 +125,8 @@ export interface GameEventPayload extends TableFeedFields {
   narration?: string | null;
   /** …and each line of speech it pulled out, with who the record says spoke it. The feed draws these as that character's own rows. */
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
+  /** …and each `::action::` it wrote for a roster character (2026-10-23). The feed draws these as that character's own action rows. */
+  actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
   /** Encounter lines (encounter_begin/round/down/up/end, since 2026-10-08): which encounter, so the feed folds begin → end. */
   encounterId?: string;
   encounterName?: string;

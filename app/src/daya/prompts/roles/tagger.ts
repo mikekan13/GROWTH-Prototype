@@ -38,9 +38,10 @@ export function buildTaggerPrompt(args: TaggerPromptArgs): string {
    "contentCategory": "dialogue"|"perception"|"reasoning"|"world"|"meta",
    "sensitivity": "sensitive"|"safe",
    "icOoc": "IC"|"OOC",
-   "rationaleTag": <3-6 word content-free reason>
+   "rationaleTag": "routine"|"first-time"|"threat"|"strong-feeling"|"identity"|"relationship"|"world-fact"|"table-talk"
  }
 }
+No prose before or after the JSON, no commentary, no field beyond these.
 Judge from the experiencer's point of view. Ordinary sensory beats are low
 salience (0.05-0.2); firsts, threats, strong feeling, and identity-touching
 moments are high (0.6+). When unsure on sensitivity, choose "sensitive".

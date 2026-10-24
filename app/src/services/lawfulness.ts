@@ -63,6 +63,8 @@ export interface FlagRef {
 
 export interface ScreenContext {
   campaignId?: string | null;
+  /** Which caller produced the text — logged on a block, never stored. */
+  site?: string;
   userId?: string | null;
   lane: LawfulnessLane;
   source: LawfulnessSource;

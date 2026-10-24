@@ -105,3 +105,31 @@ describe('spoken beats fold', () => {
     expect(beat.lastTimestamp).toBe(b.timestamp);
   });
 });
+
+describe('the Watcher writes a roster character\'s action (hello world 2026-10-17)', () => {
+  it('a stored action is that character\'s own row, with his following speech on the same row', () => {
+    const rows = eventRows(ev({
+      kind: 'game_event', eventType: 'declaration', description: '::Warden knocks twice:: "Open up."',
+      narration: null, speech: [{ speakerId: 'warden', speakerLabel: 'Warden', text: 'Open up.' }],
+      actions: [{ actorId: 'warden', actorLabel: 'Warden', text: 'Warden knocks twice' }],
+    }), roster);
+    expect(rows.map((r) => r.type)).toEqual(['character']);
+    expect(rows[0]).toMatchObject({
+      characterId: 'warden', name: 'Warden', fromNarration: true, voice: 'Watcher',
+      segments: [{ kind: 'action', text: 'Warden knocks twice' }, { kind: 'speech', text: 'Open up.' }],
+    });
+  });
+  it('an action with no speech is still his row, not narration', () => {
+    const rows = eventRows(ev({
+      kind: 'game_event', eventType: 'declaration', description: '::Warden lets his eyes wander::',
+      narration: null, speech: [], actions: [{ actorId: 'warden', actorLabel: 'Warden', text: 'Warden lets his eyes wander' }],
+    }), roster);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ type: 'character', characterId: 'warden', segments: [{ kind: 'action', text: 'Warden lets his eyes wander' }] });
+  });
+  it('an old row with an action span re-parses to his row too', () => {
+    const rows = eventRows(ev({ kind: 'game_event', eventType: 'declaration', description: 'The hall is dark. ::Warden knocks::' }), roster);
+    expect(rows.map((r) => r.type)).toEqual(['narration', 'character']);
+    expect(rows[1]).toMatchObject({ characterId: 'warden', segments: [{ kind: 'action', text: 'Warden knocks' }] });
+  });
+});

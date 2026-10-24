@@ -235,7 +235,8 @@ export default function TableFeed({
   }, [campaignId]);
 
   const feedEntities = useMemo(() => (perceived ? perceivedFeedEntities(events, entities) : entities), [perceived, events, entities]);
-  const roster = useMemo(() => feedEntities.filter((e) => e.kind === 'npc').map((e) => ({ id: e.id, name: e.name })), [feedEntities]);
+  // NPCs and player characters both: the GM's prose names either (hello world 2026-10-17).
+  const roster = useMemo(() => feedEntities.filter((e) => e.kind === 'npc' || e.kind === 'character').map((e) => ({ id: e.id, name: e.name })), [feedEntities]);
   const liveEncounter = encounter?.live ?? null;
   const tree = useMemo(
     () => (sessions ? buildFoldTree(events, sessions, { emptyFrom, liveEncounter, keep, dropBetween, prune }) : null),
