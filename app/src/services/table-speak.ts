@@ -232,29 +232,38 @@ export async function proseRoster(campaignId: string): Promise<ProseRosterEntry[
  * chat line, or the last actor/speaker a declaration named.
  */
 export async function lastTableActor(campaignId: string, roster: ProseRosterEntry[]): Promise<ProseRosterEntry | null> {
-  if (!roster.length) return null;
+  return (await recentTableActors(campaignId, roster))[0] ?? null;
+}
+
+/**
+ * The recent actors at the table, newest first, each once: a being's chat
+ * line, or the actors/speakers a declaration named. A bare "he" after Violet
+ * spoke still finds Kristopher two rows back (HW3 2026-10-24).
+ */
+export async function recentTableActors(campaignId: string, roster: ProseRosterEntry[], limit = 4): Promise<ProseRosterEntry[]> {
+  if (!roster.length) return [];
   const rows = await prisma.campaignEvent.findMany({
     where: { campaignId, type: { in: ['game_event', 'chat'] } },
     orderBy: { createdAt: 'desc' },
-    take: 16,
+    take: 24,
     select: { type: true, characterId: true, payload: true },
   });
+  const out: ProseRosterEntry[] = [];
+  const add = (id: string | null | undefined) => {
+    const hit = id ? roster.find((r) => r.id === id) : null;
+    if (hit && !out.some((o) => o.id === hit.id)) out.push(hit);
+  };
   for (const row of rows) {
-    if (row.type === 'chat') {
-      const hit = row.characterId ? roster.find((r) => r.id === row.characterId) : null;
-      if (hit) return hit;
-      continue;
-    }
+    if (out.length >= limit) break;
+    if (row.type === 'chat') { add(row.characterId); continue; }
     try {
       const p = JSON.parse(row.payload) as { eventType?: string; actions?: Array<{ actorId: string }>; speech?: Array<{ speakerId: string | null }> };
       if (p.eventType !== 'declaration') continue;
       const ids = [...(p.actions ?? []).map((a) => a.actorId), ...(p.speech ?? []).map((s) => s.speakerId)].filter((x): x is string => !!x);
-      const last = ids.at(-1);
-      const hit = last ? roster.find((r) => r.id === last) : null;
-      if (hit) return hit;
+      for (const id of ids.reverse()) add(id);
     } catch { /* not a payload we read */ }
   }
-  return null;
+  return out;
 }
 
 /** Every being the Watcher voiced in this message: the actors of its `::actions::` and the speakers of its quotes. */
@@ -366,7 +375,7 @@ export async function speakProse(
   if (tableSplitLoop()) return speakProseSplit(campaignId, actor, { ...input, message });
 
   const roster = await proseRoster(campaignId);
-  const proseCtx = { lastActor: await lastTableActor(campaignId, roster) };
+  const proseCtx = { recentActors: await recentTableActors(campaignId, roster) };
   const parsed = parseTableProse(message, roster, proseCtx);
 
   // 0. JEWL reads it against the sim BEFORE it becomes canon (Mike 09-26,
@@ -662,7 +671,7 @@ async function speakProseSplit(
   const npcRoster = () => proseRoster(campaignId);
   const listeners = await activeListeners(campaignId);
   let roster = await npcRoster();
-  const proseCtx = { lastActor: await lastTableActor(campaignId, roster) };
+  const proseCtx = { recentActors: await recentTableActors(campaignId, roster) };
   let parsed = parseTableProse(message, roster, proseCtx);
   const planFor = (npcs: typeof roster) => planTableTalk(readTableTalk(message, { present: listeners, npcs }).utterances, 'typed');
   let plan = planFor(roster);

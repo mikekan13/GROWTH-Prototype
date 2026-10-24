@@ -195,3 +195,16 @@ describe('an unterminated quote (HW3, Mike 2026-10-24: the closing mark was miss
     expect(p.narration).toBeNull();
   });
 });
+
+describe('a pronoun walks back through the recent actors (HW3 2026-10-24)', () => {
+  const table = [{ id: 'kris', name: 'Kristopher', sex: 'Male' }, { id: 'violet', name: 'Violet', sex: 'Female' }];
+  it('"He knocks…" right after Violet spoke is still Kristopher', () => {
+    const p = parseTableProse('He knocks on the door once more and lets his head sink to rest on the door.', table, { recentActors: [table[1], table[0]] });
+    expect(p.actions).toEqual([{ text: 'Knocks on the door once more and lets his head sink to rest on the door', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    expect(p.narration).toBeNull();
+  });
+  it('"She …" in the same spot is Violet', () => {
+    const p = parseTableProse('She does not move.', table, { recentActors: [table[1], table[0]] });
+    expect(p.actions?.[0]).toMatchObject({ actorId: 'violet', text: 'Does not move' });
+  });
+});

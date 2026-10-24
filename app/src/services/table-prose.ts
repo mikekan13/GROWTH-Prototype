@@ -35,6 +35,12 @@ export interface ProseAction {
 export interface ProseContext {
   /** Who acted or spoke last at the table before this message — the referent of a bare "he"/"she". */
   lastActor?: ProseRosterEntry | null;
+  /**
+   * The recent actors at the table, newest first (HW3 2026-10-24: "He knocks…" after Violet's
+   * line stayed narration because the single last actor was her). A pronoun walks back through
+   * these to the first whose sex fits. Supersedes `lastActor` when given.
+   */
+  recentActors?: ProseRosterEntry[];
 }
 
 export interface ProseQuote {
@@ -217,7 +223,7 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
   const narrationParts: string[] = [];
   // Who a bare pronoun points at: most recent first — this message's own
   // actors and speakers, then whoever acted last before it.
-  const recent: ProseRosterEntry[] = ctx.lastActor ? [ctx.lastActor] : [];
+  const recent: ProseRosterEntry[] = ctx.recentActors?.length ? [...ctx.recentActors] : ctx.lastActor ? [ctx.lastActor] : [];
   const noteActor = (entry: ProseRosterEntry | null) => {
     if (!entry) return;
     const i = recent.findIndex((r) => r.id === entry.id);
