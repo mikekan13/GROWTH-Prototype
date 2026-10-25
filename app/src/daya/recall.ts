@@ -23,6 +23,7 @@ import { RECALL_TUNING } from './recall-tuning';
 import { climb, cueCoverage, ladderCompare, RUNG_RANK, type Rung } from './ladder';
 import { parseChain, type MemoryChain } from './chain';
 import { classifyDomains } from './domains';
+import { dueIntentionsFor, type DueIntention } from './intentions';
 
 export { RECALL_TUNING };
 
@@ -84,6 +85,8 @@ export interface RecallResult {
   surfaced: SurfacedMemory[];
   failedFeel: string | null;
   deferred: string[];
+  /** What the being meant to do, due now (trigger in the cue or its hour): the sentences as it put them. */
+  intentions?: string[];
 }
 
 // ── Minimal local seal-lint (WP9 owns the canonical src/daya/seal.ts) ─────
@@ -471,12 +474,17 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
   const theta = godlike ? 0 : wisdomThreshold(req.soulState.wisdomMax);
   const budget = godlike ? Number.MAX_SAFE_INTEGER : (req.budget ?? wisdomBudget(req.soulState.wisdomMax, req.soulState.wisdomCur));
 
-  // Ladder (Mike 09-23): classify the cue, then survival → goals → domain → chain → words.
+  // Intentions (Mike 2026-10-25): what the being meant to do, due now — its source memory climbs above the vines
+  // and surfaces whatever the budget or the Wit roll says.
+  const due: DueIntention[] = await dueIntentionsFor(req.entityId, req.cue, req.nowCycle);
+  const intentionMemoryIds = new Set(due.map((d) => d.sourceMemoryId).filter((id): id is string => !!id));
+
+  // Ladder (Mike 09-23): classify the cue, then survival → intention → goals → domain → chain → words.
   // A memory standing on the goals rung or higher is reachable at half the
   // words-threshold — what a being cares about stays reachable even when the
   // words don't match; the flat pile still needs the full threshold.
   const cueDomains = classifyDomains(req.cue).all;
-  const ladderCtx = { cue: req.cue, cueRefs, goals: req.goals ?? [], situation: req.situation ?? { threatened: false, frequencyLow: false }, cueDomains };
+  const ladderCtx = { cue: req.cue, cueRefs, goals: req.goals ?? [], situation: req.situation ?? { threatened: false, frequencyLow: false }, cueDomains, intentionMemoryIds };
   const rungOf = new Map<string, ReturnType<typeof climb>>();
   for (const c of scored) {
     rungOf.set(c.memory.id, climb({ id: c.memory.id, content: c.memory.content, valence: c.memory.valence, arousal: c.memory.arousal, domain: c.memory.domain ?? null, domains: c.memory.domains ?? [], chain: c.memory.chain ?? parseChain(null) }, ladderCtx));
@@ -485,6 +493,7 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
     .filter((c) => {
       if (!Number.isFinite(c.score)) return false;
       const r = rungOf.get(c.memory.id)!;
+      if (r.rung === 'intention') return true;
       return c.score >= theta || (RUNG_RANK[r.rung] >= RUNG_RANK.goals && c.score >= theta * 0.5);
     })
     .sort((a, b) => ladderCompare({ ...rungOf.get(a.memory.id)!, score: a.score }, { ...rungOf.get(b.memory.id)!, score: b.score }));
@@ -492,11 +501,13 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
   passing = await maybeRerank(passing, req.cue, overrides);
 
   const withinBudget = spreadBudget(passing, (c) => rungOf.get(c.memory.id)?.rung ?? 'none', budget);
+  // A due intention's memory is held whatever the budget: it was not retrieved, it was waiting.
+  for (const c of passing) if (rungOf.get(c.memory.id)?.rung === 'intention' && !withinBudget.includes(c)) withinBudget.unshift(c);
 
   const surfacedList: ScoredCandidate[] = [];
   const deferred: string[] = [];
   for (const c of withinBudget) {
-    if (godlike || witPasses(req.entityId, c.memory.id, req.nowCycle, req.soulState.witMax)) {
+    if (godlike || rungOf.get(c.memory.id)?.rung === 'intention' || witPasses(req.entityId, c.memory.id, req.nowCycle, req.soulState.witMax)) {
       surfacedList.push(c);
     } else {
       deferred.push(c.memory.id);
@@ -588,5 +599,6 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
     surfaced: surfacedList.map((c) => ({ memoryId: c.memory.id, score: c.score, rung: rungOf.get(c.memory.id)?.rung })),
     failedFeel,
     deferred,
+    ...(due.length ? { intentions: due.map((d) => d.description) } : {}),
   };
 }

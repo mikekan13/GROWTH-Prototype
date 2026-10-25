@@ -26,6 +26,7 @@ import { resolveDayaEntityId } from './entity';
 import { chat, type DayaChatMessage, type DayaClientOverrides } from './model-client';
 import { registerHandler, wake, type DayaTrigger, type HandlerResult } from './events';
 import { ingestStimulus, writeMemoryEntry } from './memory';
+import { intentionLine } from './intentions';
 import { recall, stemmedJaccard } from './recall';
 import { render, type Observer, type BiasProfile, type VoiceParams, type AffectVector } from './renderer';
 import { currentFacts, type WorldFactRecord } from './world-ledger';
@@ -442,7 +443,7 @@ async function runStimulusPipeline(
     },
     overrides,
   );
-  const rawRecallBlock = [recallResult.prose ?? recallResult.failedFeel ?? 'Nothing in particular comes to mind.', ...thornFire.fired.map((f) => f.feltLine)]
+  const rawRecallBlock = [intentionLine(recallResult.intentions?.map((description) => ({ description })) ?? []), recallResult.prose ?? recallResult.failedFeel ?? 'Nothing in particular comes to mind.', ...thornFire.fired.map((f) => f.feltLine)]
     .filter(Boolean)
     .join(' ');
   // Seal inversion (WP13 spec §2/§4-4): a JEWL-tier entity is allowed to
@@ -909,7 +910,7 @@ export async function listenStimulus(
     },
     overrides,
   );
-  const rawRecallBlock = [recallResult.prose ?? recallResult.failedFeel ?? 'Nothing in particular comes to mind.', ...thornFire.fired.map((f) => f.feltLine)]
+  const rawRecallBlock = [intentionLine(recallResult.intentions?.map((description) => ({ description })) ?? []), recallResult.prose ?? recallResult.failedFeel ?? 'Nothing in particular comes to mind.', ...thornFire.fired.map((f) => f.feltLine)]
     .filter(Boolean)
     .join(' ');
   const recallBlock = omniscient
@@ -1183,7 +1184,8 @@ export async function answerAsk(
           prisma.goal.findMany({ where: { characterId, status: 'ACTIVE' }, select: { id: true, description: true } }).catch(() => []),
         ]);
         const r = await recall({ entityId: ctx.entityDaId, cue, mood: ctx.mood, soulState: ctx.soulState, thornBlocks, nowCycle: ctx.cycle, ruminationLockActive, goals, situation: { threatened: false, frequencyLow: false } }, overrides);
-        return r.prose ?? r.failedFeel ?? state.recallBlock;
+        const meant = intentionLine(r.intentions?.map((description) => ({ description })) ?? []);
+        return [meant, r.prose ?? r.failedFeel ?? state.recallBlock].filter(Boolean).join(' ');
       } catch { return state.recallBlock; }
     })(),
     Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: characterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 })).catch((): Array<{ name: string; data: string | null }> => []),

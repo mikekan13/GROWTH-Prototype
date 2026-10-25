@@ -12,9 +12,10 @@ import { classifyDomains } from './domains';
 import { goalsTouched } from './chain';
 import { vectorize, cosine } from './probes-vec';
 
-export type Rung = 'survival' | 'goals' | 'domain' | 'chain' | 'words' | 'none';
+export type Rung = 'survival' | 'intention' | 'goals' | 'domain' | 'chain' | 'words' | 'none';
 
-export const RUNG_RANK: Record<Rung, number> = { survival: 5, goals: 4, domain: 3, chain: 2, words: 1, none: 0 };
+/** Survival, then what the being meant to do now (intentions, 2026-10-25), then its vines, then the rest. */
+export const RUNG_RANK: Record<Rung, number> = { survival: 6, intention: 5, goals: 4, domain: 3, chain: 2, words: 1, none: 0 };
 
 export interface LadderMemory {
   id: string;
@@ -35,6 +36,8 @@ export interface LadderContext {
   situation: { threatened: boolean; frequencyLow: boolean };
   /** Domains the cue itself is about (computed if omitted). */
   cueDomains?: string[];
+  /** Memories whose words hold an intention that is due now (daya/intentions.ts). */
+  intentionMemoryIds?: Set<string>;
 }
 
 export interface LadderResult {
@@ -114,6 +117,7 @@ export function climb(m: LadderMemory, ctx: LadderContext): LadderResult {
   const words = wordsStrength(ctx.cue, m.content);
   const rungs: Array<[Rung, number]> = [
     ['survival', survivalStrength(m, ctx.situation)],
+    ['intention', ctx.intentionMemoryIds?.has(m.id) ? 1 : 0],
     ['goals', goalStrength(m, ctx)],
     ['domain', domainStrength(m, cueDomains)],
     ['chain', chainStrength(m, ctx.cueRefs)],

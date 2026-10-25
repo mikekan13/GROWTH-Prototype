@@ -1300,6 +1300,32 @@ model DayaEntity {
   spiritTiesAsChild  DayaSpiritTie[]    @relation("DayaSpiritTieChild")
   modelCalls         DayaModelCall[]
   familiarities      Familiarity[]
+  intentions         DayaIntention[]
+}
+
+// What a being means to do (Mike 2026-10-25): under the GRO.vines (overall
+// goals) sit the day's intentions and the life's routines — tonight when he
+// knocks, the pizza every day, the door locked every time. Derived from the
+// being's own prospective words at encode time (daya/intentions.ts), never
+// authored. A due one (trigger in the cue, or its hour now) surfaces outside
+// the Wisdom budget.
+model DayaIntention {
+  id             String     @id @default(cuid())
+  entity         DayaEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  entityId       String
+  description    String     // the sentence as the being put it
+  trigger        String?    // what calls it up: "he knocks"
+  dueCycle       Float?     // the window it is for (campaign cycles); null = no time of its own
+  dueUntil       Float?
+  cadence        String?    // daily | nightly | weekly | always — a routine
+  goalId         String?    // the GRO.vine it serves (Goal.id), when its words touch one
+  status         String     @default("PENDING") // PENDING | DONE | LAPSED
+  sourceMemoryId String?    // the DayaMemoryEntry whose words it came from
+  narrativeCycle Float      // when it was formed
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([entityId, status])
 }
 
 // The entity's own fuzzy/possibly-wrong mirror of its GrowthCharacter sheet.
