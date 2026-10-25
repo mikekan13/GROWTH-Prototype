@@ -13,6 +13,7 @@ import {
   scoreCandidate,
   localSealLint,
   poolNorm,
+  spreadBudget,
   type ParsedMemory,
 } from './recall';
 
@@ -56,6 +57,29 @@ describe('computeRelevance', () => {
     const heard = 'He wipes his eyes from the tears he was crying in the car. He knocks on the door.';
     expect(stemmedJaccard(heard, lingers)).toBeLessThan(0.1);
     expect(computeRelevance(heard, [], lingers, [])).toBeCloseTo(0.6, 5);
+  });
+});
+
+// HW7 2026-10-25 (Mike): survival stays first, and "she should be able to hold both memories at once" — two survival
+// memories must not fill a budget of two between them.
+describe('spreadBudget — the budget spread down the ladder', () => {
+  const rows = [
+    { id: 'rosemary-died', rung: 'survival' as const },
+    { id: 'rosemary-raised-me', rung: 'survival' as const },
+    { id: 'ordering-the-knock', rung: 'goals' as const },
+    { id: 'tonight-when-he-knocks', rung: 'domain' as const },
+    { id: 'cocteau-twins', rung: 'none' as const },
+  ];
+  const rung = (r: { rung: 'survival' | 'goals' | 'domain' | 'none' }) => r.rung;
+  it('one per rung first, top rung first; then the rest in ladder order', () => {
+    expect(spreadBudget(rows, rung, 2).map((r) => r.id)).toEqual(['rosemary-died', 'ordering-the-knock']);
+    expect(spreadBudget(rows, rung, 3).map((r) => r.id)).toEqual(['rosemary-died', 'ordering-the-knock', 'tonight-when-he-knocks']);
+    expect(spreadBudget(rows, rung, 4).map((r) => r.id)).toEqual(['rosemary-died', 'rosemary-raised-me', 'ordering-the-knock', 'tonight-when-he-knocks']);
+  });
+  it('a budget of one is the top of the ladder; a budget that fits everything changes nothing', () => {
+    expect(spreadBudget(rows, rung, 1).map((r) => r.id)).toEqual(['rosemary-died']);
+    expect(spreadBudget(rows, rung, 9)).toEqual(rows);
+    expect(spreadBudget(rows, rung, 0)).toEqual([]);
   });
 });
 

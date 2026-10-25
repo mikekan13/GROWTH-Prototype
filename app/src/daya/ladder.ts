@@ -45,24 +45,19 @@ export interface LadderResult {
   words: number;
 }
 
-/** The domains a cue is about when it is about harm: death and the undoing of it. */
-const HARM_DOMAINS = ['dissolution', 'restoration'];
-
 /**
- * Survival relevance of a memory: threat-shaped affect, or death/harm domains, full strength when the being is in
- * danger now. Survival leads the ladder — but only when survival is in question: the being is in danger, or the cue
- * itself is about harm. A calm knock at the door is neither (HW7 2026-10-25: Violet's recall on the knock surfaced
- * her grandmother's death and never reached "tonight, when he knocks").
+ * Survival relevance of a memory: threat-shaped affect, or death/harm domains, sharpened when the being is in danger
+ * now. Survival leads the ladder whatever the cue (Mike 2026-10-25: "survival should be most important. And perhaps
+ * someone knocking at her door does trigger PTSD. But she should be able to hold both memories at once" — holding
+ * both is the budget's job, see recall.spreadBudget).
  */
-export function survivalStrength(m: LadderMemory, situation: LadderContext['situation'], cueDomains: string[] = []): number {
+export function survivalStrength(m: LadderMemory, situation: LadderContext['situation']): number {
   const threatAffect = m.arousal >= 0.7 && m.valence <= -0.3 ? 1 : 0;
   const harmDomain = m.domains.includes('dissolution') ? 0.7 : m.domains.includes('restoration') ? 0.4 : 0;
   const base = Math.max(threatAffect, harmDomain);
   if (base === 0) return 0;
-  const danger = situation.threatened || situation.frequencyLow;
-  const harmCue = cueDomains.some((d) => HARM_DOMAINS.includes(d));
-  if (!danger && !harmCue) return 0;
-  return Math.min(1, base * (danger ? 1 : 0.6));
+  const danger = situation.threatened || situation.frequencyLow ? 1 : 0.6;
+  return Math.min(1, base * danger);
 }
 
 export function goalStrength(m: LadderMemory, ctx: LadderContext): number {
@@ -118,7 +113,7 @@ export function climb(m: LadderMemory, ctx: LadderContext): LadderResult {
   const cueDomains = ctx.cueDomains ?? classifyDomains(ctx.cue).all;
   const words = wordsStrength(ctx.cue, m.content);
   const rungs: Array<[Rung, number]> = [
-    ['survival', survivalStrength(m, ctx.situation, cueDomains)],
+    ['survival', survivalStrength(m, ctx.situation)],
     ['goals', goalStrength(m, ctx)],
     ['domain', domainStrength(m, cueDomains)],
     ['chain', chainStrength(m, ctx.cueRefs)],

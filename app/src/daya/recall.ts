@@ -425,6 +425,27 @@ function mergeClassification(raw: string, patch: Record<string, unknown>): strin
   }
 }
 
+/**
+ * The budget, spread down the ladder (Mike 2026-10-25: "survival should be most important… But she should be able to
+ * hold both memories at once"): the strongest memory on each rung takes a slot first, top rung first, so two survival
+ * memories cannot fill a budget of two between them; what is left goes in ladder order. `passing` is already in
+ * ladder order. Pure.
+ */
+export function spreadBudget<T>(passing: readonly T[], rungOf: (c: T) => Rung, budget: number): T[] {
+  const n = Math.max(0, budget);
+  if (passing.length <= n) return [...passing];
+  const chosen = new Set<number>();
+  const seenRung = new Set<Rung>();
+  for (let i = 0; i < passing.length && chosen.size < n; i++) {
+    const r = rungOf(passing[i]);
+    if (r === 'none' || seenRung.has(r)) continue;
+    seenRung.add(r);
+    chosen.add(i);
+  }
+  for (let i = 0; i < passing.length && chosen.size < n; i++) chosen.add(i);
+  return [...chosen].sort((a, b) => a - b).map((i) => passing[i]);
+}
+
 export async function recall(req: RecallRequest, overrides: DayaClientOverrides = {}): Promise<RecallResult> {
   const cueRefs = req.cueRefs ?? [];
   // Sensed-but-unnoticed rows (perception units 6+7) stay out of normal surfacing; an explicit look/recall asks for them.
@@ -470,7 +491,7 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
 
   passing = await maybeRerank(passing, req.cue, overrides);
 
-  const withinBudget = passing.slice(0, Math.max(0, budget));
+  const withinBudget = spreadBudget(passing, (c) => rungOf.get(c.memory.id)?.rung ?? 'none', budget);
 
   const surfacedList: ScoredCandidate[] = [];
   const deferred: string[] = [];
