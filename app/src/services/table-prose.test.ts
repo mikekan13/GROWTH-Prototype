@@ -249,6 +249,28 @@ describe('the subject pronoun wins; an unclaimed quote beside one character\'s p
   });
 });
 
+describe("a line that is only a quote is the Watcher's last voice going on (HW5 2026-10-25)", () => {
+  const table = [
+    { id: 'kris', name: 'Kristopher', sex: 'm' },
+    { id: 'violet', name: 'Violet', sex: 'f' },
+  ] as Parameters<typeof parseTableProse>[1];
+  it('a bare quote after the Watcher voiced Kristopher is Kristopher speaking, even if Violet spoke since', () => {
+    const p = parseTableProse('"You took the pizza, closed the door, and locked it... Were you going to pay me?"', table, { recentActors: [table[1], table[0]], lastVoiced: table[0] });
+    expect(p.quotes[0]).toMatchObject({ speakerId: 'kris', speakerLabel: 'Kristopher' });
+    expect(p.narration).toBeNull();
+  });
+  it('with no voice to go on, the bare quote stays "someone present"', () => {
+    const p = parseTableProse('"Who is it?"', table, { recentActors: [table[0]] });
+    expect(p.quotes[0]).toMatchObject({ speakerId: null, speakerLabel: 'someone present' });
+  });
+  it('a quote with prose beside it keeps the older rules: the sentence names the speaker, not the last voice', () => {
+    const p = parseTableProse('A bright eyed lass behind the bar gives you a wink. "Hey scruffy?"', table, { recentActors: [table[0]], lastVoiced: table[0] });
+    expect(p.quotes[0]).toMatchObject({ speakerId: null, speakerLabel: 'a bright eyed lass behind the bar' });
+    const q = parseTableProse('Violet opens the door a crack. "What."', table, { recentActors: [table[0]], lastVoiced: table[0] });
+    expect(q.quotes[0].speakerId).toBe('violet');
+  });
+});
+
 describe('the quote belongs to the subject of the sentence before it, not to a name in it (HW5 2026-10-25)', () => {
   const table = [
     { id: 'kris', name: 'Kristopher', sex: 'm' },

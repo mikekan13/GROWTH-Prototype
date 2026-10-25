@@ -269,6 +269,35 @@ export async function recentTableActors(campaignId: string, roster: ProseRosterE
   return out;
 }
 
+/**
+ * The roster character the Watcher voiced last on a line of their own — the newest declaration's
+ * last act or quote; beings' chat lines do not count (HW5 2026-10-25). Pure.
+ */
+export function lastVoicedFrom(rows: Array<{ type: string; payload: string }>, roster: ProseRosterEntry[]): ProseRosterEntry | null {
+  for (const row of rows) {
+    if (row.type !== 'game_event') continue;
+    try {
+      const p = JSON.parse(row.payload) as { eventType?: string; actions?: Array<{ actorId: string }>; speech?: Array<{ speakerId: string | null }> };
+      if (p.eventType !== 'declaration') continue;
+      const ids = [...(p.actions ?? []).map((a) => a.actorId), ...(p.speech ?? []).map((s) => s.speakerId)].filter((x): x is string => !!x);
+      for (const id of ids.reverse()) { const hit = roster.find((r) => r.id === id); if (hit) return hit; }
+    } catch { /* not a payload we read */ }
+  }
+  return null;
+}
+
+/** `lastVoicedFrom` over the table's recent rows. */
+export async function lastVoicedActor(campaignId: string, roster: ProseRosterEntry[]): Promise<ProseRosterEntry | null> {
+  if (!roster.length) return null;
+  const rows = await prisma.campaignEvent.findMany({
+    where: { campaignId, type: 'game_event' },
+    orderBy: { createdAt: 'desc' },
+    take: 24,
+    select: { type: true, payload: true },
+  });
+  return lastVoicedFrom(rows, roster);
+}
+
 /** Every being the Watcher voiced in this message: the actors of its `::actions::` and the speakers of its quotes. */
 function voicedIn(parsed: { actions?: Array<{ actorId: string }>; quotes: Array<{ speakerId: string | null }> }): string[] {
   return [...new Set([...(parsed.actions ?? []).map((a) => a.actorId), ...parsed.quotes.map((q) => q.speakerId).filter((id): id is string => !!id)])];
@@ -378,7 +407,7 @@ export async function speakProse(
   if (tableSplitLoop()) return speakProseSplit(campaignId, actor, { ...input, message });
 
   const roster = await proseRoster(campaignId);
-  const proseCtx = { recentActors: await recentTableActors(campaignId, roster) };
+  const proseCtx = { recentActors: await recentTableActors(campaignId, roster), lastVoiced: await lastVoicedActor(campaignId, roster) };
   const parsed = parseTableProse(message, roster, proseCtx);
 
   // 0. JEWL reads it against the sim BEFORE it becomes canon (Mike 09-26,
@@ -691,7 +720,7 @@ async function speakProseSplit(
   const npcRoster = () => proseRoster(campaignId);
   const listeners = await activeListeners(campaignId);
   let roster = await npcRoster();
-  const proseCtx = { recentActors: await recentTableActors(campaignId, roster) };
+  const proseCtx = { recentActors: await recentTableActors(campaignId, roster), lastVoiced: await lastVoicedActor(campaignId, roster) };
   let parsed = parseTableProse(message, roster, proseCtx);
   const planFor = (npcs: typeof roster) => planTableTalk(readTableTalk(message, { present: listeners, npcs, prose: proseCtx }).utterances, 'typed');
   let plan = planFor(roster);
@@ -883,7 +912,7 @@ async function hearSpokenChunk(campaignId: string, actor: TableActor, transcript
     prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { id: true, name: true } }),
   ]);
   const heard = `${carried}${transcript}`.trim();
-  const reading = readTableTalk(heard, { present: listeners, npcs, state: table.talk, holdTrailingFragment: true, prose: { recentActors: await recentTableActors(campaignId, npcs) } });
+  const reading = readTableTalk(heard, { present: listeners, npcs, state: table.talk, holdTrailingFragment: true, prose: { recentActors: await recentTableActors(campaignId, npcs), lastVoiced: await lastVoicedActor(campaignId, npcs) } });
   table.talk = reading.state;
   table.pending = reading.pending;
   table.lastAt = now;

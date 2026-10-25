@@ -41,6 +41,13 @@ export interface ProseContext {
    * these to the first whose sex fits. Supersedes `lastActor` when given.
    */
   recentActors?: ProseRosterEntry[];
+  /**
+   * The roster character the Watcher voiced most recently on a line of their own (an act or a quote),
+   * beings' replies not counted. A line that is nothing but a quote — no prose, no name, no action
+   * span — is that voice going on (HW5 2026-10-25: a bare "You took the pizza… Were you going to pay
+   * me?" became "someone present", and the Kristopher being answered the Watcher's own Kristopher).
+   */
+  lastVoiced?: ProseRosterEntry | null;
 }
 
 export interface ProseQuote {
@@ -321,6 +328,9 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
     }
 
     // 2. Quoted runs inside prose.
+    // A line that is only quotes, with nothing to name a speaker: the Watcher's last voice goes on.
+    const onlyQuotes = line.replace(new RegExp(QUOTE_RE.source, 'g'), '').trim() === '';
+    const voiceGoesOn = onlyQuotes && !lineActor ? ctx.lastVoiced ?? null : null;
     let cursor = 0;
     let stripped = '';
     for (const m of line.matchAll(QUOTE_RE)) {
@@ -345,7 +355,7 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
       // No name by the quote: "His voice is warm. 'Take your time.'" → the
       // man the table was just talking about, if the pronoun fits his sheet.
       const byPronoun = named ? null : pronounActor(`${contextSentence ?? ''} ${runsOn ? afterTag.slice(0, 120) : ''}`, recent);
-      const npc = named ?? byPronoun ?? (contextSentence === null ? lineActor : null);
+      const npc = named ?? byPronoun ?? (contextSentence === null ? lineActor ?? voiceGoesOn : null);
       const subject = npc ? null : introducedSubject(contextSentence);
       quotes.push({
         text: m[1].trim(),

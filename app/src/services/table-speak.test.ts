@@ -64,7 +64,26 @@ vi.mock('@/services/reconciliation', () => ({
   cementCheck: vi.fn(async () => {}),
 }));
 
-import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine } from './table-speak';
+import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom } from './table-speak';
+
+describe("lastVoicedFrom — the Watcher's last voice (HW5 2026-10-25)", () => {
+  const roster = [{ id: 'kris', name: 'Kristopher' }, { id: 'violet', name: 'Violet' }];
+  it("a being's chat line does not count; the newest declaration's last act or quote does", () => {
+    const rows = [
+      { type: 'chat', payload: JSON.stringify({ kind: 'chat', message: 'I was going to.' }) },
+      { type: 'game_event', payload: JSON.stringify({ kind: 'game_event', eventType: 'declaration', speech: [{ speakerId: 'kris' }], actions: [{ actorId: 'kris' }] }) },
+      { type: 'game_event', payload: JSON.stringify({ kind: 'game_event', eventType: 'declaration', speech: [{ speakerId: 'violet' }] }) },
+    ];
+    expect(lastVoicedFrom(rows, roster)?.id).toBe('kris');
+  });
+  it('a session marker or an unattributed quote is skipped; nothing voiced → null', () => {
+    const rows = [
+      { type: 'game_event', payload: JSON.stringify({ kind: 'game_event', eventType: 'session_end', description: 'Session 5 ended' }) },
+      { type: 'game_event', payload: JSON.stringify({ kind: 'game_event', eventType: 'declaration', speech: [{ speakerId: null }] }) },
+    ];
+    expect(lastVoicedFrom(rows, roster)).toBeNull();
+  });
+});
 
 const actor = { userId: 'gm', username: 'watcher', role: 'WATCHER' };
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
