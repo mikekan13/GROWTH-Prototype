@@ -63,9 +63,9 @@ import { correctCanon } from './reconciliation';
 beforeEach(() => {
   w.memoryUpdates = 0;
   w.ruthIdentity = 0.7;
-  w.events = [{ id: 'ev1', campaignId: 'c1', kind: 'declaration', narration: 'Ruth opens the door.', detail: '{}', actorId: null, sourceType: 'gm' }];
+  w.events = [{ id: 'ev1', campaignId: 'c1', kind: 'declaration', narration: 'The door opens and Ruth stands in it.', detail: '{}', actorId: null, sourceType: 'gm' }];
   w.memories = [
-    { id: 'm1', entityId: 'ent-v', truthRef: 'ev1', chain: JSON.stringify({ truthRefs: ['ev1'] }), noticed: true, perceivedVia: '["sight","hearing"]', visibleForm: null, firstVisibleForm: null, source: 'perception', content: 'You see Ruth open the door.', classification: '{}' },
+    { id: 'm1', entityId: 'ent-v', truthRef: 'ev1', chain: JSON.stringify({ truthRefs: ['ev1'] }), noticed: true, perceivedVia: '["sight","hearing"]', visibleForm: null, firstVisibleForm: null, source: 'perception', content: 'You see the door open and Ruth in it.', classification: '{}' },
     { id: 'm2', entityId: 'ent-v', truthRef: 'ev1', chain: '{}', noticed: false, perceivedVia: '["hearing"]', visibleForm: null, source: 'perception', content: 'a creak', classification: '{}' },
   ];
 });
@@ -79,7 +79,7 @@ describe('visible form cache', () => {
   it('renders once, then serves the cache without a model call; unnoticed rows have no feed line', async () => {
     const rewrite = vi.fn(async () => null);
     const first = await renderViewerFeed('c1', 'violet', ['m1', 'm2', 'nope'], { rewrite });
-    expect(text(first, 'm1')).toBe('Ruth opens the door.'); // Ruth at F3 (0.7) → her name
+    expect(text(first, 'm1')).toBe('The door opens and Ruth stands in it.'); // Ruth at F3 (0.7) → her name
     expect(first.get('m2')).toBeNull();
     expect(first.get('nope')).toBeNull();
     expect(w.memories[0].visibleForm).toContain('"sig"');
@@ -92,16 +92,16 @@ describe('visible form cache', () => {
   it('a canon correction clears the cache and the next read renders the corrected truth', async () => {
     await renderViewerFeed('c1', 'violet', ['m1'], { rewrite: null });
     expect(w.memories[0].visibleForm).not.toBeNull();
-    await correctCanon('c1', { userId: 'gm', role: 'WATCHER' }, { canonEventId: 'ev1', narration: 'Ruth slams the door.' });
+    await correctCanon('c1', { userId: 'gm', role: 'WATCHER' }, { canonEventId: 'ev1', narration: 'The door slams and Ruth is gone.' });
     expect(w.memories.every((m) => m.visibleForm === null)).toBe(true);
     const after = await renderViewerFeed('c1', 'violet', ['m1'], { rewrite: null });
-    expect(text(after, 'm1')).toBe('Ruth slams the door.');
+    expect(text(after, 'm1')).toBe('The door slams and Ruth is gone.');
     expect(w.memories[0].visibleForm).toContain('slams');
   });
 
   it('a canon correction sends the text-free re-read signal once per affected being (owner + Watcher via feedReadersOf)', async () => {
     push.notifyMemoryWritten.mockClear();
-    await correctCanon('c1', { userId: 'gm', role: 'WATCHER' }, { canonEventId: 'ev1', narration: 'Ruth slams the door.' });
+    await correctCanon('c1', { userId: 'gm', role: 'WATCHER' }, { canonEventId: 'ev1', narration: 'The door slams and Ruth is gone.' });
     await vi.waitFor(() => expect(push.notifyMemoryWritten).toHaveBeenCalledTimes(1));
     expect(push.notifyMemoryWritten).toHaveBeenCalledWith('ent-v');
   });
@@ -111,10 +111,10 @@ describe('visible form cache', () => {
     w.memories.push({ id: 'm3', entityId: 'ent-v', truthRef: 'ev1', chain: JSON.stringify({ truthRefs: ['ev1'] }), noticed: true, perceivedVia: JSON.stringify({ via: ['sight', 'hearing'], clarity: { sight: 0, hearing: 0 } }), visibleForm: null, source: 'perception', content: '', classification: '{}' });
     w.memories.push({ id: 'm4', entityId: 'ent-v', truthRef: 'ev1', chain: JSON.stringify({ truthRefs: ['ev1'] }), noticed: true, perceivedVia: JSON.stringify({ via: ['sight', 'hearing'], clarity: { sight: 0.15, hearing: 0.15 } }), visibleForm: null, source: 'perception', content: '', classification: '{}' });
     const f = await renderViewerFeed('c1', 'violet', ['m1', 'm3', 'm4'], { rewrite: null });
-    expect(text(f, 'm1')).toBe('Ruth opens the door.'); // legacy row → the body now (whole)
+    expect(text(f, 'm1')).toBe('The door opens and Ruth stands in it.'); // legacy row → the body now (whole)
     expect(f.get('m3')?.rows).toEqual([]); // took nothing in then → nothing now
     expect(text(f, 'm4')).toContain('{gap}');
-    expect(text(f, 'm4')).not.toBe('Ruth opens the door.');
+    expect(text(f, 'm4')).not.toBe('The door opens and Ruth stands in it.');
   });
 
   it('first render is frozen beside the live cache: later knowledge re-labels the live line, never the snapshot', async () => {
@@ -130,12 +130,12 @@ describe('visible form cache', () => {
 
     w.ruthIdentity = 0.7; // later she learns the name
     const later = await renderViewerFeed('c1', 'violet', ['m1'], { rewrite: null });
-    expect(text(later, 'm1')).toBe('Ruth opens the door.'); // live cache re-labels
+    expect(text(later, 'm1')).toBe('The door opens and Ruth stands in it.'); // live cache re-labels
     expect((await getFirstVisibleForm('m1'))?.form).toEqual(first.get('m1')); // the record does not
     expect(w.memories[0].firstVisibleForm).toBe(JSON.stringify(snap));
 
     // a canon correction clears the live cache only
-    await correctCanon('c1', { userId: 'gm', role: 'WATCHER' }, { canonEventId: 'ev1', narration: 'Ruth slams the door.' });
+    await correctCanon('c1', { userId: 'gm', role: 'WATCHER' }, { canonEventId: 'ev1', narration: 'The door slams and Ruth is gone.' });
     expect(w.memories[0].visibleForm).toBeNull();
     expect(w.memories[0].firstVisibleForm).toBe(JSON.stringify(snap));
   });

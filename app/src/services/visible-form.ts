@@ -453,6 +453,13 @@ export async function truthForm(truth: TruthLine, seed = 'truth'): Promise<Visib
 
 export interface CanonRowForm { id: string; kind: string; narration: string; detail: string; actorId: string | null; sourceType?: string | null }
 
+/** The table's split of a declaration, as canon.ts stores it in the row's detail (`split`). */
+export interface DeclarationSplit {
+  narration?: string | null;
+  speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
+  actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
+}
+
 /**
  * A canon event as the feed reads it (pure): table dialogue → the speaker's
  * character row (its segments as typed); the Watcher's declaration → narration
@@ -460,7 +467,7 @@ export interface CanonRowForm { id: string; kind: string; narration: string; det
  * same split feed-rows uses); any other act with an actor → a sim act.
  */
 export function truthRowsFromCanon(ev: CanonRowForm, entities: TruthEntity[]): TruthRow[] {
-  let detail: { message?: string; speakerLabel?: string } = {};
+  let detail: { message?: string; speakerLabel?: string; split?: DeclarationSplit } = {};
   try { detail = JSON.parse(ev.detail) as typeof detail; } catch { detail = {}; }
   const nameOf = (id: string | null) => (id ? entities.find((e) => e.id === id)?.name ?? null : null);
   if (ev.kind === 'dialogue') {
@@ -469,10 +476,28 @@ export function truthRowsFromCanon(ev: CanonRowForm, entities: TruthEntity[]): T
   }
   if (ev.kind === 'declaration' || ev.sourceType === 'gm') {
     const roster = entities.filter((e) => e.kind === 'CHARACTER' || e.kind === 'NPC').map((e) => ({ id: e.id, name: e.name }));
-    const parsed = parseTableProse(ev.narration, roster);
+    // The table's own split when the canon row carries it (it knew the recent actors a pronoun points at);
+    // otherwise the same parse feed-rows makes.
+    const split: DeclarationSplit = detail.split ?? (() => {
+      const parsed = parseTableProse(ev.narration, roster);
+      return { narration: parsed.narration, speech: parsed.quotes, actions: parsed.actions ?? [] };
+    })();
     const rows: TruthRow[] = [];
-    if (parsed.narration?.trim()) rows.push({ type: 'narration', text: parsed.narration.trim() });
-    for (const q of parsed.quotes) rows.push({ type: 'character', speakerId: q.speakerId, name: q.speakerLabel, segments: [{ kind: 'speech', text: q.text }] });
+    if (split.narration?.trim()) rows.push({ type: 'narration', text: split.narration.trim() });
+    // The Watcher's prose act for a roster character is HIS row, as the Watcher's feed draws it (HW5 2026-10-25:
+    // "He walks back to the door and knocks with frustration." had no card in Kristopher's own view). The speech
+    // that follows from the same mouth joins the row.
+    const taken = new Set<number>();
+    for (const a of split.actions ?? []) {
+      const segments: FeedSegment[] = [{ kind: 'action', text: a.text }];
+      const next = (split.speech ?? []).findIndex((s, j) => !taken.has(j) && s.speakerId === a.actorId);
+      if (next >= 0) { taken.add(next); segments.push({ kind: 'speech', text: split.speech![next].text }); }
+      rows.push({ type: 'character', speakerId: a.actorId, name: nameOf(a.actorId) ?? a.actorLabel, segments });
+    }
+    (split.speech ?? []).forEach((q, j) => {
+      if (taken.has(j)) return;
+      rows.push({ type: 'character', speakerId: q.speakerId, name: (q.speakerId ? nameOf(q.speakerId) : null) ?? q.speakerLabel, segments: [{ kind: 'speech', text: q.text }] });
+    });
     if (!rows.length && ev.narration.trim()) rows.push({ type: 'narration', text: ev.narration.trim() });
     return rows;
   }

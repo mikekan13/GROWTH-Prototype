@@ -53,6 +53,19 @@ describe('visible form — full clarity is the truth', () => {
     expect(act).toEqual([{ type: 'narration', text: 'Ruth swings at Violet.', act: true, actorId: 'ruth' }]);
   });
 
+  it("the Watcher's prose act for a roster character is his row, with the speech from the same mouth (HW5 2026-10-25)", () => {
+    // The canon row carries the table's split (the pronoun was resolved at the table).
+    const split = { narration: null, speech: [{ speakerId: 'ruth', speakerLabel: 'Ruth', text: 'Who is it?' }], actions: [{ actorId: 'ruth', actorLabel: 'Ruth', text: 'Walks back to the door and knocks' }] };
+    const rows = truthRowsFromCanon({ id: 'k', kind: 'narration', narration: 'She walks back to the door and knocks. "Who is it?"', detail: JSON.stringify({ declaredBy: 'u', split }), actorId: 'ruth', sourceType: 'gm' }, entities);
+    expect(rows).toEqual([{ type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'action', text: 'Walks back to the door and knocks' }, { kind: 'speech', text: 'Who is it?' }] }]);
+    // No split on the row: the same parse feed-rows makes, acts included.
+    const parsed = truthRowsFromCanon({ id: 'k2', kind: 'narration', narration: 'Ruth knocks twice. The hall is quiet.', detail: '{}', actorId: 'ruth', sourceType: 'gm' }, entities);
+    expect(parsed).toEqual([
+      { type: 'narration', text: 'The hall is quiet.' },
+      { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'action', text: 'Knocks twice' }] },
+    ]);
+  });
+
   it('a chain does not repeat a dialogue row already inside an earlier row', () => {
     const t = truthLineFromCanon([
       { id: 'd', kind: 'declaration', narration: 'Ruth says, "Sit down."', detail: '{}', actorId: null, sourceType: 'gm' },

@@ -117,7 +117,7 @@ describe('GET events — per-viewer feed (PERCEPTION_FEED)', () => {
     expect(raw).not.toContain('SECRET-WHISPER'); // reached, unnoticed
     expect(body.perceived).toBe(true);
     // What she did perceive: her memory's view of it (Ruth known by name at F3).
-    expect(raw).toContain('opens the door.');
+    expect(raw).toContain('::Opens the door::'); // the Watcher's prose act is Ruth's own card in a character's view (HW5 2026-10-25)
     expect(body.events.some((e) => e.id.startsWith('pm-m1-'))).toBe(true);
     // Her own line, in full, once (her memory of saying it is not a second line).
     expect(body.events.filter((e) => JSON.stringify(e.payload).includes('I wave.'))).toHaveLength(1);

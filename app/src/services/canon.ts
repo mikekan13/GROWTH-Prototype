@@ -301,7 +301,18 @@ export async function declareCanon(
   const event = await recordCanonEvent({
     campaignId, cycle, seq: 0, kind: input.kind ?? 'declaration',
     locationId: input.locationId ?? null, actorId: input.actorId ?? null, targetId: input.targetId ?? null,
-    narration: input.narration, detail: { declaredBy: actor.userId, ...(input.beatId ? { beatId: input.beatId } : {}) }, consequences: {},
+    narration: input.narration,
+    // The table's split rides on the canon row too (HW5 2026-10-25: a character's own feed is rendered from
+    // canon, and "He walks back to the door and knocks" had lost Kristopher's card there — the pronoun
+    // cannot be re-resolved later without the table's recent actors).
+    detail: {
+      declaredBy: actor.userId,
+      ...(input.beatId ? { beatId: input.beatId } : {}),
+      ...(input.feed && (input.feed.speech || input.feed.actions?.length)
+        ? { split: { narration: input.feed.narration ?? null, speech: input.feed.speech ?? [], actions: input.feed.actions ?? [] } }
+        : {}),
+    },
+    consequences: {},
     sourceType: 'gm', goalIds, domains,
   });
   if (goalIds.length) recordVineEntriesSafe({ campaignId, canonEventId: event.id, cycle, narration: input.narration, goalIds });
