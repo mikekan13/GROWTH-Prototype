@@ -243,8 +243,8 @@ export interface DeclarationFeed {
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
   /** `::…::` actions the GM wrote for roster characters — the feed draws each as that character's own row. */
   actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
-  /** What the GM wrote a roster character as thinking — the record draws it as his ((thought)) (HW6 2026-10-25). */
-  thoughts?: Array<{ actorId: string; actorLabel: string; text: string }>;
+  /** What the GM wrote a roster character as thinking — the record draws it as his ((thought)) (HW6 2026-10-25). `sentence` = as written. */
+  thoughts?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
 }
 
 /** The feed row's payload for a declaration: the canon text, its beat, the cycle it happened at, and what the table writer passed for the feed. Pure. */
@@ -259,7 +259,7 @@ export function declarationPayload(eventType: string, description: string, opts:
     ...(f.narration !== undefined ? { narration: f.narration } : {}),
     ...(f.speech ? { speech: f.speech.map((s) => ({ speakerId: s.speakerId, speakerLabel: s.speakerLabel, text: s.text })) } : {}),
     ...(f.actions?.length ? { actions: f.actions.map((a) => ({ actorId: a.actorId, actorLabel: a.actorLabel, text: a.text })) } : {}),
-    ...(f.thoughts?.length ? { thoughts: f.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text })) } : {}),
+    ...(f.thoughts?.length ? { thoughts: f.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text, ...(t.sentence ? { sentence: t.sentence } : {}) })) } : {}),
   };
 }
 
@@ -312,7 +312,7 @@ export async function declareCanon(
       declaredBy: actor.userId,
       ...(input.beatId ? { beatId: input.beatId } : {}),
       ...(input.feed && (input.feed.speech || input.feed.actions?.length || input.feed.thoughts?.length)
-        ? { split: { narration: input.feed.narration ?? null, speech: input.feed.speech ?? [], actions: input.feed.actions ?? [], ...(input.feed.thoughts?.length ? { thoughts: input.feed.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text })) } : {}) } }
+        ? { split: { narration: input.feed.narration ?? null, speech: input.feed.speech ?? [], actions: input.feed.actions ?? [], ...(input.feed.thoughts?.length ? { thoughts: input.feed.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text, ...(t.sentence ? { sentence: t.sentence } : {}) })) } : {}) } }
         : {}),
     },
     consequences: {},

@@ -471,7 +471,7 @@ export interface DeclarationSplit {
   narration?: string | null;
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
   actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
-  thoughts?: Array<{ actorId: string; actorLabel: string; text: string }>;
+  thoughts?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
 }
 
 /**

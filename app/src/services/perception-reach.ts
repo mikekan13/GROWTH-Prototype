@@ -22,6 +22,7 @@ import { writeMemoryEntry } from '@/daya/memory';
 import { perceive } from '@/daya/perceive';
 import type { MemoryChain } from '@/daya/chain';
 import { laneReadiness } from '@/daya/l1-endpoint';
+import { actorMap, mapFactLines } from '@/services/world-apply';
 import { decodePerceivedVia, encodePerceivedVia, mergePerceivedVia } from '@/daya/perceived-via';
 
 export { perceptionReachOn };
@@ -135,6 +136,40 @@ export function placeAtSource(event: ReachEvent, beings: ReachBeing[]): ReachEve
   return src?.locationId ? { ...event, locationId: src.locationId, locationName: src.locationName ?? null } : event;
 }
 
+/** A door the map knows between two rooms, by name. */
+export interface WallDoor { name: string; between: string[]; state: string }
+
+/**
+ * Sight does not cross a closed door (HW7 2026-10-25: the judge, told nothing of the door, ruled that Violet SAW
+ * his smile widen from inside her locked apartment). A being in another room than the event keeps sight only
+ * when an OPEN door or opening joins the two rooms; otherwise sight comes off its verdict, and a verdict left
+ * with no sense does not reach. Rooms are matched by name, as the map names them. Pure.
+ */
+export function throughWalls(event: ReachEvent, b: ReachBeing, v: ReachVerdict, doors: WallDoor[]): ReachVerdict {
+  if (!v.reaches || v.via.includes('self')) return v;
+  if (!event.locationId || !b.locationId || event.locationId === b.locationId) return v;
+  const here = (b.locationName ?? '').toLowerCase();
+  const there = (event.locationName ?? '').toLowerCase();
+  if (!here || !there) return v;
+  const joins = doors.filter((d) => { const rooms = d.between.map((r) => r.toLowerCase()); return rooms.includes(here) && rooms.includes(there); });
+  const open = joins.some((d) => d.state === 'open');
+  if (open) return v;
+  const via = v.via.filter((s) => s !== 'sight');
+  if (via.length === v.via.length) return v;
+  if (!via.length) return { beingId: b.id, reaches: false, via: [], noticed: false, salience: 0 };
+  const clarity = v.clarity ? Object.fromEntries(Object.entries(v.clarity).filter(([k]) => k !== 'sight')) : undefined;
+  return { ...v, via, ...(clarity ? { clarity } : {}) };
+}
+
+/** The doors around the event's source, as the adjudicator reads them (services/world-apply). Never throws. */
+async function doorsAround(sourceId: string | null | undefined): Promise<{ doors: WallDoor[]; lines: string[] }> {
+  if (!sourceId) return { doors: [], lines: [] };
+  try {
+    const map = await actorMap(sourceId);
+    return { doors: (map?.doors ?? []).map((d) => ({ name: d.name, between: d.between, state: d.state })), lines: mapFactLines(map) };
+  } catch { return { doors: [], lines: [] }; }
+}
+
 export async function judgeCanonReach(
   campaignId: string,
   event: ReachEvent,
@@ -142,10 +177,17 @@ export async function judgeCanonReach(
   opts: { focusById?: Record<string, string | null | undefined>; model?: ReachModel | null; beings?: ReachBeing[]; atScene?: boolean } = {},
 ): Promise<ReachJudgement & { beings: ReachBeing[] }> {
   let beings: ReachBeing[] = [];
+  let walls: WallDoor[] = [];
   try {
     beings = opts.beings ?? await loadReachBeings(campaignId, characterIds, { focusById: opts.focusById });
     if (opts.atScene) beings = beings.map((b) => ({ ...b, locationId: event.locationId ?? null, locationName: event.locationName ?? b.locationName ?? null }));
     if (!opts.atScene) event = placeAtSource(event, beings);
+    // What stands between the rooms: the judge is told the doors, and held to them below.
+    if (!opts.atScene) {
+      const around = await doorsAround(event.sourceId);
+      walls = around.doors;
+      if (around.lines.length) event = { ...event, setting: [event.setting, ...around.lines].filter(Boolean).join(' · ') };
+    }
     if (event.locationId && !event.locationName) {
       const loc = await prisma.location.findUnique({ where: { id: event.locationId }, select: { name: true } });
       event = { ...event, locationName: loc?.name ?? null };
@@ -167,6 +209,14 @@ export async function judgeCanonReach(
     j = await judgeReach(event, beings, { model, timeoutMs: REACH_TUNING.timeoutMs * 3 });
   }
   if (j.source === 'fallback') console.warn(`[perception-reach] world-sim fell back to the stub after ${j.ms}ms: ${j.error}`);
+  if (walls.length || event.locationId) {
+    for (const b of beings) {
+      const v = j.verdicts.get(b.id);
+      if (!v) continue;
+      const held = throughWalls(event, b, v, walls);
+      if (held !== v) { console.log(`[perception-reach] ${b.name}: a wall is a wall — ${v.via.join('+')} → ${held.reaches ? held.via.join('+') : 'nothing'}`); j.verdicts.set(b.id, held); }
+    }
+  }
   return { ...j, beings };
 }
 

@@ -8,13 +8,22 @@ describe('senses filter — hearing carries sound and words, nothing else (HW6 2
   });
   it('a sound sentence is cut where it stops being sound', () => {
     expect(audibleSentence('He knocks on the door as a genuine smile masks the tears.')).toBe('He knocks on the door.');
-    expect(audibleSentence('He gets close to the door and speaks loudly.')).toBe('He gets close to the door and speaks loudly.');
+    // Getting close is not a sound; the speaking is.
+    expect(audibleSentence('He gets close to the door and speaks loudly.')).toBe('He speaks loudly.');
     expect(audibleSentence('His face looks tired and his eyes are red.')).toBeNull();
     expect(audibleSentence('Kristopher shifts in the hallway as he waits.')).toBeNull();
+    // The sound must be the main verb: "crying" inside a sentence about wiping is not a sound through the door (HW7 2026-10-25).
+    expect(audibleSentence('He wipes his eyes from the tears he was crying in the car.')).toBeNull();
+    expect(audibleSentence('He cries into his sleeve.')).toBe('He cries into his sleeve.');
+    expect(audibleSentence('The man knocks twice.')).toBe('The man knocks twice.');
+    expect(audibleSentence('Someone slowly knocks again.')).toBe('Someone slowly knocks again.');
+    // Several predicates: the silent one goes, the sounding one stays with the subject.
+    expect(audibleSentence('He waits for a moment and then knocks again a little louder.')).toBe('He knocks again a little louder.');
+    expect(audibleSentence('He knocks on the door and a genuine smile flutters across his face.')).toBe('He knocks on the door.');
   });
   it('speech lines stay whole; sight or self leaves everything whole', () => {
     const line = 'He gets close to the door and speaks loudly.\nKristopher: hello? Anyone home?';
-    expect(audibleOnly(line, ['hearing'])).toBe(line);
+    expect(audibleOnly(line, ['hearing'])).toBe('He speaks loudly.\nKristopher: hello? Anyone home?');
     expect(audibleOnly(receipt, ['sight', 'hearing'])).toBe(receipt);
     expect(audibleOnly(receipt, ['self'])).toBe(receipt);
     expect(audibleOnly(receipt, undefined)).toBe(receipt);

@@ -624,7 +624,8 @@ async function runBeats(
     if (via) lastVia.set(listenerId, via);
     const own = voiced.has(listenerId) || (via?.includes('self') ?? false);
     // Hearing alone carries sound and words, not the receipt in his hand (HW6 2026-10-25).
-    let content = own ? stimulus.content : audibleOnly(stimulus.content, via);
+    const handed = own ? stimulus.content : audibleOnly(stimulus.content, via);
+    let content = handed;
     // His own act, in his own person: "I knock again", not a stranger knocking (HW6 2026-10-25).
     const me = own ? truth.actors?.[listenerId] : undefined;
     if (me) content = ownVoice(content, me);
@@ -651,7 +652,7 @@ async function runBeats(
         // null = an answer took this stretch over; that answer stores it and points it at the truth.
         if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId, truthId);
         if (reached && outcome.listened?.memoryEntryId) {
-          await stampPerception(outcome.listened.memoryEntryId, reached.verdict, reached.source, stimulus.content);
+          await stampPerception(outcome.listened.memoryEntryId, reached.verdict, reached.source, handed);
           // Introductions teach names (this stretch's row, once it points at the truth and carries its senses).
           await learnIntroductions(campaignId, [{ characterId: listenerId, memoryIds: [outcome.listened.memoryEntryId] }], undefined, { canonEventId: truthId });
         }

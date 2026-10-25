@@ -30,10 +30,33 @@ function sentencesOf(line: string): string[] {
   return line.replace(/\s+/g, ' ').trim().split(/(?<=[.!?…]["”')\]]*)\s+/).filter(Boolean);
 }
 
+// The subject of a sentence of prose, so the verbs after it can be read: "He", "Kristopher", "The man", "Someone".
+const SUBJECT_RE = /^((?:[Hh]e|[Ss]he|[Tt]hey|[Ss]omeone|[Ss]omebody|[Ii]t|(?:[Tt]he|[Aa]n?|[Ss]ome|[Aa]nother|[Hh]is|[Hh]er|[Tt]heir)\s+[\w-]+|[A-Z][\w'’-]*(?:\s+[A-Z][\w'’-]*)?))\s+(.+)$/;
+// "waits for a moment and then knocks again": predicates that share the subject.
+const PREDICATE_SPLIT_RE = /\s*,?\s*\b(?:and then|then|and|but)\s+(?=[a-z]+s\b)/i;
+const ADVERB_RE = /^(?:then|also|just|again|slowly|quietly|loudly|softly|suddenly|gently|finally)\s+/i;
+
 /** One sentence trimmed to the part hearing carries; null when none of it is sound. */
 export function audibleSentence(sentence: string): string | null {
   const s = sentence.trim();
   if (!SOUND_VERB_RE.test(s)) return null;
+  // The sound has to be what the sentence SAYS HAPPENS — a main verb — not a word inside it (HW7 2026-10-25:
+  // "He wipes his eyes from the tears he was crying in the car" reached Violet through the door on "crying").
+  // A sentence with several predicates keeps the sounding ones: "He waits for a moment and then knocks again
+  // a little louder" → "He knocks again a little louder."
+  const subj = s.replace(/[.!?…]+$/, '').match(SUBJECT_RE);
+  if (subj) {
+    const end = s.match(/[.!?…]+$/)?.[0] ?? '.';
+    const predicates = subj[2].split(PREDICATE_SPLIT_RE).map((p) => p.trim()).filter(Boolean);
+    const sounding = predicates.filter((p) => SOUND_VERB_RE.test(p.replace(ADVERB_RE, '').split(/\s+/)[0] ?? ''));
+    if (!sounding.length) return null;
+    return audibleClauses(sounding.length === predicates.length ? s : `${subj[1]} ${sounding.join(' and ')}${end}`);
+  }
+  return audibleClauses(s);
+}
+
+/** The sounding sentence cut at the clause where it stops being sound ("…as a genuine smile…"). */
+function audibleClauses(s: string): string | null {
   const end = s.match(/[.!?…]+$/)?.[0] ?? '.';
   const body = s.replace(/[.!?…]+$/, '');
   const clauses = body.split(CLAUSE_SPLIT_RE);
