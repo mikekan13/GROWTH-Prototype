@@ -105,8 +105,8 @@ function declarationRows(e: TerminalEvent, p: GameEventPayload, roster: RosterNa
   const raw = p.raw ?? p.description;
   let narration: string | null;
   let speech: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
-  let actions: Array<{ actorId: string; actorLabel: string; text: string }>;
-  let thoughts: Array<{ actorId: string; actorLabel: string; text: string }>;
+  let actions: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
+  let thoughts: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
   if (Array.isArray(p.speech)) {
     speech = p.speech;
     actions = Array.isArray(p.actions) ? p.actions : [];
@@ -202,13 +202,20 @@ export function eventRows(e: TerminalEvent, roster: RosterName[]): FeedRowModel[
     // What went through a being while someone else had the floor: its ((thought)) row, Soul blue — the record
     // reads like a novel (Mike 2026-10-25), and a thought is in it. Only the Watcher and the being itself get these rows.
     case 'being_thought': {
-      const t = (p as { thought?: string; cycle?: number }).thought?.trim();
-      if (!t) return [];
-      return [{
-        type: 'character', key: e.id, timestamp: e.timestamp, cycle: (p as { cycle?: number }).cycle,
-        characterId: e.characterId ?? null, name: e.characterName || 'someone present', segments: [{ kind: 'thought', text: t }],
-        raw: t, via: 'being', voice: 'Being', voicedBy: null, fromNarration: false,
-      }];
+      const bp = p as { thought?: string; cycle?: number; scene?: string | null; segments?: Array<{ kind: FeedSegment['kind']; text: string }> };
+      const t = bp.thought?.trim();
+      if (!t && !bp.segments?.length) return [];
+      const rows: FeedRowModel[] = [];
+      // Built up (scene-builder 2026-10-25): a prose line setting the being's side of the scene, then its card —
+      // thoughts blue, what it did red, what it said purple.
+      if (bp.scene?.trim()) rows.push({ type: 'narration', key: `${e.id}#scene`, timestamp: e.timestamp, cycle: bp.cycle, text: bp.scene.trim(), raw: bp.scene.trim(), via: 'being', voicedBy: null });
+      const segments: FeedSegment[] = bp.segments?.length ? bp.segments.map((s) => ({ kind: s.kind, text: s.text })) : [{ kind: 'thought', text: t! }];
+      rows.push({
+        type: 'character', key: e.id, timestamp: e.timestamp, cycle: bp.cycle,
+        characterId: e.characterId ?? null, name: e.characterName || 'someone present', segments,
+        raw: t || segments.map((s) => s.text).join(' '), via: 'being', voice: 'Being', voicedBy: null, fromNarration: false,
+      });
+      return rows;
     }
     case 'changelog': {
       const c = p as ChangeLogPayload;

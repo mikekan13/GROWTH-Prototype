@@ -68,3 +68,17 @@ describe('dueReason / hasLapsed', () => {
     expect(intentionLine([{ description: "Tonight, when he knocks, I'm going to give it to him as the tip." }])).toBe("What you meant to do: Tonight, when he knocks, I'm going to give it to him as the tip.");
   });
 });
+
+describe('completing — what an act carries out (Mike 2026-10-25: "build a way for intentions to be completed")', async () => {
+  const { doingOf, actCompletes } = await import('./intentions');
+  it('the doing is the words after the prospective marker', () => {
+    expect(doingOf("Tonight, when he knocks, I'm going to give it to him as the tip.")).toBe('give it to him as the tip');
+    expect(doingOf("If he doesn't, I go to the shelter on Fifth Street and adopt the cat.")).toBe('I go to the shelter on Fifth Street and adopt the cat');
+    expect(doingOf('I lock the door every time.')).toBe('I lock the door every time');
+  });
+  it('an act that carries most of the doing completes it by the words; a step toward it does not', () => {
+    expect(actCompletes("Tonight, when he knocks, I'm going to give it to him as the tip.", 'She gives the folded bill to him as the tip.')).toBe(true);
+    expect(actCompletes("Tonight, when he knocks, I'm going to give it to him as the tip.", 'She walks to the door.')).toBe(false);
+    expect(actCompletes("If he doesn't, I go to the shelter on Fifth Street and adopt the cat.", 'She goes to the shelter on Fifth Street and adopts the cat.')).toBe(true);
+  });
+});

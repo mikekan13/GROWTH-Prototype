@@ -126,8 +126,12 @@ export interface GameEventPayload extends TableFeedFields {
   narration?: string | null;
   /** …and each line of speech it pulled out, with who the record says spoke it. The feed draws these as that character's own rows. */
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
-  /** …and each `::action::` it wrote for a roster character (2026-10-23). The feed draws these as that character's own action rows. */
-  actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
+  /** …and each `::action::` it wrote for a roster character (2026-10-23). The feed draws these as that character's own action rows.
+   *  `sentence` = the seed sentence a built act derives from (scene-builder 2026-10-25). */
+  actions?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
+  /** The scene builder wrote the narration and the cards up from the Watcher's seed (`raw` holds the seed; `seedNarration` the seed's own narration). */
+  built?: boolean;
+  seedNarration?: string | null;
   /** …and what it wrote a roster character as thinking (HW6 2026-10-25): his ((thought)) row, Soul blue. */
   thoughts?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
   /** Encounter lines (encounter_begin/round/down/up/end, since 2026-10-08): which encounter, so the feed folds begin → end. */
@@ -150,6 +154,9 @@ export interface BeingThoughtPayload extends TableFeedFields {
   impulse: 'speak' | 'act' | 'stay';
   /** The truth event this stretch was about, when known. */
   canonEventId?: string | null;
+  /** Built up (scene-builder 2026-10-25): a line setting the being's side of the scene, and its monologue split into its card. */
+  scene?: string | null;
+  segments?: Array<{ kind: 'action' | 'thought' | 'speech'; text: string }>;
 }
 
 export type TerminalPayload =

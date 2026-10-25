@@ -67,7 +67,7 @@ export interface TruthEntity {
 export type TruthRow =
   | { type: 'character'; speakerId: string | null; name: string; segments: FeedSegment[] }
   /** `act` = a sim act (an encounter swing, a move): degraded like an action, not fragmented like scene prose. */
-  | { type: 'narration'; text: string; act?: boolean; actorId?: string | null };
+  | { type: 'narration'; text: string; act?: boolean; actorId?: string | null; /** A built scene: the seed narration it stands on ('' = none). Shown whole when any of it reached the viewer. */ source?: string };
 
 export interface TruthLine {
   /** Canon event ids this line renders, in order. */
@@ -407,7 +407,17 @@ export async function renderVisibleForm(truth: TruthLine, perception: ViewerPerc
         continue;
       }
       if (cl.scene <= 0) continue;
-      const text = coveredText(row.text);
+      // A built scene stands on the seed's narration: whole to whoever that stage reached (the one standing on it,
+      // anyone who sees it), nothing to a viewer the seed's narration never reached (scene-builder 2026-10-25).
+      let text: string;
+      if (row.source !== undefined) {
+        const stage = row.source ? splitSentences(row.source) : [];
+        const reached = !heard || (stage.length ? stage.some((s) => covers(s)) : perception.via.some((v) => v === 'self' || v === 'sight'));
+        if (!reached) continue;
+        text = row.text;
+      } else {
+        text = coveredText(row.text);
+      }
       if (!text.trim()) continue;
       const r = catchWords(toWords(entityToks(text, truth.entities, label)), cl.scene, seededRng(key));
       rows.push({ type: 'narration', text: r.text, pieces: r.pieces });
@@ -470,8 +480,11 @@ export interface CanonRowForm { id: string; kind: string; narration: string; det
 export interface DeclarationSplit {
   narration?: string | null;
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
-  actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
+  actions?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
   thoughts?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
+  /** Built up from the seed by the scene builder (2026-10-25); `seedNarration` is the Watcher's own narration. */
+  built?: boolean;
+  seedNarration?: string | null;
 }
 
 /**
@@ -499,7 +512,7 @@ export function truthRowsFromCanon(ev: CanonRowForm, entities: TruthEntity[]): T
     const rows: TruthRow[] = [];
     // The scene first, then ONE card per character with its acts, thoughts and words in the order the Watcher
     // wrote them (Mike 2026-10-25: "a block of scene setting narration and then one Kristopher card").
-    if (split.narration?.trim()) rows.push({ type: 'narration', text: split.narration.trim() });
+    if (split.narration?.trim()) rows.push({ type: 'narration', text: split.narration.trim(), ...(split.built ? { source: split.seedNarration ?? '' } : {}) });
     for (const card of characterCards(ev.narration, split)) {
       rows.push({ type: 'character', speakerId: card.id, name: (card.id ? nameOf(card.id) : null) ?? card.label, segments: card.segments.map((s) => ({ kind: s.kind, text: s.text, source: s.source })) });
     }

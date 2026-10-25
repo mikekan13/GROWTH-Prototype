@@ -60,10 +60,12 @@ Last updated: 2026-10-25
 > (hover = tooltip, click = centre the canvas; names match as written — aa09d3a). The knock test: survival stays FIRST, the Wisdom
 > budget is spread per rung, the cue's words count sentence by sentence (d4d7450 f031b33). INTENTIONS UNDER THE VINES BUILT
 > (2174801): DayaIntention rows derived from a being's own words — tonight when he knocks, pizza every day, the day job — due ones
-> surface outside the budget. STILL OPEN for line 1: the seed built up from world data (cloud via translator, local compiles) with
-> the being's listening monologue BLENDED into its card, then a prose line setting Violet's scene, then her card; the builder
-> resolves misspellings/aliases/bad audio to world entities; settle an intention DONE when the being does it; Violet's 4th vine;
-> goals-rung stoplist; Wisdom budget calibration; her PTSD memory encoded with arousal 0.12.
+> surface outside the budget. THE SEED → THE PAGE BUILT (services/scene-builder.ts): the voiced being listens first, its monologue
+> is blended into ONE card by the cloud builder with the stage set from clock/room/doors/items (facts and memories stay inside the
+> wall), every segment pinned to its seed sentence; other beings come back as a scene line + a card split into thought/act/speech.
+> Intentions are completed by acts (words, then the local lane) and can be set outright. STILL OPEN: the builder resolving
+> misspellings/aliases/bad audio to world entities (regex floor only); the local editor pass behind the cloud draft; Violet's 4th
+> vine; goals-rung stoplist; Wisdom budget calibration; her PTSD memory encoded with arousal 0.12. World reset (after-hw7c) → HW8.
 
 > 2026-10-23 (hello world 2 prep): the 17 Oct hello-world hiccups ironed out in three commits on
 > merge/fork-portrait-pipeline — sheet edits no longer wake JEWL (and can't become damage); the tagger stops

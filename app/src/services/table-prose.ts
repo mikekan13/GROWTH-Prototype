@@ -331,7 +331,7 @@ export function unquotedSpeech(sentence: string, roster: ProseRosterEntry[]): Pr
 export interface SplitParts {
   narration?: string | null;
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
-  actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
+  actions?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
   thoughts?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
 }
 
@@ -352,7 +352,7 @@ export function characterCards(full: string, split: SplitParts): CharacterCard[]
   const at = (key: string) => { const i = hay.indexOf(straight(key).replace(/[.!?…"]+$/, '').trim()); return i < 0 ? Number.POSITIVE_INFINITY : i; };
   const items: Array<{ id: string | null; label: string; kind: 'action' | 'thought' | 'speech'; text: string; source: string; pos: number; n: number }> = [];
   let n = 0;
-  for (const a of split.actions ?? []) items.push({ id: a.actorId, label: a.actorLabel, kind: 'action', text: a.text, source: a.text, pos: at(a.text), n: n++ });
+  for (const a of split.actions ?? []) items.push({ id: a.actorId, label: a.actorLabel, kind: 'action', text: a.text, source: a.sentence ?? a.text, pos: at(a.sentence ?? a.text), n: n++ });
   for (const t of split.thoughts ?? []) items.push({ id: t.actorId, label: t.actorLabel, kind: 'thought', text: t.text, source: t.sentence ?? t.text, pos: at(t.sentence ?? t.text), n: n++ });
   for (const q of split.speech ?? []) items.push({ id: q.speakerId, label: q.speakerLabel, kind: 'speech', text: q.text, source: q.text, pos: at(q.text), n: n++ });
   items.sort((a, b) => (a.pos - b.pos) || (a.n - b.n));

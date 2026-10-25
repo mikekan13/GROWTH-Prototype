@@ -241,8 +241,12 @@ export interface DeclarationFeed {
   raw?: string;
   narration?: string | null;
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
-  /** `::…::` actions the GM wrote for roster characters — the feed draws each as that character's own row. */
-  actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
+  /** `::…::` actions the GM wrote for roster characters — the feed draws each as that character's own row.
+   *  `sentence` = the seed sentence a BUILT act derives from (scene-builder), for a viewer's coverage. */
+  actions?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
+  /** The scene builder wrote narration/actions/thoughts up from the seed (2026-10-25); `seedNarration` is what the Watcher's own narration was. */
+  built?: boolean;
+  seedNarration?: string | null;
   /** What the GM wrote a roster character as thinking — the record draws it as his ((thought)) (HW6 2026-10-25). `sentence` = as written. */
   thoughts?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
 }
@@ -258,8 +262,9 @@ export function declarationPayload(eventType: string, description: string, opts:
     ...(f.raw !== undefined && f.raw.trim() !== description.trim() ? { raw: f.raw } : {}),
     ...(f.narration !== undefined ? { narration: f.narration } : {}),
     ...(f.speech ? { speech: f.speech.map((s) => ({ speakerId: s.speakerId, speakerLabel: s.speakerLabel, text: s.text })) } : {}),
-    ...(f.actions?.length ? { actions: f.actions.map((a) => ({ actorId: a.actorId, actorLabel: a.actorLabel, text: a.text })) } : {}),
+    ...(f.actions?.length ? { actions: f.actions.map((a) => ({ actorId: a.actorId, actorLabel: a.actorLabel, text: a.text, ...(a.sentence ? { sentence: a.sentence } : {}) })) } : {}),
     ...(f.thoughts?.length ? { thoughts: f.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text, ...(t.sentence ? { sentence: t.sentence } : {}) })) } : {}),
+    ...(f.built ? { built: true, seedNarration: f.seedNarration ?? null } : {}),
   };
 }
 
@@ -312,7 +317,7 @@ export async function declareCanon(
       declaredBy: actor.userId,
       ...(input.beatId ? { beatId: input.beatId } : {}),
       ...(input.feed && (input.feed.speech || input.feed.actions?.length || input.feed.thoughts?.length)
-        ? { split: { narration: input.feed.narration ?? null, speech: input.feed.speech ?? [], actions: input.feed.actions ?? [], ...(input.feed.thoughts?.length ? { thoughts: input.feed.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text, ...(t.sentence ? { sentence: t.sentence } : {}) })) } : {}) } }
+        ? { split: { narration: input.feed.narration ?? null, speech: input.feed.speech ?? [], actions: (input.feed.actions ?? []).map((a) => ({ actorId: a.actorId, actorLabel: a.actorLabel, text: a.text, ...(a.sentence ? { sentence: a.sentence } : {}) })), ...(input.feed.thoughts?.length ? { thoughts: input.feed.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text, ...(t.sentence ? { sentence: t.sentence } : {}) })) } : {}), ...(input.feed.built ? { built: true, seedNarration: input.feed.seedNarration ?? null } : {}) } }
         : {}),
     },
     consequences: {},

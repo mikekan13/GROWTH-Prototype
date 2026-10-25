@@ -210,3 +210,87 @@ export async function dueIntentionsFor(entityId: string, cue: string, nowCycle: 
 export async function settleIntention(id: string, status: 'DONE' | 'LAPSED'): Promise<void> {
   await prisma.dayaIntention.update({ where: { id }, data: { status } });
 }
+
+// ── Setting and completing (Mike 2026-10-25: "build a way for intentions to be completed and also how are they set?") ──
+//
+// HOW THEY ARE SET: derived from the being's own words whenever a memory is written (genesis seeds, what it
+// perceives and says, its answers) — see noteIntentions above — or set outright with setIntention (the Watcher,
+// JEWL, a script) in the same shape. HOW THEY ARE COMPLETED: when the being does the thing. Every act of its on
+// the record (the Watcher voicing it, its own answer) is read against its pending intentions — first by the words
+// (the act carries the intention's own doing), then, when the local lane is up, by the lane's judgment — and a
+// carried-out intention is DONE.
+
+export interface SetIntentionInput {
+  description: string;
+  trigger?: string | null;
+  dueCycle?: number | null;
+  dueUntil?: number | null;
+  cadence?: Cadence | null;
+  goalId?: string | null;
+}
+
+/** Set an intention outright, in the being's own words. Returns the row id (an identical pending one is reused). */
+export async function setIntention(characterId: string, input: SetIntentionInput, atCycle: number): Promise<string> {
+  const entity = await prisma.dayaEntity.findUniqueOrThrow({ where: { characterId }, select: { id: true } });
+  const description = input.description.trim();
+  const already = await prisma.dayaIntention.findFirst({ where: { entityId: entity.id, description, status: 'PENDING' }, select: { id: true } });
+  if (already) return already.id;
+  const row = await prisma.dayaIntention.create({
+    data: {
+      entityId: entity.id, description,
+      trigger: input.trigger ?? triggerOf(description), dueCycle: input.dueCycle ?? null, dueUntil: input.dueUntil ?? null,
+      cadence: input.cadence ?? cadenceOf(description), goalId: input.goalId ?? null, narrativeCycle: atCycle,
+    },
+  });
+  return row.id;
+}
+
+/** What an intention says the being will DO: the words after its prospective marker, or the whole sentence. Pure. */
+export function doingOf(description: string): string {
+  const m = description.match(PROSPECTIVE_RE);
+  if (m && m.index !== undefined) return description.slice(m.index + m[0].length).replace(/^[\s,]+/, '').replace(/[.!?]+$/, '').trim() || description;
+  const cond = description.match(/^(?:and |but |then )?if\s+[^,]+,\s*(I\s+.+)$/i);
+  if (cond) return cond[1].replace(/[.!?]+$/, '').trim();
+  return description.replace(/[.!?]+$/, '').trim();
+}
+
+/**
+ * Does this act carry out the intention, by the words alone? The act must carry most of the doing's content words
+ * ("give it to him as the tip" ↔ "hands him the folded bill as the tip" fails on words alone — the lane judges that).
+ * Pure.
+ */
+export function actCompletes(description: string, act: string): boolean {
+  const doing = doingOf(description);
+  return cueCoverage(doing, act) >= 0.6;
+}
+
+/**
+ * Read a being's act against its pending intentions and mark the carried-out ones DONE. The words first; then,
+ * when a judge is given (the local lane), its yes/no on the rest. Returns the settled rows. Never throws outward.
+ */
+export async function settleIntentionsByAct(
+  characterId: string,
+  act: string,
+  judge?: (pending: Array<{ id: string; description: string }>, act: string) => Promise<string[]>,
+): Promise<Array<{ id: string; description: string }>> {
+  try {
+    const entity = await prisma.dayaEntity.findUnique({ where: { characterId }, select: { id: true } });
+    if (!entity || !act.trim()) return [];
+    const pending = await prisma.dayaIntention.findMany({ where: { entityId: entity.id, status: 'PENDING', cadence: null }, select: { id: true, description: true } });
+    if (!pending.length) return [];
+    const done = new Set(pending.filter((p) => actCompletes(p.description, act)).map((p) => p.id));
+    const rest = pending.filter((p) => !done.has(p.id));
+    if (judge && rest.length) {
+      try { for (const id of await judge(rest, act)) if (rest.some((p) => p.id === id)) done.add(id); }
+      catch (err) { console.warn('[daya/intentions] the judge could not read the act (non-fatal):', err instanceof Error ? err.message : err); }
+    }
+    if (!done.size) return [];
+    await prisma.dayaIntention.updateMany({ where: { id: { in: [...done] } }, data: { status: 'DONE' } });
+    const settled = pending.filter((p) => done.has(p.id));
+    for (const s of settled) console.log(`[daya/intentions] DONE for ${characterId}: "${s.description.slice(0, 90)}" ← act: "${act.slice(0, 90)}"`);
+    return settled;
+  } catch (err) {
+    console.warn('[daya/intentions] settling by act failed (non-fatal):', err instanceof Error ? err.message : err);
+    return [];
+  }
+}

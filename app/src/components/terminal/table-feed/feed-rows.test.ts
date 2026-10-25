@@ -131,3 +131,21 @@ describe('the Watcher writes a roster character\'s action (hello world 2026-10-1
     expect(rows[1]).toMatchObject({ characterId: 'warden', segments: [{ kind: 'action', text: 'Warden knocks' }] });
   });
 });
+
+describe("a being's beat, built up (scene-builder 2026-10-25)", () => {
+  it('its scene line, then its card with thoughts, acts and words split', () => {
+    const rows = eventRows(ev({
+      kind: 'being_thought', heard: 'Someone knocks on the door.', thought: 'The knock is a small, sharp thing. My hand finds the deadbolt.', impulse: 'stay', canonEventId: 'c1', cycle: 0.0022,
+      scene: 'Inside the Main Room the lamp is already on; the knock comes through the locked entry door.',
+      segments: [{ kind: 'thought', text: 'The knock is a small, sharp thing against the silence.' }, { kind: 'action', text: 'Her hand finds the deadbolt.' }],
+    } as never, { actor: 'system', characterId: 'violet', characterName: 'Violet' }), roster);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ type: 'narration', via: 'being', text: 'Inside the Main Room the lamp is already on; the knock comes through the locked entry door.' });
+    expect(rows[1]).toMatchObject({ type: 'character', characterId: 'violet', via: 'being', voice: 'Being', segments: [{ kind: 'thought', text: 'The knock is a small, sharp thing against the silence.' }, { kind: 'action', text: 'Her hand finds the deadbolt.' }] });
+  });
+  it('an old row with only a thought is one blue card, as before', () => {
+    const rows = eventRows(ev({ kind: 'being_thought', heard: 'x', thought: 'The salt stings.', impulse: 'stay', canonEventId: null } as never, { actor: 'system', characterId: 'kris', characterName: 'Kristopher' }), roster);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ type: 'character', segments: [{ kind: 'thought', text: 'The salt stings.' }] });
+  });
+});

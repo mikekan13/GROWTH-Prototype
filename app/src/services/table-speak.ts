@@ -32,7 +32,10 @@ import { assertLawfulInput } from '@/services/lawful-intake';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
-import { converseWithEntity, listenToTable, answerAtTable, type ConverseStatus } from '@/daya/conversation';
+import { converseWithEntity, listenToTable, answerAtTable, type ConverseStatus, type TableListenOutcome } from '@/daya/conversation';
+import { sceneBuilderOn, buildScene, buildBeingCard, sceneFacts, type SeedParts } from '@/services/scene-builder';
+import { settleIntentionsByAct } from '@/daya/intentions';
+import { judgeIntentionsDone } from '@/daya/intention-judge';
 import { isDayaEnabled } from '@/daya/events';
 import type { TableAsk, ListenTimings, AnswerTimings } from '@/daya/ensemble';
 import { readTableTalk, type TableTalkState, type TableUtterance } from '@/services/table-talk';
@@ -113,6 +116,59 @@ const BEINGS_ANSWER = 'when-asked' as 'when-asked' | 'always';
 
 /** Kept for the pre-09-26 narrate-only callers; prose handles it now. */
 export type TableNarrateResult = TableProseResult;
+
+/** How long the page waits for a voiced being's own listening before it is built without the monologue. */
+const PRELISTEN_WAIT_MS = 20_000;
+
+/**
+ * THE SEED → THE PAGE (Mike 2026-10-25): a being the Watcher voiced listens to its own beat FIRST, so its monologue
+ * ("the salt stings") can be blended into its card by the scene builder instead of landing as a second row. The
+ * same stretch gatedHear would compose for it — the public run in its own voice, what it was voiced as thinking, its
+ * own words — handed to listenToTable now; runBeats takes the promise instead of listening again.
+ */
+function preListenVoiced(
+  actor: TableActor,
+  plan: TablePlan,
+  parsed: { thoughts?: ProseThought[] },
+  actors: Record<string, OwnVoiceActor>,
+  ids: string[],
+): Map<string, Promise<TableListenOutcome>> {
+  const out = new Map<string, Promise<TableListenOutcome>>();
+  const hearBeat = plan.beats.find((b): b is Extract<TableBeat, { type: 'hear' }> => b.type === 'hear');
+  const thoughts = parsed.thoughts ?? [];
+  const publicRun = hearBeat ? withoutThoughts(hearBeat.utterances, thoughts) : [];
+  for (const id of ids) {
+    const s = stimulusFor(publicRun, id, { ownVoiced: true });
+    const thinking = thoughts.filter((t) => t.actorId === id).map((t) => t.sentence).join(' ');
+    const words = plan.beats
+      .filter((b): b is Extract<TableBeat, { type: 'spoken' }> => b.type === 'spoken' && b.utterance.speaker?.id === id)
+      .map((b) => `${b.utterance.speaker?.label ?? 'someone present'}: ${b.utterance.text}`).join('\n');
+    let content = [s?.content, thinking, words].filter((x) => x && x.trim()).join('\n');
+    if (!content) continue;
+    const me = actors[id];
+    if (me) content = ownVoice(content, me);
+    // Exactly what hear() would hand it: its senses ride along only when the reach pass is on (then it is 'self' by rule).
+    const stim: PlannedStimulus = { source: s?.source ?? (words ? 'dialogue' : 'perception'), content, own: true, ...(perceptionReachOn() ? { via: ['self'] } : {}) };
+    out.set(id, listenToTable(id, actor.role, stim));
+  }
+  return out;
+}
+
+/** The monologues that are in within the wait; the rest keep listening and land by themselves. */
+async function monologuesWithin(pre: Map<string, Promise<TableListenOutcome>>, ms: number): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  await Promise.all([...pre].map(async ([id, p]) => {
+    const o = await Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]).catch(() => null);
+    const t = o?.listened?.thought?.trim();
+    if (t) out.set(id, t);
+  }));
+  return out;
+}
+
+/** A being's act on the record settles the intentions it carried out (Mike 2026-10-25: "build a way for intentions to be completed"). */
+function settleByAct(campaignId: string, characterId: string, act: string): void {
+  void settleIntentionsByAct(characterId, act, (pending, a) => judgeIntentionsDone(campaignId, pending, a)).catch(() => {});
+}
 
 /** The campaign clock for a feed row; a row without it still posts (the feed shows "not recorded"). */
 async function feedCycle(campaignId: string): Promise<number | undefined> {
@@ -597,6 +653,10 @@ async function runBeats(
     thoughts?: ProseThought[];
     /** The roster by id, so a being's own act can be put in its own person. */
     actors?: Record<string, OwnVoiceActor>;
+    /** Voiced beings already listening to their own beat (preListenVoiced): their promise is taken once instead of a second listen. */
+    preListened?: Map<string, Promise<TableListenOutcome>>;
+    /** Voiced beings whose monologue the scene builder blended into their card: no second row for them. */
+    blended?: Set<string>;
   },
   opts: { waitForAnswers: boolean; answerAfterWorldOnly: boolean },
 ): Promise<Map<string, ListenerResponse>> {
@@ -630,7 +690,10 @@ async function runBeats(
     const me = own ? truth.actors?.[listenerId] : undefined;
     if (me) content = ownVoice(content, me);
     const carried: PlannedStimulus = { ...stimulus, content, ...(via ? { via } : {}), ...(own ? { own: true } : {}) };
-    void listenToTable(listenerId, actor.role, carried)
+    // A voiced being already listening to this beat (the page was built from its monologue): take that, once.
+    const pre = truth.preListened?.get(listenerId);
+    if (pre) truth.preListened!.delete(listenerId);
+    void (pre ?? listenToTable(listenerId, actor.role, carried))
       .then(async (outcome) => {
         if (outcome.status !== 'ok') {
           console.warn(`[table-speak] ${listenerId} could not listen: ${outcome.status}${outcome.detail ? ` (${outcome.detail})` : ''}`);
@@ -639,14 +702,22 @@ async function runBeats(
         }
         reportTiming({ kind: 'listen', characterId: listenerId, outcome: outcome.listened ? outcome.listened.status : 'taken_over', timings: outcome.listened?.timings, impulse: outcome.listened?.impulse });
         // The Watcher can read a silence: what went through it and its own say, on the record (not a memory).
-        if (outcome.listened?.status === 'listened') {
+        // Built up (Mike 2026-10-25): a prose line setting the being's side of the scene, then its card — unless the
+        // Watcher voiced it this beat and its monologue already went into its card on the page.
+        if (outcome.listened?.status === 'listened' && !truth.blended?.has(listenerId)) {
+          const name = listeners.find((l) => l.id === listenerId)?.name ?? listenerId;
+          const thought = outcome.listened.thought;
+          const card = sceneBuilderOn() && thought && !own
+            ? await buildBeingCard(campaignId, { id: listenerId, name }, carried.content, thought, await sceneFacts(campaignId, [listenerId])).catch(() => null)
+            : null;
           void recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
             characterId: listenerId,
-            characterName: listeners.find((l) => l.id === listenerId)?.name ?? listenerId,
+            characterName: name,
             heard: carried.content,
-            thought: outcome.listened.thought,
+            thought,
             impulse: outcome.listened.impulse,
             canonEventId: truthId,
+            ...(card ? { scene: card.scene, segments: card.segments } : {}),
           });
         }
         // null = an answer took this stretch over; that answer stores it and points it at the truth.
@@ -779,6 +850,8 @@ async function runBeats(
     // The being's line costs the world its seconds (table-clock) before it is on the record.
     if (line && (action.kind === 'speak' || action.kind === 'act')) await advanceClockForLine(campaignId, action.kind === 'speak' ? 'being-speech' : 'being-act', action.content ?? line);
     if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(action) });
+    // What it did settles what it meant to do.
+    if ((action.kind === 'speak' || action.kind === 'act') && action.content?.trim()) settleByAct(campaignId, listener.id, action.content.trim());
     // THE ROOM HEARS HER (HW5 2026-10-25: Violet's answers never reached Kristopher — a being's words went on the
     // record and into nobody's senses). Her line is canon dialogue; every other being is judged for reach and
     // listens, as for anyone's words. No turn is granted on it: the Watcher drives the turns, and being-to-being
@@ -889,10 +962,36 @@ async function speakProseSplit(
   let canonEventId: string | null = null;
   const dialogue: TableProseResult['dialogue'] = [];
   const soloAttributed = !narrated && !hasActions && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
+  // 0c. THE SEED → THE PAGE (Mike 2026-10-25: the record reads like a novel, built from data). The beings the
+  //     Watcher voiced listen to their own beat first; their monologue, the seed and the world's facts go to the
+  //     scene builder; what comes back is the declaration's feed — the seed itself stays the canon text and the raw.
+  const actorsById = actorsOf(roster);
+  let feedParts: { narration: string | null; speech: typeof parsed.quotes; actions: typeof parsed.actions; thoughts: typeof parsed.thoughts; built?: boolean; seedNarration?: string | null } = { narration: narrated ? parsed.narration : null, speech: parsed.quotes, actions: parsed.actions, thoughts: parsed.thoughts };
+  let preListened: Map<string, Promise<TableListenOutcome>> | undefined;
+  let blended: Set<string> | undefined;
+  if (sceneBuilderOn() && narration !== null && (narrated || hasActions)) {
+    const voicedHere = voicedIn(parsed).filter((id) => listeners.some((l) => l.id === id));
+    preListened = preListenVoiced(actor, plan, parsed, actorsById, voicedHere);
+    const monologues = await monologuesWithin(preListened, PRELISTEN_WAIT_MS);
+    const seed: SeedParts = { full: parsed.full, narration: narrated ? parsed.narration : null, actions: parsed.actions ?? [], thoughts: parsed.thoughts ?? [], quotes: parsed.quotes };
+    const focus = [...new Set([soleActor(parsed), ...voicedHere].filter((x): x is string => !!x))];
+    const built = await buildScene(campaignId, seed, monologues, await sceneFacts(campaignId, focus.length ? focus : listeners.map((l) => l.id)));
+    if (built.source === 'cloud') {
+      feedParts = {
+        narration: built.scene,
+        speech: parsed.quotes,
+        actions: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'action').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence }))),
+        thoughts: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'thought').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence }))),
+        built: true,
+        seedNarration: narrated ? parsed.narration : null,
+      };
+      blended = new Set(monologues.keys());
+    }
+  }
   if (narration !== null && (narrated || hasActions || parsed.quotes.length !== 1)) {
     const declared = await declareCanon(campaignId, actor, {
       narration, kind: 'narration', actorId: soleActor(parsed), locationId: input.locationId ?? null, witnessIds: [],
-      feed: { via: 'typed', raw: message, narration: narrated ? parsed.narration : null, speech: parsed.quotes, actions: parsed.actions, thoughts: parsed.thoughts },
+      feed: { via: 'typed', raw: message, ...feedParts },
     });
     canonEventId = declared.event.id;
     narratedActs(campaignId, parsed.actions);
@@ -912,7 +1011,7 @@ async function speakProseSplit(
   // 2. LISTEN and ANSWER, beat by beat.
   const truthPrimary = canonEventId ?? dialogue[0]?.canonEventId ?? null;
   const truthExtra = dialogue.map((d) => d.canonEventId).filter((id) => id !== truthPrimary);
-  const answered = await runBeats(campaignId, actor, plan.beats, listeners, { primary: truthPrimary, extra: truthExtra, voicedIds: voicedIn(parsed), actorId: soleActor(parsed), thoughts: parsed.thoughts, actors: actorsOf(roster) }, {
+  const answered = await runBeats(campaignId, actor, plan.beats, listeners, { primary: truthPrimary, extra: truthExtra, voicedIds: voicedIn(parsed), actorId: soleActor(parsed), thoughts: parsed.thoughts, actors: actorsById, preListened, blended }, {
     waitForAnswers: true,
     answerAfterWorldOnly: BEINGS_ANSWER === 'always',
   });
@@ -967,6 +1066,8 @@ async function liveStatedTime(campaignId: string, actor: TableActor, adv: Awaite
 function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined): void {
   for (const a of actions ?? []) {
     if (!a.actorId || !a.text.trim()) continue;
+    // What the Watcher had it do settles what it meant to do (intentions, 2026-10-25).
+    settleByAct(campaignId, a.actorId, a.text);
     void feedCycle(campaignId)
       .then((cycle) => resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: a.text, cycle: cycle ?? 0, narrated: true }))
       .then((r) => {
