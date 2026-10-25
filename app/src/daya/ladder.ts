@@ -45,14 +45,24 @@ export interface LadderResult {
   words: number;
 }
 
-/** Survival relevance of a memory: threat-shaped affect, or death/harm domains, sharpened when the being is in danger now. */
-export function survivalStrength(m: LadderMemory, situation: LadderContext['situation']): number {
+/** The domains a cue is about when it is about harm: death and the undoing of it. */
+const HARM_DOMAINS = ['dissolution', 'restoration'];
+
+/**
+ * Survival relevance of a memory: threat-shaped affect, or death/harm domains, full strength when the being is in
+ * danger now. Survival leads the ladder — but only when survival is in question: the being is in danger, or the cue
+ * itself is about harm. A calm knock at the door is neither (HW7 2026-10-25: Violet's recall on the knock surfaced
+ * her grandmother's death and never reached "tonight, when he knocks").
+ */
+export function survivalStrength(m: LadderMemory, situation: LadderContext['situation'], cueDomains: string[] = []): number {
   const threatAffect = m.arousal >= 0.7 && m.valence <= -0.3 ? 1 : 0;
   const harmDomain = m.domains.includes('dissolution') ? 0.7 : m.domains.includes('restoration') ? 0.4 : 0;
   const base = Math.max(threatAffect, harmDomain);
   if (base === 0) return 0;
-  const danger = situation.threatened || situation.frequencyLow ? 1 : 0.6;
-  return Math.min(1, base * danger);
+  const danger = situation.threatened || situation.frequencyLow;
+  const harmCue = cueDomains.some((d) => HARM_DOMAINS.includes(d));
+  if (!danger && !harmCue) return 0;
+  return Math.min(1, base * (danger ? 1 : 0.6));
 }
 
 export function goalStrength(m: LadderMemory, ctx: LadderContext): number {
@@ -74,15 +84,41 @@ export function chainStrength(m: LadderMemory, cueRefs: string[]): number {
   return hits === 0 ? 0 : Math.min(1, 0.5 + 0.25 * hits);
 }
 
+/** A light stem so "knocks" meets "knock" and "tears" meets "tear". */
+function stemLight(t: string): string {
+  return t.length > 3 && t.endsWith('s') && !t.endsWith('ss') ? t.slice(0, -1) : t;
+}
+
+/**
+ * How much of what was said the memory carries: the cue's content words found in the memory, over the cue's
+ * content words, taken sentence by sentence and the best sentence wins. A heard stretch is several beats; the
+ * knock is one of them, and the memory that says "when he knocks" carries that beat whole, however long the memory
+ * is (TF cosine over a 90-word memory sinks to ~0.04). A one-word sentence counts only on a word of four letters or
+ * more. Pure.
+ */
+export function cueCoverage(cue: string, content: string): number {
+  const have = new Set([...vectorize(content).keys()].map(stemLight));
+  if (have.size === 0) return 0;
+  let best = 0;
+  for (const sentence of cue.split(/(?<=[.!?])\s+/)) {
+    const toks = [...new Set([...vectorize(sentence).keys()].map(stemLight))];
+    if (toks.length === 0) continue;
+    const hit = toks.filter((t) => have.has(t));
+    if (toks.length === 1 && hit.length === 1 && hit[0].length < 4) continue;
+    best = Math.max(best, hit.length / toks.length);
+  }
+  return best;
+}
+
 export function wordsStrength(cue: string, content: string): number {
-  return cosine(vectorize(cue), vectorize(content));
+  return Math.max(cosine(vectorize(cue), vectorize(content)), cueCoverage(cue, content));
 }
 
 export function climb(m: LadderMemory, ctx: LadderContext): LadderResult {
   const cueDomains = ctx.cueDomains ?? classifyDomains(ctx.cue).all;
   const words = wordsStrength(ctx.cue, m.content);
   const rungs: Array<[Rung, number]> = [
-    ['survival', survivalStrength(m, ctx.situation)],
+    ['survival', survivalStrength(m, ctx.situation, cueDomains)],
     ['goals', goalStrength(m, ctx)],
     ['domain', domainStrength(m, cueDomains)],
     ['chain', chainStrength(m, ctx.cueRefs)],

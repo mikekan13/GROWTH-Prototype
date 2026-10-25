@@ -49,6 +49,14 @@ describe('computeRelevance', () => {
     const r = computeRelevance('letter letter letter', ['a', 'b'], 'letter letter letter', ['a'], true);
     expect(r).toBeLessThanOrEqual(1);
   });
+
+  // HW7 2026-10-25: the knock had to reach "Tonight, when he knocks" — Jaccard over a long memory gave 0.037.
+  it('a long memory that carries one sentence of the cue whole is relevant to it', () => {
+    const lingers = 'Kristopher always lingers. Every other driver hands over the box and leaves. I wrote my phone number on a five-dollar bill. It\'s folded on the shelf by the door. Tonight, when he knocks, I\'m going to give it to him as the tip.';
+    const heard = 'He wipes his eyes from the tears he was crying in the car. He knocks on the door.';
+    expect(stemmedJaccard(heard, lingers)).toBeLessThan(0.1);
+    expect(computeRelevance(heard, [], lingers, [])).toBeCloseTo(0.6, 5);
+  });
 });
 
 describe('computeRecency (power-law decay, salience resists it)', () => {

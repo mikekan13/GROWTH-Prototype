@@ -20,7 +20,7 @@ import { prisma } from '@/lib/db';
 import { chat, type DayaClientOverrides } from './model-client';
 import { writeMemoryEntry } from './memory';
 import { RECALL_TUNING } from './recall-tuning';
-import { climb, ladderCompare, RUNG_RANK, type Rung } from './ladder';
+import { climb, cueCoverage, ladderCompare, RUNG_RANK, type Rung } from './ladder';
 import { parseChain, type MemoryChain } from './chain';
 import { classifyDomains } from './domains';
 
@@ -149,7 +149,9 @@ export function computeRelevance(
   entityRefs: string[],
   sameSourceThread = false,
 ): number {
-  const keywordScore = stemmedJaccard(cue, content) * 0.6;
+  // Jaccard sinks for a long memory; the cue's own words carried by the memory, sentence by sentence, count too
+  // (HW7 2026-10-25: "He knocks on the door." against "Tonight, when he knocks…" scored 0.037).
+  const keywordScore = Math.max(stemmedJaccard(cue, content), cueCoverage(cue, content)) * 0.6;
   const refsOverlap = cueRefs.length > 0 && entityRefs.some((r) => cueRefs.includes(r)) ? 0.3 : 0;
   const threadBonus = sameSourceThread ? 0.1 : 0;
   return clamp(keywordScore + refsOverlap + threadBonus, 0, 1);
