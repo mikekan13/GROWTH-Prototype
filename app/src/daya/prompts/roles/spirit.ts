@@ -83,9 +83,31 @@ export interface SpiritListeningArgs {
   heard: string;
   /** How long it has been since the being itself last spoke or acted, in its own words ("about two minutes"), or null when unknown. */
   sinceOwn?: string | null;
+  /** What the senses allow of this stretch (sensesNoteFor), or null when nothing need be said. */
+  sensesNote?: string | null;
 }
 
 export const LISTENING_MAX_TOKENS = 140;
+
+/**
+ * What a stretch's senses allow the being to think about it (HW5 2026-10-25: Violet, behind
+ * her closed door, thought "He looks like he's waiting" of a man she only heard; Kristopher
+ * listened to the Watcher's "He walks back to the door and knocks with frustration" as if
+ * watching a stranger). `own` = the Watcher voiced this being's own act or words. Pure.
+ */
+export function sensesNoteFor(via: string[] | undefined, own: boolean): string | null {
+  if (own || via?.includes('self')) {
+    return 'This is your OWN doing, voiced for you by the Watcher: you did this, you said this. Take it as your own act and your own words — what it was like from inside — not as something you watched someone else do.';
+  }
+  if (!via?.length) return null;
+  if (!via.includes('sight') && via.includes('hearing')) {
+    return 'This reached you by HEARING only — you saw none of it. Where he stands, what his face or hands do, how he looks: none of that is yours to know. Think only from the sound.';
+  }
+  if (via.includes('sight') && !via.includes('hearing')) {
+    return 'This reached you by SIGHT only — you heard none of it. Any words were not yours to catch; think only from what you saw.';
+  }
+  return null;
+}
 
 export type ListenImpulse = 'speak' | 'act' | 'stay';
 
@@ -126,7 +148,7 @@ ${args.innerSoFar || 'Nothing yet — you have only just started paying attentio
 
 What just reached you:
 ${args.heard}
-${args.sinceOwn ? `\nTime, as you feel it: it has been ${args.sinceOwn} since you last said or did anything.\n` : ''}
+${args.sensesNote ? `\n${args.sensesNote}\n` : ''}${args.sinceOwn ? `\nTime, as you feel it: it has been ${args.sinceOwn} since you last said or did anything.\n` : ''}
 Nobody is waiting on you; the moment is still unfolding. Take it in. Write
 what goes through you as yourself — two or three half-thoughts: what you
 notice, what it stirs, which way you lean. What you don't know, you don't know.
@@ -233,6 +255,9 @@ What the world holds true about this (facts you can act on):
 ${args.facts?.length ? args.facts.join('\n') : '(none that bear on this)'}
 
 ${NEVER_GUESS_BLOCK}
+Before you answer about where a thing is, what you have, what you did or what
+happened: read what you have on you, what memory gives you and the facts above
+first. If it is not there, you do not know it — say so, or check.
 
 ${turn}
 
@@ -241,6 +266,61 @@ nothing else — no thinking aloud first. Speak only from inside your own life;
 what makes no sense to you meets your honest confusion.
 Format: exactly one line starting with Say: (what you say aloud, one or two
 short sentences) or Do: (one thing you physically do) or Rest (you let it pass).`;
+}
+
+// ── The guess check (HW5 2026-10-25) ──────────────────────────────────────
+// The law was in the prompt and the line still filled the gap ("I think I left
+// it on the counter" with the cash on her; "I paid you, didn't I?" with his
+// voice in her memory saying she had not). One small read of the line against
+// what she knows; a guess is re-voiced once with the gap named.
+
+export interface GroundingCheckArgs {
+  name: string;
+  line: string;
+  heard: string[];
+  recallBlock?: string;
+  held?: string[];
+  facts?: string[];
+}
+
+export const GROUNDING_CHECK_MAX_TOKENS = 40;
+
+export function buildGroundingCheckPrompt(args: GroundingCheckArgs): string {
+  return `You check one spoken line against what the speaker actually knows. The speaker is ${args.name}.
+
+What she has just heard and seen:
+${args.heard.length ? args.heard.join('\n') : '(nothing new)'}
+
+What her memory gave her for this moment:
+${args.recallBlock || '(nothing in particular)'}
+
+What she has on her:
+${args.held?.length ? args.held.join('\n') : '(nothing listed)'}
+
+What the world holds true:
+${args.facts?.length ? args.facts.join('\n') : '(nothing that bears on this)'}
+
+Her line: "${args.line}"
+
+A GUESS is a thing stated as so that nothing above supports, or that the above contradicts:
+where an object is, that something happened or was paid or given, what someone said, what
+she has or did. Feelings, wishes, intentions ("I was going to"), refusals, questions back,
+opinions, and anything the above supports are NOT guesses.
+Answer with exactly one line: OK — or — GUESS: <the unsupported claim, in a few words>`;
+}
+
+/** Read the check's one line. Anything unreadable counts as OK: the check may never mute her by accident. Pure. */
+export function readGroundingVerdict(raw: string): { grounded: boolean; claim?: string } {
+  const first = (raw ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+  const guess = first.match(/^\W*guess\b\W*(.*)$/i);
+  if (guess) return { grounded: false, ...(guess[1].trim() ? { claim: guess[1].trim().replace(/[.]+$/, '') } : {}) };
+  return { grounded: true };
+}
+
+/** The hint for a second take when the first line filled a gap with a guess. */
+export function guessHint(line: string, claim?: string): string {
+  const what = claim ? `that ${claim}` : 'what your line claimed';
+  return `Your line was: "${line}". You do not actually know ${what} — nothing in your memory, your things or the facts says so. Answer again as yourself: say what you DO know, say you don't know, or check (look, feel your pocket, ask). Never fill the gap.`;
 }
 
 // ── Ruling-22 desires-block guard ─────────────────────────────────────────

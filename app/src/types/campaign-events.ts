@@ -247,7 +247,7 @@ export interface JewlHighlightEvent {
 export type BeingSpeakingPhase =
   | { phase: 'start'; utteranceId: string; characterId: string; characterName: string }
   | { phase: 'partial'; utteranceId: string; characterId: string; text: string; delta: string }
-  | { phase: 'retract'; utteranceId: string; characterId: string; reason: 'seal' | 'echo'; rule: string }
+  | { phase: 'retract'; utteranceId: string; characterId: string; reason: 'seal' | 'echo' | 'guess'; rule: string }
   | { phase: 'final'; utteranceId: string; characterId: string; action: 'speak' | 'act' | 'attend' | 'rest'; text: string; revoiced: boolean };
 
 /** Transient: never persisted. The spoken line itself still arrives as a `terminal_event` chat. */

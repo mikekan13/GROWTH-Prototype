@@ -39,6 +39,10 @@ export interface TablePlan {
 export interface PlannedStimulus {
   source: 'perception' | 'dialogue';
   content: string;
+  /** The senses that carried it to this listener (the reach verdict), when judged. */
+  via?: string[];
+  /** The Watcher voiced this listener's own act or words in it. */
+  own?: boolean;
 }
 
 /** The out-of-character rules that are safe to act on when the words were spoken, not typed. */

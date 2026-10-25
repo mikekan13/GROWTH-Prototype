@@ -64,7 +64,19 @@ vi.mock('@/services/reconciliation', () => ({
   cementCheck: vi.fn(async () => {}),
 }));
 
-import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom } from './table-speak';
+import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom, reachEventOf } from './table-speak';
+
+describe("reachEventOf — the Watcher's prose act is its actor's own event (HW5 2026-10-25)", () => {
+  const narr = (text: string) => ({ text, kind: 'narration' as const, to: null, speaker: null, expectsReply: false, ambiguous: false, rule: 'x' });
+  const say = (text: string, id: string, label: string) => ({ text, kind: 'dialogue' as const, to: null, speaker: { id, label }, expectsReply: false, ambiguous: false, rule: 'x' });
+  it('narration voiced for one roster character carries him as the source; with no actor the source stays null', () => {
+    expect(reachEventOf([narr('He walks back to the door and knocks.')], 'c1', 'kris')).toMatchObject({ kind: 'narration', sourceId: 'kris', sourceName: null });
+    expect(reachEventOf([narr('The radiator ticks.')], 'c1', null)).toMatchObject({ kind: 'narration', sourceId: null });
+  });
+  it('speech from one speaker keeps that speaker as the source, whoever the prose actor is', () => {
+    expect(reachEventOf([say('Who is it?', 'violet', 'Violet')], 'c1', 'kris')).toMatchObject({ kind: 'speech', sourceId: 'violet', sourceName: 'Violet' });
+  });
+});
 
 describe("lastVoicedFrom — the Watcher's last voice (HW5 2026-10-25)", () => {
   const roster = [{ id: 'kris', name: 'Kristopher' }, { id: 'violet', name: 'Violet' }];
@@ -190,7 +202,7 @@ describe('speakProse — switch ON: listen while the GM has the floor, answer at
   it('narration then a turn to the party: all listen, all answer, the lines grow on the stream and land as chat', async () => {
     answerWith({ mara: { kind: 'speak', content: 'Who is there?' }, oren: { kind: 'act', content: 'steps back' } });
     const result = await speakProse('camp', actor, { message: 'The door bangs open. What do you do?' });
-    expect(w.listen).toHaveBeenCalledTimes(2);
+    expect(w.listen.mock.calls.filter((c) => c[2].content === 'The door bangs open.').map((c) => c[0])).toEqual(['mara', 'oren']);
     expect(w.answer.mock.calls.map((c) => [c[0], c[2]])).toEqual([['mara', { kind: 'turn' }], ['oren', { kind: 'turn' }]]);
     const speaking = w.broadcasts.filter((b) => b.kind === 'being_speaking');
     expect(speaking.filter((b) => b.characterId === 'mara').map((b) => b.phase)).toEqual(['start', 'partial', 'final']);
@@ -200,25 +212,35 @@ describe('speakProse — switch ON: listen while the GM has the floor, answer at
       { actor: 'ai_copilot', characterId: 'oren', message: '*steps back*' },
     ]));
     expect(result.responses.map((r) => [r.characterId, r.status, r.actionKind])).toEqual([['mara', 'ok', 'speak'], ['oren', 'ok', 'act']]);
-    // The record keeps the GM's text as given when nothing was ignored.
-    expect(w.canon).toEqual([{ kind: 'narration', narration: 'The door bangs open. What do you do?' }]);
+    // The record keeps the GM's text as given when nothing was ignored; Mara's words are canon dialogue too.
+    expect(w.canon[0]).toEqual({ kind: 'narration', narration: 'The door bangs open. What do you do?' });
+    await flush(); await flush();
+    expect(w.canon).toContainEqual({ kind: 'dialogue', speaker: 'mara', text: 'Who is there?' });
+    // THE ROOM HEARS HER (HW5 2026-10-25): Oren is handed Mara's line as something said; Mara never hears her own.
+    expect(w.listen.mock.calls.filter((c) => c[2].content === 'Mara: Who is there?').map((c) => c[0])).toEqual(['oren']);
   });
 
   it('a turn to one name: only that being answers', async () => {
     answerWith({ mara: { kind: 'speak', content: 'Me?' } });
     await speakProse('camp', actor, { message: 'Mara, what do you do?' });
     expect(w.answer.mock.calls.map((c) => c[0])).toEqual(['mara']);
-    expect(w.listen).not.toHaveBeenCalled();
-    expect(w.canon).toEqual([]);
     expect(w.readNarration).not.toHaveBeenCalled();
+    await flush(); await flush();
+    // The ask itself is never canon; Mara's answer is, and Oren hears it (HW5 2026-10-25). Nobody listened to the ask.
+    expect(w.canon).toEqual([{ kind: 'dialogue', speaker: 'mara', text: 'Me?' }]);
+    expect(w.listen.mock.calls.map((c) => [c[0], c[2].content])).toEqual([['oren', 'Mara: Me?']]);
   });
 
   it('an NPC speaks to one being: that one answers the line, the other overhears it, and the line is on the record', async () => {
     answerWith({ mara: { kind: 'speak', content: 'Depends who asks.' } });
     const result = await speakProse('camp', actor, { message: 'Tess: Mara, you the pilot?' });
     expect(w.answer.mock.calls.map((c) => [c[0], c[2]])).toEqual([['mara', { kind: 'spoken', by: 'Tess', text: 'Mara, you the pilot?' }]]);
-    expect(w.listen.mock.calls.map((c) => [c[0], c[2]])).toEqual([['oren', { source: 'dialogue', content: 'Tess: Mara, you the pilot?' }]]);
-    expect(w.canon).toEqual([{ kind: 'dialogue', speaker: 'tess', text: 'Mara, you the pilot?' }]);
+    expect(w.listen.mock.calls[0].slice(0, 3).filter((_, i) => i !== 1)).toEqual(['oren', { source: 'dialogue', content: 'Tess: Mara, you the pilot?' }]);
+    expect(w.canon[0]).toEqual({ kind: 'dialogue', speaker: 'tess', text: 'Mara, you the pilot?' });
+    await flush(); await flush();
+    // Mara's answer is on the record and reaches Oren too (HW5 2026-10-25).
+    expect(w.canon).toContainEqual({ kind: 'dialogue', speaker: 'mara', text: 'Depends who asks.' });
+    expect(w.listen.mock.calls.map((c) => [c[0], c[2].content])).toContainEqual(['oren', 'Mara: Depends who asks.']);
     // A lone attributed line still reads at the table as that NPC speaking.
     expect(w.chats[0]).toEqual({ actor: 'gm', characterId: 'tess', message: 'Mara, you the pilot?' });
     expect(result.dialogue).toHaveLength(1);
@@ -239,7 +261,7 @@ describe('speakProse — switch ON: listen while the GM has the floor, answer at
     answerWith({ mara: { kind: 'speak', content: 'Who is it?' } });
     await speakProse('camp', actor, { message: 'Three knocks on the door, slow and even.' });
     await flush(); await flush();
-    expect(w.listen.mock.calls.map((c) => c[0]).sort()).toEqual(['mara', 'oren']);
+    expect(w.listen.mock.calls.filter((c) => c[2].content === 'Three knocks on the door, slow and even.').map((c) => c[0]).sort()).toEqual(['mara', 'oren']);
     expect(w.answer.mock.calls.map((c) => [c[0], (c[2] as { kind: string }).kind])).toEqual([['mara', 'turn']]);
     expect(w.chats.some((c) => c.characterId === 'mara' && c.message === 'Who is it?')).toBe(true);
   });
@@ -345,9 +367,9 @@ describe('hearSpoken — switch ON, session live: the mic is table talk', () => 
     release();
     await flush();
     await flush();
-    expect(w.chats).toEqual([{ actor: 'ai_copilot', characterId: 'mara', message: 'Me?' }]);
-    // The ask itself is table talk: it is never recorded as something that happened in the world.
-    expect(w.canon).toEqual([]);
+    expect(w.chats.filter((c) => c.actor === 'ai_copilot')).toEqual([{ actor: 'ai_copilot', characterId: 'mara', message: 'Me?' }]);
+    // The ask itself is table talk: it is never recorded as something that happened in the world. Mara's answer is.
+    expect(w.canon).toEqual([{ kind: 'dialogue', speaker: 'mara', text: 'Me?' }]);
   });
 
   it('who the GM addressed carries from one chunk to the next', async () => {

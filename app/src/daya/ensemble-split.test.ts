@@ -70,7 +70,7 @@ import { wake } from './events';
 
 // ── a fake lane ─────────────────────────────────────────────────────────────
 
-interface LaneCall { kind: 'soul' | 'listen' | 'answer' | 'body'; stream: boolean; stop?: string[]; hinted: boolean; prompt: string }
+interface LaneCall { kind: 'soul' | 'listen' | 'answer' | 'body' | 'check'; stream: boolean; stop?: string[]; hinted: boolean; prompt: string }
 
 function sseBody(pieces: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -83,19 +83,22 @@ function sseBody(pieces: string[]): ReadableStream<Uint8Array> {
   return new ReadableStream<Uint8Array>({ pull(controller) { if (i < chunks.length) controller.enqueue(encoder.encode(chunks[i++])); else controller.close(); } });
 }
 
-function fakeLane(script: { answers?: string[][]; listen?: string; soul?: string } = {}) {
+function fakeLane(script: { answers?: string[][]; listen?: string; soul?: string; checks?: string[] } = {}) {
   const calls: LaneCall[] = [];
   let answered = 0;
+  let checked = 0;
   const fetchImpl: DayaFetch = async (_url, init) => {
     const body = JSON.parse(init.body) as { messages: Array<{ content: string }>; stream?: boolean; stop?: string[] };
     const prompt = body.messages.map((m) => m.content).join('\n');
-    const kind: LaneCall['kind'] = prompt.includes('Answer now') ? 'answer' : prompt.includes('Nobody is waiting on you') ? 'listen' : prompt.includes('Output ONLY JSON') ? 'body' : 'soul';
+    const kind: LaneCall['kind'] = prompt.includes('You check one spoken line') ? 'check' : prompt.includes('Answer now') ? 'answer' : prompt.includes('Nobody is waiting on you') ? 'listen' : prompt.includes('Output ONLY JSON') ? 'body' : 'soul';
     calls.push({ kind, stream: body.stream === true, stop: body.stop, hinted: body.messages.length > 1, prompt });
     const json = (text: string) => ({ ok: true, status: 200, text: async () => '', json: async () => ({ choices: [{ message: { content: text } }], usage: { prompt_tokens: 800, completion_tokens: 20 } }) });
     if (kind === 'answer') {
       const pieces = script.answers?.[answered++] ?? ['Say:', ' Fine.'];
       return body.stream ? { ok: true, status: 200, text: async () => '', json: async () => { throw new Error('streamed'); }, body: sseBody(pieces) } : json(pieces.join(''));
     }
+    // The guess check (HW5 2026-10-25): OK unless the script says otherwise.
+    if (kind === 'check') return json(script.checks?.[checked++] ?? 'OK');
     if (kind === 'listen') return json(script.listen ?? 'He looks like trouble. Keep the bar between us.');
     if (kind === 'body') return json('{"intent":"steps back from the door","subjectKeys":[],"effortContext":"casual"}');
     return json(script.soul ?? 'Tired in the shoulders, wary.');
@@ -211,8 +214,10 @@ describe('answerAsk — one short streamed call at the ask', () => {
     const { events, onEvent } = collect();
     const result = await answerAsk('mara', { kind: 'turn' }, { onEvent, overrides: { fetchImpl: lane.fetchImpl } });
 
-    expect(lane.calls).toHaveLength(1);
+    // One call for the line; the guess check reads it afterwards (HW5 2026-10-25).
+    expect(lane.calls.map((c) => c.kind)).toEqual(['answer', 'check']);
     expect(lane.calls[0]).toMatchObject({ kind: 'answer', stream: true, stop: ['\n'], hinted: false });
+    expect(lane.calls[1].prompt).toContain('Her line: "Who are you?"');
     expect(lane.calls[0].prompt).toContain('He looks like trouble. Keep the bar between us.');
     expect(lane.calls[0].prompt).toContain('[the room] The door bangs open.');
     expect(lane.calls[0].prompt).toContain('The moment has come to you.');
@@ -227,7 +232,7 @@ describe('answerAsk — one short streamed call at the ask', () => {
     expect(result.timings.firstWordMs).not.toBeNull();
     expect(await result.after).toEqual({ spokenMemoryId: 'own-1' });
     expect(store.memories).toEqual([{ source: 'dialogue', content: 'Who are you?' }]);
-    expect(store.modelCalls.map((c) => c.subsystem)).toEqual(['spirit_answer']);
+    expect(store.modelCalls.map((c) => c.subsystem)).toEqual(['spirit_answer', 'spirit_guess_check']);
     expect(store.modelCalls[0].rationale ?? null).toBeNull();
     expect(getListening('mara')!.heard.at(-1)).toBe('You said: "Who are you?"');
   });
@@ -245,7 +250,7 @@ describe('answerAsk — one short streamed call at the ask', () => {
     expect(JSON.stringify(retractBody)).not.toContain('14');
     expect(events.at(-1)).toMatchObject({ phase: 'final', action: 'speak', text: 'That was a hard climb.', revoiced: true });
 
-    expect(lane.calls.map((c) => [c.kind, c.stream, c.hinted])).toEqual([['answer', true, false], ['answer', false, true]]);
+    expect(lane.calls.map((c) => [c.kind, c.stream, c.hinted])).toEqual([['answer', true, false], ['answer', false, true], ['check', false, false]]);
     expect(result.action).toEqual({ kind: 'speak', content: 'That was a hard climb.' });
     expect(result.timings).toMatchObject({ retracted: true, revoiced: true });
     await result.after;
@@ -297,7 +302,7 @@ describe('answerAsk — one short streamed call at the ask', () => {
     const result = await answerAsk('mara', { kind: 'spoken', by: 'Oren', text: 'You the pilot?' }, { overrides: { fetchImpl: lane.fetchImpl } });
     expect(store.perceived.at(-1)).toEqual({ stimulus: 'Oren: You the pilot?', source: 'dialogue', standing: 'once', voice: false });
     expect(lane.calls[0].prompt).toContain('You are being spoken to, right now:\n[plain] Oren: You the pilot?');
-    expect(lane.calls).toHaveLength(1);
+    expect(lane.calls.map((c) => c.kind)).toEqual(['answer', 'check']);
     expect(await result.after).toEqual({ memoryEntryId: 'mem-2', spokenMemoryId: 'own-1' });
     expect(store.ingested.at(-1)).toEqual({ source: 'dialogue', content: '[plain] Oren: You the pilot?' });
     expect(getListening('mara')!.heard.slice(-2)).toEqual(['[plain] Oren: You the pilot?', 'You said: "Depends who asks."']);
@@ -307,7 +312,7 @@ describe('answerAsk — one short streamed call at the ask', () => {
     const lane = fakeLane({ answers: [['Say:', ' Hm.']] });
     const result = await answerAsk('mara', { kind: 'turn' }, { overrides: { fetchImpl: lane.fetchImpl } });
     expect(result.timings.listen).toBe('none');
-    expect(lane.calls.map((c) => c.kind)).toEqual(['answer']);
+    expect(lane.calls.map((c) => c.kind)).toEqual(['answer', 'check']);
     expect(store.perceived).toEqual([{ stimulus: '', source: 'perception', standing: 'always', voice: false }]);
     expect(result.action).toEqual({ kind: 'speak', content: 'Hm.' });
   });
@@ -316,8 +321,34 @@ describe('answerAsk — one short streamed call at the ask', () => {
     const lane = fakeLane({ answers: [[], ['\nSay: Not tonight.']] });
     await listened(lane);
     const result = await answerAsk('mara', { kind: 'turn' }, { overrides: { fetchImpl: lane.fetchImpl } });
-    expect(lane.calls.map((c) => [c.stream, c.stop])).toEqual([[true, ['\n']], [false, undefined]]);
+    expect(lane.calls.map((c) => [c.stream, c.stop])).toEqual([[true, ['\n']], [false, undefined], [false, ['\n']]]);
     expect(result.action).toEqual({ kind: 'speak', content: 'Not tonight.' });
+  });
+
+  it('NEVER GUESS, checked (HW5 2026-10-25): a guess is re-voiced once with the gap named; a second guess lets the moment sit', async () => {
+    const lane = fakeLane({
+      answers: [['Say:', ' I', ' think', ' I', ' left', ' it', ' on', ' the', ' counter.'], ['Say: I have it right here.']],
+      checks: ['GUESS: the money is on the counter', 'OK'],
+    });
+    await listened(lane);
+    const { events, onEvent } = collect();
+    const result = await answerAsk('mara', { kind: 'spoken', by: 'Oren', text: 'Can you pay?' }, { onEvent, overrides: { fetchImpl: lane.fetchImpl } });
+    expect(lane.calls.map((c) => [c.kind, c.hinted])).toEqual([['answer', false], ['check', false], ['answer', true], ['check', false]]);
+    expect(lane.calls[2].prompt).toContain('You do not actually know that the money is on the counter');
+    expect(events.find((e) => e.phase === 'retract')).toMatchObject({ reason: 'guess', rule: 'never-guess' });
+    expect(result.action).toEqual({ kind: 'speak', content: 'I have it right here.' });
+    expect(result.timings.revoiced).toBe(true);
+    await result.after;
+    expect(store.memories).toEqual([{ source: 'dialogue', content: 'I have it right here.' }]);
+
+    const lane2 = fakeLane({ answers: [['Say:', ' I', ' paid', ' you.'], ['Say: I paid you yesterday.']], checks: ['GUESS: she paid him', 'GUESS: she paid him yesterday'] });
+    store.memories.length = 0;
+    forgetListening();
+    await listened(lane2);
+    const second = await answerAsk('mara', { kind: 'spoken', by: 'Oren', text: "You didn't pay." }, { overrides: { fetchImpl: lane2.fetchImpl } });
+    expect(second.action).toEqual({ kind: 'rest' });
+    await second.after;
+    expect(store.memories).toEqual([]);
   });
 
   it('D2 — an ask that lands mid-listen waits only up to the cap, then goes on with the unvoiced mirror', async () => {

@@ -49,6 +49,11 @@ import {
   ANSWERING_MAX_TOKENS,
   type DesireSourceItem,
   type SpiritAsk,
+  sensesNoteFor,
+  buildGroundingCheckPrompt,
+  GROUNDING_CHECK_MAX_TOKENS,
+  readGroundingVerdict,
+  guessHint,
 } from './prompts/roles/spirit';
 import {
   ListenQueue,
@@ -788,6 +793,10 @@ export type { AdjudicationResult };
 export interface TableStimulus {
   source: 'perception' | 'dialogue';
   content: string;
+  /** The senses that carried it (the reach verdict), when judged — what the being may think from. */
+  via?: string[];
+  /** The Watcher voiced this being's own act or words: it is its own doing, not something watched. */
+  own?: boolean;
 }
 
 export interface ListenTimings {
@@ -836,14 +845,19 @@ export async function listenStimulus(
   const omniscient = ctx.persona.omniscient === true;
   const prior = getListening(characterId);
 
+  // The being's own act, voiced for it by the Watcher, is its own doing (HW5 2026-10-25: Kristopher took
+  // "He walks back to the door and knocks with frustration" as a stranger's, and his perception of it was
+  // written half in the third person). The mirror and the memory carry it as his.
+  const own = stimulus.own === true || (stimulus.via?.includes('self') ?? false);
+  const raw = own ? `Your own doing, as the Watcher voiced it: ${stimulus.content}` : stimulus.content;
   // The mirror. The place is taken in once; after that a stretch carries only itself and what changed there.
-  let content = stimulus.content;
+  let content = raw;
   let standing: ListenTimings['standing'] = 'raw';
   let locationId = prior?.locationId ?? null;
   let mirrorAudit: Record<string, unknown> | undefined;
   if (isMirrored(ctx)) {
     try {
-      const p = await perceive(characterId, ctx.campaignId!, stimulus.content, stimulus.source, overrides, { standing: 'once' });
+      const p = await perceive(characterId, ctx.campaignId!, raw, stimulus.source, overrides, { standing: 'once' });
       content = p.prose;
       standing = p.standing;
       locationId = p.locationId;
@@ -929,6 +943,7 @@ export async function listenStimulus(
       innerSoFar: innerState,
       heard: fullTake ? 'You are only now taking in where you are.' : content,
       sinceOwn,
+      sensesNote: sensesNoteFor(stimulus.via, own),
     });
     const raw = (await chat({ tier: 'L1', subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS }, overrides)).text.trim();
     // The last line is the being's own say on breaking in; only the thought is kept as its inner state.
@@ -1174,6 +1189,8 @@ export async function answerAsk(
     Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: characterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 })).catch((): Array<{ name: string; data: string | null }> => []),
     actorFacts(ctx, cue).catch((): WorldFactRecord[] => []),
   ]);
+  const heldText = heldLines(splitHeld(heldRows));
+  const factLines = askFacts.slice(0, 10).map((f) => `${f.subjectKey}: ${f.fact.length > 200 ? `${f.fact.slice(0, 197)}…` : f.fact}`);
   const prompt = buildSpiritAnsweringPrompt({
     name: ctx.name,
     identityNarrative: ctx.persona.identityNarrative ?? `${ctx.name}, living her own life, day to day.`,
@@ -1185,9 +1202,23 @@ export async function answerAsk(
     ask: askArg,
     sinceOwn: ctx.campaignId ? await sinceOwnInWords(ctx.campaignId, ctx.entityDaId, state.lastOwnCycle ?? null).catch(() => null) : null,
     recallBlock: answerRecall,
-    held: heldLines(splitHeld(heldRows)),
-    facts: askFacts.slice(0, 10).map((f) => `${f.subjectKey}: ${f.fact.length > 200 ? `${f.fact.slice(0, 197)}…` : f.fact}`),
+    held: heldText,
+    facts: factLines,
   });
+  // The guess check reads a spoken line against the same knowledge. Never throws; unreadable = OK.
+  const checkGrounding = async (said: string): Promise<{ grounded: boolean; claim?: string }> => {
+    try {
+      const r = await chat({
+        tier: 'L1', subsystem: 'spirit_guess_check', contentClass: 'fiction', entityId: ctx.entityDaId,
+        messages: [{ role: 'system', content: buildGroundingCheckPrompt({ name: ctx.name, line: said, heard, recallBlock: answerRecall, held: heldText, facts: factLines }) }],
+        maxTokens: GROUNDING_CHECK_MAX_TOKENS, stop: ['\n'],
+      }, overrides);
+      return readGroundingVerdict(r.text);
+    } catch (err) {
+      console.warn('[daya/ensemble] guess check failed; the line stands (non-fatal):', err instanceof Error ? err.message : err);
+      return { grounded: true };
+    }
+  };
   const answerCall = (extra: { hint?: string; stream?: (delta: string) => boolean | void; stop?: boolean }) =>
     chat(
       {
@@ -1254,6 +1285,31 @@ export async function answerAsk(
       line = { kind: 'rest', content: '' };
     }
     revoiced = true;
+  }
+  // NEVER GUESS, CHECKED (HW5 2026-10-25: "I think I left it on the counter" with the cash on her; "I paid you,
+  // didn't I?" with his voice in her memory saying she had not — the law was in the prompt and the line still
+  // filled the gap). A guess is re-voiced once with the gap named; a second guess lets the moment sit.
+  if (line.kind === 'speak' && line.content.trim()) {
+    const verdict = await checkGrounding(line.content);
+    if (!verdict.grounded) {
+      console.warn(`[daya/ensemble] guess for ${ctx.name} — revoicing: "${line.content.slice(0, 80)}"${verdict.claim ? ` (claim: ${verdict.claim})` : ''}`);
+      if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'guess', rule: 'never-guess' });
+      try {
+        const sealed = await enforceSeal((await answerCall({ hint: guessHint(line.content, verdict.claim), stop: false })).text, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
+        const second = sealed.usedFallback ? { kind: 'rest' as GateKind, content: '' } : readLine(sealed.text);
+        if (second.kind === 'speak' && second.content.trim()) {
+          const again = await checkGrounding(second.content);
+          if (!again.grounded) console.warn(`[daya/ensemble] second guess for ${ctx.name}; the moment sits: "${second.content.slice(0, 80)}"`);
+          line = again.grounded ? second : { kind: 'rest', content: '' };
+        } else {
+          line = second;
+        }
+      } catch (err) {
+        console.warn('[daya/ensemble] guess revoice failed; the moment sits (non-fatal):', err);
+        line = { kind: 'rest', content: '' };
+      }
+      revoiced = true;
+    }
   }
   const lineMs = Date.now() - t0;
   emit({ phase: 'final', utteranceId, characterId, action: line.kind, text: line.content, revoiced });

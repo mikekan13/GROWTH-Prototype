@@ -3,6 +3,7 @@ import {
   buildDesiresBlock, parseSpiritOutput, buildSpiritListeningPrompt, buildSpiritAnsweringPrompt,
   SPIRIT_TENETS_BLOCK, LISTENING_MAX_TOKENS, ANSWERING_MAX_TOKENS, type DesireSourceItem,
   capSpeech, splitImpulse, NEVER_GUESS_BLOCK, isEcho,
+  sensesNoteFor, buildGroundingCheckPrompt, readGroundingVerdict, guessHint,
 } from './spirit';
 import { sealLint, hasHardHit } from '../../seal';
 
@@ -210,6 +211,56 @@ describe('the answer never guesses (Mike 2026-10-24: "the LLM should almost neve
     expect(p).toContain('Nothing in particular comes to mind.');
     expect(p).toContain('you carry nothing you know of');
     expect(p).toContain('(none that bear on this)');
+  });
+});
+
+describe('the senses bound the monologue; an own act is lived from inside (HW5 2026-10-25)', () => {
+  it('hearing only: no sight is hers to think from', () => {
+    expect(sensesNoteFor(['hearing'], false)).toContain('HEARING only');
+    expect(sensesNoteFor(['hearing', 'smell'], false)).toContain('HEARING only');
+  });
+  it('sight and hearing, or nothing judged: no note', () => {
+    expect(sensesNoteFor(['sight', 'hearing'], false)).toBeNull();
+    expect(sensesNoteFor(undefined, false)).toBeNull();
+    expect(sensesNoteFor([], false)).toBeNull();
+  });
+  it("the Watcher's voicing of her own act, or a 'self' verdict, is her own doing", () => {
+    expect(sensesNoteFor(['sight', 'hearing'], true)).toContain('your OWN doing');
+    expect(sensesNoteFor(['self'], false)).toContain('your OWN doing');
+  });
+  it('the listening prompt carries the note between what reached her and the impulse', () => {
+    const p = buildSpiritListeningPrompt({ name: 'Violet', identityNarrative: 'x', voiceNotes: 'y', feltStateBrief: 'z', standingScene: 's', recallBlock: 'r', desiresBlock: 'd', innerSoFar: '', heard: 'A knock.', sensesNote: sensesNoteFor(['hearing'], false) });
+    expect(p.indexOf('A knock.')).toBeLessThan(p.indexOf('HEARING only'));
+    expect(p.indexOf('HEARING only')).toBeLessThan(p.indexOf('Impulse: speak'));
+  });
+});
+
+describe('the guess check (HW5 2026-10-25: the law was in the prompt and the line still filled the gap)', () => {
+  it('the check prompt carries the line and everything she knows', () => {
+    const p = buildGroundingCheckPrompt({ name: 'Violet', line: 'I think I left it on the counter.', heard: ['Kristopher: Can you please pay for the pizza...'], recallBlock: 'r', held: ['You have on you: The brown wallet, The cash in her wallet.'], facts: ['kitchenette:counter: On the counter: the coffee maker.'] });
+    expect(p).toContain('Her line: "I think I left it on the counter."');
+    expect(p).toContain('The cash in her wallet');
+    expect(p).toContain('GUESS: <the unsupported claim');
+  });
+  it('reads OK, reads a guess with its claim, and treats anything unreadable as OK', () => {
+    expect(readGroundingVerdict('OK')).toEqual({ grounded: true });
+    expect(readGroundingVerdict('  ok.')).toEqual({ grounded: true });
+    expect(readGroundingVerdict('GUESS: the wallet is on the counter.')).toEqual({ grounded: false, claim: 'the wallet is on the counter' });
+    expect(readGroundingVerdict('Guess — she paid him')).toEqual({ grounded: false, claim: 'she paid him' });
+    expect(readGroundingVerdict('GUESS')).toEqual({ grounded: false });
+    expect(readGroundingVerdict('')).toEqual({ grounded: true });
+    expect(readGroundingVerdict('Hmm, probably fine')).toEqual({ grounded: true });
+  });
+  it('the hint names the gap and the law', () => {
+    const h = guessHint('I paid you, didn\'t I?', 'she paid him');
+    expect(h).toContain('"I paid you, didn\'t I?"');
+    expect(h).toContain('that she paid him');
+    expect(h).toContain('Never fill the gap');
+    expect(guessHint('x')).toContain('what your line claimed');
+  });
+  it('the answering prompt tells her to read what she has before answering about it', () => {
+    const p = buildSpiritAnsweringPrompt({ name: 'V', identityNarrative: 'x', voiceNotes: 'y', feltStateBrief: 'z', standingScene: 's', innerState: '', heard: [], ask: { kind: 'turn' } });
+    expect(p).toContain('read what you have on you, what memory gives you and the facts above');
   });
 });
 
