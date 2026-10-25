@@ -51,6 +51,9 @@ interface ComplexTooltipProps {
   triggerProps?: React.HTMLAttributes<HTMLElement> & { [data: `data-${string}`]: string | undefined };
   /** Told when the tooltip opens and closes (the host can mark its trigger as open). */
   onOpenChange?: (open: boolean) => void;
+  /** A click (or Enter/Space) on the trigger does this too — hover is the tooltip, click is the act
+   *  (Mike 2026-10-25: a named thing in the feed centres the canvas on it). On touch the tap still opens the tooltip. */
+  onActivate?: () => void;
 }
 
 /** True when the primary pointer is a finger. Read at event time, not render time. */
@@ -80,6 +83,7 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
   triggerAs = 'div',
   triggerProps,
   onOpenChange,
+  onActivate,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -232,7 +236,9 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
 
   /** Touch: a plain tap toggles the tooltip, anchored to the trigger and locked. */
   const handleClick = (e: React.MouseEvent) => {
-    if (disabled || !isCoarsePointer()) return;
+    if (disabled) return;
+    if (onActivate) { e.stopPropagation(); onActivate(); }
+    if (!isCoarsePointer()) return;
     e.stopPropagation();
     openAnchored();
   };
@@ -244,6 +250,7 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
     if (e.key !== 'Enter' && e.key !== ' ') return;
     e.preventDefault();
     e.stopPropagation();
+    onActivate?.();
     openAnchored();
   };
 

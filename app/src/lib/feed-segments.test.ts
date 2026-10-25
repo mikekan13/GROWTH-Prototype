@@ -104,6 +104,27 @@ describe('splitEntities — names of things in the world', () => {
   it('no world, one plain piece', () => {
     expect(splitEntities('anything', [])).toEqual([{ text: 'anything' }]);
   });
+
+  // HW7 line 1 (Mike 2026-10-25): the places he wrote were in the world, spelled as people spell them.
+  describe('a name as the Watcher writes it', () => {
+    const map = [
+      { id: 'landing', name: 'Fourth-floor landing' },
+      { id: 'flat', name: "Violet's Apartment — Fourth-Floor Walkup Studio" },
+      { id: 'main', name: 'Main Room' },
+    ];
+    it('a hyphenated name is found written with spaces, and the other way round', () => {
+      expect(splitEntities('He stands on the fourth floor landing.', map).filter((p) => p.entityId)).toEqual([{ text: 'fourth floor landing', entityId: 'landing' }]);
+      expect(splitEntities('up to the Fourth-Floor Landing', map).filter((p) => p.entityId)).toEqual([{ text: 'Fourth-Floor Landing', entityId: 'landing' }]);
+    });
+    it("a name's head before its qualifier is the name; the full name still wins", () => {
+      expect(splitEntities("outside Violet's apartment", map).filter((p) => p.entityId)).toEqual([{ text: "Violet's apartment", entityId: 'flat' }]);
+      expect(splitEntities('outside Violet’s apartment door', map).filter((p) => p.entityId)).toEqual([{ text: 'Violet’s apartment', entityId: 'flat' }]);
+      expect(splitEntities("Violet's Apartment — Fourth-Floor Walkup Studio", map)).toEqual([{ text: "Violet's Apartment — Fourth-Floor Walkup Studio", entityId: 'flat' }]);
+    });
+    it('the qualifier alone is not the place', () => {
+      expect(splitEntities('a fourth-floor walkup studio', map)).toEqual([{ text: 'a fourth-floor walkup studio' }]);
+    });
+  });
 });
 
 describe('time — in-world first, real second', () => {

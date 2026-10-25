@@ -120,6 +120,12 @@ function RawBlock({ raw, via, cycle, timestamp }: { raw: string; via: Via; cycle
   );
 }
 
+/** Click on a named thing = centre the canvas on it (Mike 2026-10-25: hover is the tooltip, click centres the canvas, for now). */
+function focusCanvasOn(entityId: string): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('growth:focus-canvas-node', { detail: { entityId } }));
+}
+
 function entityKindLine(e: FeedEntity): string {
   const kind = e.kind === 'npc' ? 'NPC' : e.kind === 'character' ? 'PC' : e.kind === 'location' ? 'Place' : 'Item';
   return e.subtype ? `${kind} · ${e.subtype}` : kind;
@@ -141,6 +147,7 @@ function EntitySpan({ entity, text, source }: { entity: FeedEntity; text: string
       triggerStyle={{ display: 'inline' }}
       triggerProps={{ role: 'button', tabIndex: 0, 'aria-haspopup': 'dialog', 'aria-expanded': open, 'data-entity': `${entity.kind}:${entity.id}`, 'data-no-hold': '' }}
       onOpenChange={setOpen}
+      onActivate={() => focusCanvasOn(entity.id)}
       content={entity.known ? (
         <>
           {/* Perceived: only what the viewer knows of it, phrased at their fidelity — never a level, never an unknown aspect. */}
@@ -242,6 +249,7 @@ function PortraitChip({ row }: { row: CharacterRowModel }) {
       triggerStyle={{ width: 80 }}
       triggerProps={{ role: 'button', tabIndex: 0, 'aria-haspopup': 'dialog', 'aria-expanded': open, 'aria-label': `${row.name}: who, how, when`, 'data-no-hold': '' }}
       onOpenChange={setOpen}
+      onActivate={row.characterId ? () => focusCanvasOn(row.characterId!) : undefined}
       content={(
         <>
           <dl className="tft-f">

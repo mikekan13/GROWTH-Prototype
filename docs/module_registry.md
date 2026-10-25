@@ -758,6 +758,12 @@ Item data fields (shared with the stock content pass): `value` (KRMA, decimal), 
 | `src/daya/prompts/roles/adjudicator.ts` | Rule 0: beyond a closed/locked door = not seen, touched or handed; an act that needs someone present reaches no one. |
 | `src/services/table-prose.ts` | `pronounActor`: the FIRST pronoun is the subject ("He … her …" is about him). Post-pass per line: an unclaimed `someone present` quote on a line whose prose acts are all one character's, with no other mouth on the line, is his speech. |
 
+## Hello world 7 fixes — the opening line, walls, places as tooltips (2026-10-25)
+
+Three runs of the same first line from the phone. Fixes: `table-prose.characterCards` (scene narration, then one card per character with acts and thoughts in the Watcher's order; a quote "in his head" is a thought), `visible-form` per-stretch rendering (`chain.heardOf` + `FeedSegment.source`), `perception-reach` (`awaitLaneForReach`, `placeAtSource`, `throughWalls` — sight never crosses a closed door; the judge reads `world-apply.actorMap` doors), `senses-filter` (a sound must be the main verb; several predicates keep only the sounding ones), canon split keeps each thought's `sentence`.
+
+Places as dynamic tooltips (Mike: "the fourth floor landing and violets apartment should have also been tagged… these are our dynamic tooltips; hover is the tooltip, click centres the canvas"): `lib/feed-segments.splitEntities` matches a name as people write it (`nameKey`: hyphen/space, either apostrophe; a name's head before its " — " qualifier counts), `ui/ComplexTooltip.onActivate` (click/Enter does the act; a touch tap still opens the tooltip), `table-feed/TableFeedRows.focusCanvasOn` dispatches `growth:focus-canvas-node` from entity spans and the portrait chip.
+
 ## Hello world 6 fixes — per-part reach, the own voice, hearing only, thoughts in the record (2026-10-25)
 
 Played from the phone: 8 lines, Violet spoke once, nobody heard her, and the one line that would have moved the scene produced nothing. Layer one of the fix list (the perception and parsing layer); layer two (the record as a novel, built from data) and JEWL's manners are open.

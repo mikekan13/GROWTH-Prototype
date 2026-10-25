@@ -100,11 +100,30 @@ export interface TextPiece { text: string; entityId?: string }
 /** Names shorter than this are never matched (too many false hits: "Al", "Ox"). */
 const MIN_ENTITY_NAME = 3;
 
+/** A name's head: what stands before a " — ", " – ", " - ", ": " or " (" qualifier ("Violet's Apartment — Fourth-Floor Walkup Studio" → "Violet's Apartment"). */
+const NAME_HEAD_RE = /^(.+?)(?:\s+[—–-]\s+|:\s+|\s+\()/u;
+
+/** The form a name is looked up by: lower case, hyphens as spaces, one space between words, straight apostrophes. */
+export function nameKey(s: string): string {
+  return s.toLowerCase().replace(/[\u2019\u2018]/g, "'").replace(/[-\u2010\u2011\s]+/gu, ' ').trim();
+}
+
+/** A pattern for one name as people write it: hyphen or space between its words, either apostrophe. */
+function namePattern(key: string): string {
+  return key.split(' ').map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/'/g, "['\u2019]")).join('[-\\u2010\\u2011\\s]+');
+}
+
 /**
  * Cut a stretch of text into plain pieces and pieces that name a thing in the
  * world. Whole words only, case-insensitive, longest name wins where names
  * overlap ("Main Room" before "Room"). `exclude` drops ids (e.g. the row's own
  * speaker, whose chip already opens them).
+ *
+ * A name is matched as the Watcher writes it, not only as the record stores it
+ * (HW7 line 1, Mike 2026-10-25: "the fourth floor landing and violets apartment should have also been tagged"):
+ * "fourth floor landing" finds "Fourth-floor landing", and a name's head before its qualifier counts as the
+ * name ("Violet's apartment" finds "Violet's Apartment — Fourth-Floor Walkup Studio"). The full name still wins
+ * over its head where both fit.
  */
 export function splitEntities(text: string, entities: EntityName[], exclude: Iterable<string> = []): TextPiece[] {
   if (!text) return [];
@@ -113,18 +132,23 @@ export function splitEntities(text: string, entities: EntityName[], exclude: Ite
   for (const e of entities) {
     const name = e.name?.trim();
     if (!name || name.length < MIN_ENTITY_NAME || skip.has(e.id)) continue;
-    const key = name.toLowerCase();
-    if (!byName.has(key)) byName.set(key, e.id);
+    const forms = [name];
+    const head = name.match(NAME_HEAD_RE)?.[1]?.trim();
+    if (head && head.length >= MIN_ENTITY_NAME && head.includes(' ')) forms.push(head);
+    for (const f of forms) {
+      const key = nameKey(f);
+      if (key.length >= MIN_ENTITY_NAME && !byName.has(key)) byName.set(key, e.id);
+    }
   }
   if (byName.size === 0) return [{ text }];
-  const alts = [...byName.keys()].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const alts = [...byName.keys()].sort((a, b) => b.length - a.length).map(namePattern);
   const re = new RegExp(`(?<![\\p{L}\\p{N}_])(${alts.join('|')})(?![\\p{L}\\p{N}_])`, 'giu');
   const out: TextPiece[] = [];
   let cursor = 0;
   for (const m of text.matchAll(re)) {
     const at = m.index ?? 0;
     if (at > cursor) out.push({ text: text.slice(cursor, at) });
-    out.push({ text: m[0], entityId: byName.get(m[0].toLowerCase()) });
+    out.push({ text: m[0], entityId: byName.get(nameKey(m[0])) });
     cursor = at + m[0].length;
   }
   if (cursor < text.length) out.push({ text: text.slice(cursor) });
