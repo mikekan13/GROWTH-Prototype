@@ -1,6 +1,6 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-10-24
+Last updated: 2026-10-25
 
 > 2026-10-24 (hello world 2 → fixes): HW2 ran on the split loop (TABLE_SPLIT_LOOP=on). Violet listened to every
 > line and never answered: the ask reader needed a name, and the clock never moved (cycle 0.0022 all session).
@@ -21,6 +21,23 @@ Last updated: 2026-10-24
 > lags ~1 h, so the guard trips late. OPEN: pizza holder canon (Kristopher per the items; Violet per her
 > memories), Kristopher still on the landing ("He leaves" has nowhere to go on the map), stale-repeat display
 > unconfirmed. NEXT: hello world 4 (watcher on; cap decision first).
+>
+> 2026-10-25 (hello world 4 + 5 → fixes → RESET): HW4 stopped after one line (the adjudicator handed a five
+> through a locked door; "He… her" resolved to nobody) → the adjudicator knows who is where (passage graph,
+> same-room give), the subject pronoun wins, the bare quote goes to the line's one actor. HW5 ran five lines:
+> the possessive "Violet's door" made her the speaker; a character's own view had no card for the Watcher's
+> prose act; Violet's answers never reached Kristopher's senses; a bare quote line became "someone present" and
+> the Kristopher being answered the Watcher's own Kristopher; every Violet answer was a guess ("I think I left
+> it on the counter" with the cash on her). Built: quote = subject of the sentence before it; quote-only line =
+> the Watcher's last voice; canon carries the table's split so character views draw the card; THE ROOM HEARS
+> HER (a being's line is canon dialogue, the others are judged for reach and listen; no turn granted); AN
+> UNREACHED ASK IS NO ASK; the senses bound the monologue (hearing-only / own-act notes); NEVER GUESS, CHECKED
+> (spirit_guess_check: a guess retracts, re-voices once with the gap named, a second guess rests). Pizza ledger
+> corrected (Violet took it in session 1 — canon, the item said Kristopher). Then, Mike: "clear all session
+> history and memories, reset everything including time back to the moment Kris first arrives with the pizza"
+> → tmp/reset-to-the-knock.ts: all play since 17 Oct archived, clock 0.0022, Violet in the Main Room, the pizza
+> on Kristopher, the door locked. NEXT: session 1 again (HW6) with the watcher on; open — being acts are not
+> delivered to the room, JEWL's sim check reads items not canon, hunger/sleep.
 
 > 2026-10-23 (hello world 2 prep): the 17 Oct hello-world hiccups ironed out in three commits on
 > merge/fork-portrait-pipeline — sheet edits no longer wake JEWL (and can't become damage); the tagger stops
