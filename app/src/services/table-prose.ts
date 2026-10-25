@@ -342,6 +342,8 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
   const keepNarration = (text: string) => {
     if (roster.length === 0) { narrationParts.push(text); return; }
     const rest: string[] = [];
+    // What the sentence before this one was, on this line: a thought goes on through a description after it.
+    let lastKind: 'thought' | 'act' | 'description' | 'narration' | 'tag' | null = null;
     for (const written of splitSentences(text)) {
       let sentence = written;
       let actor = sentenceActor(sentence, roster, recent);
@@ -349,20 +351,26 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
         // "After a minute, he knocks again.": the span is narration first; the rest is whoever it is about.
         const lead = leadingSpan(sentence);
         if (lead) { rest.push(lead.wait); sentence = lead.rest; actor = sentenceActor(sentence, roster, recent); }
-        if (!actor) { rest.push(sentence); continue; }
+        if (!actor) { rest.push(sentence); lastKind = 'narration'; continue; }
       }
       noteActor(actor);
       // "He waits a minute and then knocks again": the minute is narration (time passing), the knock his act.
       const span = splitDurationClause(sentence, actor);
       if (span) { rest.push(span.wait); if (!span.rest) continue; sentence = span.rest; }
-      // "His face looks tired…" / "She is gorgeous but a bit weird.": an observation of him, not his act.
-      if (isDescriptive(sentence, actor)) { rest.push(sentence); continue; }
+      // "His face looks tired…" / "She is gorgeous but a bit weird.": an observation of him, not his act —
+      // unless it follows what someone was just thinking on this line: then it is the thought going on
+      // (Mike 2026-10-25: "She is gorgeous but a bit weird" after "he remembers this woman…" was Kristopher's).
+      if (isDescriptive(sentence, actor)) {
+        const going = thoughts.at(-1);
+        if (going && lastKind === 'thought') { going.text = `${going.text.replace(/\.{3}$|…$/, '')}… ${sentence}`.replace(/\s+/g, ' ').trim(); going.sentence = `${going.sentence} ${sentence}`; lastKind = 'thought'; continue; }
+        rest.push(sentence); lastKind = 'description'; continue;
+      }
       // The card carries the name: "Kristopher knocks twice." → ::Knocks twice::.
       const body = actionBody(sentence, actor);
       // A bare speech tag ("Ruth says,") is neither narration nor an act — the quote beside it is the record.
-      if (!body) continue;
-      if (isThoughtBody(body)) thoughts.push({ text: body, sentence, actorId: actor.id, actorLabel: actor.name });
-      else actions.push({ text: body, actorId: actor.id, actorLabel: actor.name });
+      if (!body) { lastKind = 'tag'; continue; }
+      if (isThoughtBody(body)) { thoughts.push({ text: body, sentence, actorId: actor.id, actorLabel: actor.name }); lastKind = 'thought'; }
+      else { actions.push({ text: body, actorId: actor.id, actorLabel: actor.name }); lastKind = 'act'; }
     }
     const kept = rest.join(' ').trim();
     if (kept) { narrationParts.push(kept); noteActor(lastRosterName(kept, roster)); }

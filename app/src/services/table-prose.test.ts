@@ -306,6 +306,11 @@ describe('description, thought and a stated span are not acts (HW6 2026-10-25)',
     expect(p.actions).toEqual([{ text: 'Speaks again', actorId: 'kris', actorLabel: 'Kristopher' }]);
     expect(p.narration).toBe('She is gorgeous but a bit weird.');
   });
+  it('a description on its own, or after an act, stays narration; only after a thought does it join the thought', () => {
+    const p = parseTableProse('He knocks again. She is gorgeous but a bit weird.', table, { recentActors: [table[0], table[1]] });
+    expect(p.narration).toBe('She is gorgeous but a bit weird.');
+    expect(p.thoughts).toBeUndefined();
+  });
   it('"looks at", "is knocking" and "feels for" stay acts; a part of him doing something stays his act', () => {
     expect(parseTableProse('He looks at the door.', table, { recentActors: [table[0]] }).actions?.[0]).toMatchObject({ text: 'Looks at the door' });
     expect(parseTableProse('He is knocking again.', table, { recentActors: [table[0]] }).actions?.[0]).toMatchObject({ text: 'Is knocking again' });
@@ -323,9 +328,10 @@ describe('description, thought and a stated span are not acts (HW6 2026-10-25)',
   });
   it('what he thinks and remembers is his thought, not his act, and the quote after it is still his', () => {
     const p = parseTableProse('He thinks about just leaving but he remembers this woman... She is gorgeous but a bit weird. Kristopher speaks again. "Ma\'am you didn\'t pay yet so I can\'t just leave it..."', table, { recentActors: [table[0], table[1]] });
-    expect(p.thoughts).toEqual([{ text: 'Thinks about just leaving but he remembers this woman', sentence: 'He thinks about just leaving but he remembers this woman...', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    // "She is gorgeous but a bit weird" after "he remembers this woman…" is the thought going on, not narration (Mike 2026-10-25).
+    expect(p.thoughts).toEqual([{ text: 'Thinks about just leaving but he remembers this woman… She is gorgeous but a bit weird.', sentence: 'He thinks about just leaving but he remembers this woman... She is gorgeous but a bit weird.', actorId: 'kris', actorLabel: 'Kristopher' }]);
     expect(p.actions).toEqual([{ text: 'Speaks again', actorId: 'kris', actorLabel: 'Kristopher' }]);
-    expect(p.narration).toBe('She is gorgeous but a bit weird.');
+    expect(p.narration).toBeNull();
     expect(p.quotes[0]).toMatchObject({ speakerId: 'kris', text: "Ma'am you didn't pay yet so I can't just leave it..." });
   });
   it('"He waits a minute and then knocks again." → the minute is narration, the knock his card', () => {
