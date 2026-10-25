@@ -50,7 +50,7 @@ import {
   recordDialogueCanon,
   recordUnattributedDialogueCanon,
 } from '@/services/canon';
-import { parseTableProse, type ProseQuote, type ProseRosterEntry, type ProseThought } from '@/services/table-prose';
+import { parseTableProse, splitSentences, type ProseQuote, type ProseRosterEntry, type ProseThought } from '@/services/table-prose';
 import { ensureKeepalive } from '@/daya/l1-keepalive';
 import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, type ReconTicket } from '@/services/reconciliation';
 import { advanceClockForLine } from '@/services/table-clock';
@@ -322,7 +322,9 @@ export function withoutThoughts(utterances: TableUtterance[], thoughts: Array<{ 
   for (const u of utterances) {
     if (u.kind === 'dialogue') { out.push(u); continue; }
     let text = norm(u.text);
-    for (const t of thoughts) text = text.split(norm(t.sentence)).join(' ');
+    // A thought's `sentence` may be a tag and its quote ("And he says the prayer in his head. "Lord…""); the
+    // run holds the tag alone (the quote is no longer speech), so each sentence of it comes out on its own.
+    for (const t of thoughts) for (const part of [norm(t.sentence), ...splitSentences(t.sentence).map(norm)]) if (part) text = text.split(part).join(' ');
     text = norm(text);
     if (text) out.push(text === norm(u.text) ? u : { ...u, text });
   }

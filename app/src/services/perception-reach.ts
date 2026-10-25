@@ -16,11 +16,12 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import { localLane, routedChatText } from '@/ai/network';
 import { senseProfileFromSheet, type SenseItemSource } from '@/sim/senses/field';
-import { judgeReach, perceptionReachOn, type ReachBeing, type ReachEvent, type ReachJudgement, type ReachModel, type ReachVerdict } from '@/sim/senses/reach';
+import { judgeReach, perceptionReachOn, type ReachBeing, type ReachEvent, type ReachJudgement, type ReachModel, type ReachVerdict, REACH_TUNING } from '@/sim/senses/reach';
 import { recordExposureBatch, type ExposureSubject } from '@/services/familiarity';
 import { writeMemoryEntry } from '@/daya/memory';
 import { perceive } from '@/daya/perceive';
 import type { MemoryChain } from '@/daya/chain';
+import { laneReadiness } from '@/daya/l1-endpoint';
 import { decodePerceivedVia, encodePerceivedVia, mergePerceivedVia } from '@/daya/perceived-via';
 
 export { perceptionReachOn };
@@ -105,6 +106,35 @@ export async function loadReachBeings(campaignId: string, characterIds: string[]
  * judged by the stub over a default-human profile, which reaches everyone at
  * the scene (the behaviour before units 6+7).
  */
+/**
+ * How long the judge waits for a cold lane before it judges (HW7 2026-10-25: the core was still loading its
+ * weights, the judge gave up after 8 s and the stub, handed an unplaced line, ruled it theater of mind — Violet
+ * saw the tears on his cheeks through a locked door). The mirror waits for the same lane; so does the judge.
+ */
+export const REACH_WARMUP_WAIT_MS = Number(process.env.PERCEPTION_REACH_WARMUP_WAIT_MS ?? 4 * 60 * 1000);
+const REACH_WARMUP_POLL_MS = 5000;
+
+/** Resolves when the lane is ready (or will not be: disabled / offline), or when the wait runs out. */
+export async function awaitLaneForReach(readiness: () => Promise<{ phase: string }> = laneReadiness, waitMs = REACH_WARMUP_WAIT_MS, pollMs = REACH_WARMUP_POLL_MS): Promise<string> {
+  const until = Date.now() + waitMs;
+  let phase = 'host';
+  for (;;) {
+    try { phase = (await readiness()).phase; } catch { phase = 'offline'; }
+    if (phase === 'ready' || phase === 'disabled' || phase === 'offline' || Date.now() >= until) return phase;
+    await new Promise((r) => setTimeout(r, pollMs));
+  }
+}
+
+/**
+ * An unplaced event from a known being happens where that being is: the stub (a fallback) then keeps it to
+ * that place instead of the whole scene. The model judge still reads the passages. Pure.
+ */
+export function placeAtSource(event: ReachEvent, beings: ReachBeing[]): ReachEvent {
+  if (event.locationId || !event.sourceId) return event;
+  const src = beings.find((b) => b.id === event.sourceId);
+  return src?.locationId ? { ...event, locationId: src.locationId, locationName: src.locationName ?? null } : event;
+}
+
 export async function judgeCanonReach(
   campaignId: string,
   event: ReachEvent,
@@ -114,8 +144,8 @@ export async function judgeCanonReach(
   let beings: ReachBeing[] = [];
   try {
     beings = opts.beings ?? await loadReachBeings(campaignId, characterIds, { focusById: opts.focusById });
-    // atScene: every being is IN this scene by definition (encounter participants) — wherever its located_at edge says.
     if (opts.atScene) beings = beings.map((b) => ({ ...b, locationId: event.locationId ?? null, locationName: event.locationName ?? b.locationName ?? null }));
+    if (!opts.atScene) event = placeAtSource(event, beings);
     if (event.locationId && !event.locationName) {
       const loc = await prisma.location.findUnique({ where: { id: event.locationId }, select: { name: true } });
       event = { ...event, locationName: loc?.name ?? null };
@@ -125,7 +155,17 @@ export async function judgeCanonReach(
     console.warn('[perception-reach] could not load beings; the stub judges a default body', err);
     beings = characterIds.map((id) => ({ id, name: id, locationId: null, senses: senseProfileFromSheet(null) }));
   }
-  const j = await judgeReach(event, beings, { model: opts.model === undefined ? reachModelFor(campaignId) : opts.model });
+  const model = opts.model === undefined ? reachModelFor(campaignId) : opts.model;
+  // A cold lane is waited for, not judged around; a timed-out judge gets one more, longer try before the stub.
+  if (model && perceptionReachOn()) {
+    const phase = await awaitLaneForReach();
+    if (phase !== 'ready' && phase !== 'disabled') console.warn(`[perception-reach] lane ${phase} after the warm-up wait; judging anyway`);
+  }
+  let j = await judgeReach(event, beings, { model });
+  if (j.source === 'fallback' && model && /timed out/.test(j.error ?? '')) {
+    console.warn(`[perception-reach] judge timed out after ${j.ms}ms — once more, slower`);
+    j = await judgeReach(event, beings, { model, timeoutMs: REACH_TUNING.timeoutMs * 3 });
+  }
   if (j.source === 'fallback') console.warn(`[perception-reach] world-sim fell back to the stub after ${j.ms}ms: ${j.error}`);
   return { ...j, beings };
 }

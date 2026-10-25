@@ -496,6 +496,10 @@ describe("the Watcher's line, per part: a thought is the thinker's alone, an own
     expect(withoutThoughts(run, [{ sentence: 'He thinks about leaving.' }, { sentence: 'He remembers her.' }]).map((u) => u.text)).toEqual(['He knocks again.', 'Hello?']);
     expect(withoutThoughts(run, [])).toBe(run);
   });
+  it('a thought that is a tag and its quote comes out of the run even when the run holds the tag alone (HW7 2026-10-25)', () => {
+    const run = [narr('He wipes his eyes. And he says the prayer in his head. He knocks on the door.')];
+    expect(withoutThoughts(run, [{ sentence: 'And he says the prayer in his head. "Lord Jesus Christ, have mercy on me."' }]).map((u) => u.text)).toEqual(['He wipes his eyes. He knocks on the door.']);
+  });
   it('the others never sense what Tess thinks; Tess gets her thought with her act, both in her own person', async () => {
     const before = [...w.active];
     w.active.push('tess');
