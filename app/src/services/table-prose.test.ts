@@ -248,3 +248,25 @@ describe('the subject pronoun wins; an unclaimed quote beside one character\'s p
     expect(p.quotes[0].speakerId).toBe('violet');
   });
 });
+
+describe('the quote belongs to the subject of the sentence before it, not to a name in it (HW5 2026-10-25)', () => {
+  const table = [
+    { id: 'kris', name: 'Kristopher', sex: 'm' },
+    { id: 'violet', name: 'Violet', sex: 'f' },
+  ] as Parameters<typeof parseTableProse>[1];
+  it('"He … looks back at Violet\'s closed door. "Please…"" is Kristopher speaking', () => {
+    const p = parseTableProse('He stops at the door way to the landing and looks back at Violet\'s closed door. "Please... can you just slip money under the door at least?"', table, { recentActors: [table[0], table[1]] });
+    expect(p.actions?.map((a) => a.actorId)).toEqual(['kris']);
+    expect(p.quotes[0]).toMatchObject({ speakerId: 'kris', speakerLabel: 'Kristopher' });
+    expect(p.narration).toBeNull();
+  });
+  it('"Kristopher looks at Violet. "Hi."" is Kristopher speaking', () => {
+    const p = parseTableProse('Kristopher looks at Violet. "Hi."', table, { recentActors: [] });
+    expect(p.quotes[0].speakerId).toBe('kris');
+  });
+  it('a possessive alone puts no words in her mouth; her door is still her card, so the quote stays open', () => {
+    const p = parseTableProse('::Kristopher waits:: Violet\'s door stays shut. "Hello?"', table, { recentActors: [] });
+    expect(p.quotes[0]).toMatchObject({ speakerId: null, speakerLabel: 'someone present' });
+    expect(p.actions?.map((a) => [a.actorId, a.text])).toEqual([['kris', 'Kristopher waits'], ['violet', "Violet's door stays shut"]]);
+  });
+});

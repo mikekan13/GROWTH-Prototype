@@ -110,7 +110,8 @@ const BARE_TAG_RE = /^(?:says|asks|shouts|whispers|yells|replies|calls out|mutte
 export function actionBody(sentence: string, actor: ProseRosterEntry): string | null {
   let s = sentence.trim().replace(/[.]+$/, '').trim();
   const name = actor.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  s = s.replace(new RegExp(`^(?:${name}|he|she)\\b[,]?\\s*`, 'i'), '');
+  // "Kristopher's hand drops" keeps its opener: the card reads whole, not "'s hand drops".
+  s = s.replace(new RegExp(`^(?:${name}|he|she)\\b(?!['’]s\\b)[,]?\\s*`, 'i'), '');
   if (!s || BARE_TAG_RE.test(s)) return null;
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -120,7 +121,7 @@ export function actionBody(sentence: string, actor: ProseRosterEntry): string | 
  * ("Kristopher knocks twice.") or a bare he/she that the table resolves. A
  * possessive opener ("Kristopher's door creaks") is not his act. Pure.
  */
-export function sentenceActor(sentence: string, roster: ProseRosterEntry[], recent: ProseRosterEntry[]): ProseRosterEntry | null {
+export function sentenceActor(sentence: string, roster: ProseRosterEntry[], recent: ProseRosterEntry[], opts: { ownedThings?: boolean } = {}): ProseRosterEntry | null {
   const s = sentence.trim();
   for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
     const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -129,10 +130,13 @@ export function sentenceActor(sentence: string, roster: ProseRosterEntry[], rece
   }
   if (SUBJECT_PRONOUN_RE.test(s)) return pronounActor(s.split(/\s+/)[0]!, recent);
   // "A tear falls from his eye." / "Kristopher's hand drops." — about a part or thing of his: his
-  // card (HW3, Mike 2026-10-24: "didn't end up as proper cards").
-  for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
-    const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (name && new RegExp(`\\b${name}['’]s\\b`, 'i').test(s)) return entry;
+  // card (HW3, Mike 2026-10-24: "didn't end up as proper cards"). Not for a speaker lookup
+  // (ownedThings false): "Violet's door stays shut." puts no words in her mouth.
+  if (opts.ownedThings !== false) {
+    for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
+      const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (name && new RegExp(`\\b${name}['’]s\\b`, 'i').test(s)) return entry;
+    }
   }
   const possessive = s.match(/\b(his|her)\b/i);
   if (possessive) return pronounActor(possessive[1], recent);
@@ -172,6 +176,11 @@ function findRosterName(window: string, roster: ProseRosterEntry[]): ProseRoster
     }
   }
   return best?.entry ?? null;
+}
+
+/** "Violet's closed door" names a door, not a speaker: the possessive names come out before a speaker lookup. */
+function withoutPossessives(window: string): string {
+  return window.replace(/\b[\w.-]+['’]s\b/g, ' ');
 }
 
 function firstRosterName(window: string, roster: ProseRosterEntry[]): ProseRosterEntry | null {
@@ -327,7 +336,12 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
       // by a capitalized new sentence ("Ruth sighs.") is a new beat, not a tag.
       const quoteText = m[1].trim();
       const runsOn = /,$/.test(quoteText) || !/[.!?…]$/.test(quoteText) || /^\s*[,a-z]/.test(afterAll);
-      const named = findRosterName(beforeWindow.slice(-160), roster) ?? (runsOn ? firstRosterName(afterTag.slice(0, 120), roster) : null);
+      // The speaker is whoever the sentence before the quote is ABOUT — its subject. "He stops… and looks
+      // back at Violet's closed door." is Kristopher's sentence, so the words after it are his (HW5
+      // 2026-10-25: the possessive "Violet's" beside the quote made her the speaker, and the table had
+      // her asking him). A name merely in the window, never a possessive, is the fallback.
+      const subjectActor = contextSentence ? sentenceActor(contextSentence, roster, recent, { ownedThings: false }) : null;
+      const named = subjectActor ?? findRosterName(withoutPossessives(beforeWindow.slice(-160)), roster) ?? (runsOn ? firstRosterName(afterTag.slice(0, 120), roster) : null);
       // No name by the quote: "His voice is warm. 'Take your time.'" → the
       // man the table was just talking about, if the pronoun fits his sheet.
       const byPronoun = named ? null : pronounActor(`${contextSentence ?? ''} ${runsOn ? afterTag.slice(0, 120) : ''}`, recent);
