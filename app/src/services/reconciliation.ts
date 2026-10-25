@@ -97,7 +97,10 @@ async function simStateSummary(campaignId: string, listeners: Array<{ id: string
     try { desc = loc ? String((JSON.parse(loc.data) as { description?: string }).description ?? '').slice(0, 200) : ''; } catch { /* none */ }
     const here = rel ? await prisma.entityRelationship.findMany({ where: { targetId: rel.targetId, relationshipType: 'located_at', sourceId: { not: l.id } }, select: { sourceId: true } }) : [];
     const names = here.length ? (await prisma.character.findMany({ where: { id: { in: here.map((h) => h.sourceId) } }, select: { name: true } })).map((c) => c.name) : [];
-    lines.push(`${l.name}: ${loc ? `at "${loc.name}"${desc ? ` — ${desc}` : ''}` : 'nowhere on the canvas'}${names.length ? `; also present: ${names.join(', ')}` : '; no one else present'}`);
+    // What he has on him (HW6 2026-10-25: the pizza on Kristopher's ledger was "a new presence" to JEWL every
+    // line, because nothing told him what anyone was holding).
+    const held = await prisma.campaignItem.findMany({ where: { campaignId, holderId: l.id, status: { notIn: ['DESTROYED', 'CONSUMED', 'LOST'] } }, select: { name: true }, take: 40 });
+    lines.push(`${l.name}: ${loc ? `at "${loc.name}"${desc ? ` — ${desc}` : ''}` : 'nowhere on the canvas'}${names.length ? `; also present: ${names.join(', ')}` : '; no one else present'}${held.length ? `; holding: ${held.map((h) => h.name).join(', ')}` : '; holding nothing'}`);
   }
   const locations = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { name: true, status: true }, take: 60 });
   const npcs = await prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { name: true }, take: 60 });

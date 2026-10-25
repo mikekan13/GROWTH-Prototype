@@ -243,6 +243,8 @@ export interface DeclarationFeed {
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
   /** `::…::` actions the GM wrote for roster characters — the feed draws each as that character's own row. */
   actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
+  /** What the GM wrote a roster character as thinking — the record draws it as his ((thought)) (HW6 2026-10-25). */
+  thoughts?: Array<{ actorId: string; actorLabel: string; text: string }>;
 }
 
 /** The feed row's payload for a declaration: the canon text, its beat, the cycle it happened at, and what the table writer passed for the feed. Pure. */
@@ -308,8 +310,8 @@ export async function declareCanon(
     detail: {
       declaredBy: actor.userId,
       ...(input.beatId ? { beatId: input.beatId } : {}),
-      ...(input.feed && (input.feed.speech || input.feed.actions?.length)
-        ? { split: { narration: input.feed.narration ?? null, speech: input.feed.speech ?? [], actions: input.feed.actions ?? [] } }
+      ...(input.feed && (input.feed.speech || input.feed.actions?.length || input.feed.thoughts?.length)
+        ? { split: { narration: input.feed.narration ?? null, speech: input.feed.speech ?? [], actions: input.feed.actions ?? [], ...(input.feed.thoughts?.length ? { thoughts: input.feed.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text })) } : {}) } }
         : {}),
     },
     consequences: {},

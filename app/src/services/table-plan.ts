@@ -89,12 +89,14 @@ function spokenLine(utterance: TableUtterance): string {
 
 /**
  * What one listener is handed for a run: narration as written, speech as
- * `Speaker: words`. A being is never handed its own line as something heard.
+ * `Speaker: words`. A being is never handed its own line as something heard —
+ * unless the Watcher voiced it for him (`ownVoiced`, HW6 2026-10-25): then the
+ * words are his own doing and ride in his stretch like his acts do.
  * Narration anywhere in the run makes the whole a perception. Null = nothing
  * in the run is for this listener.
  */
-export function stimulusFor(run: TableUtterance[], listenerId: string): PlannedStimulus | null {
-  const mine = run.filter((u) => !(u.kind === 'dialogue' && u.speaker?.id === listenerId));
+export function stimulusFor(run: TableUtterance[], listenerId: string, opts: { ownVoiced?: boolean } = {}): PlannedStimulus | null {
+  const mine = run.filter((u) => !(u.kind === 'dialogue' && u.speaker?.id === listenerId && !opts.ownVoiced));
   if (!mine.length) return null;
   return {
     source: mine.some((u) => u.kind !== 'dialogue') ? 'perception' : 'dialogue',

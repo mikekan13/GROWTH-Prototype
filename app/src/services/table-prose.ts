@@ -31,6 +31,18 @@ export interface ProseAction {
   actorLabel: string;
 }
 
+/**
+ * What goes through a roster character, as the Watcher voiced it — "He thinks about just leaving but he
+ * remembers this woman" (HW6 2026-10-25). Not his act: nobody but him perceives it, and the record draws it as
+ * his ((thought)). `sentence` is the whole sentence as written, so the table can take it out of what the others hear.
+ */
+export interface ProseThought {
+  text: string;
+  sentence: string;
+  actorId: string;
+  actorLabel: string;
+}
+
 /** What the parser may know about the table beyond the message itself. */
 export interface ProseContext {
   /** Who acted or spoke last at the table before this message — the referent of a bare "he"/"she". */
@@ -68,6 +80,8 @@ export interface ParsedProse {
   quotes: ProseQuote[];
   /** `::…::` spans the GM wrote for a roster character. Absent when there are none (the frozen fixtures predate it). */
   actions?: ProseAction[];
+  /** Sentences of what a roster character thinks, remembers or wants. Absent when there are none. */
+  thoughts?: ProseThought[];
 }
 
 // An unterminated quote runs to the end of the line (HW3, Mike 2026-10-24: a line without its closing mark lost its speech).
@@ -121,6 +135,71 @@ export function actionBody(sentence: string, actor: ProseRosterEntry): string | 
   s = s.replace(new RegExp(`^(?:${name}|he|she)\\b(?!['’]s\\b)[,]?\\s*`, 'i'), '');
   if (!s || BARE_TAG_RE.test(s)) return null;
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Verbs of the mind: a sentence about a roster character whose verb is one of these is what goes THROUGH him,
+// not what he does (HW6 2026-10-25: "He thinks about just leaving but he remembers this woman" was his act, and
+// the reach judge, handed the whole line, read all of it as private thought — the spoken plea went down with it).
+const MENTAL_VERB_RE = /^(?:thinks|wonders|remembers|recalls|realizes|realises|considers|decides|knows|wants|wishes|hopes|fears|dreads|imagines|believes|doubts|suspects|figures|reckons|feels (?:like|that|as if)|tells (?:himself|herself)|reminds (?:himself|herself)|can(?:'|’)t help (?:thinking|wondering))\b/i;
+/** The body of an act is a thought when it opens with a verb of the mind. Pure. */
+export function isThoughtBody(body: string): boolean {
+  return MENTAL_VERB_RE.test(body.trim());
+}
+
+// A sentence that DESCRIBES a character or a part of him — looks tired, is red, seems off — is an observation,
+// not an act (Mike 2026-10-25: "the second one wasn't an action but an observation"). The verb right after the
+// subject decides it; "looks at the door", "is knocking" and "feels for the key" stay acts.
+const STATIVE_START_RE = /^(?:is|are|was|were|seems|seem|appears|appear|looks|look|feels|feel|sounds|sound|smells|smell)\b(?!\s+(?:at|to|toward|towards|over|up|down|around|into|for|through|back|away|on|out|in|about|across|after|past|along|under|behind|upon|onto)\b|\s+\w+ing\b)/i;
+const BODY_WORDS = 3;
+/** "His face looks tired and his eyes are red." / "She is gorgeous but a bit weird." → true; "He looks at the door." → false. Pure. */
+export function isDescriptive(sentence: string, actor: ProseRosterEntry): boolean {
+  const s = sentence.trim().replace(/[.!?]+$/, '');
+  const name = actor.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const subject = s.match(new RegExp(`^(?:${name}|he|she)\\s+(.+)$`, 'i'));
+  if (subject) return STATIVE_START_RE.test(subject[1]);
+  const owned = s.match(new RegExp(`^(?:${name}['’]s|his|her)\\s+(.+)$`, 'i'));
+  if (!owned) return false;
+  // "His face looks…" / "Her eyes are…": the verb after a noun phrase of one to three words.
+  const words = owned[1].split(/\s+/);
+  for (let i = 1; i <= BODY_WORDS && i < words.length; i++) if (STATIVE_START_RE.test(words.slice(i).join(' '))) return true;
+  return false;
+}
+
+// A stated span inside an act — "He waits a minute and then knocks again" — is time passing, which is the
+// Watcher's narration (and the clock's business), and then the act (Mike 2026-10-25: "a narration of a minute
+// passes while he waits … and then just him with ::He knocks again::").
+const DURATION_RE = /\b(?:(?:a|an|one|two|three|four|five|ten|few|several|couple of|half a|\d+)\s+(?:second|minute|moment|hour|while|beat|heartbeat)s?|for a (?:while|moment|bit|second|minute)|a (?:moment|minute|while|beat) (?:later|passes|goes by)|after a (?:moment|minute|while|beat))\b/i;
+const WAIT_VERB_RE = /\b(?:waits?|pauses?|lingers?|stands? there|hesitates?|lets? [\w\s]{1,20}? pass|counts? (?:to|the)|holds? (?:still|off|back)|says? nothing|does? nothing|stays? (?:put|silent|still))\b/i;
+const LEADING_SPAN_RE = /^((?:after|a|an|one|two|three|few|several|some|\d+)\b[^,]{0,40}?\b(?:seconds?|minutes?|moments?|hours?|while|beats?)(?:\s+(?:later|pass(?:es)?|goes? by))?),?\s+(\S.*)$/i;
+/**
+ * Splits the waiting from the doing: `{ wait, rest }` with `rest` null when the sentence was only the wait.
+ * Returns null when the sentence states no span, or states it inside the act itself ("knocks for a minute"). Pure.
+ */
+/** "After a minute, he knocks again." → the span as its own sentence, then the rest; null when the sentence does not open with a span. Pure. */
+export function leadingSpan(sentence: string): { wait: string; rest: string } | null {
+  const s = sentence.trim();
+  const end = s.match(/[.!?…]+$/)?.[0] ?? '.';
+  const lead = s.replace(/[.!?…]+$/, '').match(LEADING_SPAN_RE);
+  if (!lead || /^(?:and|then|but)\b/i.test(lead[2])) return null;
+  return { wait: `${lead[1].charAt(0).toUpperCase()}${lead[1].slice(1)}.`, rest: `${lead[2]}${end}` };
+}
+
+export function splitDurationClause(sentence: string, actor: ProseRosterEntry): { wait: string; rest: string | null } | null {
+  const s = sentence.trim();
+  if (!DURATION_RE.test(s)) return null;
+  const end = s.match(/[.!?…]+$/)?.[0] ?? '.';
+  const body = s.replace(/[.!?…]+$/, '');
+  const lead = leadingSpan(s);
+  if (lead) return lead;
+  const name = actor.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const subject = body.match(new RegExp(`^((?:${name}|he|she)\\b,?)\\s+(.+)$`, 'i'));
+  if (!subject) return null;
+  const clauses = subject[2].split(/\s*,?\s*\b(?:and then|then|and|before)\s+/i).map((c) => c.trim()).filter(Boolean);
+  if (!clauses.length || !DURATION_RE.test(clauses[0]) || !WAIT_VERB_RE.test(clauses[0])) return null;
+  const who = subject[1].replace(/,$/, '');
+  const wait = `${who} ${clauses[0]}.`;
+  const rest = clauses.slice(1).join(' and ').trim();
+  return { wait, rest: rest ? `${who} ${rest}${end}` : null };
 }
 
 /**
@@ -245,6 +324,7 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
   const full = message.trim();
   const quotes: ProseQuote[] = [];
   const actions: ProseAction[] = [];
+  const thoughts: ProseThought[] = [];
   const lines = full.split(/\r?\n/);
   const narrationParts: string[] = [];
   // Who a bare pronoun points at: most recent first — this message's own
@@ -262,14 +342,27 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
   const keepNarration = (text: string) => {
     if (roster.length === 0) { narrationParts.push(text); return; }
     const rest: string[] = [];
-    for (const sentence of splitSentences(text)) {
-      const actor = sentenceActor(sentence, roster, recent);
-      if (!actor) { rest.push(sentence); continue; }
+    for (const written of splitSentences(text)) {
+      let sentence = written;
+      let actor = sentenceActor(sentence, roster, recent);
+      if (!actor) {
+        // "After a minute, he knocks again.": the span is narration first; the rest is whoever it is about.
+        const lead = leadingSpan(sentence);
+        if (lead) { rest.push(lead.wait); sentence = lead.rest; actor = sentenceActor(sentence, roster, recent); }
+        if (!actor) { rest.push(sentence); continue; }
+      }
       noteActor(actor);
+      // "He waits a minute and then knocks again": the minute is narration (time passing), the knock his act.
+      const span = splitDurationClause(sentence, actor);
+      if (span) { rest.push(span.wait); if (!span.rest) continue; sentence = span.rest; }
+      // "His face looks tired…" / "She is gorgeous but a bit weird.": an observation of him, not his act.
+      if (isDescriptive(sentence, actor)) { rest.push(sentence); continue; }
       // The card carries the name: "Kristopher knocks twice." → ::Knocks twice::.
       const body = actionBody(sentence, actor);
       // A bare speech tag ("Ruth says,") is neither narration nor an act — the quote beside it is the record.
-      if (body) actions.push({ text: body, actorId: actor.id, actorLabel: actor.name });
+      if (!body) continue;
+      if (isThoughtBody(body)) thoughts.push({ text: body, sentence, actorId: actor.id, actorLabel: actor.name });
+      else actions.push({ text: body, actorId: actor.id, actorLabel: actor.name });
     }
     const kept = rest.join(' ').trim();
     if (kept) { narrationParts.push(kept); noteActor(lastRosterName(kept, roster)); }
@@ -383,5 +476,5 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
   }
 
   const narration = narrationParts.join('\n').trim() || null;
-  return { full, narration, quotes, ...(actions.length ? { actions } : {}) };
+  return { full, narration, quotes, ...(actions.length ? { actions } : {}), ...(thoughts.length ? { thoughts } : {}) };
 }

@@ -39,6 +39,20 @@ Last updated: 2026-10-25
 > on Kristopher, the door locked. NEXT: session 1 again (HW6) with the watcher on; open — being acts are not
 > delivered to the room, JEWL's sim check reads items not canon, hunger/sleep.
 
+> 2026-10-25, later (hello world 6, from the phone): 8 lines, Violet spoke once ("I think I was afraid"), nobody heard
+> her, and the line that would have moved the scene ("He thinks about just leaving… 'Ma'am you didn't pay yet…'") produced
+> nothing: one reach verdict on the whole line read it as private thought → NOT ASKED. Layer one BUILT (docs/module_registry
+> "Hello world 6 fixes"): description ≠ act ("His face looks tired"), thought ≠ act ("He thinks about leaving" = his ((thought))),
+> stated span → narration + the act ("He waits a minute." + ::Knocks again::), the own act in the first person ("I knock again"),
+> hearing carries sound and words only (the receipt stays behind the door), reach judged per part (a thought is the thinker's
+> alone, self by rule), a voiced being hears its own words, the reply's way back (whoever asked her by sound hears her answer),
+> thoughts drawn in the record (Soul blue), JEWL's scene summary lists what each being holds, dev page entries kept alive an
+> hour for the relayed phone. OPEN — layer two (ruling 10-25, the record reads like a novel): the GM's line is a SEED the engine
+> builds up from world data (the opening sets the stage; the receipt says what it says; derive, never invent); the being's
+> listening monologue split into ((thought)) / ::act:: / "speech" rows (the deadbolt hand is an act the room perceives); the raw
+> sent text behind an expand; JEWL force-opens his chat on a question; his hold estimate scales with the thing (75 KRMA for a
+> paper receipt was wrong). Record: GameSession #1 is empty (closed by a second start tap), #2 holds the play — Mike's call.
+
 > 2026-10-23 (hello world 2 prep): the 17 Oct hello-world hiccups ironed out in three commits on
 > merge/fork-portrait-pipeline — sheet edits no longer wake JEWL (and can't become damage); the tagger stops
 > re-asking after a lawfulness block; `::Name …::` is the character's card and he/she resolves to the last actor;

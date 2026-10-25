@@ -38,7 +38,9 @@ import type { TableAsk, ListenTimings, AnswerTimings } from '@/daya/ensemble';
 import { readTableTalk, type TableTalkState, type TableUtterance } from '@/services/table-talk';
 import { learnIntroductions, groupRows } from '@/services/introductions';
 import { perceptionReachOn, judgeCanonReach, stampPerception, storeUnnoticedAtTable, recordNoticedExposures, addRefs, type EventRefs } from '@/services/perception-reach';
-import { REACH_TUNING, type ReachEvent, type ReachJudgement, type ReachVerdict } from '@/sim/senses/reach';
+import { REACH_TUNING, cuesFromText, type ReachEvent, type ReachJudgement, type ReachVerdict } from '@/sim/senses/reach';
+import { ownVoice, type OwnVoiceActor } from '@/services/own-voice';
+import { audibleOnly } from '@/services/senses-filter';
 import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, narrationSentences, type PlannedStimulus, type TableBeat, type TablePlan } from '@/services/table-plan';
 import type { TerminalEvent, TerminalActor, TerminalPayload, TableFeedFields } from '@/types/terminal';
 import {
@@ -48,7 +50,7 @@ import {
   recordDialogueCanon,
   recordUnattributedDialogueCanon,
 } from '@/services/canon';
-import { parseTableProse, type ProseQuote, type ProseRosterEntry } from '@/services/table-prose';
+import { parseTableProse, type ProseQuote, type ProseRosterEntry, type ProseThought } from '@/services/table-prose';
 import { ensureKeepalive } from '@/daya/l1-keepalive';
 import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, type ReconTicket } from '@/services/reconciliation';
 import { advanceClockForLine } from '@/services/table-clock';
@@ -260,9 +262,9 @@ export async function recentTableActors(campaignId: string, roster: ProseRosterE
     if (out.length >= limit) break;
     if (row.type === 'chat') { add(row.characterId); continue; }
     try {
-      const p = JSON.parse(row.payload) as { eventType?: string; actions?: Array<{ actorId: string }>; speech?: Array<{ speakerId: string | null }> };
+      const p = JSON.parse(row.payload) as { eventType?: string; actions?: Array<{ actorId: string }>; thoughts?: Array<{ actorId: string }>; speech?: Array<{ speakerId: string | null }> };
       if (p.eventType !== 'declaration') continue;
-      const ids = [...(p.actions ?? []).map((a) => a.actorId), ...(p.speech ?? []).map((s) => s.speakerId)].filter((x): x is string => !!x);
+      const ids = [...(p.thoughts ?? []).map((t) => t.actorId), ...(p.actions ?? []).map((a) => a.actorId), ...(p.speech ?? []).map((s) => s.speakerId)].filter((x): x is string => !!x);
       for (const id of ids.reverse()) add(id);
     } catch { /* not a payload we read */ }
   }
@@ -277,9 +279,9 @@ export function lastVoicedFrom(rows: Array<{ type: string; payload: string }>, r
   for (const row of rows) {
     if (row.type !== 'game_event') continue;
     try {
-      const p = JSON.parse(row.payload) as { eventType?: string; actions?: Array<{ actorId: string }>; speech?: Array<{ speakerId: string | null }> };
+      const p = JSON.parse(row.payload) as { eventType?: string; actions?: Array<{ actorId: string }>; thoughts?: Array<{ actorId: string }>; speech?: Array<{ speakerId: string | null }> };
       if (p.eventType !== 'declaration') continue;
-      const ids = [...(p.actions ?? []).map((a) => a.actorId), ...(p.speech ?? []).map((s) => s.speakerId)].filter((x): x is string => !!x);
+      const ids = [...(p.thoughts ?? []).map((t) => t.actorId), ...(p.actions ?? []).map((a) => a.actorId), ...(p.speech ?? []).map((s) => s.speakerId)].filter((x): x is string => !!x);
       for (const id of ids.reverse()) { const hit = roster.find((r) => r.id === id); if (hit) return hit; }
     } catch { /* not a payload we read */ }
   }
@@ -299,8 +301,38 @@ export async function lastVoicedActor(campaignId: string, roster: ProseRosterEnt
 }
 
 /** Every being the Watcher voiced in this message: the actors of its `::actions::` and the speakers of its quotes. */
-function voicedIn(parsed: { actions?: Array<{ actorId: string }>; quotes: Array<{ speakerId: string | null }> }): string[] {
-  return [...new Set([...(parsed.actions ?? []).map((a) => a.actorId), ...parsed.quotes.map((q) => q.speakerId).filter((id): id is string => !!id)])];
+function voicedIn(parsed: { actions?: Array<{ actorId: string }>; thoughts?: Array<{ actorId: string }>; quotes: Array<{ speakerId: string | null }> }): string[] {
+  return [...new Set([...(parsed.actions ?? []).map((a) => a.actorId), ...(parsed.thoughts ?? []).map((t) => t.actorId), ...parsed.quotes.map((q) => q.speakerId).filter((id): id is string => !!id)])];
+}
+
+/** The roster by id, for a being's own voice (name + sex). */
+function actorsOf(roster: ProseRosterEntry[]): Record<string, OwnVoiceActor> {
+  return Object.fromEntries(roster.map((r) => [r.id, { name: r.name, sex: r.sex ?? null }]));
+}
+
+/**
+ * A run of utterances with a character's thought sentences taken out (HW6 2026-10-25): what the Watcher
+ * voiced as going THROUGH him is his alone — the rest of the table never senses it, and the reach judge
+ * is not handed it as if it were in the room. Utterances left empty go. Pure.
+ */
+export function withoutThoughts(utterances: TableUtterance[], thoughts: Array<{ sentence: string }>): TableUtterance[] {
+  if (!thoughts.length) return utterances;
+  const norm = (t: string) => t.replace(/\s+/g, ' ').trim();
+  const out: TableUtterance[] = [];
+  for (const u of utterances) {
+    if (u.kind === 'dialogue') { out.push(u); continue; }
+    let text = norm(u.text);
+    for (const t of thoughts) text = text.split(norm(t.sentence)).join(' ');
+    text = norm(text);
+    if (text) out.push(text === norm(u.text) ? u : { ...u, text });
+  }
+  return out;
+}
+
+/** The one speaker of a run's dialogue, when there is exactly one. */
+function oneSpeakerOf(utterances: TableUtterance[]): string | null {
+  const ids = [...new Set(utterances.filter((u) => u.kind === 'dialogue').map((u) => u.speaker?.id ?? null))];
+  return ids.length === 1 ? ids[0] : null;
 }
 
 /** The one actor every `::action::` in the message belongs to, when there is exactly one — the canon row's actorId. */
@@ -430,7 +462,7 @@ export async function speakProse(
   //    live it through the mirror below, not as a raw witness row.
   let canonEventId: string | null = null;
   const dialogue: TableProseResult['dialogue'] = [];
-  const hasActions = (parsed.actions?.length ?? 0) > 0;
+  const hasActions = (parsed.actions?.length ?? 0) + (parsed.thoughts?.length ?? 0) > 0;
   const soloAttributed = parsed.narration === null && !hasActions && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
   await liveStatedTime(campaignId, actor, await advanceClockForLine(campaignId, 'gm-line', message), message);
   if (parsed.narration !== null || hasActions || parsed.quotes.length !== 1) {
@@ -559,6 +591,10 @@ async function runBeats(
     voicedIds?: string[];
     /** The one roster character every prose act in the message belongs to, when there is one: the reach judge's source for narration. */
     actorId?: string | null;
+    /** What the Watcher voiced as going through a character (HW6): his alone — out of everyone else's stretch, never judged as in the room. */
+    thoughts?: ProseThought[];
+    /** The roster by id, so a being's own act can be put in its own person. */
+    actors?: Record<string, OwnVoiceActor>;
   },
   opts: { waitForAnswers: boolean; answerAfterWorldOnly: boolean },
 ): Promise<Map<string, ListenerResponse>> {
@@ -569,12 +605,28 @@ async function runBeats(
   // One answer turn per being per message, whoever grants it: the ask (named / party) or the being's own impulse.
   const granted = new Set<string>();
   const voiced = new Set(truth.voicedIds ?? []);
+  // The senses that carried the last stretch to each being (for the reply's way back, HW6).
+  const lastVia = new Map<string, string[]>();
+  // The words the Watcher voiced for a being at the table that expect a reply: a spoken beat goes to its
+  // answerers and overhearers, never its speaker — so his own question rides in his own stretch (HW6).
+  const ownWords = new Map<string, TableUtterance[]>();
+  for (const b of beats) {
+    if (b.type !== 'spoken') continue;
+    const sid = b.utterance.speaker?.id;
+    if (sid && voiced.has(sid) && listeners.some((l) => l.id === sid)) ownWords.set(sid, [...(ownWords.get(sid) ?? []), b.utterance]);
+  }
   const hear = (listenerId: string, stimulus: PlannedStimulus | null, reached?: { verdict: ReachVerdict; source: ReachJudgement['source'] }, askFor?: TableAsk, truthId: string | null = truth.primary) => {
     if (!stimulus) return;
     // What the senses carried, and whether it was the being's own doing, travel with the stretch (HW5 2026-10-25).
     const via = reached?.verdict.via;
+    if (via) lastVia.set(listenerId, via);
     const own = voiced.has(listenerId) || (via?.includes('self') ?? false);
-    const carried: PlannedStimulus = { ...stimulus, ...(via ? { via } : {}), ...(own ? { own: true } : {}) };
+    // Hearing alone carries sound and words, not the receipt in his hand (HW6 2026-10-25).
+    let content = own ? stimulus.content : audibleOnly(stimulus.content, via);
+    // His own act, in his own person: "I knock again", not a stranger knocking (HW6 2026-10-25).
+    const me = own ? truth.actors?.[listenerId] : undefined;
+    if (me) content = ownVoice(content, me);
+    const carried: PlannedStimulus = { ...stimulus, content, ...(via ? { via } : {}), ...(own ? { own: true } : {}) };
     void listenToTable(listenerId, actor.role, carried)
       .then(async (outcome) => {
         if (outcome.status !== 'ok') {
@@ -588,7 +640,7 @@ async function runBeats(
           void recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
             characterId: listenerId,
             characterName: listeners.find((l) => l.id === listenerId)?.name ?? listenerId,
-            heard: stimulus.content,
+            heard: carried.content,
             thought: outcome.listened.thought,
             impulse: outcome.listened.impulse,
             canonEventId: truthId,
@@ -620,10 +672,33 @@ async function runBeats(
   // The ask waits for the verdict on the stretch that carried it (HW5 2026-10-25: Violet, asked at once, was
   // handed every plea "as before" and answered a man the judge had ruled she could not hear from inside).
   const verdictWaits = new Map<string, Promise<ReachVerdict | null>>();
-  const gatedHear = (utterances: TableUtterance[], ids: string[], askFor?: TableAsk, truthId: string | null = truth.primary) => {
-    if (!reachOn) { for (const id of ids) hear(id, stimulusFor(utterances, id), undefined, askFor, truthId); return; }
+  const selfVerdict = (id: string): ReachVerdict => ({ beingId: id, reaches: true, via: ['self'], noticed: true, salience: 0.95 });
+  const gatedHear = (utterances: TableUtterance[], ids: string[], askFor?: TableAsk, truthId: string | null = truth.primary, preset: Map<string, ReachVerdict> = new Map(), withOwnWords = false) => {
+    // Reach per part (HW6 2026-10-25: one verdict on a line that opened with what he THOUGHT ruled the whole
+    // of it unperceivable, his spoken plea included, and nobody was asked). What goes through a character is
+    // his alone: out of the run everyone else is judged on, and handed to him with his own, unjudged.
+    const thoughts = truthId === truth.primary ? truth.thoughts ?? [] : [];
+    const publicRun = withoutThoughts(utterances, thoughts);
     const stims = new Map<string, PlannedStimulus>();
-    for (const id of ids) { const s = stimulusFor(utterances, id); if (s) stims.set(id, s); }
+    for (const id of ids) {
+      const s = stimulusFor(publicRun, id, { ownVoiced: voiced.has(id) });
+      const mine = thoughts.filter((t) => t.actorId === id);
+      if (mine.length) {
+        const thinking = mine.map((t) => t.sentence).join(' ');
+        stims.set(id, s ? { ...s, content: `${s.content}\n${thinking}`, own: true } : { source: 'perception', content: thinking, own: true });
+      } else if (s) stims.set(id, s);
+    }
+    if (withOwnWords) {
+      for (const [sid, us] of ownWords) {
+        if (!ids.includes(sid)) continue;
+        const lines = us.map((u) => `${u.speaker?.label ?? 'someone present'}: ${u.text}`).join('\n');
+        const s = stims.get(sid);
+        stims.set(sid, s ? { ...s, content: `${s.content}\n${lines}`, own: true } : { source: 'dialogue', content: lines, own: true });
+      }
+    }
+    // A being's own stretch — the Watcher voiced him in it — is his by rule; the judge is for the others.
+    for (const id of stims.keys()) if ((voiced.has(id) || stims.get(id)!.own) && !preset.has(id)) preset.set(id, selfVerdict(id));
+    if (!reachOn) { for (const id of stims.keys()) hear(id, stims.get(id)!, undefined, askFor, truthId); return; }
     if (!stims.size) return;
     const delivered = new Set<string>();
     const nameOf = (id: string) => listeners.find((l) => l.id === id)?.name ?? id;
@@ -643,12 +718,16 @@ async function runBeats(
       console.log(`[perception-reach] ${nameOf(id)}: reached via ${verdict.via.join('+')}, noticed (${source}, salience ${verdict.salience.toFixed(2)}) ${what}`);
       hear(id, stim, { verdict, source }, askFor, truthId);
     };
-    for (const id of stims.keys()) waiting.set(id, [...(waiting.get(id) ?? []), () => deliver(id, null, 'stub')]);
-    const judged = judgeCanonReach(campaignId, reachEventOf(utterances, truthId, truthId === truth.primary ? truth.actorId ?? null : null), [...stims.keys()]);
+    // Settled by rule, not by the judge: a being's own thought, or the way back of a reply (HW6).
+    for (const [id, v] of preset) if (stims.has(id)) deliver(id, v, 'stub');
+    const toJudge = [...stims.keys()].filter((id) => !preset.has(id));
+    if (!toJudge.length || !publicRun.length) return;
+    for (const id of toJudge) waiting.set(id, [...(waiting.get(id) ?? []), () => deliver(id, null, 'stub')]);
+    const judged = judgeCanonReach(campaignId, reachEventOf(publicRun, truthId, truthId === truth.primary ? truth.actorId ?? null : null), toJudge);
     const prior = reachChains.get(campaignId) ?? Promise.resolve();
     const next = prior.then(() => judged).then(async (j) => {
       const refs = new Map<string, EventRefs>();
-      for (const id of stims.keys()) {
+      for (const id of toJudge) {
         const v = j.verdicts.get(id) ?? null;
         const early = delivered.has(id);
         deliver(id, v, j.source);
@@ -661,12 +740,14 @@ async function runBeats(
       }
     }).catch((err) => {
       console.error('[table-speak] reach pass failed; stretches heard as before (non-fatal):', err);
-      for (const id of stims.keys()) deliver(id, null, 'stub');
+      for (const id of toJudge) deliver(id, null, 'stub');
     });
     reachChains.set(campaignId, next);
   };
 
   const answered = new Map<string, ListenerResponse>();
+  // Who asked each being (the speaker of the line it answers), for the reply's way back.
+  const askSource = new Map<string, string | null>();
   const answer = async (listenerId: string, ask: TableAsk) => {
     const listener = listeners.find((l) => l.id === listenerId);
     if (!listener || granted.has(listenerId)) return;
@@ -703,10 +784,18 @@ async function runBeats(
       const said = action.content.trim();
       const others = listeners.map((l) => l.id).filter((id) => id !== listener.id);
       if (others.length) {
+        // The way back is open (HW6 2026-10-25: his shout crossed the door to her and the judge ruled her reply
+        // could not cross it back). Whoever asked her, and reached her by hearing, hears the answer — unless
+        // she whispered it. Everyone else is judged as before.
+        const askedBy = askSource.get(listener.id) ?? null;
+        const preset = new Map<string, ReachVerdict>();
+        if (askedBy && others.includes(askedBy) && (lastVia.get(listener.id)?.includes('hearing') ?? false) && cuesFromText(said).volume !== 'whisper') {
+          preset.set(askedBy, { beingId: askedBy, reaches: true, via: ['hearing'], noticed: true, salience: 0.8 });
+        }
         void recordDialogueCanon(campaignId, listener.id, listener.name, said, null)
           .then((ev) => {
             const u: TableUtterance = { text: said, kind: 'dialogue', to: null, speaker: { id: listener.id, label: listener.name }, expectsReply: false, ambiguous: false, rule: 'being-line' };
-            gatedHear([u], others, undefined, ev.id);
+            gatedHear([u], others, undefined, ev.id, preset);
           })
           .catch((err) => console.warn('[table-speak] the room did not hear the being (non-fatal):', err));
       }
@@ -731,12 +820,19 @@ async function runBeats(
   // What a listener who was not asked could answer to, should its own impulse say so: the spoken
   // line it overheard, or the turn the world's beat implies.
   const impulseAskFor = (beat: TableBeat): TableAsk => (beat.type === 'spoken' ? askOf(beat) : { kind: 'turn' });
+  // No run of world content to ride in: a voiced being still gets its own words as its own stretch.
+  if (!beats.some((b) => b.type === 'hear')) for (const [sid, us] of ownWords) gatedHear(us, [sid], undefined, truth.primary, new Map(), false);
   for (const beat of beats) {
     if (beat.type === 'hear') {
-      gatedHear(beat.utterances, listeners.map((l) => l.id), impulseAskFor(beat));
+      const by = oneSpeakerOf(beat.utterances);
+      for (const l of listeners) if (l.id !== by) askSource.set(l.id, by);
+      gatedHear(beat.utterances, listeners.map((l) => l.id), impulseAskFor(beat), truth.primary, new Map(), true);
       continue;
     }
-    if (beat.type === 'spoken') gatedHear([beat.utterance], overhearers(beat, listeners), impulseAskFor(beat));
+    if (beat.type === 'spoken') {
+      for (const id of answerers(beat, listeners)) askSource.set(id, beat.utterance.speaker?.id ?? null);
+      gatedHear([beat.utterance], overhearers(beat, listeners), impulseAskFor(beat));
+    }
     await answerAll(answerers(beat, listeners), askOf(beat));
   }
   if (opts.answerAfterWorldOnly && beats.length > 0 && beats.every((b) => b.type === 'hear')) {
@@ -786,14 +882,14 @@ async function speakProseSplit(
   // 1. TRUTH — as speakProse writes it, minus what was not part of the world.
   const narration = canonNarration(parsed.full, plan);
   const narrated = plan.world.some((u) => u.kind !== 'dialogue');
-  const hasActions = (parsed.actions?.length ?? 0) > 0;
+  const hasActions = (parsed.actions?.length ?? 0) + (parsed.thoughts?.length ?? 0) > 0;
   let canonEventId: string | null = null;
   const dialogue: TableProseResult['dialogue'] = [];
   const soloAttributed = !narrated && !hasActions && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
   if (narration !== null && (narrated || hasActions || parsed.quotes.length !== 1)) {
     const declared = await declareCanon(campaignId, actor, {
       narration, kind: 'narration', actorId: soleActor(parsed), locationId: input.locationId ?? null, witnessIds: [],
-      feed: { via: 'typed', raw: message, narration: narrated ? parsed.narration : null, speech: parsed.quotes, actions: parsed.actions },
+      feed: { via: 'typed', raw: message, narration: narrated ? parsed.narration : null, speech: parsed.quotes, actions: parsed.actions, thoughts: parsed.thoughts },
     });
     canonEventId = declared.event.id;
     narratedActs(campaignId, parsed.actions);
@@ -813,7 +909,7 @@ async function speakProseSplit(
   // 2. LISTEN and ANSWER, beat by beat.
   const truthPrimary = canonEventId ?? dialogue[0]?.canonEventId ?? null;
   const truthExtra = dialogue.map((d) => d.canonEventId).filter((id) => id !== truthPrimary);
-  const answered = await runBeats(campaignId, actor, plan.beats, listeners, { primary: truthPrimary, extra: truthExtra, voicedIds: voicedIn(parsed), actorId: soleActor(parsed) }, {
+  const answered = await runBeats(campaignId, actor, plan.beats, listeners, { primary: truthPrimary, extra: truthExtra, voicedIds: voicedIn(parsed), actorId: soleActor(parsed), thoughts: parsed.thoughts, actors: actorsOf(roster) }, {
     waitForAnswers: true,
     answerAfterWorldOnly: BEINGS_ANSWER === 'always',
   });

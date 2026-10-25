@@ -142,3 +142,11 @@ describe('canonNarration — what goes on the record', () => {
     expect(canonNarration('Roll perception.', plan('Roll perception.'))).toBeNull();
   });
 });
+
+describe('stimulusFor — a being the Watcher voiced gets its own words (HW6 2026-10-25)', () => {
+  const run = (text: string) => { const b = plan(text).beats[0]; if (b.type !== 'hear') throw new Error('not a run'); return b.utterances; };
+  it('ownVoiced keeps the speaker\'s own line in the stretch; without it the line is still never heard by its speaker', () => {
+    expect(stimulusFor(run('Tess: "Eat."'), 'tess')).toBeNull();
+    expect(stimulusFor(run('Tess: "Eat."'), 'tess', { ownVoiced: true })).toEqual({ source: 'dialogue', content: 'Tess: Eat.' });
+  });
+});

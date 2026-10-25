@@ -458,6 +458,7 @@ export interface DeclarationSplit {
   narration?: string | null;
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
   actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
+  thoughts?: Array<{ actorId: string; actorLabel: string; text: string }>;
 }
 
 /**
@@ -480,10 +481,13 @@ export function truthRowsFromCanon(ev: CanonRowForm, entities: TruthEntity[]): T
     // otherwise the same parse feed-rows makes.
     const split: DeclarationSplit = detail.split ?? (() => {
       const parsed = parseTableProse(ev.narration, roster);
-      return { narration: parsed.narration, speech: parsed.quotes, actions: parsed.actions ?? [] };
+      return { narration: parsed.narration, speech: parsed.quotes, actions: parsed.actions ?? [], thoughts: parsed.thoughts ?? [] };
     })();
     const rows: TruthRow[] = [];
     if (split.narration?.trim()) rows.push({ type: 'narration', text: split.narration.trim() });
+    // What the Watcher wrote a character as thinking is his ((thought)) row — the record reads like a novel
+    // (Mike 2026-10-25), and a thought is Soul blue under his chip.
+    for (const t of split.thoughts ?? []) rows.push({ type: 'character', speakerId: t.actorId, name: nameOf(t.actorId) ?? t.actorLabel, segments: [{ kind: 'thought', text: t.text }] });
     // The Watcher's prose act for a roster character is HIS row, as the Watcher's feed draws it (HW5 2026-10-25:
     // "He walks back to the door and knocks with frustration." had no card in Kristopher's own view). The speech
     // that follows from the same mouth joins the row.

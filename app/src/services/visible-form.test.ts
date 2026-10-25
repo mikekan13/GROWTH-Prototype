@@ -195,3 +195,22 @@ describe('wrong impressions show as received (Mike 2026-10-09: "shows as gold fo
     expect(w.known).toEqual(expect.arrayContaining([{ aspectKind: 'material', fidelity: 0, impression: 'gold' }]));
   });
 });
+
+describe("what the Watcher wrote a character as thinking is his ((thought)) row (HW6 2026-10-25)", () => {
+  it('a split with thoughts draws the thought under his chip, Soul blue, before his act', () => {
+    const split = { narration: 'She is gorgeous but a bit weird.', speech: [{ speakerId: 'ruth', speakerLabel: 'Ruth', text: "Ma'am you didn't pay yet." }], actions: [{ actorId: 'ruth', actorLabel: 'Ruth', text: 'Speaks again' }], thoughts: [{ actorId: 'ruth', actorLabel: 'Ruth', text: 'Thinks about just leaving but remembers this woman' }] };
+    const rows = truthRowsFromCanon({ id: 't', kind: 'narration', narration: 'x', detail: JSON.stringify({ declaredBy: 'u', split }), actorId: 'ruth', sourceType: 'gm' }, entities);
+    expect(rows).toEqual([
+      { type: 'narration', text: 'She is gorgeous but a bit weird.' },
+      { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'thought', text: 'Thinks about just leaving but remembers this woman' }] },
+      { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'action', text: 'Speaks again' }, { kind: 'speech', text: "Ma'am you didn't pay yet." }] },
+    ]);
+  });
+  it('a row without the split parses the same way: the thought comes out of the prose', () => {
+    const rows = truthRowsFromCanon({ id: 't2', kind: 'declaration', narration: 'Ruth thinks about leaving. Ruth knocks again.', detail: '{}', actorId: null, sourceType: 'gm' }, entities);
+    expect(rows).toEqual([
+      { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'thought', text: 'Thinks about leaving' }] },
+      { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'action', text: 'Knocks again' }] },
+    ]);
+  });
+});

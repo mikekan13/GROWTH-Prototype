@@ -106,20 +106,31 @@ function declarationRows(e: TerminalEvent, p: GameEventPayload, roster: RosterNa
   let narration: string | null;
   let speech: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
   let actions: Array<{ actorId: string; actorLabel: string; text: string }>;
+  let thoughts: Array<{ actorId: string; actorLabel: string; text: string }>;
   if (Array.isArray(p.speech)) {
     speech = p.speech;
     actions = Array.isArray(p.actions) ? p.actions : [];
-    narration = p.narration !== undefined ? p.narration : (speech.length || actions.length ? null : p.description);
+    thoughts = Array.isArray(p.thoughts) ? p.thoughts : [];
+    narration = p.narration !== undefined ? p.narration : (speech.length || actions.length || thoughts.length ? null : p.description);
   } else {
     const parsed = parseTableProse(p.description, roster);
     speech = parsed.quotes;
     actions = parsed.actions ?? [];
+    thoughts = parsed.thoughts ?? [];
     narration = parsed.narration;
   }
   const rows: Array<NarrationRowModel | CharacterRowModel> = [];
   if (narration && narration.trim()) {
     rows.push({ type: 'narration', key: e.id, timestamp: e.timestamp, cycle: p.cycle, text: narration.trim(), raw, via, voicedBy: e.actorName || null });
   }
+  // What the Watcher wrote a character as thinking is his ((thought)) row (HW6 2026-10-25) — Soul blue.
+  thoughts.forEach((t, i) => {
+    rows.push({
+      type: 'character', key: `${e.id}#t${i}`, timestamp: e.timestamp, cycle: p.cycle,
+      characterId: t.actorId, name: t.actorLabel, segments: [{ kind: 'thought', text: t.text }],
+      raw, via, voice: 'Watcher', voicedBy: e.actorName || null, fromNarration: true,
+    });
+  });
   // A roster character's `::action::` is HIS row (Mike 2026-10-17: "it should
   // have shown him as a card"), with or without speech, whoever perceived it.
   // The speech that follows it from the same mouth joins the same row.

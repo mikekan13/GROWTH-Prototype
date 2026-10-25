@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseTableProse, introducedSubject, type ParsedProse } from './table-prose';
+import { parseTableProse, introducedSubject, isDescriptive, isThoughtBody, splitDurationClause, type ParsedProse } from './table-prose';
 import frozenJson from './table-prose.frozen.json';
 
 const frozen = frozenJson as Array<{ text: string; withRoster: boolean; parsed: ParsedProse }>;
@@ -290,5 +290,59 @@ describe('the quote belongs to the subject of the sentence before it, not to a n
     const p = parseTableProse('::Kristopher waits:: Violet\'s door stays shut. "Hello?"', table, { recentActors: [] });
     expect(p.quotes[0]).toMatchObject({ speakerId: null, speakerLabel: 'someone present' });
     expect(p.actions?.map((a) => [a.actorId, a.text])).toEqual([['kris', 'Kristopher waits'], ['violet', "Violet's door stays shut"]]);
+  });
+});
+
+describe('description, thought and a stated span are not acts (HW6 2026-10-25)', () => {
+  const table = [{ id: 'kris', name: 'Kristopher', sex: 'Male' }, { id: 'violet', name: 'Violet', sex: 'Female' }];
+  it('"His face looks tired and his eyes are slightly red" is an observation: narration, not a second card', () => {
+    const p = parseTableProse('Kristopher knocks on the apartment door. His face looks tired and his eyes are slightly red from crying in the car.', table);
+    expect(p.actions).toEqual([{ text: 'Knocks on the apartment door', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    expect(p.narration).toBe('His face looks tired and his eyes are slightly red from crying in the car.');
+    expect(p.thoughts).toBeUndefined();
+  });
+  it('"She is gorgeous but a bit weird." is not her act', () => {
+    const p = parseTableProse('She is gorgeous but a bit weird. Kristopher speaks again.', table, { recentActors: [table[1], table[0]] });
+    expect(p.actions).toEqual([{ text: 'Speaks again', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    expect(p.narration).toBe('She is gorgeous but a bit weird.');
+  });
+  it('"looks at", "is knocking" and "feels for" stay acts; a part of him doing something stays his act', () => {
+    expect(parseTableProse('He looks at the door.', table, { recentActors: [table[0]] }).actions?.[0]).toMatchObject({ text: 'Looks at the door' });
+    expect(parseTableProse('He is knocking again.', table, { recentActors: [table[0]] }).actions?.[0]).toMatchObject({ text: 'Is knocking again' });
+    expect(parseTableProse('He feels for the key.', table, { recentActors: [table[0]] }).actions?.[0]).toMatchObject({ text: 'Feels for the key' });
+    expect(parseTableProse('His hand hovers near the deadbolt.', table, { recentActors: [table[0]] }).actions?.[0]).toMatchObject({ actorId: 'kris', text: 'His hand hovers near the deadbolt' });
+    expect(parseTableProse("Kristopher's hand drops to his side.", table).actions?.[0]).toMatchObject({ actorId: 'kris' });
+  });
+  it('isDescriptive / isThoughtBody on their own', () => {
+    expect(isDescriptive('His face looks tired and his eyes are red', table[0])).toBe(true);
+    expect(isDescriptive('Kristopher seems off', table[0])).toBe(true);
+    expect(isDescriptive('He looks over the receipt', table[0])).toBe(false);
+    expect(isDescriptive("Violet's door stays shut", table[1])).toBe(false);
+    expect(isThoughtBody('Thinks about just leaving but he remembers this woman')).toBe(true);
+    expect(isThoughtBody('Knocks again')).toBe(false);
+  });
+  it('what he thinks and remembers is his thought, not his act, and the quote after it is still his', () => {
+    const p = parseTableProse('He thinks about just leaving but he remembers this woman... She is gorgeous but a bit weird. Kristopher speaks again. "Ma\'am you didn\'t pay yet so I can\'t just leave it..."', table, { recentActors: [table[0], table[1]] });
+    expect(p.thoughts).toEqual([{ text: 'Thinks about just leaving but he remembers this woman', sentence: 'He thinks about just leaving but he remembers this woman...', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    expect(p.actions).toEqual([{ text: 'Speaks again', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    expect(p.narration).toBe('She is gorgeous but a bit weird.');
+    expect(p.quotes[0]).toMatchObject({ speakerId: 'kris', text: "Ma'am you didn't pay yet so I can't just leave it..." });
+  });
+  it('"He waits a minute and then knocks again." → the minute is narration, the knock his card', () => {
+    const p = parseTableProse('He waits a minute and then knocks again.', table, { recentActors: [table[0]] });
+    expect(p.narration).toBe('He waits a minute.');
+    expect(p.actions).toEqual([{ text: 'Knocks again', actorId: 'kris', actorLabel: 'Kristopher' }]);
+  });
+  it('a leading span — "After a minute, he knocks again." — and a wait with nothing after it', () => {
+    const p = parseTableProse('After a minute, he knocks again.', table, { recentActors: [table[0]] });
+    expect(p.narration).toBe('After a minute.');
+    expect(p.actions).toEqual([{ text: 'Knocks again', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    const q = parseTableProse('Kristopher waits a moment.', table);
+    expect(q.narration).toBe('Kristopher waits a moment.');
+    expect(q.actions).toBeUndefined();
+  });
+  it('a span inside the act itself is left alone: "He knocks for a minute."', () => {
+    expect(splitDurationClause('He knocks for a minute.', table[0])).toBeNull();
+    expect(parseTableProse('He knocks for a minute.', table, { recentActors: [table[0]] }).actions?.[0]).toMatchObject({ text: 'Knocks for a minute' });
   });
 });

@@ -64,7 +64,7 @@ vi.mock('@/services/reconciliation', () => ({
   cementCheck: vi.fn(async () => {}),
 }));
 
-import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom, reachEventOf } from './table-speak';
+import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom, reachEventOf, withoutThoughts } from './table-speak';
 
 describe("reachEventOf — the Watcher's prose act is its actor's own event (HW5 2026-10-25)", () => {
   const narr = (text: string) => ({ text, kind: 'narration' as const, to: null, speaker: null, expectsReply: false, ambiguous: false, rule: 'x' });
@@ -248,10 +248,11 @@ describe('speakProse — switch ON: listen while the GM has the floor, answer at
     expect(w.attached).toEqual(expect.arrayContaining([{ memoryId: 'ask-mem-mara', canonEventId: 'canon-1' }, { memoryId: 'listen-mem-oren', canonEventId: 'canon-1' }]));
   });
 
-  it('a being voiced by the GM does not hear its own line; with one other present, that one is spoken TO and answers', async () => {
+  it('a being voiced by the GM hears its own line as its own saying (HW6 2026-10-25); with one other present, that one is spoken TO and answers', async () => {
     w.npcs = [{ id: 'tess', name: 'Tess' }, { id: 'oren', name: 'Oren' }];
     await speakProse('camp', actor, { message: 'Oren: "Leave it."' });
-    expect(w.listen.mock.calls.map((c) => c[0])).toEqual([]);
+    await flush();
+    expect(w.listen.mock.calls.map((c) => [c[0], c[2]])).toEqual([['oren', { source: 'dialogue', content: 'I say: "Leave it."', own: true }]]);
     expect(w.answer.mock.calls.map((c) => [c[0], (c[2] as { kind: string }).kind])).toEqual([['mara', 'spoken']]);
     w.npcs = [{ id: 'tess', name: 'Tess' }];
   });
@@ -483,5 +484,43 @@ describe('actionToTableLine (hello world 2026-10-17)', () => {
     expect(actionToTableLine('Violet', { kind: 'attend', content: 'The dust' })).toBeNull();
     expect(actionToTableLine('Violet', { kind: 'attend', content: 'the folded bill by the door' })).toBe("*Violet's attention settles on the folded bill by the door*");
     expect(actionToTableLine('Violet', { kind: 'attend' })).toBe('*Violet goes quiet, watching*');
+  });
+});
+
+describe("the Watcher's line, per part: a thought is the thinker's alone, an own act is in his person (HW6 2026-10-25)", () => {
+  const narr = (text: string) => ({ text, kind: 'narration' as const, to: null, speaker: null, expectsReply: false, ambiguous: false, rule: 'x' });
+  const say = (text: string, id: string, label: string) => ({ text, kind: 'dialogue' as const, to: null, speaker: { id, label }, expectsReply: false, ambiguous: false, rule: 'x' });
+  beforeEach(() => { process.env.TABLE_SPLIT_LOOP = 'on'; });
+  it('withoutThoughts takes the thought sentences out of the run and drops what is left empty', () => {
+    const run = [narr('He thinks about leaving. He knocks again.'), say('Hello?', 'kris', 'Kristopher'), narr('He remembers her.')];
+    expect(withoutThoughts(run, [{ sentence: 'He thinks about leaving.' }, { sentence: 'He remembers her.' }]).map((u) => u.text)).toEqual(['He knocks again.', 'Hello?']);
+    expect(withoutThoughts(run, [])).toBe(run);
+  });
+  it('the others never sense what Tess thinks; Tess gets her thought with her act, both in her own person', async () => {
+    const before = [...w.active];
+    w.active.push('tess');
+    try {
+      await speakProse('camp', actor, { message: 'Tess thinks about leaving. Tess knocks on the door.' });
+      await flush();
+      const byId = Object.fromEntries(w.listen.mock.calls.map((c) => [c[0], c[2]]));
+      expect(byId.mara).toEqual({ source: 'perception', content: 'Tess knocks on the door.' });
+      expect(byId.oren).toEqual({ source: 'perception', content: 'Tess knocks on the door.' });
+      expect(byId.tess).toEqual({ source: 'perception', content: 'I knock on the door.\nI think about leaving.', own: true });
+      expect(w.feeds[0]).toMatchObject({ actions: [{ actorId: 'tess', text: 'Knocks on the door' }], thoughts: [{ actorId: 'tess', text: 'Thinks about leaving', sentence: 'Tess thinks about leaving.' }] });
+    } finally {
+      w.active.length = 0; w.active.push(...before);
+    }
+  });
+  it("a being the Watcher voiced hears its own words as its own saying, not as a stranger's", async () => {
+    const before = [...w.active];
+    w.active.push('tess');
+    try {
+      await speakProse('camp', actor, { message: 'Tess gets close to the door and speaks loudly. "Anyone home?"' });
+      await flush();
+      const tess = w.listen.mock.calls.find((c) => c[0] === 'tess')?.[2];
+      expect(tess).toMatchObject({ own: true, content: 'I get close to the door and speak loudly.\nI say: "Anyone home?"' });
+    } finally {
+      w.active.length = 0; w.active.push(...before);
+    }
   });
 });
