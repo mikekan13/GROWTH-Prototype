@@ -250,6 +250,8 @@ export async function queryPerceivedFeed(q: PerceivedFeedQuery): Promise<{ event
         { actorUserId: viewer.userId, actor: 'player' },
         { type: 'game_event', payload: { contains: '"eventType":"session_' } },
       ],
+      // Genesis reports and prods are the making of the character, not its life at the table (HW7 2026-10-25).
+      NOT: [{ payload: { contains: '"eventType":"genesis_report"' } }, { payload: { contains: '"eventType":"prod"' } }],
     },
     orderBy: { createdAt: 'desc' },
     take: limit + 1,

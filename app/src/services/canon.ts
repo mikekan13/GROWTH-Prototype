@@ -259,6 +259,7 @@ export function declarationPayload(eventType: string, description: string, opts:
     ...(f.narration !== undefined ? { narration: f.narration } : {}),
     ...(f.speech ? { speech: f.speech.map((s) => ({ speakerId: s.speakerId, speakerLabel: s.speakerLabel, text: s.text })) } : {}),
     ...(f.actions?.length ? { actions: f.actions.map((a) => ({ actorId: a.actorId, actorLabel: a.actorLabel, text: a.text })) } : {}),
+    ...(f.thoughts?.length ? { thoughts: f.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text })) } : {}),
   };
 }
 

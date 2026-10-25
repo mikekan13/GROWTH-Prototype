@@ -181,13 +181,16 @@ export function memoryFieldsOf(v: ReachVerdict, source: ReachJudgement['source']
 }
 
 /** Stamp a row the being loop wrote (the table's listening path) with the verdict; joined stretches union their senses (newer clarity wins per sense). */
-export async function stampPerception(memoryId: string, v: ReachVerdict, source: ReachJudgement['source']): Promise<void> {
+export async function stampPerception(memoryId: string, v: ReachVerdict, source: ReachJudgement['source'], heardOf?: string): Promise<void> {
   try {
-    const row = await prisma.dayaMemoryEntry.findUnique({ where: { id: memoryId }, select: { perceivedVia: true } });
+    const row = await prisma.dayaMemoryEntry.findUnique({ where: { id: memoryId }, select: { perceivedVia: true, chain: true } });
     if (!row) return;
     const f = memoryFieldsOf(v, source);
     const merged = mergePerceivedVia(decodePerceivedVia(row.perceivedVia), { via: f.perceivedVia, clarity: f.perceivedClarity ?? {} });
-    await prisma.dayaMemoryEntry.update({ where: { id: memoryId }, data: { noticed: true, perceivedVia: encodePerceivedVia(merged.via, merged.clarity), ...(f.salience !== undefined ? { salience: f.salience } : {}) } });
+    // The stretch of the line this memory is of, as the table handed it over: the viewer's feed draws only its parts (HW7 2026-10-25).
+    let chain: Record<string, unknown> | null = null;
+    if (heardOf?.trim()) { try { chain = { ...(JSON.parse(row.chain) as Record<string, unknown>), heardOf: heardOf.trim() }; } catch { chain = null; } }
+    await prisma.dayaMemoryEntry.update({ where: { id: memoryId }, data: { noticed: true, ...(chain ? { chain: JSON.stringify(chain) } : {}), perceivedVia: encodePerceivedVia(merged.via, merged.clarity), ...(f.salience !== undefined ? { salience: f.salience } : {}) } });
   } catch (err) { console.warn('[perception-reach] stamp failed (record-keeping only)', err); }
 }
 

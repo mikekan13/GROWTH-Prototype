@@ -649,7 +649,7 @@ async function runBeats(
         // null = an answer took this stretch over; that answer stores it and points it at the truth.
         if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId, truthId);
         if (reached && outcome.listened?.memoryEntryId) {
-          await stampPerception(outcome.listened.memoryEntryId, reached.verdict, reached.source);
+          await stampPerception(outcome.listened.memoryEntryId, reached.verdict, reached.source, stimulus.content);
           // Introductions teach names (this stretch's row, once it points at the truth and carries its senses).
           await learnIntroductions(campaignId, [{ characterId: listenerId, memoryIds: [outcome.listened.memoryEntryId] }], undefined, { canonEventId: truthId });
         }

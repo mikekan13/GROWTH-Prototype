@@ -131,6 +131,8 @@ const BARE_TAG_RE = /^(?:says|asks|shouts|whispers|yells|replies|calls out|mutte
 export function actionBody(sentence: string, actor: ProseRosterEntry): string | null {
   let s = sentence.trim().replace(/[.]+$/, '').trim();
   const name = actor.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // "And he says the prayer in his head" → the card does not open with "And".
+  s = s.replace(/^(?:and|then|so|but|now)\b,?\s+/i, '');
   // "Kristopher's hand drops" keeps its opener: the card reads whole, not "'s hand drops".
   s = s.replace(new RegExp(`^(?:${name}|he|she)\\b(?!['’]s\\b)[,]?\\s*`, 'i'), '');
   if (!s || BARE_TAG_RE.test(s)) return null;
@@ -150,13 +152,16 @@ export function isThoughtBody(body: string): boolean {
 // not an act (Mike 2026-10-25: "the second one wasn't an action but an observation"). The verb right after the
 // subject decides it; "looks at the door", "is knocking" and "feels for the key" stay acts.
 const STATIVE_START_RE = /^(?:is|are|was|were|seems|seem|appears|appear|looks|look|feels|feel|sounds|sound|smells|smell)\b(?!\s+(?:at|to|toward|towards|over|up|down|around|into|for|through|back|away|on|out|in|about|across|after|past|along|under|behind|upon|onto)\b|\s+\w+ing\b)/i;
+// Where he is — "Kristopher stands on the fourth floor landing" — sets the scene; it is not something he does
+// (Mike 2026-10-25: "That should have been a block of scene setting narration").
+const POSTURE_PLACE_RE = /^(?:stands|sits|lies|kneels|leans|remains|rests|waits|is standing|is sitting|is lying|is kneeling|is waiting)\s+(?:on|in|at|by|beside|near|outside|inside|under|before|against|behind|atop|upon|along|across|between|beneath)\b/i;
 const BODY_WORDS = 3;
 /** "His face looks tired and his eyes are red." / "She is gorgeous but a bit weird." → true; "He looks at the door." → false. Pure. */
 export function isDescriptive(sentence: string, actor: ProseRosterEntry): boolean {
   const s = sentence.trim().replace(/[.!?]+$/, '');
   const name = actor.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const subject = s.match(new RegExp(`^(?:${name}|he|she)\\s+(.+)$`, 'i'));
-  if (subject) return STATIVE_START_RE.test(subject[1]);
+  if (subject) return STATIVE_START_RE.test(subject[1]) || POSTURE_PLACE_RE.test(subject[1]);
   const owned = s.match(new RegExp(`^(?:${name}['’]s|his|her)\\s+(.+)$`, 'i'));
   if (!owned) return false;
   // "His face looks…" / "Her eyes are…": the verb after a noun phrase of one to three words.
@@ -300,6 +305,8 @@ export function isScriptLine(line: string): boolean {
 }
 
 const QUOTE_CHAR_RE = /["“”]/;
+// A quote said where nobody can hear it: in his head, to himself, silently.
+const SILENT_SAY_RE = /\b(?:in (?:his|her|their) (?:head|mind)|to (?:himself|herself|themselves)|silently|without a sound|inwardly|in silence)\b/i;
 const SAID_VERBS = '(?:says|asks|shouts|whispers|yells|replies|calls out|mutters|growls|snaps)';
 const SAID_LEAD_IN = '(?:(?:and|so|ok|okay|alright|all right|now|then|but|well|meanwhile)[,\\s]+)*';
 
@@ -318,6 +325,45 @@ export function unquotedSpeech(sentence: string, roster: ProseRosterEntry[]): Pr
     if (m) return { text: m[1].trim(), speakerId: entry.id, speakerLabel: entry.name, context: null };
   }
   return null;
+}
+
+/** The split a declaration carries (canon detail / feed payload): what the feed draws from. */
+export interface SplitParts {
+  narration?: string | null;
+  speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
+  actions?: Array<{ actorId: string; actorLabel: string; text: string }>;
+  thoughts?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
+}
+
+export interface CharacterCard {
+  id: string | null;
+  label: string;
+  segments: Array<{ kind: 'action' | 'thought' | 'speech'; text: string; source: string }>;
+}
+
+/**
+ * ONE card per character for a line, its acts, thoughts and words in the order the Watcher wrote them
+ * (Mike 2026-10-25: "one Kristopher card that had his actions and thoughts all in one card"). `source` is
+ * the sentence each segment came from, for a viewer's feed to show only what reached them. Pure.
+ */
+export function characterCards(full: string, split: SplitParts): CharacterCard[] {
+  const straight = (t: string) => t.toLowerCase().replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+  const hay = straight(full);
+  const at = (key: string) => { const i = hay.indexOf(straight(key).replace(/[.!?…"]+$/, '').trim()); return i < 0 ? Number.POSITIVE_INFINITY : i; };
+  const items: Array<{ id: string | null; label: string; kind: 'action' | 'thought' | 'speech'; text: string; source: string; pos: number; n: number }> = [];
+  let n = 0;
+  for (const a of split.actions ?? []) items.push({ id: a.actorId, label: a.actorLabel, kind: 'action', text: a.text, source: a.text, pos: at(a.text), n: n++ });
+  for (const t of split.thoughts ?? []) items.push({ id: t.actorId, label: t.actorLabel, kind: 'thought', text: t.text, source: t.sentence ?? t.text, pos: at(t.sentence ?? t.text), n: n++ });
+  for (const q of split.speech ?? []) items.push({ id: q.speakerId, label: q.speakerLabel, kind: 'speech', text: q.text, source: q.text, pos: at(q.text), n: n++ });
+  items.sort((a, b) => (a.pos - b.pos) || (a.n - b.n));
+  const cards: CharacterCard[] = [];
+  for (const it of items) {
+    const key = it.id ?? `label:${it.label}`;
+    let card = cards.find((c) => (c.id ?? `label:${c.label}`) === key);
+    if (!card) { card = { id: it.id, label: it.label, segments: [] }; cards.push(card); }
+    card.segments.push({ kind: it.kind, text: it.text, source: it.source });
+  }
+  return cards;
 }
 
 export function parseTableProse(message: string, roster: ProseRosterEntry[] = [], ctx: ProseContext = {}): ParsedProse {
@@ -480,6 +526,20 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
       const lineQuotes = quotes.slice(quotesBefore);
       const otherMouth = lineQuotes.some((q) => (q.speakerId && q.speakerId !== only?.id) || (!q.speakerId && q.speakerLabel !== 'someone present'));
       if (only && !otherMouth) for (const q of lineQuotes) if (!q.speakerId) { q.speakerId = only.id; q.speakerLabel = only.name; }
+    }
+    // "And he says the prayer in his head. "Lord Jesus Christ…"": said in his head is THOUGHT, not speech (HW7
+    // 2026-10-25: the prayer went out loud through the door). The tag sentence and the words become one thought;
+    // the act the tag sentence made goes.
+    for (let qi = quotes.length - 1; qi >= quotesBefore; qi--) {
+      const q = quotes[qi];
+      if (!q.speakerId || !q.context || !SILENT_SAY_RE.test(q.context)) continue;
+      const who = roster.find((r) => r.id === q.speakerId);
+      if (!who) continue;
+      const tagBody = actionBody(q.context, who) ?? q.context.replace(/[.]+$/, '');
+      const ai = actions.findIndex((a, i) => i >= actionsBefore && a.actorId === who.id && a.text === tagBody);
+      if (ai >= 0) actions.splice(ai, 1);
+      thoughts.push({ text: `${tagBody}: "${q.text}"`, sentence: `${q.context} "${q.text}"`, actorId: who.id, actorLabel: who.name });
+      quotes.splice(qi, 1);
     }
   }
 

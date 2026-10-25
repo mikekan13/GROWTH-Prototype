@@ -35,7 +35,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/db';
 import { parseSegments, splitEntities, type FeedSegment } from '@/lib/feed-segments';
-import { parseTableProse } from '@/services/table-prose';
+import { parseTableProse, characterCards, splitSentences } from '@/services/table-prose';
 import { SENSE_KINDS, mindSensesOf, senseProfileFromSheet, type SenseKind } from '@/sim/senses/field';
 import { perceptionReachOn } from '@/sim/senses/reach';
 import { familiarityAt, scoreToFidelity, witMaxFromSheet } from '@/services/familiarity';
@@ -86,6 +86,12 @@ export interface ViewerPerception {
   via: string[];
   /** Per sense, how well it works for this viewer, 0..1 (organ effectiveness; a mind sense's own). Missing = 1 for a carried sense. */
   clarity: Partial<Record<string, number>>;
+  /**
+   * The stretch of the line that reached this viewer, as the table handed it over (HW7 2026-10-25: one canon
+   * row per line, reach judged per stretch — Violet's one memory of the knock rendered the tears in the car
+   * and the prayer in his head as hers to perceive). Only the parts of the line found in it are drawn. Absent = all.
+   */
+  heardOf?: string;
 }
 
 /** Per entity, per aspect: the viewer's familiarity level F0–F5 (already faded to now). */
@@ -363,6 +369,10 @@ export async function renderVisibleForm(truth: TruthLine, perception: ViewerPerc
   const label = (id: string) => visible.get(id)?.label ?? byId.get(id)?.name ?? 'someone';
   if (!perception.noticed) return { truthRefs: truth.refs, rows: [], entities: [] };
   const cl = clarityOf(perception);
+  // Only the parts of the line that reached this viewer (ViewerPerception.heardOf); everything when not recorded.
+  const heard = perception.heardOf ? perception.heardOf.toLowerCase().replace(/\s+/g, ' ') : null;
+  const covers = (src: string | undefined) => !heard || !src || heard.includes(src.toLowerCase().replace(/[.!?…]+$/, '').replace(/\s+/g, ' ').trim());
+  const coveredText = (text: string) => (heard ? splitSentences(text).filter((s) => covers(s)).join(' ') : text);
   const unknownNames = truth.entities.filter((e) => e.id !== viewerId && (familiarity[e.id]?.identity ?? 0) < VISIBLE_FORM_TUNING.nameAt).map((e) => e.name);
 
   const whole = (text: string) => catchWords(toWords(entityToks(text, truth.entities, label)), 1, () => 0);
@@ -397,7 +407,9 @@ export async function renderVisibleForm(truth: TruthLine, perception: ViewerPerc
         continue;
       }
       if (cl.scene <= 0) continue;
-      const r = catchWords(toWords(entityToks(row.text, truth.entities, label)), cl.scene, seededRng(key));
+      const text = coveredText(row.text);
+      if (!text.trim()) continue;
+      const r = catchWords(toWords(entityToks(text, truth.entities, label)), cl.scene, seededRng(key));
       rows.push({ type: 'narration', text: r.text, pieces: r.pieces });
       continue;
     }
@@ -406,6 +418,7 @@ export async function renderVisibleForm(truth: TruthLine, perception: ViewerPerc
     const own = ownBy(row.speakerId);
     for (const seg of row.segments) {
       const skey = `${key}.${s++}`;
+      if (!covers(seg.source)) continue;
       if (own && seg.kind !== 'action') {
         // Their own words and thoughts, as they said / thought them.
         const r = catchWords(toWords(entityToks(seg.text, truth.entities, null)), 1, () => 0);
@@ -484,24 +497,12 @@ export function truthRowsFromCanon(ev: CanonRowForm, entities: TruthEntity[]): T
       return { narration: parsed.narration, speech: parsed.quotes, actions: parsed.actions ?? [], thoughts: parsed.thoughts ?? [] };
     })();
     const rows: TruthRow[] = [];
+    // The scene first, then ONE card per character with its acts, thoughts and words in the order the Watcher
+    // wrote them (Mike 2026-10-25: "a block of scene setting narration and then one Kristopher card").
     if (split.narration?.trim()) rows.push({ type: 'narration', text: split.narration.trim() });
-    // What the Watcher wrote a character as thinking is his ((thought)) row — the record reads like a novel
-    // (Mike 2026-10-25), and a thought is Soul blue under his chip.
-    for (const t of split.thoughts ?? []) rows.push({ type: 'character', speakerId: t.actorId, name: nameOf(t.actorId) ?? t.actorLabel, segments: [{ kind: 'thought', text: t.text }] });
-    // The Watcher's prose act for a roster character is HIS row, as the Watcher's feed draws it (HW5 2026-10-25:
-    // "He walks back to the door and knocks with frustration." had no card in Kristopher's own view). The speech
-    // that follows from the same mouth joins the row.
-    const taken = new Set<number>();
-    for (const a of split.actions ?? []) {
-      const segments: FeedSegment[] = [{ kind: 'action', text: a.text }];
-      const next = (split.speech ?? []).findIndex((s, j) => !taken.has(j) && s.speakerId === a.actorId);
-      if (next >= 0) { taken.add(next); segments.push({ kind: 'speech', text: split.speech![next].text }); }
-      rows.push({ type: 'character', speakerId: a.actorId, name: nameOf(a.actorId) ?? a.actorLabel, segments });
+    for (const card of characterCards(ev.narration, split)) {
+      rows.push({ type: 'character', speakerId: card.id, name: (card.id ? nameOf(card.id) : null) ?? card.label, segments: card.segments.map((s) => ({ kind: s.kind, text: s.text, source: s.source })) });
     }
-    (split.speech ?? []).forEach((q, j) => {
-      if (taken.has(j)) return;
-      rows.push({ type: 'character', speakerId: q.speakerId, name: (q.speakerId ? nameOf(q.speakerId) : null) ?? q.speakerLabel, segments: [{ kind: 'speech', text: q.text }] });
-    });
     if (!rows.length && ev.narration.trim()) rows.push({ type: 'narration', text: ev.narration.trim() });
     return rows;
   }
@@ -757,9 +758,11 @@ async function prepareViewerRows(ctx: ViewerContext, memoryIds: string[]) {
     // the viewer's body now only for senses the row carries no stored value for (rows from before D3).
     const stored = decodePerceivedVia(r.perceivedVia);
     const via = stored.via;
+    let heardOf: string | undefined;
+    try { const h = (JSON.parse(r.chain) as { heardOf?: unknown }).heardOf; if (typeof h === 'string' && h.trim()) heardOf = h; } catch { heardOf = undefined; }
     const ents = entitiesIn(evs.map((e) => `${e.narration}\n${e.detail}`), ctx.entities, [...evs.map((e) => e.actorId), ctx.viewerId]);
     const truth = truthLineFromCanon(evs, ents);
-    const perception: ViewerPerception = { viewerId: ctx.viewerId, noticed: true, via, clarity: Object.fromEntries((via.length ? via : ['sight', 'hearing']).filter((v) => v !== 'self').map((v) => [v, stored.clarity[v] ?? ctx.clarity[v] ?? 1])) };
+    const perception: ViewerPerception = { viewerId: ctx.viewerId, noticed: true, via, ...(heardOf ? { heardOf } : {}), clarity: Object.fromEntries((via.length ? via : ['sight', 'hearing']).filter((v) => v !== 'self').map((v) => [v, stored.clarity[v] ?? ctx.clarity[v] ?? 1])) };
     const fam: ViewerFamiliarity = Object.fromEntries(ents.filter((e) => ctx.familiarity[e.id]).map((e) => [e.id, ctx.familiarity[e.id]]));
     prepared.push({ r, truth, perception, fam });
   }

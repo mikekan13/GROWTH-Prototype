@@ -21,7 +21,7 @@ import type {
   TerminalEvent, ChatPayload, GameEventPayload, DiceRollPayload, CommandPayload, AIMessagePayload, ChangeLogPayload,
 } from '@/types/terminal';
 import { parseSegments, type FeedSegment } from '@/lib/feed-segments';
-import { parseTableProse } from '@/services/table-prose';
+import { parseTableProse, characterCards } from '@/services/table-prose';
 import { foldSpokenBeats } from '../SpokenBeatBlock';
 
 export type Via = 'typed' | 'spoken' | 'being';
@@ -123,33 +123,12 @@ function declarationRows(e: TerminalEvent, p: GameEventPayload, roster: RosterNa
   if (narration && narration.trim()) {
     rows.push({ type: 'narration', key: e.id, timestamp: e.timestamp, cycle: p.cycle, text: narration.trim(), raw, via, voicedBy: e.actorName || null });
   }
-  // What the Watcher wrote a character as thinking is his ((thought)) row (HW6 2026-10-25) — Soul blue.
-  thoughts.forEach((t, i) => {
+  // ONE card per character: its acts (Body red), thoughts (Soul blue) and words (Spirit purple) in the order the
+  // Watcher wrote them (Mike 2026-10-25: "one Kristopher card that had his actions and thoughts all in one card").
+  characterCards(p.description, { narration, speech, actions, thoughts }).forEach((card, i) => {
     rows.push({
-      type: 'character', key: `${e.id}#t${i}`, timestamp: e.timestamp, cycle: p.cycle,
-      characterId: t.actorId, name: t.actorLabel, segments: [{ kind: 'thought', text: t.text }],
-      raw, via, voice: 'Watcher', voicedBy: e.actorName || null, fromNarration: true,
-    });
-  });
-  // A roster character's `::action::` is HIS row (Mike 2026-10-17: "it should
-  // have shown him as a card"), with or without speech, whoever perceived it.
-  // The speech that follows it from the same mouth joins the same row.
-  const taken = new Set<number>();
-  actions.forEach((a, i) => {
-    const segments: FeedSegment[] = [{ kind: 'action', text: a.text }];
-    const next = speech.findIndex((s, j) => !taken.has(j) && s.speakerId === a.actorId);
-    if (next >= 0) { taken.add(next); segments.push({ kind: 'speech', text: speech[next].text }); }
-    rows.push({
-      type: 'character', key: `${e.id}#a${i}`, timestamp: e.timestamp, cycle: p.cycle,
-      characterId: a.actorId, name: a.actorLabel, segments,
-      raw, via, voice: 'Watcher', voicedBy: e.actorName || null, fromNarration: true,
-    });
-  });
-  speech.forEach((s, i) => {
-    if (taken.has(i)) return;
-    rows.push({
-      type: 'character', key: `${e.id}#${i}`, timestamp: e.timestamp, cycle: p.cycle,
-      characterId: s.speakerId, name: s.speakerLabel, segments: [{ kind: 'speech', text: s.text }],
+      type: 'character', key: `${e.id}#c${i}`, timestamp: e.timestamp, cycle: p.cycle,
+      characterId: card.id, name: card.label, segments: card.segments.map((s): FeedSegment => ({ kind: s.kind, text: s.text })),
       raw, via, voice: 'Watcher', voicedBy: e.actorName || null, fromNarration: true,
     });
   });
@@ -220,6 +199,17 @@ export function eventRows(e: TerminalEvent, roster: RosterName[]): FeedRowModel[
       return [{ type: 'system', key: e.id, timestamp: e.timestamp, lines: [`> ${c.input}`, ...(c.result ? c.result.split('\n') : [])] }];
     }
     case 'ai_message': return [{ type: 'jewl', key: e.id, timestamp: e.timestamp, tag: '[jEWL]:', lines: [(p as AIMessagePayload).message] }];
+    // What went through a being while someone else had the floor: its ((thought)) row, Soul blue — the record
+    // reads like a novel (Mike 2026-10-25), and a thought is in it. Only the Watcher and the being itself get these rows.
+    case 'being_thought': {
+      const t = (p as { thought?: string; cycle?: number }).thought?.trim();
+      if (!t) return [];
+      return [{
+        type: 'character', key: e.id, timestamp: e.timestamp, cycle: (p as { cycle?: number }).cycle,
+        characterId: e.characterId ?? null, name: e.characterName || 'someone present', segments: [{ kind: 'thought', text: t }],
+        raw: t, via: 'being', voice: 'Being', voicedBy: null, fromNarration: false,
+      }];
+    }
     case 'changelog': {
       const c = p as ChangeLogPayload;
       const who = e.characterName ? `${e.characterName} · ` : '';

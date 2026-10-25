@@ -27,6 +27,8 @@ export type SegmentKind = 'action' | 'speech' | 'thought';
 export interface FeedSegment {
   kind: SegmentKind;
   text: string;
+  /** The sentence of the Watcher's line this segment came from (visible-form: shown to a viewer only when that sentence reached them). */
+  source?: string;
 }
 
 // One alternation, left to right: ::action::  ((thought))  "speech" / “speech”  *action*

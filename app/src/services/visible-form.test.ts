@@ -56,10 +56,12 @@ describe('visible form — full clarity is the truth', () => {
   it("the Watcher's prose act for a roster character is his row, with the speech from the same mouth (HW5 2026-10-25)", () => {
     // The canon row carries the table's split (the pronoun was resolved at the table).
     const split = { narration: null, speech: [{ speakerId: 'ruth', speakerLabel: 'Ruth', text: 'Who is it?' }], actions: [{ actorId: 'ruth', actorLabel: 'Ruth', text: 'Walks back to the door and knocks' }] };
-    const rows = truthRowsFromCanon({ id: 'k', kind: 'narration', narration: 'She walks back to the door and knocks. "Who is it?"', detail: JSON.stringify({ declaredBy: 'u', split }), actorId: 'ruth', sourceType: 'gm' }, entities);
+    const rows = truthRowsFromCanon({ id: 'k', kind: 'narration', narration: 'She walks back to the door and knocks. "Who is it?"', detail: JSON.stringify({ declaredBy: 'u', split }), actorId: 'ruth', sourceType: 'gm' }, entities)
+      .map((r) => (r.type === 'character' ? { ...r, segments: r.segments.map(({ kind, text }) => ({ kind, text })) } : r));
     expect(rows).toEqual([{ type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'action', text: 'Walks back to the door and knocks' }, { kind: 'speech', text: 'Who is it?' }] }]);
     // No split on the row: the same parse feed-rows makes, acts included.
-    const parsed = truthRowsFromCanon({ id: 'k2', kind: 'narration', narration: 'Ruth knocks twice. The hall is quiet.', detail: '{}', actorId: 'ruth', sourceType: 'gm' }, entities);
+    const parsed = truthRowsFromCanon({ id: 'k2', kind: 'narration', narration: 'Ruth knocks twice. The hall is quiet.', detail: '{}', actorId: 'ruth', sourceType: 'gm' }, entities)
+      .map((r) => (r.type === 'character' ? { ...r, segments: r.segments.map(({ kind, text }) => ({ kind, text })) } : r));
     expect(parsed).toEqual([
       { type: 'narration', text: 'The hall is quiet.' },
       { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'action', text: 'Knocks twice' }] },
@@ -197,20 +199,35 @@ describe('wrong impressions show as received (Mike 2026-10-09: "shows as gold fo
 });
 
 describe("what the Watcher wrote a character as thinking is his ((thought)) row (HW6 2026-10-25)", () => {
-  it('a split with thoughts draws the thought under his chip, Soul blue, before his act', () => {
-    const split = { narration: 'She is gorgeous but a bit weird.', speech: [{ speakerId: 'ruth', speakerLabel: 'Ruth', text: "Ma'am you didn't pay yet." }], actions: [{ actorId: 'ruth', actorLabel: 'Ruth', text: 'Speaks again' }], thoughts: [{ actorId: 'ruth', actorLabel: 'Ruth', text: 'Thinks about just leaving but remembers this woman' }] };
-    const rows = truthRowsFromCanon({ id: 't', kind: 'narration', narration: 'x', detail: JSON.stringify({ declaredBy: 'u', split }), actorId: 'ruth', sourceType: 'gm' }, entities);
-    expect(rows).toEqual([
+  const plain = (rows: ReturnType<typeof truthRowsFromCanon>) => rows.map((r) => (r.type === 'character' ? { ...r, segments: r.segments.map(({ kind, text }) => ({ kind, text })) } : r));
+  it('the scene first, then ONE card: his thought, his act and his words in the order of the line (Mike 2026-10-25)', () => {
+    const full = 'Ruth thinks about just leaving but remembers this woman. She is gorgeous but a bit weird. Ruth speaks again. "Ma\'am you didn\'t pay yet."';
+    const split = { narration: 'She is gorgeous but a bit weird.', speech: [{ speakerId: 'ruth', speakerLabel: 'Ruth', text: "Ma'am you didn't pay yet." }], actions: [{ actorId: 'ruth', actorLabel: 'Ruth', text: 'Speaks again' }], thoughts: [{ actorId: 'ruth', actorLabel: 'Ruth', text: 'Thinks about just leaving but remembers this woman', sentence: 'Ruth thinks about just leaving but remembers this woman.' }] };
+    const rows = truthRowsFromCanon({ id: 't', kind: 'narration', narration: full, detail: JSON.stringify({ declaredBy: 'u', split }), actorId: 'ruth', sourceType: 'gm' }, entities);
+    expect(plain(rows)).toEqual([
       { type: 'narration', text: 'She is gorgeous but a bit weird.' },
-      { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'thought', text: 'Thinks about just leaving but remembers this woman' }] },
-      { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'action', text: 'Speaks again' }, { kind: 'speech', text: "Ma'am you didn't pay yet." }] },
+      { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'thought', text: 'Thinks about just leaving but remembers this woman' }, { kind: 'action', text: 'Speaks again' }, { kind: 'speech', text: "Ma'am you didn't pay yet." }] },
     ]);
   });
-  it('a row without the split parses the same way: the thought comes out of the prose', () => {
+  it('a row without the split parses the same way: the thought comes out of the prose, on the one card', () => {
     const rows = truthRowsFromCanon({ id: 't2', kind: 'declaration', narration: 'Ruth thinks about leaving. Ruth knocks again.', detail: '{}', actorId: null, sourceType: 'gm' }, entities);
-    expect(rows).toEqual([
-      { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'thought', text: 'Thinks about leaving' }] },
-      { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'action', text: 'Knocks again' }] },
+    expect(plain(rows)).toEqual([
+      { type: 'character', speakerId: 'ruth', name: 'Ruth', segments: [{ kind: 'thought', text: 'Thinks about leaving' }, { kind: 'action', text: 'Knocks again' }] },
     ]);
+  });
+  it('a viewer sees only the parts of the line that reached them (heardOf), the thinker sees his thought (HW7 2026-10-25)', async () => {
+    const full = 'Ruth stands on the landing. Ruth thinks it is odd. Ruth wipes her eyes. Ruth knocks on the door and a smile flutters across her face.';
+    const split = { narration: 'Ruth stands on the landing.', speech: [], actions: [{ actorId: 'ruth', actorLabel: 'Ruth', text: 'Wipes her eyes' }, { actorId: 'ruth', actorLabel: 'Ruth', text: 'Knocks on the door and a smile flutters across her face' }], thoughts: [{ actorId: 'ruth', actorLabel: 'Ruth', text: 'Thinks it is odd', sentence: 'Ruth thinks it is odd.' }] };
+    const truth = truthLineFromCanon([{ id: 'c1', kind: 'narration', narration: full, detail: JSON.stringify({ declaredBy: 'u', split }), actorId: 'ruth', sourceType: 'gm' }], entities);
+    // Violet, behind the door, was handed only the knock stretch by hearing.
+    const violetSees = await renderVisibleForm(truth, { viewerId: 'violet', noticed: true, via: ['hearing'], clarity: { hearing: 1 }, heardOf: 'Ruth knocks on the door and a smile flutters across her face.' }, knowsAll, { seed: 's', rewrite: null });
+    expect(violetSees.rows.map((r) => (r.type === 'character' ? r.segments.map((s) => s.kind) : 'narration'))).toEqual([['action']]);
+    expect(violetSees.rows.some((r) => r.type === 'narration')).toBe(false);
+    // Ruth herself: the whole of her own stretch, thought included.
+    const ruthSees = await renderVisibleForm(truth, { viewerId: 'ruth', noticed: true, via: ['self'], clarity: {}, heardOf: full }, knowsAll, { seed: 's', rewrite: null });
+    expect(ruthSees.rows.map((r) => (r.type === 'character' ? r.segments.map((s) => s.kind) : 'narration'))).toEqual(['narration', ['thought', 'action', 'action']]);
+    // No heardOf recorded (rows from before HW7): everything, as before.
+    const legacy = await renderVisibleForm(truth, { viewerId: 'violet', noticed: true, via: ['sight', 'hearing'], clarity: { sight: 1, hearing: 1 } }, knowsAll, { seed: 's', rewrite: null });
+    expect(legacy.rows.length).toBe(2);
   });
 });

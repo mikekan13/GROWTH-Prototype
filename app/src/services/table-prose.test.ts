@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseTableProse, introducedSubject, isDescriptive, isThoughtBody, splitDurationClause, type ParsedProse } from './table-prose';
+import { parseTableProse, introducedSubject, isDescriptive, isThoughtBody, splitDurationClause, characterCards, type ParsedProse } from './table-prose';
 import frozenJson from './table-prose.frozen.json';
 
 const frozen = frozenJson as Array<{ text: string; withRoster: boolean; parsed: ParsedProse }>;
@@ -190,9 +190,10 @@ describe('an unterminated quote (HW3, Mike 2026-10-24: the closing mark was miss
   const table = [{ id: 'kris', name: 'Kristopher', sex: 'Male' }];
   it('runs to the end of the line and is his speech, on his card with his action', () => {
     const p = parseTableProse('He stands in the hallway with the empty pizza bag... "Please lady... Just pay the pizza. You don\'t even have to tip me... please.', table, { lastActor: table[0] });
-    expect(p.actions).toEqual([{ text: 'Stands in the hallway with the empty pizza bag', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    // Where he stands sets the scene (Mike 2026-10-25); the words after it are still his.
+    expect(p.actions).toBeUndefined();
+    expect(p.narration).toBe('He stands in the hallway with the empty pizza bag...');
     expect(p.quotes).toEqual([expect.objectContaining({ speakerId: 'kris', text: "Please lady... Just pay the pizza. You don't even have to tip me... please." })]);
-    expect(p.narration).toBeNull();
   });
 });
 
@@ -350,5 +351,30 @@ describe('description, thought and a stated span are not acts (HW6 2026-10-25)',
   it('a span inside the act itself is left alone: "He knocks for a minute."', () => {
     expect(splitDurationClause('He knocks for a minute.', table[0])).toBeNull();
     expect(parseTableProse('He knocks for a minute.', table, { recentActors: [table[0]] }).actions?.[0]).toMatchObject({ text: 'Knocks for a minute' });
+  });
+});
+
+describe('the opening line (HW7 2026-10-25): the scene, then one card with his acts and thoughts, the prayer in his head', () => {
+  const table = [{ id: 'kris', name: 'Kristopher', sex: 'Male' }, { id: 'violet', name: 'Violet', sex: 'Female' }];
+  const line = 'Kristopher stands on the fourth floor landing which only has one apartment. He thinks it is odd and his brain begins to race for meaning where perhaps none is. He wipes his eyes from the tears he was crying in the car. And he says the prayer in his head. "Lord Jesus Christ, Son of God, have mercy on me a sinner." He knocks on the door and a genuine smile flutters across his face.';
+  it('where he stands is the scene; what he thinks and prays is thought; what he does is his acts; nothing is spoken', () => {
+    const p = parseTableProse(line, table);
+    expect(p.narration).toBe('Kristopher stands on the fourth floor landing which only has one apartment.');
+    expect(p.quotes).toEqual([]);
+    expect(p.thoughts?.map((t) => t.text)).toEqual([
+      'Thinks it is odd and his brain begins to race for meaning where perhaps none is',
+      'Says the prayer in his head: "Lord Jesus Christ, Son of God, have mercy on me a sinner."',
+    ]);
+    expect(p.actions?.map((a) => a.text)).toEqual(['Wipes his eyes from the tears he was crying in the car', 'Knocks on the door and a genuine smile flutters across his face']);
+  });
+  it('characterCards: one Kristopher card, segments in the order of the line', () => {
+    const p = parseTableProse(line, table);
+    const cards = characterCards(line, { narration: p.narration, speech: p.quotes, actions: p.actions, thoughts: p.thoughts });
+    expect(cards.map((c) => [c.id, c.segments.map((s) => s.kind)])).toEqual([['kris', ['thought', 'action', 'thought', 'action']]]);
+    expect(cards[0].segments[2].source).toBe('And he says the prayer in his head. "Lord Jesus Christ, Son of God, have mercy on me a sinner."');
+  });
+  it('"to himself" and "silently" are thought too; "under his breath" is still speech (a whisper)', () => {
+    expect(parseTableProse('Kristopher mutters to himself. "Not today."', table).thoughts?.[0]?.text).toBe('Mutters to himself: "Not today."');
+    expect(parseTableProse('Kristopher mutters under his breath. "Not today."', table).quotes[0]).toMatchObject({ speakerId: 'kris', text: 'Not today.' });
   });
 });
