@@ -53,6 +53,18 @@ Last updated: 2026-10-25
 > sent text behind an expand; JEWL force-opens his chat on a question; his hold estimate scales with the thing (75 KRMA for a
 > paper receipt was wrong). Record: GameSession #1 is empty (closed by a second start tap), #2 holds the play — Mike's call.
 
+> 2026-10-25, HW7 (three runs of the same first line from the phone, then Mike's line-by-line): the opening line → scene narration
+> + ONE card per character with acts and thoughts in order; a prayer "in his head" is a thought; a viewer sees only the stretch that
+> reached them; the reach judge waits for a cold lane, places an unplaced line at its source, reads the doors and never lets sight
+> cross a closed one; hearing keeps only sounding predicates (cddb8c2 e38589b a3b4087). Places are dynamic tooltips like people
+> (hover = tooltip, click = centre the canvas; names match as written — aa09d3a). The knock test: survival stays FIRST, the Wisdom
+> budget is spread per rung, the cue's words count sentence by sentence (d4d7450 f031b33). INTENTIONS UNDER THE VINES BUILT
+> (2174801): DayaIntention rows derived from a being's own words — tonight when he knocks, pizza every day, the day job — due ones
+> surface outside the budget. STILL OPEN for line 1: the seed built up from world data (cloud via translator, local compiles) with
+> the being's listening monologue BLENDED into its card, then a prose line setting Violet's scene, then her card; the builder
+> resolves misspellings/aliases/bad audio to world entities; settle an intention DONE when the being does it; Violet's 4th vine;
+> goals-rung stoplist; Wisdom budget calibration; her PTSD memory encoded with arousal 0.12.
+
 > 2026-10-23 (hello world 2 prep): the 17 Oct hello-world hiccups ironed out in three commits on
 > merge/fork-portrait-pipeline — sheet edits no longer wake JEWL (and can't become damage); the tagger stops
 > re-asking after a lawfulness block; `::Name …::` is the character's card and he/she resolves to the last actor;
