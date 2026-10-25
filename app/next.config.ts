@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
   // (bottom-left: the carry tray; top-left: the campaign title). Nobody needs
   // it; off (2026-10-06). Compile errors still show their own overlay.
   devIndicators: false,
+  // Mobile over the Tailscale relay (2026-10-25): the dev server disposes a page
+  // entry after ~60 s without an HMR ping; the phone's relayed websocket misses
+  // pings, the next fetch recompiles the page (~2 s) and the browser reloads.
+  // Keep entries alive for an hour instead.
+  onDemandEntries: { maxInactiveAge: 60 * 60 * 1000, pagesBufferLength: 10 },
   webpack: (config) => {
     const existing = config.watchOptions?.ignored;
     const baseIgnored: string[] = Array.isArray(existing)
