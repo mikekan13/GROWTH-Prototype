@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { onlyDerived, pinToSeed, cardsFromSeed, clockInWords, fromInnerVoice, nameHead, isSpeechTagAct, lightOf, withoutRepeatedHour, dropEchoedThoughts, reattachDanglers, type SeedParts } from './scene-builder';
+import { onlyDerived, pinToSeed, cardsFromSeed, clockInWords, fromInnerVoice, nameHead, isSpeechTagAct, lightOf, withoutRepeatedHour, dropEchoedThoughts, reattachDanglers, withoutLightLabel, physicalDoingToAct, type SeedParts } from './scene-builder';
 
 describe('nameHead / isSpeechTagAct (HW8 run 2)', () => {
   it('takes the name before its qualifier', () => {
@@ -140,5 +140,20 @@ describe('dropEchoedThoughts / reattachDanglers — one sentence, one segment (H
       { kind: 'action', text: 'His thumb rubs the ink, wanting to verify the ink is still there.' },
       { kind: 'thought', text: 'Nothing moves.' },
     ]);
+  });
+});
+
+describe('withoutLightLabel — the light is a fact, never a pasted label (HW8 run 5, 2026-10-26)', () => {
+  it('strips a bare light label', () => {
+    expect(withoutLightLabel('About half past seven in the evening — after dark. The landing is quiet.')).toBe('About half past seven in the evening. The landing is quiet.');
+    expect(withoutLightLabel('— daylight. The landing is quiet.')).toBe('The landing is quiet.');
+  });
+});
+
+describe('physicalDoingToAct — a doing in his voice becomes an act (HW8 run 5, 2026-10-26)', () => {
+  it('converts the first person', () => {
+    expect(physicalDoingToAct('I adjust the cross, feeling the wood grain against my sternum.', 'Kristopher')).toBe('Kristopher adjusts the cross, feeling the wood grain against his sternum.');
+    expect(physicalDoingToAct('The wood grain under my palm is rough, familiar.', 'Kristopher')).toBe('The wood grain under his palm is rough, familiar.');
+    expect(physicalDoingToAct('The silence stretches.', 'Kristopher')).toBeNull();
   });
 });

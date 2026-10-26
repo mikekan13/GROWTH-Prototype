@@ -64,7 +64,7 @@ vi.mock('@/services/reconciliation', () => ({
   cementCheck: vi.fn(async () => {}),
 }));
 
-import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom, reachEventOf, withoutThoughts, withoutRepeats, waitsFor } from './table-speak';
+import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom, reachEventOf, withoutThoughts, withoutRepeats, waitsFor, orderBeats } from './table-speak';
 
 describe("reachEventOf — the Watcher's prose act is its actor's own event (HW5 2026-10-25)", () => {
   const narr = (text: string) => ({ text, kind: 'narration' as const, to: null, speaker: null, expectsReply: false, ambiguous: false, rule: 'x' });
@@ -549,5 +549,17 @@ describe('waitsFor — a wait that names another being hands it the turn (HW8 20
   });
   it('resolves a name', () => {
     expect(waitsFor('She waits for Kristopher to knock', roster, 'vio')).toBe('kris');
+  });
+  it('a wait on the door hands the turn to the one being behind it (HW8 run 5, 2026-10-26)', () => {
+    expect(waitsFor('He waits for the door.', roster, 'kris', 'vio')).toBe('vio');
+    expect(waitsFor('He waits for the door.', roster, 'kris', null)).toBeNull();
+    expect(waitsFor('He waits for the door.', roster, 'kris')).toBeNull();
+  });
+});
+
+describe('orderBeats — hear beats first, the rest in order (HW8 run 5, 2026-10-26)', () => {
+  it('moves a quote that precedes its narration behind the hear beat', () => {
+    const out = orderBeats([{ type: 'spoken', n: 1 }, { type: 'hear', n: 2 }, { type: 'turn', n: 3 }]);
+    expect(out.map((b) => b.n)).toEqual([2, 1, 3]);
   });
 });

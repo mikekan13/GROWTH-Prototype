@@ -83,6 +83,11 @@ Last updated: 2026-10-25
 > hands her the turn; the hour never restated on a being card; light is a fact on the clock line; echoed thoughts and dangling clauses
 > fixed. Readability read: cards all one shape, stock images shared across heads, the two never share a paragraph — the next design
 > talk. Reset (after-hw8d) → run 5.
+> HW8 run 5 (10-26, 14 lines): the scene lived (recall on his children, her deadbolt decision, "I'm not arguing with the pizza, I'm arguing
+> with the door"), JEWL stopped the table on a car — one the world already had as an `owns` deed (undone; JEWL now sees possessions).
+> Fixes: her card gets his words; hear before spoken; rest = no row; replay dedupe reads monologues; cross-room fallback = hearing;
+> sounding acts reach the room; the prayer's words on the rope; silent "says" is not sound; no seed fragment as the stage; physical
+> doings → acts. Reset (after-hw8e) → design talk → run 6.
 
 > 2026-10-23 (hello world 2 prep): the 17 Oct hello-world hiccups ironed out in three commits on
 > merge/fork-portrait-pipeline — sheet edits no longer wake JEWL (and can't become damage); the tagger stops

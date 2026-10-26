@@ -51,3 +51,14 @@ describe('senses filter — hearing carries sound and words, nothing else (HW6 2
     expect(audibleOnly('His face looks tired and his eyes are slightly red from crying in the car.', ['hearing'])).toBe('A sound from beyond the room, too faint to make out.');
   });
 });
+
+describe('a silent "says" is not sound (HW8 run 5, 2026-10-26)', () => {
+  it('"He says the Jesus prayer in his mind." is not heard', () => {
+    expect(audibleSentence('He says the Jesus prayer in his mind.')).toBeNull();
+  });
+  it('the knock after a silent prayer still is', () => {
+    const out = audibleSentence('He says the Jesus prayer in his mind and knocks on the door.');
+    expect(out).toContain('knocks');
+    expect(out).not.toContain('prayer');
+  });
+});

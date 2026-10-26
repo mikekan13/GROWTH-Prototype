@@ -36,6 +36,10 @@ const SUBJECT_RE = /^((?:[Hh]e|[Ss]he|[Tt]hey|[Ss]omeone|[Ss]omebody|[Ii]t|(?:[T
 const PREDICATE_SPLIT_RE = /\s*,?\s*\b(?:and then|then|and|but)\s+(?=(?:(?:then|also|just|again|slowly|quietly|loudly|softly|suddenly|gently|finally)\s+)?[a-z]+s\b)/i;
 const ADVERB_RE = /^(?:then|also|just|again|slowly|quietly|loudly|softly|suddenly|gently|finally)\s+/i;
 
+// A sound verb that is done silently is not sound (HW8 run 5 2026-10-26: "He says the Jesus prayer in his mind" reached
+// Violet through the door on "says"). Tested per predicate, so "…in his mind and knocks" keeps the knock.
+const SILENT_RE = /\b(?:in (?:his|her|their|my) (?:mind|head)|to (?:himself|herself|themselves|myself)|silently|inwardly|under (?:his|her) breath|without a sound)\b/i;
+
 /** One sentence trimmed to the part hearing carries; null when none of it is sound. */
 export function audibleSentence(sentence: string): string | null {
   const s = sentence.trim();
@@ -48,10 +52,11 @@ export function audibleSentence(sentence: string): string | null {
   if (subj) {
     const end = s.match(/[.!?…]+$/)?.[0] ?? '.';
     const predicates = subj[2].split(PREDICATE_SPLIT_RE).map((p) => p.trim()).filter(Boolean);
-    const sounding = predicates.filter((p) => SOUND_VERB_RE.test(p.replace(ADVERB_RE, '').split(/\s+/)[0] ?? ''));
+    const sounding = predicates.filter((p) => SOUND_VERB_RE.test(p.replace(ADVERB_RE, '').split(/\s+/)[0] ?? '') && !SILENT_RE.test(p));
     if (!sounding.length) return null;
     return audibleClauses(sounding.length === predicates.length ? s : `${subj[1]} ${sounding.join(' and ')}${end}`);
   }
+  if (SILENT_RE.test(s)) return null;
   return audibleClauses(s);
 }
 

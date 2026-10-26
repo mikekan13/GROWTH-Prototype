@@ -181,6 +181,32 @@ export function clockInWords(shown: string): string {
   return `${hour} ${partOf}${when}`;
 }
 
+/**
+ * The [clock] line's light is a fact to write from, never a label to paste (HW8 run 5 2026-10-26: "About half past seven
+ * in the evening — after dark. The landing…"). A bare " — after dark" / " — daylight" is removed. Pure.
+ */
+export function withoutLightLabel(text: string): string {
+  return text.replace(/(?:\s*[—–]|\s-)\s*(?:after dark|daylight)\b(\.?)/gi, '$1').replace(/^[.\s]+/, '').trim();
+}
+
+/**
+ * A sentence of the actor's monologue in which he PHYSICALLY does something is an act, not a thought (HW8 run 5
+ * 2026-10-26: "I adjust the cross, feeling the wood grain against my sternum" kept being dropped). Deterministic floor:
+ * first person + a body part + a doing verb, or an opening "I <doing verb>". Returns the third-person act ("Kristopher
+ * adjusts the cross…", "my" → his/her) or null when the sentence is no physical doing. Pure.
+ */
+const PHYSICAL_BODY_RE = /\b(?:I|my)\b[^.]*\b(?:hand|hands|thumb|fingers?|palm|knuckles|arm|shoulder|foot|feet|knee)\b[^.]*\b(?:adjusts?|rests?|rubs?|drifts?|hovers?|finds?|presses?|grips?|tightens?|steadies|steady|lifts?|lowers?|wipes?|touch(?:es)?|holds?|turns?|reaches?|twitch(?:es)?|flex(?:es)?|is|are)\b/i;
+const PHYSICAL_I_RE = /^I\s+(?:adjust|wipe|lift|lower|press|grip|touch|hold|turn|reach|step|lean|straighten|shift)\b/i;
+const THIRD_PERSON_OF = (verb: string): string => (/(?:s|sh|ch|x|z)$/i.test(verb) ? `${verb}es` : /[^aeiou]y$/i.test(verb) ? `${verb.slice(0, -1)}ies` : `${verb}s`);
+export function physicalDoingToAct(sentence: string, actorLabel: string, possessive = 'his'): string | null {
+  const s = sentence.trim();
+  if (!PHYSICAL_BODY_RE.test(s) && !PHYSICAL_I_RE.test(s)) return null;
+  let out = s.replace(/\bmy\b/gi, (m) => (m[0] === 'M' ? possessive.charAt(0).toUpperCase() + possessive.slice(1) : possessive));
+  const lead = out.match(/^I\s+([a-z]+)\b/i);
+  if (lead) out = `${actorLabel} ${THIRD_PERSON_OF(lead[1])}${out.slice(lead[0].length)}`;
+  return out;
+}
+
 const INNER_VOICE_FLOOR = 0.3;
 /**
  * A thought on the page comes from the being's inner voice this beat — its listening monologue and what the seed said it
@@ -355,11 +381,11 @@ const SCENE_SYSTEM = `You build up a game master's seed line into a page of a no
 
 Rules — all of them, every time:
 - DERIVE, NEVER INVENT. Every sentence you write must be supported by the SEED or by a FACT line given. Do not add objects, people, weather, sounds, furniture, feelings, bodily details or events that are in neither ("the skin around them still raw" is an invention unless a fact says so). If the facts are thin, write less.
-- SCENE: 0 to 4 sentences that set the stage from the facts — the place, the hour, the door and its state, what the actor holds, what is written on a thing he reads. THE PAGE REMEMBERS ITSELF: when ALREADY ON THE PAGE is given, do not describe again what it already set (the room, its light, its fixtures, a thing's text) — write only what is NEW this beat: a changed hour, a changed door, a thing now held or read for the first time, who moved; when nothing changed, one short sentence or an empty scene. Never restate the actor's acts or thoughts in the scene. Use the world's names EXACTLY as given in NAMES (so the record can tag them). The hour as the [clock] line gives it, in words — never the calendar date, never a year, never digits. Light only from the facts: no daylight, dusk or sun unless a fact says so (an evening in autumn is dark; a lamp lights a room only if a fact lists it lit).
+- SCENE: 0 to 4 sentences that set the stage from the facts — the place, the hour, the door and its state, what the actor holds, what is written on a thing he reads. THE PAGE REMEMBERS ITSELF: when ALREADY ON THE PAGE is given, do not describe again what it already set (the room, its light, its fixtures, a thing's text) — write only what is NEW this beat: a changed hour, a changed door, a thing now held or read for the first time, who moved; when nothing changed, one short sentence or an empty scene. Never restate the actor's acts or thoughts in the scene. Use the world's names EXACTLY as given in NAMES (so the record can tag them). The hour as the [clock] line gives it, in words — never the calendar date, never a year, never digits. Light only from the facts: no daylight, dusk or sun unless a fact says so (an evening in autumn is dark; a lamp lights a room only if a fact lists it lit). The [clock] line's light (after dark / daylight) is a FACT to write from, never a label to paste.
 - A thing the seed names that is not in the FACTS does not exist on the page: the actor reaches for it and does not find it, or the sentence stays as the seed put it. Never describe what it looks like or what is written on it.
 - ONE CARD PER ACTOR named in the seed, segments in the SEED's order:
   - action: third person, present tense, the actor as "He"/"She" or by name: "He wipes his eyes." Only acts the seed states. An ATTEMPT is not its outcome: "looking for the receipt" never becomes "finds the receipt", "reaches for the handle" never opens the door, "listens" never hears — the outcome is the Watcher's or the world's to give, never yours. Never count or number events (first/second/third knock) unless the seed or the monologue counts them. Never add a movement the text does not state (rising, turning, stepping) to get from one act to the next. A thought that looks FORWARD to an act ("the knock is coming") goes BEFORE that act in the card, never after it. Backstory inside a seed act ("from the tears he was crying in the car") is not an act — it belongs in the scene as a fact a bystander could see (red eyes), or nowhere.
-  - thought: the actor's INNER VOICE, strictly first person ("I", "my"), free indirect, as he would think it — never "he"/"his" inside a thought, never reported ("He thinks it is odd" is wrong; "Only one apartment on the whole floor. Odd." is right). A prayer in his head is the prayer itself. When a MONOLOGUE is given for an actor, blend it into his thoughts — it is his inner voice this beat; keep what the seed said he thought and let the monologue colour and extend it. A sentence of the monologue in which the actor PHYSICALLY does something ("the receipt crinkles in my fist", "my thumb rubs the ink", "my hand hovers") is not a thought: make it a small action segment in third person ("The receipt crinkles in his fist.") — unless it contradicts or undoes an act the seed states (the seed knocked: no hovering hand, no "I don't knock"), in which case drop it. A bare speech tag ("He speaks.") is never a segment: the speech segment is the record of it.
+  - thought: the actor's INNER VOICE, strictly first person ("I", "my"), free indirect, as he would think it — never "he"/"his" inside a thought, never reported ("He thinks it is odd" is wrong; "Only one apartment on the whole floor. Odd." is right). A prayer in his head is the prayer itself. A being's inner voice may count nothing it has not counted on the page: never number knocks or minutes. When a MONOLOGUE is given for an actor, blend it into his thoughts — it is his inner voice this beat; keep what the seed said he thought and let the monologue colour and extend it. A sentence of the monologue in which the actor PHYSICALLY does something ("the receipt crinkles in my fist", "my thumb rubs the ink", "my hand hovers") is not a thought: make it a small action segment in third person ("The receipt crinkles in his fist.") — unless it contradicts or undoes an act the seed states (the seed knocked: no hovering hand, no "I don't knock"), in which case drop it. A bare speech tag ("He speaks.") is never a segment: the speech segment is the record of it.
   - speech: the words exactly as the seed quotes them.
 - Every segment carries "from": the SEED sentence it derives from, verbatim.
 - Output JSON only: {"scene": string, "cards": [{"actorId": string, "segments": [{"kind": "action"|"thought"|"speech", "text": string, "from": string}]}]}`;
@@ -417,7 +443,7 @@ export async function buildScene(
     const parsed = parseJson<{ scene?: unknown; cards?: Array<{ actorId?: unknown; segments?: Array<{ kind?: unknown; text?: unknown; from?: unknown }> }> }>(res.text);
     if (!parsed) throw new Error('no JSON in the builder\'s answer');
     const known = [seed.full, ...facts.lines, ...facts.names.map((n) => n.name), ...[...monologues.values()]];
-    const scene = typeof parsed.scene === 'string' ? onlyDerived(parsed.scene.trim(), known) : '';
+    const scene = typeof parsed.scene === 'string' ? withoutLightLabel(onlyDerived(parsed.scene.trim(), known)) : '';
     for (const [id, m] of monologues) console.log(`[scene-builder] inner voice of ${id}: ${m.replace(/\s+/g, ' ').slice(0, 400)}`);
     const labelOf = (id: string) => seed.actions.find((a) => a.actorId === id)?.actorLabel ?? seed.thoughts.find((t) => t.actorId === id)?.actorLabel ?? seed.quotes.find((q) => q.speakerId === id)?.speakerLabel ?? facts.names.find((n) => n.id === id)?.name ?? id;
     const cards: BuiltCard[] = [];
@@ -435,7 +461,9 @@ export async function buildScene(
       }
       // A thought is the being's own voice or nothing (fromInnerVoice). When the voice spoke and the builder lost all
       // of it, the monologue itself stands as the thought, where the builder had put one.
-      const voice = [monologues.get(c.actorId) ?? '', ...seed.thoughts.filter((t) => t.actorId === c.actorId).map((t) => t.text)].join(' ').trim();
+      // What is written on a thing he carries is his to think too (HW8 run 5 2026-10-26, Mike HW7: "A prayer in his head is the prayer itself").
+      const written = facts.lines.filter((l) => l.startsWith('[item · what is written on')).map((l) => l.slice(l.indexOf('] ') + 2));
+      const voice = [monologues.get(c.actorId) ?? '', ...seed.thoughts.filter((t) => t.actorId === c.actorId).map((t) => t.text), ...written].join(' ').trim();
       const vetted: BuiltSegment[] = [];
       let firstThoughtAt = -1;
       let keptThought = false;
@@ -450,12 +478,28 @@ export async function buildScene(
         const at = segments.find((s) => s.kind === 'thought')!;
         vetted.splice(firstThoughtAt, 0, { kind: 'thought', text: voice, sentence: at.sentence });
       }
+      // Physical doings in his voice become acts when nothing kept carries them (HW8 run 5 2026-10-26).
+      const mono = monologues.get(c.actorId) ?? '';
+      if (mono) {
+        const carried = vetted.filter((s) => s.kind === 'thought' || s.kind === 'action').map((s) => s.text);
+        for (const sent of splitSentences(mono)) {
+          if (carried.some((k) => Math.max(cueCoverage(sent, k), cueCoverage(k, sent)) >= 0.7)) continue;
+          const act = physicalDoingToAct(sent, labelOf(c.actorId));
+          if (!act) continue;
+          let at = -1;
+          vetted.forEach((s, i) => { if (s.kind === 'action') at = i; });
+          vetted.splice(at < 0 ? vetted.length : at + 1, 0, { kind: 'action', text: act, sentence: pinToSeed(undefined, act, seedSentences) });
+          carried.push(act);
+          console.log(`[scene-builder] physical doing → act: ${act}`);
+        }
+      }
       if (vetted.length) cards.push({ actorId: c.actorId, actorLabel: labelOf(c.actorId), segments: vetted });
     }
     // Every actor the seed voiced keeps a card: one the builder dropped falls back to the seed's own parts.
     for (const fromSeed of cardsFromSeed(seed)) if (!cards.some((c) => c.actorId === fromSeed.actorId)) cards.push(fromSeed);
     console.log(`[scene-builder] built in ${Date.now() - t0}ms: scene ${scene ? splitSentences(scene).length : 0} sentence(s), ${cards.length} card(s), ${cards.reduce((n, c) => n + c.segments.length, 0)} segment(s)`);
-    return { scene: scene || seed.narration, cards, source: 'cloud' };
+    // No seed fragment as the stage: an empty built scene means the page already set it (HW8 run 5 2026-10-26).
+    return { scene: scene || null, cards, source: 'cloud' };
   } catch (err) {
     console.warn(`[scene-builder] the seed stands as parsed (${Date.now() - t0}ms):`, err instanceof Error ? err.message : err);
     return fallback();
@@ -482,7 +526,7 @@ const BEING_SYSTEM = `You set down one being's side of a beat in a novel, from D
 
 Given what reached the being (HEARD), the being's own listening monologue (its inner voice, first person), and FACTS about where it is:
 - SCENE: 1 or 2 sentences, third person, setting its side of the stage from the facts — where it is, the hour, what reached it. Never invent objects, people, sounds or events that are in neither the monologue nor the facts. Use the world's names exactly as given. The hour as the [clock] line gives it, in words — never the calendar date, never digits. Light only from the facts: no daylight, dusk, sun or "last light" unless a fact says so (an evening in autumn is dark; a lamp lights a room only if a fact lists it lit). If the page already gave the hour or the room (ALREADY ON THE PAGE), do not give them again: one sentence of what is new for this being this beat (what reached it, what changed), or an empty scene.
-- Never count or number events (first/second/third knock) unless the monologue or HEARD counts them. Never add a movement the text does not state (rising, turning, stepping) to get from one act to the next. A thought that looks FORWARD to an act ("the knock is coming") goes BEFORE that act in the card, never after it.
+- Never count or number events (first/second/third knock) unless the monologue or HEARD counts them. A being's inner voice may count nothing it has not counted on the page: never number knocks or minutes. The [clock] line's light (after dark / daylight) is a FACT to write from, never a label to paste. Never add a movement the text does not state (rising, turning, stepping) to get from one act to the next. A thought that looks FORWARD to an act ("the knock is coming") goes BEFORE that act in the card, never after it.
 - SEGMENTS, in the monologue's order, splitting it. Each sentence of the monologue goes to exactly ONE segment. A sentence that is a physical doing is an action and is NOT also a thought. Never split a sentence: a participle clause stays with its sentence.
   - thought: its inner voice, first person, as it thinks it (keep its words; trim nothing that matters).
   - action: only what the monologue says the being PHYSICALLY does now (a hand toward the lock, holding still, a step back) — third person present: "She holds still." Perceptions and feelings are thoughts, not acts.
@@ -526,7 +570,7 @@ export async function buildBeingCard(
     const parsed = parseJson<{ scene?: unknown; segments?: Array<{ kind?: unknown; text?: unknown }> }>(res.text);
     if (!parsed) throw new Error('no JSON in the builder\'s answer');
     const known = [heard, monologue, ...facts.lines, ...facts.names.map((n) => n.name)];
-    const scene = typeof parsed.scene === 'string' ? withoutRepeatedHour(onlyDerived(parsed.scene.trim(), known), page) : '';
+    const scene = typeof parsed.scene === 'string' ? withoutRepeatedHour(withoutLightLabel(onlyDerived(parsed.scene.trim(), known)), page) : '';
     let segments: BuiltBeingCard['segments'] = [];
     for (const s of parsed.segments ?? []) {
       if (typeof s.text !== 'string' || !s.text.trim()) continue;
