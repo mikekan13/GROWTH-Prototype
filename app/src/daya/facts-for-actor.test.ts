@@ -56,7 +56,7 @@ describe('what a being is told about its own body', () => {
       { name: 'Apartment key', data: JSON.stringify({}) },
       { name: 'Broken', data: '{not json' },
     ]);
-    expect(h).toEqual({ wearing: ['Jeans'], carrying: ['Apartment key', 'Broken'] });
+    expect(h).toEqual({ wearing: ['Jeans'], carrying: ['Apartment key', 'Broken'], written: [] });
     expect(heldLines(h)).toEqual(['You are wearing: Jeans.', 'You have on you: Apartment key, Broken.']);
   });
   it('says plainly when there is nothing — never a jacket that is not there', () => {
@@ -64,5 +64,20 @@ describe('what a being is told about its own body', () => {
       'You are wearing nothing but what is on your sheet as underwear.',
       'You carry nothing else.',
     ]);
+  });
+});
+
+describe('what is written on a held thing is told to the being (HW8 2026-10-25)', () => {
+  it('splitHeld carries data.text and heldLines reads it out', () => {
+    const h = splitHeld([
+      { name: 'Chess Pizza receipt', data: JSON.stringify({ text: ['TOTAL DUE 22.97', 'NOT PAID'].join('\n') }) },
+      { name: 'Chess Pizza polo', data: JSON.stringify({ equippedTo: 'torso' }) },
+    ]);
+    expect(h.written).toEqual([{ name: 'Chess Pizza receipt', text: ['TOTAL DUE 22.97', 'NOT PAID'].join('\n') }]);
+    const lines = heldLines(h);
+    expect(lines[0]).toBe('You are wearing: Chess Pizza polo.');
+    expect(lines[1]).toBe('You have on you: Chess Pizza receipt.');
+    expect(lines[2]).toBe(['Written on the Chess Pizza receipt:', 'TOTAL DUE 22.97', 'NOT PAID'].join('\n'));
+    expect(heldLines(h, { written: false })).toHaveLength(2);
   });
 });

@@ -66,6 +66,11 @@ Last updated: 2026-10-25
 > Intentions are completed by acts (words, then the local lane) and can be set outright. STILL OPEN: the builder resolving
 > misspellings/aliases/bad audio to world entities (regex floor only); the local editor pass behind the cloud draft; Violet's 4th
 > vine; goals-rung stoplist; Wisdom budget calibration; her PTSD memory encoded with arousal 0.12. World reset (after-hw7c) → HW8.
+> HW8 run 1 (10-25): "Then he knocks on Violet's door" went to Violet (fixed: the subject after an opener; a pronoun ahead of a
+> possessive); a built thought must come from the being's own voice, and the voice is kept in the record; the hour in words,
+> never the date; JEWL now catches a THING the seed names that the world lacks (kind new_thing → ticket → item stub on confirm);
+> the receipt is a real item (UNPAID; prices/order #/time are placeholders; no street address or phones exist in the world).
+> World reset (after-hw8a) → HW8 run 2.
 
 > 2026-10-23 (hello world 2 prep): the 17 Oct hello-world hiccups ironed out in three commits on
 > merge/fork-portrait-pipeline — sheet edits no longer wake JEWL (and can't become damage); the tagger stops

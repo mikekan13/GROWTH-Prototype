@@ -61,24 +61,35 @@ export function factsForActor<T extends FactLike>(
 }
 
 export interface HeldRow { name: string; data: string | null }
-export interface HeldSplit { wearing: string[]; carrying: string[] }
+export interface HeldSplit { wearing: string[]; carrying: string[]; written?: Array<{ name: string; text: string }> }
 
-/** Worn (equippedTo set on the item) vs carried, from the held-items rows. Pure. */
+const WRITTEN_CAP = 600;
+/** Worn (equippedTo set on the item) vs carried, from the held-items rows; and what is written on any of them (`data.text`). Pure. */
 export function splitHeld(rows: HeldRow[]): HeldSplit {
   const wearing: string[] = [];
   const carrying: string[] = [];
+  const written: Array<{ name: string; text: string }> = [];
   for (const r of rows) {
     let worn = false;
-    try { worn = !!(JSON.parse(r.data ?? '{}') as { equippedTo?: unknown }).equippedTo; } catch { worn = false; }
+    let text = '';
+    try {
+      const d = JSON.parse(r.data ?? '{}') as { equippedTo?: unknown; text?: unknown };
+      worn = !!d.equippedTo;
+      text = typeof d.text === 'string' ? d.text.replace(/[ \t]+/g, ' ').trim() : '';
+    } catch { worn = false; }
     (worn ? wearing : carrying).push(r.name);
+    if (text) written.push({ name: r.name, text: text.slice(0, WRITTEN_CAP) });
   }
-  return { wearing, carrying };
+  return { wearing, carrying, written };
 }
 
 /** The lines a being is told about its own body. Second person; nothing invented. Pure. */
-export function heldLines(h: HeldSplit): string[] {
+export function heldLines(h: HeldSplit, opts: { written?: boolean } = {}): string[] {
   const lines: string[] = [];
   lines.push(h.wearing.length ? `You are wearing: ${h.wearing.join(', ')}.` : 'You are wearing nothing but what is on your sheet as underwear.');
   lines.push(h.carrying.length ? `You have on you: ${h.carrying.join(', ')}.` : 'You carry nothing else.');
+  // What is written on a thing you hold is yours to read (HW8 2026-10-25: the being read a "Paid" stamp off a receipt
+  // it had never seen; now the receipt is real and says NOT PAID, and the being is told what it says).
+  if (opts.written !== false) for (const w of h.written ?? []) lines.push(`Written on the ${w.name}:\n${w.text}`);
   return lines;
 }

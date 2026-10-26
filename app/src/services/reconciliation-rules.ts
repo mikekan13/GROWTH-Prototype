@@ -14,7 +14,7 @@
  */
 import type { ParsedProse } from './table-prose';
 
-export type ReconKind = 'relocation' | 'new_presence' | 'contradicted_fact' | 'contradiction' | 'continuity';
+export type ReconKind = 'relocation' | 'new_presence' | 'new_thing' | 'contradicted_fact' | 'contradiction' | 'continuity';
 
 export interface PlanItem {
   kind: 'location' | 'npc' | 'item';
@@ -29,6 +29,8 @@ export interface PlanItem {
   baseKrma: number;
   /** Where it goes: for an npc, the location plan item's name it belongs in (resolved on confirm). */
   at?: string | null;
+  /** For a thing: the name of the character the narration has holding it (resolved on confirm); null = it lies in the scene. */
+  holder?: string | null;
 }
 
 export const IMPROV_TUNING = {

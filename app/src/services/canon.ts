@@ -247,6 +247,8 @@ export interface DeclarationFeed {
   /** The scene builder wrote narration/actions/thoughts up from the seed (2026-10-25); `seedNarration` is what the Watcher's own narration was. */
   built?: boolean;
   seedNarration?: string | null;
+  /** The listening monologues the builder blended into the cards, kept whole (HW8 2026-10-25: a being's own voice was kept nowhere once it was blended). */
+  monologues?: Array<{ actorId: string; text: string }>;
   /** What the GM wrote a roster character as thinking — the record draws it as his ((thought)) (HW6 2026-10-25). `sentence` = as written. */
   thoughts?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
 }
@@ -265,6 +267,7 @@ export function declarationPayload(eventType: string, description: string, opts:
     ...(f.actions?.length ? { actions: f.actions.map((a) => ({ actorId: a.actorId, actorLabel: a.actorLabel, text: a.text, ...(a.sentence ? { sentence: a.sentence } : {}) })) } : {}),
     ...(f.thoughts?.length ? { thoughts: f.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text, ...(t.sentence ? { sentence: t.sentence } : {}) })) } : {}),
     ...(f.built ? { built: true, seedNarration: f.seedNarration ?? null } : {}),
+    ...(f.monologues?.length ? { monologues: f.monologues.map((m) => ({ actorId: m.actorId, text: m.text })) } : {}),
   };
 }
 

@@ -76,11 +76,50 @@ async function clockLine(campaignId: string): Promise<string | null> {
       ts = { unitsPerMetaCycle: row.unitsPerMetaCycle, calendar, unitName: row.unitName };
     }
   }
-  const shown = presentCycle(camp.currentCycle, ts);
-  const hhmm = shown.match(/\b(\d{2}):(\d{2})\b/);
-  const hour = hhmm ? Number(hhmm[1]) : null;
-  const part = hour === null ? '' : hour < 5 ? ' (deep night)' : hour < 8 ? ' (early morning)' : hour < 12 ? ' (morning)' : hour < 17 ? ' (afternoon)' : hour < 21 ? ' (evening)' : ' (night)';
-  return `[clock] ${shown}${part}`;
+  return `[clock] ${clockInWords(presentCycle(camp.currentCycle, ts))}`;
+}
+
+const HOUR_WORDS = ['twelve', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'];
+const MONTH_NAMES: Record<string, string> = { jan: 'January', feb: 'February', mar: 'March', apr: 'April', may: 'May', jun: 'June', jul: 'July', aug: 'August', sep: 'September', oct: 'October', nov: 'November', dec: 'December' };
+/**
+ * "17th Oct, Y2026 · 19:16 · 0.002 cyc" → "a little after seven in the evening, mid October". A novel gives the hour
+ * in words and never reads the calendar out (HW8 2026-10-25, Mike: "the weird way it presented the date and time" —
+ * "the evening of 17 October 2026, nineteen sixteen"). Pure.
+ */
+export function clockInWords(shown: string): string {
+  const hm = shown.match(/\b(\d{1,2}):(\d{2})\b/);
+  if (!hm) return shown;
+  const h = Number(hm[1]);
+  const m = Number(hm[2]);
+  const word = (x: number) => HOUR_WORDS[((x % 24) + 24) % 12];
+  const hour = m < 5 ? `${word(h)} o'clock` : m < 20 ? `a little after ${word(h)}` : m < 40 ? `about half past ${word(h)}` : m < 55 ? `coming up on ${word(h + 1)}` : `just before ${word(h + 1)}`;
+  const partOf = h < 5 || h >= 21 ? 'at night' : h < 12 ? 'in the morning' : h < 17 ? 'in the afternoon' : 'in the evening';
+  const dm = shown.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,})/);
+  let when = '';
+  if (dm) {
+    const day = Number(dm[1]);
+    const month = MONTH_NAMES[dm[2].slice(0, 3).toLowerCase()] ?? dm[2];
+    when = `, ${day <= 10 ? 'early' : day <= 20 ? 'mid' : 'late'} ${month}`;
+  }
+  return `${hour} ${partOf}${when}`;
+}
+
+const INNER_VOICE_FLOOR = 0.3;
+/**
+ * A thought on the page comes from the being's inner voice this beat — its listening monologue and what the seed said it
+ * thought — or not at all (HW8 2026-10-25: the card carried "Am I still the man who built, or the one who broke?" and
+ * nothing kept what the being had actually thought). Sentences the voice does not carry are dropped; null when none is
+ * left or there is no voice. Pure.
+ */
+export function fromInnerVoice(text: string, voice: string): string | null {
+  const have = voice.replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!have) return null;
+  const kept = splitSentences(text).filter((s) => {
+    const bare = s.replace(/[.!?…]+$/, '').trim();
+    if (bare.split(/\s+/).length <= 3) return have.includes(bare.toLowerCase());
+    return cueCoverage(s, voice) >= INNER_VOICE_FLOOR;
+  });
+  return kept.length ? kept.join(' ') : null;
 }
 
 function locationLines(loc: { name: string; data: string | null } | null, tag: string): string[] {
@@ -121,7 +160,7 @@ export async function sceneFacts(campaignId: string, actorIds: string[]): Promis
         lines.push(...whereaboutsLines(map.roomName, await whereOthersStand(campaignId, actorId, map)));
       }
       const held = await prisma.campaignItem.findMany({ where: { campaignId, holderId: actorId, status: { notIn: ['DESTROYED', 'CONSUMED', 'LOST'] } }, select: { name: true, data: true } });
-      for (const l of heldLines(splitHeld(held))) lines.push(`[${me.name} holds] ${l}`);
+      for (const l of heldLines(splitHeld(held), { written: false })) lines.push(`[${me.name} holds] ${l}`);
       for (const it of held) {
         let d: Record<string, unknown> = {};
         try { d = JSON.parse(it.data ?? '{}') as Record<string, unknown>; } catch { d = {}; }
@@ -217,7 +256,8 @@ const SCENE_SYSTEM = `You build up a game master's seed line into a page of a no
 
 Rules — all of them, every time:
 - DERIVE, NEVER INVENT. Every sentence you write must be supported by the SEED or by a FACT line given. Do not add objects, people, weather, sounds, furniture, feelings, bodily details or events that are in neither ("the skin around them still raw" is an invention unless a fact says so). If the facts are thin, write less.
-- SCENE: 2 to 5 sentences that set the stage from the facts — the place, the hour and its light, the door and its state, what the actor holds, what is written on a thing he reads. Never restate the actor's acts or thoughts in the scene. Use the world's names EXACTLY as given in NAMES (so the record can tag them).
+- SCENE: 2 to 5 sentences that set the stage from the facts — the place, the hour and its light, the door and its state, what the actor holds, what is written on a thing he reads. Never restate the actor's acts or thoughts in the scene. Use the world's names EXACTLY as given in NAMES (so the record can tag them). The hour as the [clock] line gives it, in words — never the calendar date, never a year, never digits.
+- A thing the seed names that is not in the FACTS does not exist on the page: the actor reaches for it and does not find it, or the sentence stays as the seed put it. Never describe what it looks like or what is written on it.
 - ONE CARD PER ACTOR named in the seed, segments in the SEED's order:
   - action: third person, present tense, the actor as "He"/"She" or by name: "He wipes his eyes." Only acts the seed states. Backstory inside a seed act ("from the tears he was crying in the car") is not an act — it belongs in the scene as a fact a bystander could see (red eyes), or nowhere.
   - thought: the actor's INNER VOICE, strictly first person ("I", "my"), free indirect, as he would think it — never "he"/"his" inside a thought, never reported ("He thinks it is odd" is wrong; "Only one apartment on the whole floor. Odd." is right). A prayer in his head is the prayer itself. When a MONOLOGUE is given for an actor, blend it into his thoughts — it is his inner voice this beat; keep what the seed said he thought and let the monologue colour and extend it. Never turn the monologue into acts.
@@ -277,6 +317,7 @@ export async function buildScene(
     if (!parsed) throw new Error('no JSON in the builder\'s answer');
     const known = [seed.full, ...facts.lines, ...facts.names.map((n) => n.name), ...[...monologues.values()]];
     const scene = typeof parsed.scene === 'string' ? onlyDerived(parsed.scene.trim(), known) : '';
+    for (const [id, m] of monologues) console.log(`[scene-builder] inner voice of ${id}: ${m.replace(/\s+/g, ' ').slice(0, 400)}`);
     const labelOf = (id: string) => seed.actions.find((a) => a.actorId === id)?.actorLabel ?? seed.thoughts.find((t) => t.actorId === id)?.actorLabel ?? seed.quotes.find((q) => q.speakerId === id)?.speakerLabel ?? facts.names.find((n) => n.id === id)?.name ?? id;
     const cards: BuiltCard[] = [];
     for (const c of parsed.cards ?? []) {
@@ -290,7 +331,24 @@ export async function buildScene(
         if (!text) continue;
         segments.push({ kind, text, sentence: pinToSeed(typeof s.from === 'string' ? s.from : undefined, text, seedSentences) });
       }
-      if (segments.length) cards.push({ actorId: c.actorId, actorLabel: labelOf(c.actorId), segments });
+      // A thought is the being's own voice or nothing (fromInnerVoice). When the voice spoke and the builder lost all
+      // of it, the monologue itself stands as the thought, where the builder had put one.
+      const voice = [monologues.get(c.actorId) ?? '', ...seed.thoughts.filter((t) => t.actorId === c.actorId).map((t) => t.text)].join(' ').trim();
+      const vetted: BuiltSegment[] = [];
+      let firstThoughtAt = -1;
+      let keptThought = false;
+      for (const s of segments) {
+        if (s.kind !== 'thought') { vetted.push(s); continue; }
+        if (firstThoughtAt < 0) firstThoughtAt = vetted.length;
+        const kept = fromInnerVoice(s.text, voice);
+        if (kept) { vetted.push({ ...s, text: kept }); keptThought = true; }
+        else console.log(`[scene-builder] dropped a thought the voice of ${labelOf(c.actorId)} never had: ${s.text.slice(0, 160)}`);
+      }
+      if (firstThoughtAt >= 0 && !keptThought && voice) {
+        const at = segments.find((s) => s.kind === 'thought')!;
+        vetted.splice(firstThoughtAt, 0, { kind: 'thought', text: voice, sentence: at.sentence });
+      }
+      if (vetted.length) cards.push({ actorId: c.actorId, actorLabel: labelOf(c.actorId), segments: vetted });
     }
     // Every actor the seed voiced keeps a card: one the builder dropped falls back to the seed's own parts.
     for (const fromSeed of cardsFromSeed(seed)) if (!cards.some((c) => c.actorId === fromSeed.actorId)) cards.push(fromSeed);
@@ -321,7 +379,7 @@ export function cardsFromSeed(seed: SeedParts): BuiltCard[] {
 const BEING_SYSTEM = `You set down one being's side of a beat in a novel, from DATA ONLY.
 
 Given what reached the being (HEARD), the being's own listening monologue (its inner voice, first person), and FACTS about where it is:
-- SCENE: 1 or 2 sentences, third person, setting its side of the stage from the facts — where it is, the hour's light, what reached it. Never invent objects, people, sounds or events that are in neither the monologue nor the facts. Use the world's names exactly as given.
+- SCENE: 1 or 2 sentences, third person, setting its side of the stage from the facts — where it is, the hour's light, what reached it. Never invent objects, people, sounds or events that are in neither the monologue nor the facts. Use the world's names exactly as given. The hour as the [clock] line gives it, in words — never the calendar date, never digits.
 - SEGMENTS, in the monologue's order, splitting it:
   - thought: its inner voice, first person, as it thinks it (keep its words; trim nothing that matters).
   - action: only what the monologue says the being PHYSICALLY does now (a hand toward the lock, holding still, a step back) — third person present: "She holds still." Perceptions and feelings are thoughts, not acts.

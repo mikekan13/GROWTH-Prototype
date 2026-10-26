@@ -132,6 +132,8 @@ export interface GameEventPayload extends TableFeedFields {
   /** The scene builder wrote the narration and the cards up from the Watcher's seed (`raw` holds the seed; `seedNarration` the seed's own narration). */
   built?: boolean;
   seedNarration?: string | null;
+  /** The listening monologues the builder blended into the cards, whole — the raw behind a built thought (HW8 2026-10-25). */
+  monologues?: Array<{ actorId: string; text: string }>;
   /** …and what it wrote a roster character as thinking (HW6 2026-10-25): his ((thought)) row, Soul blue. */
   thoughts?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
   /** Encounter lines (encounter_begin/round/down/up/end, since 2026-10-08): which encounter, so the feed folds begin → end. */

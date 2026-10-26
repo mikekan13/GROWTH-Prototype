@@ -966,7 +966,7 @@ async function speakProseSplit(
   //     Watcher voiced listen to their own beat first; their monologue, the seed and the world's facts go to the
   //     scene builder; what comes back is the declaration's feed — the seed itself stays the canon text and the raw.
   const actorsById = actorsOf(roster);
-  let feedParts: { narration: string | null; speech: typeof parsed.quotes; actions: typeof parsed.actions; thoughts: typeof parsed.thoughts; built?: boolean; seedNarration?: string | null } = { narration: narrated ? parsed.narration : null, speech: parsed.quotes, actions: parsed.actions, thoughts: parsed.thoughts };
+  let feedParts: { narration: string | null; speech: typeof parsed.quotes; actions: typeof parsed.actions; thoughts: typeof parsed.thoughts; built?: boolean; seedNarration?: string | null; monologues?: Array<{ actorId: string; text: string }> } = { narration: narrated ? parsed.narration : null, speech: parsed.quotes, actions: parsed.actions, thoughts: parsed.thoughts };
   let preListened: Map<string, Promise<TableListenOutcome>> | undefined;
   let blended: Set<string> | undefined;
   if (sceneBuilderOn() && narration !== null && (narrated || hasActions)) {
@@ -984,6 +984,7 @@ async function speakProseSplit(
         thoughts: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'thought').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence }))),
         built: true,
         seedNarration: narrated ? parsed.narration : null,
+        monologues: [...monologues].map(([actorId, text]) => ({ actorId, text })),
       };
       blended = new Set(monologues.keys());
     }

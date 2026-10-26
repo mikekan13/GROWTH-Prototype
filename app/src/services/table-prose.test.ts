@@ -210,6 +210,31 @@ describe('a pronoun walks back through the recent actors (HW3 2026-10-24)', () =
   });
 });
 
+describe('the subject after an opener; a pronoun ahead of a possessive (HW8 2026-10-25)', () => {
+  const roster = [
+    { id: 'kris', name: 'Kristopher', sex: 'm' },
+    { id: 'violet', name: 'Violet', sex: 'f' },
+  ] as unknown as Parameters<typeof parseTableProse>[1];
+
+  it('"Then he knocks on Violet\'s door." is his act, not hers', () => {
+    const p = parseTableProse("Kristopher checks the receipt to see if the order was paid. Then he knocks on Violet's door.", roster);
+    expect(p.actions.map((a) => a.actorLabel)).toEqual(['Kristopher', 'Kristopher']);
+    expect(p.actions[1].text).toBe("Knocks on Violet's door");
+    expect(p.narration).toBeNull();
+  });
+
+  it('an adverb before the pronoun is not the subject; the card keeps the adverb', () => {
+    const p = parseTableProse('Violet stands by the door. Slowly, she turns the deadbolt.', roster);
+    expect(p.actions.map((a) => a.actorLabel)).toEqual(['Violet']);
+    expect(p.actions[0].text).toBe('Slowly turns the deadbolt');
+  });
+
+  it('a possessive ahead of the pronoun still owns the sentence', () => {
+    const p = parseTableProse("Violet's door stays shut while he waits.", roster, { recentActors: [{ id: 'kris', name: 'Kristopher', sex: 'm' }] as never });
+    expect(p.actions.map((a) => a.actorLabel)).toEqual(['Violet']);
+  });
+});
+
 describe('a sentence about a part or thing of his is his card (HW3 2026-10-24)', () => {
   const table = [{ id: 'kris', name: 'Kristopher', sex: 'Male' }, { id: 'violet', name: 'Violet', sex: 'Female' }];
   it('"A tear falls from his eye." is Kristopher\'s, and the quote after it is his too', () => {

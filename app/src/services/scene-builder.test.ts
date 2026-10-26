@@ -1,5 +1,33 @@
 import { describe, it, expect } from 'vitest';
-import { onlyDerived, pinToSeed, cardsFromSeed, type SeedParts } from './scene-builder';
+import { onlyDerived, pinToSeed, cardsFromSeed, clockInWords, fromInnerVoice, type SeedParts } from './scene-builder';
+
+describe('clockInWords — the hour as a novel gives it (HW8 2026-10-25)', () => {
+  it('reads the clock in words with the part of day and the stretch of the month, never the date', () => {
+    expect(clockInWords('17th Oct, Y2026 · 19:16 · 0.002 cyc')).toBe('a little after seven in the evening, mid October');
+    expect(clockInWords('3rd Jan, Y2026 · 00:02 · 0.000 cyc')).toBe("twelve o'clock at night, early January");
+    expect(clockInWords('28th Jun, Y2026 · 14:48 · 0.491 cyc')).toBe('coming up on three in the afternoon, late June');
+    expect(clockInWords('9th Mar, Y2026 · 08:57 · 0.186 cyc')).toBe('just before nine in the morning, early March');
+    expect(clockInWords('9th Mar, Y2026 · 10:30 · 0.186 cyc')).toBe('about half past ten in the morning, early March');
+  });
+  it('leaves a clock it cannot read alone', () => {
+    expect(clockInWords('cycle 12')).toBe('cycle 12');
+  });
+});
+
+describe('fromInnerVoice — a thought is the being\'s own voice or nothing (HW8 2026-10-25)', () => {
+  const voice = 'The receipt is still warm in my hand, the ink smudging under the caged bulb. I raise my knuckles toward Violet\'s door. Odd.';
+  it('keeps the sentences the voice carries and drops the ones it never had', () => {
+    expect(fromInnerVoice('The receipt is warm in my hand, the ink smudging under the bulb. Am I still the man who built, or the one who broke?', voice))
+      .toBe('The receipt is warm in my hand, the ink smudging under the bulb.');
+  });
+  it('a short thought stands when the voice says it', () => {
+    expect(fromInnerVoice('Odd.', voice)).toBe('Odd.');
+    expect(fromInnerVoice('Run.', voice)).toBeNull();
+  });
+  it('no voice, no thought', () => {
+    expect(fromInnerVoice('Only one apartment on the whole floor.', '')).toBeNull();
+  });
+});
 
 // HW7 line 1 (2026-10-25), the seed Mike typed three times.
 const SEED: SeedParts = {

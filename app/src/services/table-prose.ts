@@ -125,6 +125,15 @@ function lastRosterName(window: string, roster: ProseRosterEntry[]): ProseRoster
 }
 
 const SUBJECT_PRONOUN_RE = /^(he|she)\b/i;
+// An opener before the subject — a connective, a time word, an adverb — is not the subject (HW8 2026-10-25: "Then he
+// knocks on Violet's door." found no subject at its head, fell through to the possessive, and Violet knocked on her own
+// door; she then listened to the beat as her own act and remembered holding his receipt).
+const OPENER_RE = /^(?:(?:and then|and|then|so|but|now|next|finally|still|meanwhile|afterwards?|later|at last|after that|with that|at that)\b,?\s+)+/i;
+const ADVERB_SUBJECT_RE = /^(\w+ly),?\s+(?=(?:he|she)\b)/i;
+/** "Then he knocks" → "he knocks"; "Slowly, she turns" → "she turns". Pure. */
+export function pastOpener(sentence: string): string {
+  return sentence.trim().replace(OPENER_RE, '').replace(ADVERB_SUBJECT_RE, '');
+}
 const BARE_TAG_RE = /^(?:says|asks|shouts|whispers|yells|replies|calls out|mutters|growls|snaps|said|asked)\s*[,:]?\s*$/i;
 
 /** "Kristopher knocks twice." → "Knocks twice"; "Ruth says," → null (a bare speech tag). Pure. */
@@ -132,7 +141,9 @@ export function actionBody(sentence: string, actor: ProseRosterEntry): string | 
   let s = sentence.trim().replace(/[.]+$/, '').trim();
   const name = actor.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // "And he says the prayer in his head" → the card does not open with "And".
-  s = s.replace(/^(?:and|then|so|but|now)\b,?\s+/i, '');
+  s = s.replace(OPENER_RE, '');
+  // "Slowly, he knocks" → "Slowly knocks": the adverb stays, the pronoun goes.
+  s = s.replace(/^(\w+ly),?\s+(?:he|she)\b\s*/i, '$1 ');
   // "Kristopher's hand drops" keeps its opener: the card reads whole, not "'s hand drops".
   s = s.replace(new RegExp(`^(?:${name}|he|she)\\b(?!['’]s\\b)[,]?\\s*`, 'i'), '');
   if (!s || BARE_TAG_RE.test(s)) return null;
@@ -158,7 +169,7 @@ const POSTURE_PLACE_RE = /^(?:stands|sits|lies|kneels|leans|remains|rests|waits|
 const BODY_WORDS = 3;
 /** "His face looks tired and his eyes are red." / "She is gorgeous but a bit weird." → true; "He looks at the door." → false. Pure. */
 export function isDescriptive(sentence: string, actor: ProseRosterEntry): boolean {
-  const s = sentence.trim().replace(/[.!?]+$/, '');
+  const s = pastOpener(sentence).replace(/[.!?]+$/, '');
   const name = actor.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const subject = s.match(new RegExp(`^(?:${name}|he|she)\\s+(.+)$`, 'i'));
   if (subject) return STATIVE_START_RE.test(subject[1]) || POSTURE_PLACE_RE.test(subject[1]);
@@ -220,6 +231,26 @@ export function sentenceActor(sentence: string, roster: ProseRosterEntry[], rece
     if (new RegExp(`^${name}(?!['’]s\\b)(?=$|[^\\w])`, 'i').test(s)) return entry;
   }
   if (SUBJECT_PRONOUN_RE.test(s)) return pronounActor(s.split(/\s+/)[0]!, recent);
+  // "Then he knocks on Violet's door." / "Slowly, Kristopher turns.": the subject stands after an opener.
+  const lead = pastOpener(s);
+  if (lead !== s) {
+    for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
+      const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (name && new RegExp(`^${name}(?!['’]s\\b)(?=$|[^\\w])`, 'i').test(lead)) return entry;
+    }
+    if (SUBJECT_PRONOUN_RE.test(lead)) { const by = pronounActor(lead.split(/\s+/)[0]!, recent); if (by) return by; }
+  }
+  // A subject pronoun ahead of a possessive name is the subject: "he knocks on Violet's door" is his act, not hers.
+  const subj = /\b(he|she)\b/i.exec(lead);
+  if (subj) {
+    let firstOwned = -1;
+    for (const entry of roster) {
+      const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const m = name ? new RegExp(`\\b${name}['’]s\\b`, 'i').exec(lead) : null;
+      if (m && (firstOwned < 0 || m.index < firstOwned)) firstOwned = m.index;
+    }
+    if (firstOwned < 0 || subj.index < firstOwned) { const by = pronounActor(subj[1], recent); if (by) return by; }
+  }
   // "A tear falls from his eye." / "Kristopher's hand drops." — about a part or thing of his: his
   // card (HW3, Mike 2026-10-24: "didn't end up as proper cards"). Not for a speaker lookup
   // (ownedThings false): "Violet's door stays shut." puts no words in her mouth.

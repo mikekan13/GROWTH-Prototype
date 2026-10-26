@@ -77,7 +77,7 @@ interface JewlRead {
   kinds: ReconKind[];
   summary: string;
   question: string;
-  needs: Array<{ kind: 'location' | 'npc' | 'item'; name: string; description: string }>;
+  needs: Array<{ kind: 'location' | 'npc' | 'item'; name: string; description: string; holder?: string | null }>;
   relocate: boolean;
 }
 
@@ -100,6 +100,10 @@ async function simStateSummary(campaignId: string, listeners: Array<{ id: string
     // What he has on him (HW6 2026-10-25: the pizza on Kristopher's ledger was "a new presence" to JEWL every
     // line, because nothing told him what anyone was holding).
     const held = await prisma.campaignItem.findMany({ where: { campaignId, holderId: l.id, status: { notIn: ['DESTROYED', 'CONSUMED', 'LOST'] } }, select: { name: true }, take: 40 });
+    // And what lies in the room with him (HW8 2026-10-25: "checks the receipt" — no receipt on him, none in the hall;
+    // JEWL let it through and the being read a "Paid" stamp off a thing the world never had).
+    const inRoom = rel ? await prisma.campaignItem.findMany({ where: { campaignId, locationId: rel.targetId, holderId: null, status: { notIn: ['DESTROYED', 'CONSUMED', 'LOST'] } }, select: { name: true }, take: 40 }) : [];
+    if (inRoom.length) lines.push(`  things in that room: ${inRoom.map((i) => i.name).join(', ')}`);
     lines.push(`${l.name}: ${loc ? `at "${loc.name}"${desc ? ` — ${desc}` : ''}` : 'nowhere on the canvas'}${names.length ? `; also present: ${names.join(', ')}` : '; no one else present'}${held.length ? `; holding: ${held.map((h) => h.name).join(', ')}` : '; holding nothing'}`);
   }
   const locations = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { name: true, status: true }, take: 60 });
@@ -133,7 +137,7 @@ async function jewlRead(campaignId: string, message: string, listeners: Array<{ 
     const res = await chat({
       tier: 'C', subsystem: 'reconciliation', contentClass: 'fiction',
       messages: [
-        { role: 'system', content: `You are JEWL, the copilot running the table underneath a GROWTH Watcher (the GM). Before a line of narration becomes canon you read it against the simulated world. Decide whether it is DIFFERENT ENOUGH from the sim to stop and ask — the Watcher may have misspoken, or may be improvising somewhere new. Ordinary additive narration inside the current scene is NOT a discrepancy. Kinds: relocation (a being is narrated somewhere other than where the sim has it), new_presence (a person the roster lacks is here and matters), contradicted_fact (the narration contradicts what the world holds), contradiction (the Watcher contradicts his own recent narration), continuity (a jump the scene did not set up). Respond with ONLY JSON: {"discrepant": boolean, "kinds": string[], "summary": one plain sentence of what differs, "question": one or two sentences in JEWL's own voice to the Watcher — plain, unbothered, ending by asking whether it was a mistake or whether we are going somewhere new, "needs": [{"kind": "location"|"npc"|"item", "name": short name the narration implies, "description": what the narration says about it}], "relocate": boolean (true when the awake beings should now be at the narrated place)}. needs lists only what the world would have to HAVE for this narration to be true and does not already have.` },
+        { role: 'system', content: `You are JEWL, the copilot running the table underneath a GROWTH Watcher (the GM). Before a line of narration becomes canon you read it against the simulated world. Decide whether it is DIFFERENT ENOUGH from the sim to stop and ask — the Watcher may have misspoken, or may be improvising somewhere new. Ordinary additive narration inside the current scene is NOT a discrepancy. Kinds: relocation (a being is narrated somewhere other than where the sim has it), new_presence (a person the roster lacks is here and matters), new_thing (the narration has someone hold, read, hand over or handle a THING — a receipt, a key, a note, a bag — that is on no one's holding list and not among the things in the room: the world does not have it, so no being can know what it is or what is written on it; ask the Watcher what it is and what it says or shows), contradicted_fact (the narration contradicts what the world holds), contradiction (the Watcher contradicts his own recent narration), continuity (a jump the scene did not set up). Respond with ONLY JSON: {"discrepant": boolean, "kinds": string[], "summary": one plain sentence of what differs, "question": one or two sentences in JEWL's own voice to the Watcher — plain, unbothered, ending by asking whether it was a mistake or whether we are going somewhere new, "needs": [{"kind": "location"|"npc"|"item", "name": short name the narration implies, "description": what the narration says about it, "holder": for an item, the name of the character holding it, else null}], "relocate": boolean (true when the awake beings should now be at the narrated place)}. needs lists only what the world would have to HAVE for this narration to be true and does not already have.` },
         { role: 'user', content: `AWAKE BEINGS AND WHERE THE SIM HAS THEM:\n${state.beings}\n\nPLACES THE CAMPAIGN HAS:\n${state.locations}\n\nPEOPLE THE CAMPAIGN HAS:\n${state.npcs}\n\nTHE WATCHER'S RECENT NARRATION:\n${state.recent}\n\nWHAT THE BEINGS THEMSELVES JUST DID AND SAID (these are canon too — the Watcher's next line is read as following them):\n${state.acts}\n\nNEW NARRATION:\n${message}` },
       ],
       maxTokens: 500, temperature: 0,
@@ -143,10 +147,10 @@ async function jewlRead(campaignId: string, message: string, listeners: Array<{ 
     const j = JSON.parse(m[0]) as Partial<JewlRead>;
     return {
       discrepant: j.discrepant === true,
-      kinds: Array.isArray(j.kinds) ? (j.kinds.filter((k) => ['relocation', 'new_presence', 'contradicted_fact', 'contradiction', 'continuity'].includes(String(k))) as ReconKind[]) : [],
+      kinds: Array.isArray(j.kinds) ? (j.kinds.filter((k) => ['relocation', 'new_presence', 'new_thing', 'contradicted_fact', 'contradiction', 'continuity'].includes(String(k))) as ReconKind[]) : [],
       summary: String(j.summary ?? '').slice(0, 400),
       question: String(j.question ?? '').slice(0, 500),
-      needs: Array.isArray(j.needs) ? j.needs.filter((n) => n && ['location', 'npc', 'item'].includes(String(n.kind))).map((n) => ({ kind: n.kind as 'location' | 'npc' | 'item', name: String(n.name ?? '').slice(0, 80), description: String(n.description ?? '').slice(0, 400) })) : [],
+      needs: Array.isArray(j.needs) ? j.needs.filter((n) => n && ['location', 'npc', 'item'].includes(String(n.kind))).map((n) => ({ kind: n.kind as 'location' | 'npc' | 'item', name: String(n.name ?? '').slice(0, 80), holder: typeof n.holder === 'string' && n.holder.trim() ? n.holder.trim().slice(0, 80) : null, description: String(n.description ?? '').slice(0, 400) })) : [],
       relocate: j.relocate === true,
     };
   } catch (err) {
@@ -160,6 +164,8 @@ async function planNeeds(campaignId: string, needs: JewlRead['needs']): Promise<
   const locations = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { id: true, name: true, data: true } });
   const locCandidates = locations.map((l) => { let d = ''; try { d = String((JSON.parse(l.data) as { description?: string }).description ?? ''); } catch { /* none */ } return { id: l.id, name: l.name, description: d }; });
   const npcs = await prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { id: true, name: true, data: true } });
+  const items = await prisma.campaignItem.findMany({ where: { campaignId, status: { notIn: ['DESTROYED', 'CONSUMED', 'LOST'] } }, select: { id: true, name: true, data: true }, take: 300 });
+  const itemCandidates = items.map((i) => { let d = ''; try { d = String((JSON.parse(i.data) as { description?: string }).description ?? ''); } catch { /* none */ } return { id: i.id, name: i.name, description: d }; });
   const npcCandidates = npcs.map((c) => { let d = ''; try { d = String((JSON.parse(c.data) as { identity?: { physicalDescription?: string } }).identity?.physicalDescription ?? ''); } catch { /* none */ } return { id: c.id, name: c.name, description: d }; });
   const plan: PlanItem[] = [];
   const seen = new Set<string>();
@@ -167,8 +173,8 @@ async function planNeeds(campaignId: string, needs: JewlRead['needs']): Promise<
     const key = `${need.kind}:${need.name.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const match = need.kind === 'location' ? matchCandidate(need, locCandidates) : need.kind === 'npc' ? matchCandidate(need, npcCandidates) : null;
-    plan.push({ kind: need.kind, name: need.name || titleCase(need.description.slice(0, 40)), description: need.description, matchId: match?.id ?? null, matchName: match?.name ?? null, baseKrma: match ? 0 : baseKrmaFor(need.kind) });
+    const match = need.kind === 'location' ? matchCandidate(need, locCandidates) : need.kind === 'npc' ? matchCandidate(need, npcCandidates) : matchCandidate(need, itemCandidates);
+    plan.push({ kind: need.kind, name: need.name || titleCase(need.description.slice(0, 40)), description: need.description, matchId: match?.id ?? null, matchName: match?.name ?? null, baseKrma: match ? 0 : baseKrmaFor(need.kind), ...(need.kind === 'item' ? { holder: need.holder ?? null } : {}) });
   }
   return plan;
 }
@@ -191,6 +197,7 @@ export async function readNarration(
 
   const kinds = new Set<ReconKind>(read?.kinds ?? []);
   if (rule.length) kinds.add('new_presence');
+  if ((read?.needs ?? []).some((n) => n.kind === 'item')) kinds.add('new_thing');
   // Merge the rule's people (named by the prose's own phrase, which the
   // attribution later matches on) with JEWL's; the same person described
   // twice ("Bright-Eyed Barmaid" / "bright eyed lass behind the bar") is one need.
@@ -287,6 +294,18 @@ export async function confirmReconciliation(campaignId: string, actor: TableActo
     created.push({ kind: 'npc', id: npc.id, name: npc.name });
     if (sceneLocationId) await moveCharacterToLocation(actor.userId, actor.role, { characterId: npc.id, locationId: sceneLocationId, note: 'improvised here', snapCanvas: true });
     else { try { await snapCharacterToLocation(campaignId, npc.id, wasAt?.targetId ?? ''); } catch { /* no place to snap to */ } }
+  }
+  // A thing the narration had someone handle and the world lacked (HW8 2026-10-25): a stub in that character's hands,
+  // or lying where the scene is. What the Watcher said about it is its description; what is written on it waits for him.
+  for (const p of plan) {
+    if (p.kind !== 'item' || p.matchId) continue;
+    const holder = p.holder ? await prisma.character.findFirst({ where: { campaignId, name: { equals: p.holder } }, select: { id: true } }) : null;
+    const data = { description: p.description || p.name, tags: ['improvised'], condition: 3, rarity: 1, value: 0, itemType: 'misc', improvised: { reconciliationId: row.id, holdKrma: row.estimateKrma } };
+    const thing = await prisma.campaignItem.create({
+      data: { campaignId, name: p.name, type: 'misc', data: JSON.stringify(data), holderId: holder?.id ?? null, locationId: holder ? null : (sceneLocationId ?? wasAt?.targetId ?? null), createdBy: actor.userId, history: JSON.stringify([{ kind: 'origin', at: new Date().toISOString(), text: `Improvised by the Watcher at the table (reconciliation ${row.id}).` }]) },
+      select: { id: true, name: true },
+    });
+    created.push({ kind: 'item', id: thing.id, name: thing.name });
   }
   // Relocate the awake beings when the narration moved them — remembering
   // where they were, because a jump owes the record the interval.
