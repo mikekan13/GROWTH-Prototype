@@ -33,7 +33,8 @@ import { isWatcherOrAbove } from '@/lib/permissions';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { converseWithEntity, listenToTable, answerAtTable, type ConverseStatus, type TableListenOutcome } from '@/daya/conversation';
-import { sceneBuilderOn, buildScene, buildBeingCard, sceneFacts, type SeedParts } from '@/services/scene-builder';
+import { sceneBuilderOn, buildScene, buildBeingCard, sceneFacts, clockLine, nameHead, type SeedParts } from '@/services/scene-builder';
+import { getFamiliarity, familiarityAt, scoreForLevel } from '@/services/familiarity';
 import { settleIntentionsByAct } from '@/daya/intentions';
 import { judgeIntentionsDone } from '@/daya/intention-judge';
 import { isDayaEnabled } from '@/daya/events';
@@ -166,6 +167,28 @@ async function monologuesWithin(pre: Map<string, Promise<TableListenOutcome>>, m
 }
 
 /** A being's act on the record settles the intentions it carried out (Mike 2026-10-25: "build a way for intentions to be completed"). */
+const REPLAY_WINDOW_MS = 90_000;
+/**
+ * The same text twice within the window is a replay, not a second beat (HW8 run 2: two lines whose first POST ran past
+ * ~25 s were posted again 23–27 s later — the dev server recycling for memory — and the record got each beat twice, with
+ * two answers). Checks the declarations and the canon of the last 90 s. Never throws.
+ */
+async function saidJustNow(campaignId: string, message: string): Promise<boolean> {
+  const want = message.replace(/\s+/g, ' ').trim();
+  if (!want) return false;
+  try {
+    const since = new Date(Date.now() - REPLAY_WINDOW_MS);
+    const [events, canon] = await Promise.all([
+      prisma.campaignEvent.findMany({ where: { campaignId, type: 'game_event', createdAt: { gte: since } }, select: { payload: true }, take: 12 }),
+      prisma.canonEvent.findMany({ where: { campaignId, createdAt: { gte: since } }, select: { narration: true }, take: 12 }),
+    ]);
+    for (const e of events) {
+      try { const p = JSON.parse(e.payload) as { description?: string; raw?: string }; if ([p.description, p.raw].some((t) => typeof t === 'string' && t.replace(/\s+/g, ' ').trim() === want)) return true; } catch { /* skip */ }
+    }
+    return canon.some((c) => c.narration.replace(/\s+/g, ' ').trim() === want);
+  } catch { return false; }
+}
+
 function settleByAct(campaignId: string, characterId: string, act: string): void {
   void settleIntentionsByAct(characterId, act, (pending, a) => judgeIntentionsDone(campaignId, pending, a)).catch(() => {});
 }
@@ -682,10 +705,13 @@ async function runBeats(
     // What the senses carried, and whether it was the being's own doing, travel with the stretch (HW5 2026-10-25).
     const via = reached?.verdict.via;
     if (via) lastVia.set(listenerId, via);
-    const own = voiced.has(listenerId) || (via?.includes('self') ?? false);
+    // His own only on the Watcher's stretch that voiced him — never on another being's line (HW8 run 2: her reply
+    // reached him "via self" and he remembered her words as the narrator, not as a voice through a door).
+    const own = (truthId === truth.primary && voiced.has(listenerId)) || (via?.includes('self') ?? false);
     // Hearing alone carries sound and words, not the receipt in his hand (HW6 2026-10-25).
     const handed = own ? stimulus.content : audibleOnly(stimulus.content, via);
     let content = handed;
+    const unnamed = !own && !!via && !via.includes('sight') && !via.includes('self') ? withheldNames(listenerId, content) : null;
     // His own act, in his own person: "I knock again", not a stranger knocking (HW6 2026-10-25).
     const me = own ? truth.actors?.[listenerId] : undefined;
     if (me) content = ownVoice(content, me);
@@ -693,7 +719,7 @@ async function runBeats(
     // A voiced being already listening to this beat (the page was built from its monologue): take that, once.
     const pre = truth.preListened?.get(listenerId);
     if (pre) truth.preListened!.delete(listenerId);
-    void (pre ?? listenToTable(listenerId, actor.role, carried))
+    void (pre ?? (unnamed ? unnamed.then((c) => listenToTable(listenerId, actor.role, { ...carried, content: c })) : listenToTable(listenerId, actor.role, carried)))
       .then(async (outcome) => {
         if (outcome.status !== 'ok') {
           console.warn(`[table-speak] ${listenerId} could not listen: ${outcome.status}${outcome.detail ? ` (${outcome.detail})` : ''}`);
@@ -747,7 +773,41 @@ async function runBeats(
   // handed every plea "as before" and answered a man the judge had ruled she could not hear from inside).
   const verdictWaits = new Map<string, Promise<ReachVerdict | null>>();
   const selfVerdict = (id: string): ReachVerdict => ({ beingId: id, reaches: true, via: ['self'], noticed: true, salience: 0.95 });
-  const gatedHear = (utterances: TableUtterance[], ids: string[], askFor?: TableAsk, truthId: string | null = truth.primary, preset: Map<string, ReachVerdict> = new Map(), withOwnWords = false) => {
+  // Hearing names a voice only when the hearer knows it (HW8 run 2, Mike: "does he know her?… would he recognize her
+  // voice"): a speaker's label on a line that reached a being by hearing alone stands only if that being's familiarity
+  // with the speaker's identity is F2 or better; otherwise it is "a man's voice" / "a woman's voice".
+  const withheldNames = async (listenerId: string, content: string): Promise<string> => {
+    const actorsHere = Object.entries(truth.actors ?? {}).filter(([id]) => id !== listenerId);
+    if (!actorsHere.length) return content;
+    const entity = await prisma.dayaEntity.findUnique({ where: { characterId: listenerId }, select: { id: true } }).catch(() => null);
+    const camp = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }).catch(() => null);
+    let out = content;
+    for (const [id, a] of actorsHere) {
+      if (!a.name || !new RegExp(`(^|\\n)${a.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\s`, 'i').test(out)) continue;
+      const rec = entity ? await getFamiliarity(entity.id, id, 'identity').catch(() => null) : null;
+      const known = rec ? familiarityAt(rec, camp?.currentCycle ?? 0) >= scoreForLevel(2) : false;
+      if (known) continue;
+      const voice = a.sex === 'f' || /^f/i.test(a.sex ?? '') ? "A woman's voice" : a.sex === 'm' || /^m/i.test(a.sex ?? '') ? "A man's voice" : 'A voice';
+      out = out.replace(new RegExp(`(^|\\n)${a.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\s`, 'gi'), `$1${voice}: `);
+    }
+    return out;
+  };
+  // THE STANDING BEAT (Mike 2026-10-25, ruling 22: "Violet is still within the scene so it should have then introduced
+  // her inside the apartment and given her a card. What is she doing before he knocks"): a being within the scene that
+  // this line did NOT reach still lives the moment — it listens to where it is and the hour, and its side goes on the
+  // page as a scene line and a card. Once per line, never for the being the Watcher voiced.
+  const standingBeat = async (listenerId: string, truthId: string | null) => {
+    if (process.env.STANDING_BEAT === 'off' || truthId !== truth.primary || voiced.has(listenerId)) return;
+    try {
+      const clock = (await clockLine(campaignId))?.replace(/^\[clock\]\s*/, '') ?? null;
+      const where = await prisma.entityRelationship.findFirst({ where: { sourceId: listenerId, relationshipType: 'located_at' }, select: { targetId: true } });
+      const room = where ? await prisma.location.findUnique({ where: { id: where.targetId }, select: { name: true } }) : null;
+      const content = [clock ? `It is ${clock}.` : null, room ? `You are in the ${nameHead(room.name)}.` : null, 'Nothing from beyond the room has reached you this moment.'].filter(Boolean).join(' ');
+      console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: ${content}`);
+      hear(listenerId, { source: 'perception', content }, { verdict: { beingId: listenerId, reaches: true, via: ['sight'], noticed: true, salience: 0.3 }, source: 'stub' }, undefined, truthId);
+    } catch (err) { console.warn('[standing-beat] failed (non-fatal):', err instanceof Error ? err.message : err); }
+  };
+  const gatedHear = (utterances: TableUtterance[], ids: string[], askFor?: TableAsk, truthId: string | null = truth.primary, preset: Map<string, ReachVerdict> = new Map(), withOwnWords = false, judgeWith?: TableUtterance[]) => {
     // Reach per part (HW6 2026-10-25: one verdict on a line that opened with what he THOUGHT ruled the whole
     // of it unperceivable, his spoken plea included, and nobody was asked). What goes through a character is
     // his alone: out of the run everyone else is judged on, and handed to him with his own, unjudged.
@@ -771,7 +831,7 @@ async function runBeats(
       }
     }
     // A being's own stretch — the Watcher voiced him in it — is his by rule; the judge is for the others.
-    for (const id of stims.keys()) if ((voiced.has(id) || stims.get(id)!.own) && !preset.has(id)) preset.set(id, selfVerdict(id));
+    for (const id of stims.keys()) if (((truthId === truth.primary && voiced.has(id)) || stims.get(id)!.own) && !preset.has(id)) preset.set(id, selfVerdict(id));
     if (!reachOn) { for (const id of stims.keys()) hear(id, stims.get(id)!, undefined, askFor, truthId); return; }
     if (!stims.size) return;
     const delivered = new Set<string>();
@@ -787,7 +847,7 @@ async function runBeats(
       // nothing said why — a man crying softly beyond a locked door did not reach her, correctly, invisibly).
       const what = `"${stim.content.slice(0, 60).replace(/\s+/g, ' ')}${stim.content.length > 60 ? '…' : ''}"`;
       if (!verdict) { console.log(`[perception-reach] ${nameOf(id)}: no verdict (${source}) → heard as before ${what}`); hear(id, stim, undefined, askFor, truthId); return; }
-      if (!verdict.reaches) { console.log(`[perception-reach] ${nameOf(id)}: NOT REACHED (${source}) — nothing stored ${what}`); return; }
+      if (!verdict.reaches) { console.log(`[perception-reach] ${nameOf(id)}: NOT REACHED (${source}) — nothing stored ${what}`); void standingBeat(id, truthId); return; }
       if (!verdict.noticed) { console.log(`[perception-reach] ${nameOf(id)}: reached via ${verdict.via.join('+')}, UNNOTICED (${source}) — stored noticed=false ${what}`); void storeUnnoticedAtTable(campaignId, id, stim, verdict, truthId); return; }
       console.log(`[perception-reach] ${nameOf(id)}: reached via ${verdict.via.join('+')}, noticed (${source}, salience ${verdict.salience.toFixed(2)}) ${what}`);
       hear(id, stim, { verdict, source }, askFor, truthId);
@@ -797,7 +857,10 @@ async function runBeats(
     const toJudge = [...stims.keys()].filter((id) => !preset.has(id));
     if (!toJudge.length || !publicRun.length) return;
     for (const id of toJudge) waiting.set(id, [...(waiting.get(id) ?? []), () => deliver(id, null, 'stub')]);
-    const judged = judgeCanonReach(campaignId, reachEventOf(publicRun, truthId, truthId === truth.primary ? truth.actorId ?? null : null), toJudge);
+    // The judge reads the WHOLE public stretch — the narration and the words spoken in it (HW8 run 2: "He breaks the
+    // silence." was judged alone, made no sound, and his "Is everything ok?" inherited the verdict: she never heard him).
+    const judgedRun = judgeWith ? withoutThoughts(judgeWith, thoughts) : publicRun;
+    const judged = judgeCanonReach(campaignId, reachEventOf(judgedRun, truthId, truthId === truth.primary ? truth.actorId ?? null : null), toJudge);
     const prior = reachChains.get(campaignId) ?? Promise.resolve();
     const next = prior.then(() => judged).then(async (j) => {
       const refs = new Map<string, EventRefs>();
@@ -851,7 +914,8 @@ async function runBeats(
     if (line && (action.kind === 'speak' || action.kind === 'act')) await advanceClockForLine(campaignId, action.kind === 'speak' ? 'being-speech' : 'being-act', action.content ?? line);
     if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(action) });
     // What it did settles what it meant to do.
-    if ((action.kind === 'speak' || action.kind === 'act') && action.content?.trim()) settleByAct(campaignId, listener.id, action.content.trim());
+    // Only a DOING settles what it meant to do (HW8 run 2: "I'm just getting the tip" closed "give it to him as the tip").
+    if (action.kind === 'act' && action.content?.trim()) settleByAct(campaignId, listener.id, action.content.trim());
     // THE ROOM HEARS HER (HW5 2026-10-25: Violet's answers never reached Kristopher — a being's words went on the
     // record and into nobody's senses). Her line is canon dialogue; every other being is judged for reach and
     // listens, as for anyone's words. No turn is granted on it: the Watcher drives the turns, and being-to-being
@@ -898,11 +962,13 @@ async function runBeats(
   const impulseAskFor = (beat: TableBeat): TableAsk => (beat.type === 'spoken' ? askOf(beat) : { kind: 'turn' });
   // No run of world content to ride in: a voiced being still gets its own words as its own stretch.
   if (!beats.some((b) => b.type === 'hear')) for (const [sid, us] of ownWords) gatedHear(us, [sid], undefined, truth.primary, new Map(), false);
+  // Everything the line put into the world — what was done and what was said — is one stretch for the reach judge.
+  const publicStretch: TableUtterance[] = beats.flatMap((b) => (b.type === 'hear' ? b.utterances : b.type === 'spoken' ? [b.utterance] : []));
   for (const beat of beats) {
     if (beat.type === 'hear') {
       const by = oneSpeakerOf(beat.utterances);
       for (const l of listeners) if (l.id !== by) askSource.set(l.id, by);
-      gatedHear(beat.utterances, listeners.map((l) => l.id), impulseAskFor(beat), truth.primary, new Map(), true);
+      gatedHear(beat.utterances, listeners.map((l) => l.id), impulseAskFor(beat), truth.primary, new Map(), true, publicStretch);
       continue;
     }
     if (beat.type === 'spoken') {
@@ -931,6 +997,9 @@ async function speakProseSplit(
   input: { message: string; locationId?: string | null; confirmTicketId?: string | null },
 ): Promise<TableProseResult> {
   const message = input.message;
+  if (!input.confirmTicketId && await saidJustNow(campaignId, message)) {
+    throw new ValidationError('That exact line was said moments ago — nothing written twice. (A slow reply can make the page re-send; say something new.)');
+  }
   const npcRoster = () => proseRoster(campaignId);
   const listeners = await activeListeners(campaignId);
   let roster = await npcRoster();

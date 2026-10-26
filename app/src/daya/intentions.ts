@@ -261,8 +261,11 @@ export function doingOf(description: string): string {
  */
 export function actCompletes(description: string, act: string): boolean {
   const doing = doingOf(description);
-  return cueCoverage(doing, act) >= 0.6;
+  // Nearly all of it, by the words (HW8 run 2: at 0.6, "I'm no longer pretending I'm waiting" closed "go to the shelter
+  // on Fifth Street and adopt the cat, and I stop pretending"). Anything less is the judge's call.
+  return cueCoverage(doing, act) >= ACT_WORDS_FLOOR;
 }
+const ACT_WORDS_FLOOR = 0.85;
 
 /**
  * Read a being's act against its pending intentions and mark the carried-out ones DONE. The words first; then,

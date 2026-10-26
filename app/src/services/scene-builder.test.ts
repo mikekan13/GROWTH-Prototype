@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { onlyDerived, pinToSeed, cardsFromSeed, clockInWords, fromInnerVoice, type SeedParts } from './scene-builder';
+import { onlyDerived, pinToSeed, cardsFromSeed, clockInWords, fromInnerVoice, nameHead, isSpeechTagAct, type SeedParts } from './scene-builder';
+
+describe('nameHead / isSpeechTagAct (HW8 run 2)', () => {
+  it('takes the name before its qualifier', () => {
+    expect(nameHead("Violet's Apartment — Fourth-Floor Walkup Studio")).toBe("Violet's Apartment");
+    expect(nameHead('Fourth-floor landing')).toBe('Fourth-floor landing');
+    expect(nameHead('Main Room: the studio')).toBe('Main Room');
+  });
+  it('a bare speech tag is not an act', () => {
+    expect(isSpeechTagAct('He speaks.')).toBe(true);
+    expect(isSpeechTagAct('Kristopher says,')).toBe(true);
+    expect(isSpeechTagAct('He speaks softly through the door.')).toBe(false);
+    expect(isSpeechTagAct('He knocks again, a bit louder.')).toBe(false);
+  });
+});
 
 describe('clockInWords — the hour as a novel gives it (HW8 2026-10-25)', () => {
   it('reads the clock in words with the part of day and the stretch of the month, never the date', () => {

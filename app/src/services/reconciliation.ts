@@ -51,6 +51,7 @@ import {
   matchCandidate,
   overlap,
   presenceNeeds,
+  unfinishedLine,
   titleCase,
   type PlanItem,
   type ReconKind,
@@ -191,6 +192,20 @@ export async function readNarration(
   listeners: Array<{ id: string; name: string }>,
 ): Promise<ReconTicket | null> {
   const rule = presenceNeeds(parsed);
+  // A line cut off mid-word needs no model to notice (HW8 run 2): JEWL asks before anything is written.
+  const cut = unfinishedLine(message);
+  if (cut) {
+    const economy = await getCampaignEconomy(campaignId);
+    const row = await prisma.reconciliation.create({
+      data: {
+        campaignId, status: 'PENDING', message, kinds: JSON.stringify(['unfinished']),
+        summary: `The line stops mid-word: "…${cut}".`,
+        question: `That one stops mid-word — "…${cut}". Finish it, or go with it as written?`,
+        plan: JSON.stringify([]), estimateKrma: 0, createdBy: actor.userId,
+      },
+    });
+    return parseRow(row, Number(economy.fluid));
+  }
   const read = await jewlRead(campaignId, message, listeners);
   const discrepant = (read?.discrepant ?? false) || rule.length > 0;
   if (!discrepant) return null;

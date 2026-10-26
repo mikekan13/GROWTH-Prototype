@@ -64,7 +64,7 @@ export interface WorldName { id: string; name: string }
 
 // ── Facts: what the builder may draw from ──────────────────────────────────────
 
-async function clockLine(campaignId: string): Promise<string | null> {
+export async function clockLine(campaignId: string): Promise<string | null> {
   const camp = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true, defaultTimescaleId: true } });
   if (!camp) return null;
   let ts: FeedTimescale | null = null;
@@ -122,12 +122,34 @@ export function fromInnerVoice(text: string, voice: string): string | null {
   return kept.length ? kept.join(' ') : null;
 }
 
+/** "Violet's Apartment — Fourth-Floor Walkup Studio" → "Violet's Apartment": the name before its qualifier (as the tagger reads it). Pure. */
+export function nameHead(name: string): string {
+  const m = name.match(/^(.+?)(?:\s+[—–-]\s+|:\s+|\s+\()/u);
+  return (m ? m[1] : name).trim() || name;
+}
+
 function locationLines(loc: { name: string; data: string | null } | null, tag: string): string[] {
   if (!loc) return [];
   let d: Record<string, unknown> = {};
   try { d = JSON.parse(loc.data ?? '{}') as Record<string, unknown>; } catch { d = {}; }
   const desc = typeof d.description === 'string' ? d.description.replace(/\s+/g, ' ').trim() : '';
-  return [`[${tag}] ${loc.name}${desc ? `: ${desc.slice(0, 700)}` : ''}`];
+  return [`[${tag}] ${nameHead(loc.name)}${desc ? `: ${desc.slice(0, 700)}` : ''}`];
+}
+
+const PAGE_MEMORY = 3;
+/** The scene blocks already on the page — the last built declarations — so the builder sets only what is new. Never throws. */
+export async function pageSoFar(campaignId: string): Promise<string[]> {
+  try {
+    const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'game_event', payload: { contains: '"built":true' } }, orderBy: { createdAt: 'desc' }, take: PAGE_MEMORY, select: { payload: true } });
+    return rows.reverse().map((r) => { try { const p = JSON.parse(r.payload) as { narration?: string | null }; return typeof p.narration === 'string' ? p.narration.trim() : ''; } catch { return ''; } }).filter(Boolean);
+  } catch { return []; }
+}
+
+// A bare speech tag is not an act ("He speaks." / "Kristopher says,"): the quote beside it is the record (HW8 run 2).
+const SPEECH_TAG_ACT_RE = /^(?:\w[\w'’-]*\s+)?(?:he|she|they|\w+)\s+(?:speaks|says|asks|replies|answers|calls out|whispers|mutters|adds|continues)(?:\s+(?:again|softly|quietly|gently|at last|finally|up))?[.!,:]?$/i;
+/** True when a built act is only a speech tag. Pure. */
+export function isSpeechTagAct(text: string): boolean {
+  return SPEECH_TAG_ACT_RE.test(text.trim());
 }
 
 /**
@@ -256,11 +278,11 @@ const SCENE_SYSTEM = `You build up a game master's seed line into a page of a no
 
 Rules — all of them, every time:
 - DERIVE, NEVER INVENT. Every sentence you write must be supported by the SEED or by a FACT line given. Do not add objects, people, weather, sounds, furniture, feelings, bodily details or events that are in neither ("the skin around them still raw" is an invention unless a fact says so). If the facts are thin, write less.
-- SCENE: 2 to 5 sentences that set the stage from the facts — the place, the hour and its light, the door and its state, what the actor holds, what is written on a thing he reads. Never restate the actor's acts or thoughts in the scene. Use the world's names EXACTLY as given in NAMES (so the record can tag them). The hour as the [clock] line gives it, in words — never the calendar date, never a year, never digits.
+- SCENE: 0 to 4 sentences that set the stage from the facts — the place, the hour, the door and its state, what the actor holds, what is written on a thing he reads. THE PAGE REMEMBERS ITSELF: when ALREADY ON THE PAGE is given, do not describe again what it already set (the room, its light, its fixtures, a thing's text) — write only what is NEW this beat: a changed hour, a changed door, a thing now held or read for the first time, who moved; when nothing changed, one short sentence or an empty scene. Never restate the actor's acts or thoughts in the scene. Use the world's names EXACTLY as given in NAMES (so the record can tag them). The hour as the [clock] line gives it, in words — never the calendar date, never a year, never digits. Light only from the facts: no daylight, dusk or sun unless a fact says so (an evening in autumn is dark; a lamp lights a room only if a fact lists it lit).
 - A thing the seed names that is not in the FACTS does not exist on the page: the actor reaches for it and does not find it, or the sentence stays as the seed put it. Never describe what it looks like or what is written on it.
 - ONE CARD PER ACTOR named in the seed, segments in the SEED's order:
   - action: third person, present tense, the actor as "He"/"She" or by name: "He wipes his eyes." Only acts the seed states. Backstory inside a seed act ("from the tears he was crying in the car") is not an act — it belongs in the scene as a fact a bystander could see (red eyes), or nowhere.
-  - thought: the actor's INNER VOICE, strictly first person ("I", "my"), free indirect, as he would think it — never "he"/"his" inside a thought, never reported ("He thinks it is odd" is wrong; "Only one apartment on the whole floor. Odd." is right). A prayer in his head is the prayer itself. When a MONOLOGUE is given for an actor, blend it into his thoughts — it is his inner voice this beat; keep what the seed said he thought and let the monologue colour and extend it. Never turn the monologue into acts.
+  - thought: the actor's INNER VOICE, strictly first person ("I", "my"), free indirect, as he would think it — never "he"/"his" inside a thought, never reported ("He thinks it is odd" is wrong; "Only one apartment on the whole floor. Odd." is right). A prayer in his head is the prayer itself. When a MONOLOGUE is given for an actor, blend it into his thoughts — it is his inner voice this beat; keep what the seed said he thought and let the monologue colour and extend it. A sentence of the monologue in which the actor PHYSICALLY does something ("the receipt crinkles in my fist", "my thumb rubs the ink", "my hand hovers") is not a thought: make it a small action segment in third person ("The receipt crinkles in his fist.") — unless it contradicts or undoes an act the seed states (the seed knocked: no hovering hand, no "I don't knock"), in which case drop it. A bare speech tag ("He speaks.") is never a segment: the speech segment is the record of it.
   - speech: the words exactly as the seed quotes them.
 - Every segment carries "from": the SEED sentence it derives from, verbatim.
 - Output JSON only: {"scene": string, "cards": [{"actorId": string, "segments": [{"kind": "action"|"thought"|"speech", "text": string, "from": string}]}]}`;
@@ -294,6 +316,7 @@ export async function buildScene(
   const actorIds = new Set<string>([...seed.actions.map((a) => a.actorId), ...seed.thoughts.map((t) => t.actorId), ...seed.quotes.flatMap((q) => (q.speakerId ? [q.speakerId] : []))]);
   if (!seed.narration && actorIds.size === 0) return fallback();
   const seedSentences = splitSentences(seed.full);
+  const page = await pageSoFar(campaignId);
   const user = [
     seedBlock(seed),
     '',
@@ -302,6 +325,7 @@ export async function buildScene(
     'FACTS:',
     ...(facts.lines.length ? facts.lines : ['(none beyond the seed)']),
     ...(monologues.size ? ['', ...[...monologues].map(([id, m]) => `MONOLOGUE of [${id}] this beat (its inner voice, first person):\n${m}`)] : []),
+    ...(page.length ? ['', 'ALREADY ON THE PAGE (the scene blocks of the last beats — do not set these again):', ...page.map((p) => `- ${p}`)] : []),
   ].join('\n');
   const t0 = Date.now();
   try {
@@ -329,6 +353,7 @@ export async function buildScene(
         if (!kind) continue;
         const text = kind === 'speech' ? s.text.trim() : onlyDerived(s.text.trim(), known);
         if (!text) continue;
+        if (kind === 'action' && isSpeechTagAct(text)) continue;
         segments.push({ kind, text, sentence: pinToSeed(typeof s.from === 'string' ? s.from : undefined, text, seedSentences) });
       }
       // A thought is the being's own voice or nothing (fromInnerVoice). When the voice spoke and the builder lost all

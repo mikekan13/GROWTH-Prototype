@@ -1,4 +1,13 @@
 import { describe, it, expect } from 'vitest';
+
+describe('the words alone close a doing only when they carry nearly all of it (HW8 run 2)', () => {
+  it('"I\'m just getting the tip" does not close "give it to him as the tip"; "I\'m no longer pretending" does not close the cat', async () => {
+    const { actCompletes } = await import('./intentions');
+    expect(actCompletes("Tonight, when he knocks, I'm going to give it to him as the tip.", "I'm just getting the tip.")).toBe(false);
+    expect(actCompletes("If he doesn't, I go to the shelter on Fifth Street and adopt the cat, and I stop pretending I'm waiting for anything.", "I'm not opening yet, but I'm no longer pretending I'm waiting for anything else.")).toBe(false);
+    expect(actCompletes("Tonight, when he knocks, I'm going to give it to him as the tip.", 'She gives it to him as the tip.')).toBe(true);
+  });
+});
 import { extractIntentions, dueReason, hasLapsed, intentionLine, DAY_CYCLES } from './intentions';
 
 // Violet's own words (genesis memories, 2026-10-12/16) — the test Mike called "a wonderful test of a being".

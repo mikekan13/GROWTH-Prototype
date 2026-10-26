@@ -758,6 +758,19 @@ Item data fields (shared with the stock content pass): `value` (KRMA, decimal), 
 | `src/daya/prompts/roles/adjudicator.ts` | Rule 0: beyond a closed/locked door = not seen, touched or handed; an act that needs someone present reaches no one. |
 | `src/services/table-prose.ts` | `pronounActor`: the FIRST pronoun is the subject ("He … her …" is about him). Post-pass per line: an unclaimed `someone present` quote on a line whose prose acts are all one character's, with no other mouth on the line, is his speech. |
 
+## Hello world 8, run 2 fixes — speech reach, the replay guard, the standing beat, the page that remembers itself (2026-10-25)
+
+Six lines played (see STATE-OF-PLAY 10-23 memory, "HW8 RUN 2"). Fixed:
+- `table-speak.gatedHear(…, judgeWith)`: the reach judge reads the WHOLE public stretch of a line — narration AND the words spoken in it (`publicStretch`) — so "He breaks the silence. 'Is everything ok?'" is judged as sound; before, the quote inherited the silent narration's "did not reach" and she never heard him.
+- `table-speak.saidJustNow`: the same text twice inside 90 s (declaration description/raw or canon narration) is a replay → `ValidationError`, nothing written (the dev server recycling for memory re-sent two lines whose first POST ran past ~25 s).
+- Only an ACT settles an intention (`answer()` no longer passes spoken lines to `settleByAct`); `intentions.actCompletes` words-only floor 0.6 → 0.85 (the judge takes the rest).
+- `scene-builder.pageSoFar` (last 3 built scene blocks) → ALREADY ON THE PAGE in the builder prompt: the scene sets only what is new; 0–4 sentences; light only from facts (no dusk at half past seven). `nameHead` for location names in facts; `isSpeechTagAct` drops "He speaks." acts; the prompt makes a physical doing in the monologue an act ("The receipt crinkles in his fist."), never a thought, and drops one that undoes a seed act.
+- THE STANDING BEAT (`table-speak.standingBeat`, ruling 22): a being within the scene that the line did NOT reach listens to the moment instead — the hour in words, the room it is in, "nothing from beyond the room has reached you" — and its side goes on the page (scene line + card via `buildBeingCard`). Once per line, never the voiced being. `STANDING_BEAT=off` disables.
+- A reply's way back is no longer "self" for the voiced being (`own` only on the Watcher's own stretch): he hears her as a voice through the door, not as the narrator.
+- `table-speak.withheldNames`: a speaker's label on a line that reached a being by HEARING alone stands only if the hearer's familiarity with the speaker's identity is ≥ F2; else "A woman's voice:" / "A man's voice:".
+- `reconciliation-rules.unfinishedLine` → kind `unfinished`: a line that stops mid-word ("…on the f") or on a dangling article is JEWL's ticket before anything is written: "Finish it, or go with it as written?"
+- Shared history seeded (tmp/seed-shared-history.ts, derived from the world's facts only): familiarity K→V identity F3/appearance F3/history F1, V→K F3/F3/F2; two memories for Kristopher of the prior deliveries (dated a week before play). tmp/reset-to-the-knock.ts now keeps seeded familiarity and pre-play memories.
+
 ## Hello world 8, run 1 fixes — the subject after an opener, the voice kept, the hour in words, JEWL and the missing thing (2026-10-25)
 
 Run 1 seed: "Kristopher checks the receipt to see if the order was paid. Then he knocks on Violet's door." Four faults, all fixed:

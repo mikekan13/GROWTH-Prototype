@@ -1,4 +1,18 @@
 import { describe, it, expect } from 'vitest';
+import { unfinishedLine } from './reconciliation-rules';
+
+describe('unfinishedLine — a line that stops mid-word (HW8 run 2)', () => {
+  it('catches the cut and the dangling article', () => {
+    expect(unfinishedLine('He knocks gently on the f')).toBe('knocks gently on the f');
+    expect(unfinishedLine('She reaches for the')).toBe('She reaches for the');
+  });
+  it('lets a finished line through, with or without a closing mark', () => {
+    expect(unfinishedLine('He knocks again a bit louder.')).toBeNull();
+    expect(unfinishedLine('Kristopher looks around for a bit')).toBeNull();
+    expect(unfinishedLine('"Umm... Is everything ok?"')).toBeNull();
+    expect(unfinishedLine('He waits')).toBeNull();
+  });
+});
 import { matchCandidate, presenceNeeds, estimatePlan, isCemented, titleCase, textToRerender, IMPROV_TUNING, type PlanItem } from './reconciliation-rules';
 import { parseTableProse } from './table-prose';
 

@@ -24,11 +24,13 @@ const dry = process.argv.includes('--dry');
   const canon = await p.canonEvent.findMany({ where: { campaignId: CAMP, createdAt: since } });
   const canonIds = canon.map((c: any) => c.id);
   const revisions = canonIds.length ? await p.canonRevision.findMany({ where: { canonEventId: { in: canonIds } } }) : [];
-  const memories = await p.dayaMemoryEntry.findMany({ where: { entityId: { in: entityIds }, realTime: since } });
+  // Memories dated BEFORE play (seeded history, narrativeCycle < 0) are part of the world, not of the run.
+  const memories = await p.dayaMemoryEntry.findMany({ where: { entityId: { in: entityIds }, realTime: since, narrativeCycle: { gte: 0 } } });
   const history = await p.historyEntry.findMany({ where: { campaignId: CAMP, realTime: since } });
   const facts = (await p.worldFact.findMany({ where: { campaignId: CAMP, establishedAtCycle: { gte: CLOCK_AT_THE_KNOCK } } })).filter((f: any) => !KEEP_FACTS.has(f.id));
-  const familiarity = await p.familiarity.findMany({ where: { campaignId: CAMP } });
-  const famChanges = await p.familiarityChange.findMany({ where: { campaignId: CAMP } });
+  // Seeded familiarity (lastSource 'seed' — the shared history between Kristopher and Violet) stays.
+  const familiarity = await p.familiarity.findMany({ where: { campaignId: CAMP, lastSource: { not: 'seed' } } });
+  const famChanges = await p.familiarityChange.findMany({ where: { campaignId: CAMP, source: { not: 'seed' } } });
   const vines = await p.vineEntry.findMany({ where: { campaignId: CAMP } });
   const recon = await p.reconciliation.findMany({ where: { campaignId: CAMP } });
   const sessions = await p.gameSession.findMany({ where: { campaignId: CAMP } });
@@ -49,7 +51,7 @@ const dry = process.argv.includes('--dry');
   console.log((dry ? 'DRY RUN — would remove: ' : 'removing: ') + JSON.stringify(summary));
   if (dry) { process.exit(0); }
   mkdirSync('data/archive', { recursive: true });
-  const file = 'data/archive/reset-to-the-knock-2026-10-25-after-hw8a.json';
+  const file = 'data/archive/reset-to-the-knock-2026-10-25-after-hw8b.json';
   writeFileSync(file, JSON.stringify({ since: SINCE, intentions, events, canon, revisions, memories, history, facts, familiarity, famChanges, vines, recon, sessions, copilot, affect, located, pizza, clockBefore: campaign?.currentCycle }, null, 1));
   for (const f of facts) await p.worldFact.updateMany({ where: { supersededById: f.id }, data: { supersededById: null } });
   await p.worldFact.deleteMany({ where: { id: { in: facts.map((f: any) => f.id) } } });
@@ -62,8 +64,8 @@ const dry = process.argv.includes('--dry');
   await p.canonEvent.deleteMany({ where: { id: { in: canonIds } } });
   await prisma.campaignEvent.deleteMany({ where: { id: { in: events.map((e) => e.id) } } });
   await p.historyEntry.deleteMany({ where: { id: { in: history.map((h: any) => h.id) } } });
-  await p.familiarityChange.deleteMany({ where: { campaignId: CAMP } });
-  await p.familiarity.deleteMany({ where: { campaignId: CAMP } });
+  await p.familiarityChange.deleteMany({ where: { campaignId: CAMP, source: { not: 'seed' } } });
+  await p.familiarity.deleteMany({ where: { campaignId: CAMP, lastSource: { not: 'seed' } } });
   await p.gameSession.deleteMany({ where: { campaignId: CAMP } });
   await p.copilotMessage.deleteMany({ where: { id: { in: copilot.map((c: any) => c.id) } } });
   await p.dayaEntity.updateMany({ where: { id: { in: entityIds } }, data: { dreamPressure: 0 } });

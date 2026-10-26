@@ -14,7 +14,25 @@
  */
 import type { ParsedProse } from './table-prose';
 
-export type ReconKind = 'relocation' | 'new_presence' | 'new_thing' | 'contradicted_fact' | 'contradiction' | 'continuity';
+export type ReconKind = 'relocation' | 'new_presence' | 'new_thing' | 'contradicted_fact' | 'contradiction' | 'continuity' | 'unfinished';
+
+/**
+ * A line that stops mid-word — no closing mark and a last word of one to three letters, or a dangling article/preposition
+ * ("He knocks gently on the f", "She reaches for the") — is JEWL's to bring up before it becomes canon (HW8 run 2: the
+ * builder finished "the f" as "the door" on its own and the knock never reached her). Returns the tail to quote, or null. Pure.
+ */
+const COMMON_SHORT = new Set(['up', 'on', 'in', 'it', 'me', 'us', 'go', 'no', 'ok', 'so', 'do', 'be', 'by', 'he', 'we', 'at', 'as', 'if', 'am', 'is', 'us', 'yes']);
+export function unfinishedLine(message: string): string | null {
+  const text = message.replace(/\s+/g, ' ').trim();
+  if (!text || /[.!?…"”')\]:]$/.test(text)) return null;
+  const words = text.split(' ');
+  const last = words[words.length - 1].replace(/^[^\w']+/, '');
+  if (!last) return null;
+  const dangling = /^(?:the|a|an|to|of|on|in|at|for|with|and|but|or|his|her|their|my|your|its)$/i.test(last);
+  const cut = last.length <= 2 && /^[a-z]+$/.test(last) && !COMMON_SHORT.has(last.toLowerCase());
+  if (!dangling && !cut) return null;
+  return words.slice(-5).join(' ');
+}
 
 export interface PlanItem {
   kind: 'location' | 'npc' | 'item';

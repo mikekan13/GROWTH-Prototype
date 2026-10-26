@@ -71,6 +71,10 @@ Last updated: 2026-10-25
 > never the date; JEWL now catches a THING the seed names that the world lacks (kind new_thing → ticket → item stub on confirm);
 > the receipt is a real item (UNPAID; prices/order #/time are placeholders; no street address or phones exist in the world).
 > World reset (after-hw8a) → HW8 run 2.
+> HW8 run 2 (10-25, 6 lines): speech reach judged on the whole stretch (she never heard "Is everything ok?"); replay guard (two lines
+> doubled by the dev server's memory recycle); speech never settles a doing; the page remembers itself (no re-set stage); the STANDING
+> BEAT (a being the line did not reach lives the moment → scene line + card); shared history + familiarity seeded both ways, names
+> withheld below F2 on hearing alone; JEWL asks on a half-sentence; physical doings in the monologue become acts. Reset (after-hw8b) → run 3.
 
 > 2026-10-23 (hello world 2 prep): the 17 Oct hello-world hiccups ironed out in three commits on
 > merge/fork-portrait-pipeline — sheet edits no longer wake JEWL (and can't become damage); the tagger stops
