@@ -939,7 +939,8 @@ export async function listenStimulus(
       voiceNotes: ctx.persona.voiceNotes ?? 'Plain, direct, her own cadence.',
       feltStateBrief,
       standingScene: fullTake ? content : prior!.standingScene,
-      recallBlock,
+      // THE REPLAY (Mike 2026-10-25): both beings returned their previous thought verbatim — recall handed the spirit its own recent perception memory. The recall result is pre-rendered prose (no per-memory source/time), so the guard is one sentence beside it.
+      recallBlock: `${recallBlock} (Your most recent thoughts are given so you can continue from them. Never repeat a sentence you have already thought; think the NEXT thing.)`,
       desiresBlock,
       innerSoFar: innerState,
       heard: fullTake ? 'You are only now taking in where you are.' : content,

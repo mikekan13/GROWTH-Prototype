@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { onlyDerived, pinToSeed, cardsFromSeed, clockInWords, fromInnerVoice, nameHead, isSpeechTagAct, type SeedParts } from './scene-builder';
+import { onlyDerived, pinToSeed, cardsFromSeed, clockInWords, fromInnerVoice, nameHead, isSpeechTagAct, lightOf, withoutRepeatedHour, dropEchoedThoughts, reattachDanglers, type SeedParts } from './scene-builder';
 
 describe('nameHead / isSpeechTagAct (HW8 run 2)', () => {
   it('takes the name before its qualifier', () => {
@@ -99,5 +99,46 @@ describe('scene builder — the seed as cards (the fallback)', () => {
     expect(cards[0].actorId).toBe('kris');
     expect(cards[0].segments.map((s) => s.kind)).toEqual(['action', 'action', 'thought', 'thought']);
     expect(cards[0].segments[2].sentence).toBe('He thinks it is odd and his brain begins to race for meaning where perhaps none is.');
+  });
+});
+
+describe('lightOf — the light is a fact (HW8 2026-10-25)', () => {
+  it('October evening is after dark, afternoon is daylight, July 7 pm is daylight, July 10 pm is dark', () => {
+    expect(lightOf(19, 9)).toBe('after dark');
+    expect(lightOf(14, 9)).toBe('daylight');
+    expect(lightOf(19, 6)).toBe('daylight');
+    expect(lightOf(22, 6)).toBe('after dark');
+  });
+});
+
+describe('withoutRepeatedHour — the page gave the hour once (HW8 2026-10-25)', () => {
+  const scene = 'A little after seven in the evening, Violet stands in the Main Room, the entry door locked behind her.';
+  it('strips a leading hour the page already gave', () => {
+    expect(withoutRepeatedHour(scene, ['A little after seven in the evening: the fourth-floor landing…'])).toBe('Violet stands in the Main Room, the entry door locked behind her.');
+  });
+  it('leaves the scene alone on an empty page', () => {
+    expect(withoutRepeatedHour(scene, [])).toBe(scene);
+  });
+});
+
+describe('dropEchoedThoughts / reattachDanglers — one sentence, one segment (HW8 2026-10-25)', () => {
+  it('drops a thought that is an act said twice', () => {
+    const out = dropEchoedThoughts([
+      { kind: 'action' as const, text: 'His fingers twitch toward the door.' },
+      { kind: 'thought' as const, text: 'My fingers twitch toward the door.' },
+      { kind: 'thought' as const, text: 'I wonder who is on the other side.' },
+    ]);
+    expect(out.map((s) => s.text)).toEqual(['His fingers twitch toward the door.', 'I wonder who is on the other side.']);
+  });
+  it('reattaches a dangling participle tail to the act before it', () => {
+    const out = reattachDanglers([
+      { kind: 'action' as const, text: 'His thumb rubs the ink.' },
+      { kind: 'thought' as const, text: 'Wanting to verify the ink is still there.' },
+      { kind: 'thought' as const, text: 'Nothing moves.' },
+    ]);
+    expect(out).toEqual([
+      { kind: 'action', text: 'His thumb rubs the ink, wanting to verify the ink is still there.' },
+      { kind: 'thought', text: 'Nothing moves.' },
+    ]);
   });
 });

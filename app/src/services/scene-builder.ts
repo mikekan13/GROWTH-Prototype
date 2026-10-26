@@ -76,7 +76,84 @@ export async function clockLine(campaignId: string): Promise<string | null> {
       ts = { unitsPerMetaCycle: row.unitsPerMetaCycle, calendar, unitName: row.unitName };
     }
   }
-  return `[clock] ${clockInWords(presentCycle(camp.currentCycle, ts))}`;
+  const shown = presentCycle(camp.currentCycle, ts);
+  return `[clock] ${clockInWords(shown)}${lightSuffix(shown)}`;
+}
+
+/**
+ * The light is a FACT, not something a being or the builder may invent (HW8 2026-10-25, Mike: daylight, dusk and "grey
+ * light" at a quarter past seven in October). After dark from 18:00 to 07:00 October–March, from 21:00 to 06:00
+ * April–September. Pure.
+ */
+export function lightOf(hour: number, monthIndex0: number): 'after dark' | 'daylight' {
+  const h = ((hour % 24) + 24) % 24;
+  const winter = monthIndex0 >= 9 || monthIndex0 <= 2;
+  return winter ? (h >= 18 || h < 7 ? 'after dark' : 'daylight') : (h >= 21 || h < 6 ? 'after dark' : 'daylight');
+}
+const MONTH_INDEX = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+/** " — after dark" / " — daylight" for a shown cycle ("17th Oct, Y2026 · 19:16 · …"); empty when the hour or month cannot be read. Pure. */
+function lightSuffix(shown: string): string {
+  const hm = shown.match(/\b(\d{1,2}):(\d{2})\b/);
+  const dm = shown.match(/\b\d{1,2}(?:st|nd|rd|th)?\s+([A-Za-z]{3,})/);
+  const mi = dm ? MONTH_INDEX.indexOf(dm[1].slice(0, 3).toLowerCase()) : -1;
+  if (!hm || mi < 0) return '';
+  return ` — ${lightOf(Number(hm[1]), mi)}`;
+}
+
+/**
+ * A being card's scene must not give the hour the page already gave (HW8 2026-10-25: "Half past seven on a mid-October
+ * evening, Violet stands…" six times in one run). When the scene opens with a clock phrase and the same phrase is already
+ * on the page, that phrase is stripped and the rest kept, capitalised. Pure.
+ */
+const LEADING_CLOCK_RE = /^((?:(?:a little after|about half past|coming up on|just before)\s+\w+|\w+ o'clock)\b.*?(?:morning|afternoon|evening|night)[^,;:]*)[,;:]\s*/i;
+export function withoutRepeatedHour(scene: string, page: string[]): string {
+  const m = scene.match(LEADING_CLOCK_RE);
+  if (!m || !page.length) return scene;
+  const phrase = m[1].trim().toLowerCase();
+  if (!page.some((p) => p.toLowerCase().includes(phrase))) return scene;
+  const rest = scene.slice(m[0].length);
+  return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : rest;
+}
+
+type CardSeg = { kind: 'action' | 'thought' | 'speech'; text: string };
+const ECHO_FLOOR = 0.7;
+/**
+ * Each sentence of a monologue goes to ONE segment: a thought whose sentences all echo an act of the same card is the
+ * same sentence said twice ("His fingers twitch toward the door." + "My fingers twitch, ready to knock, but I hold.") and
+ * is dropped. Pure.
+ */
+export function dropEchoedThoughts<T extends CardSeg>(segments: T[]): T[] {
+  const acts = segments.filter((s) => s.kind === 'action').map((s) => s.text);
+  if (!acts.length) return segments;
+  return segments.filter((s) => {
+    if (s.kind !== 'thought') return true;
+    const sentences = splitSentences(s.text);
+    if (!sentences.length) return true;
+    const echoed = sentences.every((sent) => acts.some((a) => Math.max(cueCoverage(sent, a), cueCoverage(a, sent)) >= ECHO_FLOOR));
+    return !echoed;
+  });
+}
+
+/**
+ * A thought that begins lowercase or with a present participle ("Wanting to verify the ink is still there.") is the
+ * dangling tail of a sentence whose head became an act: it goes back onto that act. Pure.
+ */
+export function reattachDanglers<T extends CardSeg>(segments: T[]): T[] {
+  const out: T[] = [];
+  for (const s of segments) {
+    const prev = out[out.length - 1];
+    const first = s.text.trim().split(/\s+/)[0] ?? '';
+    const word = first.replace(/[^A-Za-z]/g, '');
+    const participle = /^[A-Z]?[a-z]+ing$/.test(word) && !/^(?:nothing|something|anything|everything|morning|evening|thing|king|ring|spring|sing|bring|string)$/i.test(word);
+    const dangling = s.kind === 'thought' && (/^[a-z]/.test(first) || participle);
+    if (dangling && prev && prev.kind === 'action') {
+      const tail = s.text.trim();
+      out[out.length - 1] = { ...prev, text: `${prev.text.trim().replace(/[.!?…]+$/, '')}, ${tail.charAt(0).toLowerCase()}${tail.slice(1)}` };
+      continue;
+    }
+    out.push(s);
+  }
+  return out;
 }
 
 const HOUR_WORDS = ['twelve', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'];
@@ -281,7 +358,7 @@ Rules — all of them, every time:
 - SCENE: 0 to 4 sentences that set the stage from the facts — the place, the hour, the door and its state, what the actor holds, what is written on a thing he reads. THE PAGE REMEMBERS ITSELF: when ALREADY ON THE PAGE is given, do not describe again what it already set (the room, its light, its fixtures, a thing's text) — write only what is NEW this beat: a changed hour, a changed door, a thing now held or read for the first time, who moved; when nothing changed, one short sentence or an empty scene. Never restate the actor's acts or thoughts in the scene. Use the world's names EXACTLY as given in NAMES (so the record can tag them). The hour as the [clock] line gives it, in words — never the calendar date, never a year, never digits. Light only from the facts: no daylight, dusk or sun unless a fact says so (an evening in autumn is dark; a lamp lights a room only if a fact lists it lit).
 - A thing the seed names that is not in the FACTS does not exist on the page: the actor reaches for it and does not find it, or the sentence stays as the seed put it. Never describe what it looks like or what is written on it.
 - ONE CARD PER ACTOR named in the seed, segments in the SEED's order:
-  - action: third person, present tense, the actor as "He"/"She" or by name: "He wipes his eyes." Only acts the seed states. An ATTEMPT is not its outcome: "looking for the receipt" never becomes "finds the receipt", "reaches for the handle" never opens the door, "listens" never hears — the outcome is the Watcher's or the world's to give, never yours. Backstory inside a seed act ("from the tears he was crying in the car") is not an act — it belongs in the scene as a fact a bystander could see (red eyes), or nowhere.
+  - action: third person, present tense, the actor as "He"/"She" or by name: "He wipes his eyes." Only acts the seed states. An ATTEMPT is not its outcome: "looking for the receipt" never becomes "finds the receipt", "reaches for the handle" never opens the door, "listens" never hears — the outcome is the Watcher's or the world's to give, never yours. Never count or number events (first/second/third knock) unless the seed or the monologue counts them. Never add a movement the text does not state (rising, turning, stepping) to get from one act to the next. A thought that looks FORWARD to an act ("the knock is coming") goes BEFORE that act in the card, never after it. Backstory inside a seed act ("from the tears he was crying in the car") is not an act — it belongs in the scene as a fact a bystander could see (red eyes), or nowhere.
   - thought: the actor's INNER VOICE, strictly first person ("I", "my"), free indirect, as he would think it — never "he"/"his" inside a thought, never reported ("He thinks it is odd" is wrong; "Only one apartment on the whole floor. Odd." is right). A prayer in his head is the prayer itself. When a MONOLOGUE is given for an actor, blend it into his thoughts — it is his inner voice this beat; keep what the seed said he thought and let the monologue colour and extend it. A sentence of the monologue in which the actor PHYSICALLY does something ("the receipt crinkles in my fist", "my thumb rubs the ink", "my hand hovers") is not a thought: make it a small action segment in third person ("The receipt crinkles in his fist.") — unless it contradicts or undoes an act the seed states (the seed knocked: no hovering hand, no "I don't knock"), in which case drop it. A bare speech tag ("He speaks.") is never a segment: the speech segment is the record of it.
   - speech: the words exactly as the seed quotes them.
 - Every segment carries "from": the SEED sentence it derives from, verbatim.
@@ -404,8 +481,9 @@ export function cardsFromSeed(seed: SeedParts): BuiltCard[] {
 const BEING_SYSTEM = `You set down one being's side of a beat in a novel, from DATA ONLY.
 
 Given what reached the being (HEARD), the being's own listening monologue (its inner voice, first person), and FACTS about where it is:
-- SCENE: 1 or 2 sentences, third person, setting its side of the stage from the facts — where it is, the hour, what reached it. Never invent objects, people, sounds or events that are in neither the monologue nor the facts. Use the world's names exactly as given. The hour as the [clock] line gives it, in words — never the calendar date, never digits. Light only from the facts: no daylight, dusk, sun or "last light" unless a fact says so (an evening in autumn is dark; a lamp lights a room only if a fact lists it lit).
-- SEGMENTS, in the monologue's order, splitting it:
+- SCENE: 1 or 2 sentences, third person, setting its side of the stage from the facts — where it is, the hour, what reached it. Never invent objects, people, sounds or events that are in neither the monologue nor the facts. Use the world's names exactly as given. The hour as the [clock] line gives it, in words — never the calendar date, never digits. Light only from the facts: no daylight, dusk, sun or "last light" unless a fact says so (an evening in autumn is dark; a lamp lights a room only if a fact lists it lit). If the page already gave the hour or the room (ALREADY ON THE PAGE), do not give them again: one sentence of what is new for this being this beat (what reached it, what changed), or an empty scene.
+- Never count or number events (first/second/third knock) unless the monologue or HEARD counts them. Never add a movement the text does not state (rising, turning, stepping) to get from one act to the next. A thought that looks FORWARD to an act ("the knock is coming") goes BEFORE that act in the card, never after it.
+- SEGMENTS, in the monologue's order, splitting it. Each sentence of the monologue goes to exactly ONE segment. A sentence that is a physical doing is an action and is NOT also a thought. Never split a sentence: a participle clause stays with its sentence.
   - thought: its inner voice, first person, as it thinks it (keep its words; trim nothing that matters).
   - action: only what the monologue says the being PHYSICALLY does now (a hand toward the lock, holding still, a step back) — third person present: "She holds still." Perceptions and feelings are thoughts, not acts.
   - speech: only words the monologue says it says ALOUD, verbatim.
@@ -424,6 +502,7 @@ export async function buildBeingCard(
   opts: { timeoutMs?: number } = {},
 ): Promise<BuiltBeingCard | null> {
   if (!sceneBuilderOn() || !monologue.trim()) return null;
+  const page = await pageSoFar(campaignId);
   const user = [
     `BEING: ${being.name} [${being.id}]`,
     `HEARD (what reached it this beat): ${heard}`,
@@ -432,6 +511,7 @@ export async function buildBeingCard(
     `NAMES (use exactly): ${facts.names.map((n) => `${n.name} [${n.id}]`).join('; ')}`,
     'FACTS:',
     ...(facts.lines.length ? facts.lines : ['(none)']),
+    ...(page.length ? ['', 'ALREADY ON THE PAGE (the last scene blocks — never restate the hour, the room\'s fixtures or anything here):', ...page.map((p) => `- ${p}`)] : []),
   ].join('\n');
   const t0 = Date.now();
   try {
@@ -446,8 +526,8 @@ export async function buildBeingCard(
     const parsed = parseJson<{ scene?: unknown; segments?: Array<{ kind?: unknown; text?: unknown }> }>(res.text);
     if (!parsed) throw new Error('no JSON in the builder\'s answer');
     const known = [heard, monologue, ...facts.lines, ...facts.names.map((n) => n.name)];
-    const scene = typeof parsed.scene === 'string' ? onlyDerived(parsed.scene.trim(), known) : '';
-    const segments: BuiltBeingCard['segments'] = [];
+    const scene = typeof parsed.scene === 'string' ? withoutRepeatedHour(onlyDerived(parsed.scene.trim(), known), page) : '';
+    let segments: BuiltBeingCard['segments'] = [];
     for (const s of parsed.segments ?? []) {
       if (typeof s.text !== 'string' || !s.text.trim()) continue;
       const kind = s.kind === 'action' || s.kind === 'thought' || s.kind === 'speech' ? s.kind : null;
@@ -455,6 +535,7 @@ export async function buildBeingCard(
       const text = kind === 'speech' ? s.text.trim() : onlyDerived(s.text.trim(), known);
       if (text) segments.push({ kind, text });
     }
+    segments = reattachDanglers(dropEchoedThoughts(segments));
     if (!segments.length) segments.push({ kind: 'thought', text: monologue.trim() });
     console.log(`[scene-builder] ${being.name}'s card built in ${Date.now() - t0}ms: ${segments.length} segment(s)`);
     return { scene: scene || null, segments };

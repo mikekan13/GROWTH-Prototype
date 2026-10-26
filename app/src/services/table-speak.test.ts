@@ -64,7 +64,7 @@ vi.mock('@/services/reconciliation', () => ({
   cementCheck: vi.fn(async () => {}),
 }));
 
-import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom, reachEventOf, withoutThoughts } from './table-speak';
+import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom, reachEventOf, withoutThoughts, withoutRepeats, waitsFor } from './table-speak';
 
 describe("reachEventOf — the Watcher's prose act is its actor's own event (HW5 2026-10-25)", () => {
   const narr = (text: string) => ({ text, kind: 'narration' as const, to: null, speaker: null, expectsReply: false, ambiguous: false, rule: 'x' });
@@ -526,5 +526,28 @@ describe("the Watcher's line, per part: a thought is the thinker's alone, an own
     } finally {
       w.active.length = 0; w.active.push(...before);
     }
+  });
+});
+
+describe('withoutRepeats — a being never returns its last thought verbatim (REPLAY 2026-10-25)', () => {
+  it('drops a sentence seen before (case, spacing and trailing punctuation ignored), keeps the new one', () => {
+    expect(withoutRepeats('The salt stings.  Her hand shakes.', ['the SALT stings!'])).toBe('Her hand shakes.');
+  });
+  it('is empty when every sentence repeats; unchanged with no history', () => {
+    expect(withoutRepeats('The salt stings.', ['The salt stings.'])).toBe('');
+    expect(withoutRepeats('The salt stings.', [])).toBe('The salt stings.');
+  });
+});
+
+describe('waitsFor — a wait that names another being hands it the turn (HW8 2026-10-25)', () => {
+  const roster = [{ id: 'kris', name: 'Kristopher', sex: 'm' }, { id: 'vio', name: 'Violet', sex: 'f' }];
+  it('resolves the pronoun to the other being', () => {
+    expect(waitsFor('He waits until she opens the door.', roster, 'kris')).toBe('vio');
+  });
+  it('a wait naming nobody gives nothing', () => {
+    expect(waitsFor('He waits patiently.', roster, 'kris')).toBeNull();
+  });
+  it('resolves a name', () => {
+    expect(waitsFor('She waits for Kristopher to knock', roster, 'vio')).toBe('kris');
   });
 });
