@@ -75,6 +75,9 @@ Last updated: 2026-10-25
 > doubled by the dev server's memory recycle); speech never settles a doing; the page remembers itself (no re-set stage); the STANDING
 > BEAT (a being the line did not reach lives the moment → scene line + card); shared history + familiarity seeded both ways, names
 > withheld below F2 on hearing alone; JEWL asks on a half-sentence; physical doings in the monologue become acts. Reset (after-hw8b) → run 3.
+> HW8 run 3 (10-25, 2 lines, "a hard fail"): she described his face through a locked door — the hearing filter's fallback handed the whole
+> stretch over; now hearing never carries sight (fragments or an unplaceable sound). An attempt is not its outcome; light from facts on the
+> being card too; one pair of (( )) / :: :: per run on a card. Reset (after-hw8c) → run 4.
 
 > 2026-10-23 (hello world 2 prep): the 17 Oct hello-world hiccups ironed out in three commits on
 > merge/fork-portrait-pipeline — sheet edits no longer wake JEWL (and can't become damage); the tagger stops

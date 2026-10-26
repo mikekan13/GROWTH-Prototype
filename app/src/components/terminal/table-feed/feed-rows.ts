@@ -20,7 +20,7 @@
 import type {
   TerminalEvent, ChatPayload, GameEventPayload, DiceRollPayload, CommandPayload, AIMessagePayload, ChangeLogPayload,
 } from '@/types/terminal';
-import { parseSegments, type FeedSegment } from '@/lib/feed-segments';
+import { parseSegments, mergeAdjacent, type FeedSegment } from '@/lib/feed-segments';
 import { parseTableProse, characterCards } from '@/services/table-prose';
 import { foldSpokenBeats } from '../SpokenBeatBlock';
 
@@ -128,7 +128,7 @@ function declarationRows(e: TerminalEvent, p: GameEventPayload, roster: RosterNa
   characterCards(p.description, { narration, speech, actions, thoughts }).forEach((card, i) => {
     rows.push({
       type: 'character', key: `${e.id}#c${i}`, timestamp: e.timestamp, cycle: p.cycle,
-      characterId: card.id, name: card.label, segments: card.segments.map((s): FeedSegment => ({ kind: s.kind, text: s.text })),
+      characterId: card.id, name: card.label, segments: mergeAdjacent(card.segments.map((s): FeedSegment => ({ kind: s.kind, text: s.text }))),
       raw, via, voice: 'Watcher', voicedBy: e.actorName || null, fromNarration: true,
     });
   });
@@ -209,7 +209,7 @@ export function eventRows(e: TerminalEvent, roster: RosterName[]): FeedRowModel[
       // Built up (scene-builder 2026-10-25): a prose line setting the being's side of the scene, then its card —
       // thoughts blue, what it did red, what it said purple.
       if (bp.scene?.trim()) rows.push({ type: 'narration', key: `${e.id}#scene`, timestamp: e.timestamp, cycle: bp.cycle, text: bp.scene.trim(), raw: bp.scene.trim(), via: 'being', voicedBy: null });
-      const segments: FeedSegment[] = bp.segments?.length ? bp.segments.map((s) => ({ kind: s.kind, text: s.text })) : [{ kind: 'thought', text: t! }];
+      const segments: FeedSegment[] = bp.segments?.length ? mergeAdjacent(bp.segments.map((s) => ({ kind: s.kind, text: s.text }))) : [{ kind: 'thought', text: t! }];
       rows.push({
         type: 'character', key: e.id, timestamp: e.timestamp, cycle: bp.cycle,
         characterId: e.characterId ?? null, name: e.characterName || 'someone present', segments,

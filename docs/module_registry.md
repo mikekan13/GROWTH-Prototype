@@ -758,6 +758,13 @@ Item data fields (shared with the stock content pass): `value` (KRMA, decimal), 
 | `src/daya/prompts/roles/adjudicator.ts` | Rule 0: beyond a closed/locked door = not seen, touched or handed; an act that needs someone present reaches no one. |
 | `src/services/table-prose.ts` | `pronounActor`: the FIRST pronoun is the subject ("He … her …" is about him). Post-pass per line: an unclaimed `someone present` quote on a line whose prose acts are all one character's, with no other mouth on the line, is his speech. |
 
+## Hello world 8, run 3 fixes — hearing never hands over sight; an attempt is not its outcome; one pair of marks per run (2026-10-25)
+
+Run 3 (2 lines) was ended by Mike as "a hard fail": Violet, behind her locked door, described his tears and his smile. Cause: `senses-filter.audibleOnly` found no sounding SENTENCE in "…approaches the door as he wipes the tears… He smiles a genuine smile and gently knocks three times…" (the predicate splitter did not allow an adverb between "and" and the verb; the clause cutter did not allow "as he …") and its fallback handed the stretch over WHOLE. Fixed:
+- `senses-filter`: movement verbs are sound (approaches/walks/steps/crosses/climbs — footsteps); a clause may open "as he …"; a predicate may open with an adverb ("and gently knocks"); the fallback never hands over sight — the sounding fragments go over as their own sentences (`soundingFragments`: "Someone knocks three times on the door."), and failing those, a true line: "A sound from beyond the room, too faint to make out." (supersedes the HW6 whole-stretch fallback).
+- `scene-builder` SCENE_SYSTEM: an ATTEMPT is not its outcome ("looking for the receipt" never becomes "finds the receipt"); BEING_SYSTEM gets the light-only-from-facts rule (her scene line had "the last of the October light" at a quarter past seven).
+- `lib/feed-segments.mergeAdjacent` (applied in `feed-rows` for declaration cards and being cards): consecutive segments of one kind are one segment, so a card shows one pair of (( )) / :: :: per run (Mike: "the (( and :: sometimes repeat in blocks. It should just be opening and closing.").
+
 ## Hello world 8, run 2 fixes — speech reach, the replay guard, the standing beat, the page that remembers itself (2026-10-25)
 
 Six lines played (see STATE-OF-PLAY 10-23 memory, "HW8 RUN 2"). Fixed:

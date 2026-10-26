@@ -84,6 +84,17 @@ export function parseSegments(text: string, opts: { bare?: SegmentKind; growing?
 const OPENER_KIND: Record<string, SegmentKind> = { '::': 'action', '((': 'thought', '"': 'speech', '“': 'speech', '*': 'action' };
 
 /** The marks a segment is drawn with (open, close). */
+/** Consecutive segments of one kind become one segment, so a card shows one pair of marks per run (Mike 2026-10-25: "the (( and :: sometimes repeat in blocks. It should just be opening and closing."). Pure. */
+export function mergeAdjacent<T extends { kind: string; text: string }>(segments: T[]): T[] {
+  const out: T[] = [];
+  for (const s of segments) {
+    const last = out[out.length - 1];
+    if (last && last.kind === s.kind && s.kind !== 'speech') out[out.length - 1] = { ...last, text: `${last.text.trim()} ${s.text.trim()}`.trim() };
+    else out.push({ ...s });
+  }
+  return out;
+}
+
 export function segmentMarks(kind: SegmentKind): [string, string] {
   switch (kind) {
     case 'action': return ['::', '::'];

@@ -1,6 +1,25 @@
 import { describe, it, expect } from 'vitest';
 import { audibleOnly, audibleSentence } from './senses-filter';
 
+describe('hearing never hands over sight (HW8 run 3, 2026-10-25: "a hard fail")', () => {
+  it('"smiles… and gently knocks" keeps the knock and drops the smile; "approaches… as he wipes the tears" keeps the steps', () => {
+    const seed = 'Kristopher approaches the door as he wipes the tears from the car ride away. He remembers this customer. He smiles a genuine smile and gently knocks three times on the door.';
+    const heard = audibleOnly(seed, ['hearing']);
+    expect(heard).toContain('knocks three times on the door');
+    expect(heard).toContain('approaches the door');
+    expect(heard).not.toMatch(/tears|smile|remembers|customer/);
+  });
+  it('when nothing of it sounds as a sentence, the sounding fragments go over, never the whole', () => {
+    expect(audibleOnly('A genuine warmth breaks across his face and he knocks, softly.', ['hearing'])).not.toMatch(/warmth|face/);
+    expect(audibleOnly('A genuine warmth breaks across his face and he knocks, softly.', ['hearing'])).toMatch(/knocks/);
+  });
+  it('when nothing of it sounds at all, a true line about an unplaceable sound', () => {
+    expect(audibleOnly('He adjusts his visor and reads the receipt.', ['hearing'])).toBe('A sound from beyond the room, too faint to make out.');
+    // "crying" inside "red from crying in the car" is not a sound happening now (HW7): no fragment, no whole.
+    expect(audibleOnly('His face looks tired and his eyes are slightly red from crying in the car.', ['hearing'])).toBe('A sound from beyond the room, too faint to make out.');
+  });
+});
+
 describe('senses filter — hearing carries sound and words, nothing else (HW6 2026-10-25)', () => {
   const receipt = 'Kristopher looks over the recipt for the price of the pizza as a genuine smile masks the memory of the tears he was just crying on the drive over. He knocks again.';
   it('through a locked door, the receipt and the smile go; the knock stays', () => {
@@ -28,8 +47,7 @@ describe('senses filter — hearing carries sound and words, nothing else (HW6 2
     expect(audibleOnly(receipt, ['self'])).toBe(receipt);
     expect(audibleOnly(receipt, undefined)).toBe(receipt);
   });
-  it('when nothing of it is sound, the judge\'s verdict stands and the stretch is handed over whole', () => {
-    const silent = 'His face looks tired and his eyes are slightly red from crying in the car.';
-    expect(audibleOnly(silent, ['hearing'])).toBe(silent);
+  it('when nothing of it is sound, hearing hands over an unplaceable sound — never the whole (HW8 run 3 superseded HW6 here)', () => {
+    expect(audibleOnly('His face looks tired and his eyes are slightly red from crying in the car.', ['hearing'])).toBe('A sound from beyond the room, too faint to make out.');
   });
 });

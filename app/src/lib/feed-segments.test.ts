@@ -1,4 +1,19 @@
 import { describe, it, expect } from 'vitest';
+import { mergeAdjacent } from './feed-segments';
+
+describe('mergeAdjacent — one pair of marks per run of a kind (2026-10-25)', () => {
+  it('joins consecutive thoughts, keeps a different kind between them apart, never merges speech', () => {
+    const out = mergeAdjacent([
+      { kind: 'thought', text: 'Three knocks.' }, { kind: 'thought', text: 'Gentle.' },
+      { kind: 'action', text: 'Her hand finds the deadbolt.' },
+      { kind: 'thought', text: 'He is waiting.' },
+      { kind: 'speech', text: 'Who is it?' }, { kind: 'speech', text: 'Hello?' },
+    ]);
+    expect(out.map((s) => `${s.kind}:${s.text}`)).toEqual([
+      'thought:Three knocks. Gentle.', 'action:Her hand finds the deadbolt.', 'thought:He is waiting.', 'speech:Who is it?', 'speech:Hello?',
+    ]);
+  });
+});
 import { parseSegments, segmentMarks, splitEntities, presentCycle, realClock } from './feed-segments';
 
 describe('parseSegments — colour marks WHAT, never WHO (Mike 2026-10-07)', () => {
