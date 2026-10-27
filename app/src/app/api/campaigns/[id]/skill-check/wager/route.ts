@@ -34,6 +34,10 @@ const WagerSchema = z.object({
     governor: z.string(),
     amount: z.number().int().min(0),
   })),
+  /** A table roll the Watcher answers by hand: the DR he settled on (the sim's suggestion was pre-filled). */
+  dr: z.number().int().min(1).max(99).optional(),
+  /** A Watcher who let the AI choose his being's Effort (the popup filled it): the card says so. */
+  aiChose: z.boolean().optional(),
 });
 
 export async function POST(
@@ -56,6 +60,12 @@ export async function POST(
     // Verify the submitting user owns this check
     if (session.user.id !== found.targetUserId) {
       return NextResponse.json({ error: 'Not your check to wager on' }, { status: 403 });
+    }
+
+    // A table roll's Watcher may settle the DR in the popup (canon has no ladder; the sim only suggests). Only the owner (the Watcher) can.
+    if (input.dr !== undefined && found.purpose?.kind === 'roll' && found.purpose.ownerRole === 'watcher') {
+      if (input.dr !== found.dr) found.purpose.drBy = "watcher";
+      found.dr = input.dr;
     }
 
     // Validate wagers against available governors (before claiming, so a bad wager can be retried)
@@ -151,8 +161,9 @@ export async function POST(
       });
     }
 
-    // Broadcast check result to everyone
-    broadcastEvent(campaignId, {
+    // Broadcast check result to everyone — except a table roll, whose readout is the card, cut per viewer
+    // (services/table-roll.writeRollCard): the numbers and the DR never go campaign-wide.
+    if (pending.purpose?.kind !== 'roll') broadcastEvent(campaignId, {
       kind: 'check_result',
       checkId: pending.id,
       characterId: pending.characterId,
@@ -174,7 +185,7 @@ export async function POST(
     // Perception unit 11: a check started for a purpose (an inspection) resolves that purpose too.
     const effortBy: Record<string, number> = {};
     for (const w of input.wagers) if (w.amount > 0) effortBy[w.governor.toLowerCase()] = (effortBy[w.governor.toLowerCase()] ?? 0) + w.amount;
-    await afterCheckResolved(pending, { total, success, margin, effortBy });
+    await afterCheckResolved(pending, { total, success, margin, effortBy, fdResult, traitFlat, ...(input.aiChose && pending.purpose?.kind === 'roll' && pending.purpose.ownerRole === 'watcher' ? { chosenBy: 'ai' as const } : {}) });
 
     // Build effort description for the terminal
     const effortDesc = input.wagers
@@ -290,7 +301,8 @@ export async function POST(
       traitFlat,
       traitSources,
       total,
-      dr: pending.dr,
+      // A Trailblazer never sees the DR of a table roll (skill-check-flow: the player never sees DR).
+      dr: pending.purpose?.kind === 'roll' && pending.purpose.ownerRole === 'trailblazer' ? undefined : pending.dr,
       success,
       margin,
       revealDR: pending.revealDR,

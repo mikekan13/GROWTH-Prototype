@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { senseProfileFromSheet, type SenseProfile } from './field';
 import {
-  stubVerdict, stubReach, judgeReach, buildReachPrompt, parseReachOutput, lawfulVerdict, cuesFromText, perceptionReachOn,
+  stubVerdict, stubReach, judgeReach, senseGate, buildReachPrompt, parseReachOutput, lawfulVerdict, cuesFromText, perceptionReachOn,
   type ReachBeing, type ReachEvent,
 } from './reach';
 
@@ -167,5 +167,38 @@ describe('prompt + parse', () => {
     expect(parseReachOutput('Here you go: [{"id":"b1","reach":true,"via":["sight"],"noticed":true,"salience":1}] done')).toHaveLength(1);
     expect(() => parseReachOutput('[]')).toThrow();
     expect(() => parseReachOutput('[{"id":"b1","reach":true,"noticed":true,"salience":2}]')).toThrow(/validation/);
+  });
+});
+
+describe('senseGate + sense tiers in the prompt (2026-10-26)', () => {
+  const deaf = () => being('violet', { wisdom: 4, focus: 'intends: listen for the knock' }, senseProfileFromSheet(anatomy([0, 0])));
+  const blind = () => being('violet', {}, senseProfileFromSheet(anatomy(null, [0, 0])));
+
+  it('Destroyed ears gate speech out before the model is asked', () => {
+    expect(senseGate(speech(), deaf())).toMatchObject({ reaches: false, via: [], noticed: false });
+  });
+  it('a sense that is merely Broken (halved) is not gated; neither is a deaf being for an action it can see', () => {
+    expect(senseGate(speech(), being('violet', {}, senseProfileFromSheet(anatomy([1, 1]))))).toBeNull();
+    expect(senseGate({ kind: 'action', text: 'Ruth slams the door.', sourceId: 'ruth' }, deaf())).toBeNull();
+  });
+  it('blind AND deaf: an action cannot reach; the source and thoughts are never gated here', () => {
+    const both = being('violet', {}, senseProfileFromSheet({ bodyAnatomy: { partName: 'Body', contains: [{ partName: 'Head', contains: [{ partName: 'Left Eye', condition: 0 }, { partName: 'Right Eye', condition: 0 }, { partName: 'Left Ear', condition: 0 }, { partName: 'Right Ear', condition: 0 }] }] } }));
+    expect(senseGate({ kind: 'action', text: 'Ruth waves.', sourceId: 'ruth' }, both)?.reaches).toBe(false);
+    expect(senseGate(speech({ sourceId: 'violet' }), both)).toBeNull();
+    expect(senseGate({ kind: 'thought', text: '((hm))', sourceId: 'ruth' }, both)).toBeNull();
+  });
+  it('judgeReach never sends a gated being to the model, and grants it nothing whatever the model says', async () => {
+    const model = vi.fn(async () => '[{"id":"b1","reach":true,"via":["hearing"],"noticed":true,"salience":0.9}]');
+    const j = await judgeReach(speech(), [deaf(), being('tom')], { model, force: true });
+    expect(j.verdicts.get('violet')?.reaches).toBe(false);
+    const sent = (model.mock.calls[0] as unknown as [{ user: string }])[0].user;
+    expect(sent).not.toContain('VIOLET');
+    expect(sent).toContain('TOM');
+  });
+  it('prompt: Wisdom, focus, the organ condition and an UNAVAILABLE tier for a Destroyed sense', () => {
+    const { user } = buildReachPrompt(speech(), [deaf(), blind()]);
+    expect(user).toContain('Wisdom 4');
+    expect(user).toContain('intends: listen for the knock');
+    expect(user).toMatch(/hearing 0 \(.*UNAVAILABLE\)/);
   });
 });

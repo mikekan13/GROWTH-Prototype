@@ -41,6 +41,14 @@ export interface EffortWagerPromptEvent {
   skillName?: string;          // For display
   fateDie: string;             // e.g. "d6" — the die they'll throw
   fdMax: number;               // Max FD result (for range calc)
+  /** Present when the check is a ROLL at the table (popup + card, 2026-10-26): the Terminal's roll popup takes it, not the canvas modal. */
+  tableRoll?: {
+    event: string;             // the act sentence the check rests on
+    actorName: string;
+    ownerRole: 'trailblazer' | 'watcher';
+    dr?: number;               // the Watcher's popup only
+    timeoutSec: number;
+  };
 }
 
 /** Player submits their effort wager */

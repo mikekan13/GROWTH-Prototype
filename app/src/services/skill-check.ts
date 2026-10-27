@@ -21,7 +21,7 @@ import { prisma } from '@/lib/db';
 import { NotFoundError } from '@/lib/errors';
 import { rollDie } from '@/lib/dice';
 import { getSkillDieType, parseDie } from '@/lib/dice-utils';
-import { storePendingCheck, removePendingCheck, type CheckPurpose } from '@/lib/pending-checks';
+import { storePendingCheck, removePendingCheck, getPendingCheck, type CheckPurpose } from '@/lib/pending-checks';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { markAttributeTrainable, markSkillTrainable } from '@/services/advancement';
@@ -69,7 +69,17 @@ export async function initiateSkillCheck(
   campaignId: string,
   requester: { id: string; username: string },
   input: InitiateSkillCheckInput,
-  opts: { purpose?: CheckPurpose } = {},
+  opts: {
+    purpose?: CheckPurpose;
+    /** Rolls at the table: the user who must answer (the Trailblazer, else the Watcher). Default = the character's user. */
+    ownerUserId?: string;
+    /** Rolls at the table: how long the owner has before the AI chooses (default 90 s, the old auto-resolve). */
+    timeoutMs?: number;
+    /** Rolls at the table: nobody is asked (the AI chooses at once) — no wager prompt, no request broadcast. */
+    noPrompt?: boolean;
+    /** Rolls at the table: carried on the wager prompt so the popup can show the event and the Watcher's DR field. */
+    tableRoll?: { event: string; actorName: string; ownerRole: 'trailblazer' | 'watcher'; dr?: number; timeoutSec: number };
+  } = {},
 ): Promise<InitiatedCheck> {
   // Look up the character
   const character = await prisma.character.findUnique({
@@ -143,6 +153,14 @@ export async function initiateSkillCheck(
 
   // Auto-resolve after 90 seconds with 0 effort
   const timeoutHandle = setTimeout(async () => {
+    // A table roll that nobody answered in time: the AI chooses, and the card says so.
+    if (getPendingCheck(checkId)?.purpose?.kind === 'roll') {
+      try {
+        const { resolveRollByAi } = await import('@/services/table-roll');
+        await resolveRollByAi(checkId, 'ai-timeout');
+      } catch (err) { console.warn('[skill-check] table roll timeout resolve failed', err); removePendingCheck(checkId); }
+      return;
+    }
     const pending = removePendingCheck(checkId);
     if (!pending) return;
 
@@ -242,7 +260,7 @@ export async function initiateSkillCheck(
 
     // Perception unit 11: a check started for a purpose (an inspection) resolves that purpose too.
     await afterCheckResolved(pending, { total, success, margin, effortBy: {} });
-  }, 90_000);
+  }, opts.timeoutMs ?? 90_000);
 
   // Store pending check (SD already rolled, FD will be rolled on wager commit)
   storePendingCheck({
@@ -250,7 +268,7 @@ export async function initiateSkillCheck(
     campaignId,
     characterId: character.id,
     characterName: character.name,
-    targetUserId: character.userId,
+    targetUserId: opts.ownerUserId ?? character.userId,
     skillName,
     skillLevel,
     isSkilled,
@@ -269,6 +287,11 @@ export async function initiateSkillCheck(
     ...(opts.purpose ? { purpose: opts.purpose } : {}),
   });
 
+  // Nobody to ask (the AI chooses at once): the caller resolves the stored check itself.
+  if (opts.noPrompt) {
+    return { checkId, sdDie, sdResult, difficultyHint, characterName: character.name, skillName };
+  }
+
   // Broadcast effort wager prompt to the target player (shows SD result)
   broadcastEvent(campaignId, {
     kind: 'effort_wager_prompt',
@@ -282,10 +305,11 @@ export async function initiateSkillCheck(
     skillName,
     fateDie,
     fdMax,
-  }, character.userId);
+    ...(opts.tableRoll ? { tableRoll: opts.tableRoll } : {}),
+  }, opts.ownerUserId ?? character.userId);
 
-  // Broadcast check request notification to everyone
-  broadcastEvent(campaignId, {
+  // A table roll's request is not announced with its DR to everyone — the card tells the table, per viewer.
+  if (!opts.tableRoll) broadcastEvent(campaignId, {
     kind: 'skill_check_request',
     checkId,
     targetCharacterId: character.id,

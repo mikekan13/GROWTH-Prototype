@@ -17,6 +17,7 @@ export type TerminalEventType =
   | 'command'        // Command execution + result
   | 'ai_message'     // AI copilot messages (future)
   | 'game_event'     // Narrative/system events (session start, combat begin, etc.)
+  | 'roll'           // An ACTIVE check at the table: the card (event + results), per-viewer visibility (2026-10-26)
   | 'being_thought'; // A being's listening monologue + impulse per line — the Watcher's audit record, never the feed (HW3 2026-10-24)
 
 export type TerminalActor = 'player' | 'gm' | 'ai_copilot' | 'system';
@@ -161,6 +162,47 @@ export interface BeingThoughtPayload extends TableFeedFields {
   segments?: Array<{ kind: 'action' | 'thought' | 'speech'; text: string }>;
 }
 
+/** Who may see how much of a roll card: the Watcher everything; the actor and a sight-witness the readout; a hearer the sentence. */
+export type RollSeen = 'full' | 'event';
+
+/**
+ * The ROLL CARD (Mike 2026-10-26: "Rolls will appear in the terminal as a separate card ... perception based on
+ * viewpoint"). Stored whole; the server redacts it per reader (lib/roll-card.rollForViewer) before it leaves.
+ */
+export interface RollPayload {
+  kind: 'roll';
+  rollId: string;
+  /** The event sentence the check rests on ("Kristopher tries to force the lock"). */
+  event: string;
+  actorId: string;
+  actorName: string;
+  skillName?: string;
+  isSkilled: boolean;
+  /** The governor attribute (unskilled: the attribute rolled; skilled: the first governor). */
+  governor: string;
+  sd?: { die: string; value: number };
+  /** The Terminal's colour hint at the wager; never the DR. */
+  hint?: 'blue' | 'purple' | 'red';
+  fd?: { die: string; value: number };
+  effort: number;
+  effortAttribute?: string;
+  traitFlat?: number;
+  total: number;
+  /** Watcher-only. */
+  dr?: number;
+  /** Who fixed the DR: the sim's suggestion, or the Watcher. */
+  drBy?: 'sim' | 'watcher';
+  success: boolean;
+  margin?: number;
+  /** Who chose the Effort: the player, the Watcher, the AI by setting, or the AI after no answer in time. */
+  chosenBy: 'player' | 'watcher' | 'ai' | 'ai-timeout';
+  cycle?: number;
+  /** Watcher/actor-side bookkeeping: characterId → how much of the card that being perceived. Absent = not at all. */
+  visibility?: Record<string, RollSeen>;
+  /** Set by the server for the reader: the level this payload was cut to. */
+  view?: 'watcher' | RollSeen;
+}
+
 export type TerminalPayload =
   | ChangeLogPayload
   | DiceRollPayload
@@ -168,7 +210,8 @@ export type TerminalPayload =
   | CommandPayload
   | AIMessagePayload
   | GameEventPayload
-  | BeingThoughtPayload;
+  | BeingThoughtPayload
+  | RollPayload;
 
 // ── Unified Event ──────────────────────────────────────────────────────────
 

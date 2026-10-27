@@ -5,7 +5,7 @@ import { assertLawfulInput } from '@/services/lawful-intake';
 import { tableParticipantIds } from '@/services/table-speak';
 import { createCampaignEvent, queryCampaignEvents } from '@/services/campaign-event';
 import { requireCampaignMember, requireEventPoster } from '@/services/campaign-access';
-import { feedViewerFor, queryPerceivedFeed, viewAsViewer } from '@/services/perceived-feed';
+import { feedViewerFor, queryPerceivedFeed, viewAsViewer, cutRollEvents, rollReaderFor } from '@/services/perceived-feed';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { postInspectFromChat } from '@/services/inspection';
 import type { TerminalEventType, TerminalActor, TerminalPayload, TerminalEvent } from '@/types/terminal';
@@ -48,6 +48,11 @@ export async function GET(
       limit,
     });
 
+    // Roll cards are cut per reader even on the truth path (flag off: a Trailblazer must never read the DR).
+    if (result.events.some((e: { type: string }) => e.type === 'roll')) {
+      const reader = await rollReaderFor(campaignId, session.user);
+      return NextResponse.json({ ...result, events: cutRollEvents(result.events as Array<{ type: string; payload: unknown }>, reader) });
+    }
     return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error);
@@ -72,6 +77,10 @@ export async function POST(
 
     if (!type || !payload) {
       return NextResponse.json({ error: 'type and payload are required' }, { status: 400 });
+    }
+    // A roll card is the server's alone (services/table-roll): the dice are never posted by a client.
+    if (type === 'roll') {
+      return NextResponse.json({ error: 'Roll cards are written by the server' }, { status: 403 });
     }
 
     // Security (2026-10-09): members only; the campaign's GM/ADMIN posts for anyone, everyone else only for

@@ -22,7 +22,24 @@ export interface InspectPurpose {
   skillName: string;
   skillDomains: string[];
 }
-export type CheckPurpose = InspectPurpose;
+/** A check that IS a roll at the table (rolls as popup + card, 2026-10-26): resolved by services/table-roll. */
+export interface RollPurpose {
+  kind: 'roll';
+  rollId: string;
+  /** The act sentence the check rests on. */
+  event: string;
+  actorId: string;
+  actorName: string;
+  /** The governor attribute rolled (unskilled) or the skill's first governor. */
+  governor: string;
+  /** Who answers: the Trailblazer who owns the character, else the Watcher. */
+  ownerRole: 'trailblazer' | 'watcher';
+  /** Who fixed the DR: the sim's suggestion, or (after a manual answer) the Watcher. */
+  drBy: 'sim' | 'watcher';
+  /** The act's campaign cycle, for the card. */
+  cycle?: number;
+}
+export type CheckPurpose = InspectPurpose | RollPurpose;
 
 export interface PendingCheck {
   id: string;

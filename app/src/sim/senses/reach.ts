@@ -204,7 +204,9 @@ function senseLine(b: ReachBeing): string {
     const e = b.senses.effectiveness[s];
     const hurt = b.senses.organs.filter((o) => o.sense === s && !o.assumed && o.effectiveness < 1).map((o) => `${o.partName} ${o.conditionLabel}`);
     const granted = (b.senses.grants ?? []).filter((g) => g.sense === s && g.effectiveness > 0).map((g) => `via ${g.source.label}`);
-    const notes = [...hurt, ...granted];
+    // The tier in words: Broken = halved, Destroyed = no sense from that organ (the sheet's Equipment conditions).
+    const tier = e <= 0 ? 'UNAVAILABLE' : e < 1 ? 'impaired' : '';
+    const notes = [...hurt, ...granted, ...(tier ? [tier] : [])];
     return `${s} ${e}${notes.length ? ` (${notes.join(', ')})` : ''}`;
   });
   const minds = mindSenses(b);
@@ -297,6 +299,22 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 /**
+ * Deterministic pre-gate (2026-10-26): when every organ sense that could carry this event is Destroyed (effectiveness 0)
+ * and the being has no mind sense, the event cannot reach it. Returns the not-reached verdict, else null (ask the judge).
+ * Thoughts and the event's own source are not gated here (lawfulVerdict / stubVerdict own those). Pure.
+ */
+export function senseGate(event: ReachEvent, b: ReachBeing): ReachVerdict | null {
+  if (event.sourceId === b.id) return null;
+  const kind = cuesFromText(event.text).kind ?? event.kind;
+  if (kind === 'thought') return null;
+  const carriers = carriersOf(kind);
+  if (!carriers.length) return null;
+  if (mindSenses(b).some((m) => m.effectiveness > 0)) return null;
+  if (carriers.some((s) => (b.senses.effectiveness[s] ?? 0) > 0)) return null;
+  return { beingId: b.id, reaches: false, via: [], noticed: false, salience: 0 };
+}
+
+/**
  * One event, every being: does it reach, by which senses, is it noticed, how
  * salient. Flag off or no model → the stub. Never throws.
  */
@@ -312,8 +330,13 @@ export async function judgeReach(
   try {
     const verdicts = new Map<string, ReachVerdict>();
     // The source needs no judging; the rest go in chunks the small model can hold (normally one call).
-    const judged = beings.filter((b) => b.id !== event.sourceId);
-    for (const b of beings) if (b.id === event.sourceId) verdicts.set(b.id, stubVerdict(event, b));
+    // PRE-GATE (no model asked): a being whose every carrying sense is Destroyed cannot be granted the event.
+    for (const b of beings) {
+      if (b.id === event.sourceId) { verdicts.set(b.id, stubVerdict(event, b)); continue; }
+      const gate = senseGate(event, b);
+      if (gate) verdicts.set(b.id, gate);
+    }
+    const judged = beings.filter((b) => !verdicts.has(b.id));
     const chunks: ReachBeing[][] = [];
     for (let i = 0; i < judged.length; i += REACH_TUNING.maxBeingsPerCall) chunks.push(judged.slice(i, i + REACH_TUNING.maxBeingsPerCall));
     await withTimeout(Promise.all(chunks.map(async (chunk) => {

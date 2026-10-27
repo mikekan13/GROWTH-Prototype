@@ -90,13 +90,19 @@ export async function loadReachBeings(campaignId: string, characterIds: string[]
   const locIds = [...new Set(rels.map((r) => r.targetId))];
   const locs = locIds.length ? await prisma.location.findMany({ where: { id: { in: locIds } }, select: { id: true, name: true } }) : [];
   const locName = new Map(locs.map((l) => [l.id, l.name]));
+  // The being's latest standing intention (when no encounter intent was passed) is what it is attending to. Best-effort.
+  const intentOf = new Map<string, string>();
+  try {
+    const rows = await prisma.dayaIntention.findMany({ where: { status: 'PENDING', entity: { characterId: { in: ids } } }, orderBy: { createdAt: 'desc' }, select: { description: true, entity: { select: { characterId: true } } }, take: 60 });
+    for (const r of rows ?? []) { const cid = r.entity?.characterId; if (cid && !intentOf.has(cid)) intentOf.set(cid, r.description); }
+  } catch { /* no intention read → goals only */ }
   const goalsOf = new Map<string, string[]>();
   for (const g of goals) if (g.characterId) goalsOf.set(g.characterId, [...(goalsOf.get(g.characterId) ?? []), g.description]);
   return chars.map((c) => {
     let sheet: SheetBits | null = null;
     try { sheet = JSON.parse(c.data) as SheetBits; } catch { sheet = null; }
     const locationId = locOf.get(c.id) ?? null;
-    const focus = opts.focusById?.[c.id] ?? (goalsOf.get(c.id)?.slice(0, 2).join('; ') || null);
+    const focus = opts.focusById?.[c.id] ?? ([intentOf.get(c.id) ? 'intends: ' + intentOf.get(c.id) : null, ...(goalsOf.get(c.id)?.slice(0, 2) ?? [])].filter(Boolean).join('; ') || null);
     return { id: c.id, name: c.name, locationId, locationName: locationId ? locName.get(locationId) ?? null : null, senses: senseProfileFromSheet(sheet, { items: held.get(c.id) ?? [] }), focus, wisdom: wisdomOf(sheet) };
   });
 }

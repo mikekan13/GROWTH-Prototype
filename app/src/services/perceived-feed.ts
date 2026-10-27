@@ -28,7 +28,8 @@ import { entityToken, GAP } from '@/lib/perceived-text';
 import { renderViewerFeed, characterDescription, loadViewerContext, visibleEntity, VISIBLE_FORM_TUNING, type VisibleForm, type VisiblePiece, type VisibleRow, type VisibleEntity } from '@/services/visible-form';
 import { aspectFacts, type AspectSubject } from '@/sim/perception/aspect-values';
 import type { GrowthWorldItem } from '@/types/item';
-import type { TerminalActor, TerminalEventType, TerminalPayload, PerceivedEntityRef } from '@/types/terminal';
+import type { TerminalActor, TerminalEventType, TerminalPayload, PerceivedEntityRef, RollPayload } from '@/types/terminal';
+import { rollForViewer, type RollReader } from '@/lib/roll-card';
 
 export type FeedViewer =
   | { mode: 'truth' }
@@ -79,6 +80,28 @@ export async function ownRecordScope(campaignId: string, user: { id: string; rol
   if (viewer.mode === 'truth') return null;
   const own = await prisma.character.findMany({ where: { campaignId, userId: user.id }, select: { id: true } });
   return own.map((c) => c.id);
+}
+
+/**
+ * Roll cards are cut per reader (lib/roll-card): the Watcher sees all, the actor and a sight-witness the readout
+ * without the DR, a hearer the sentence, anyone else nothing. Applied wherever events leave the server.
+ */
+export function cutRollEvents<E extends { type: string; payload: unknown }>(events: E[], reader: RollReader): E[] {
+  const out: E[] = [];
+  for (const e of events) {
+    if (e.type !== 'roll') { out.push(e); continue; }
+    const cut = rollForViewer(e.payload as RollPayload, reader);
+    if (cut) out.push({ ...e, payload: cut });
+  }
+  return out;
+}
+
+/** Who is reading, for a roll card: the Watcher/ADMIN (all), else the user's own character. */
+export async function rollReaderFor(campaignId: string, user: { id: string; role: string }): Promise<RollReader> {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true } });
+  if (!campaign || seesTruthRecord(user.id, user.role, campaign)) return { kind: 'watcher' };
+  const ch = await prisma.character.findFirst({ where: { campaignId, userId: user.id, entityType: 'PLAYER_CHARACTER' }, orderBy: { createdAt: 'desc' }, select: { id: true } });
+  return { kind: 'character', characterId: ch?.id ?? null };
 }
 
 /** One feed row in the shape queryCampaignEvents returns (the client wraps it the same way). */
@@ -263,6 +286,31 @@ export async function queryPerceivedFeed(q: PerceivedFeedQuery): Promise<{ event
     characterId: row.characterId, characterName: row.characterName,
     payload: JSON.parse(row.payload) as TerminalPayload, createdAt: row.createdAt.toISOString(),
   }));
+
+  // Roll cards: the viewer's own are cut (no DR); a roll another being made is here only if the viewer perceived it.
+  const reader: RollReader = { kind: 'character', characterId: viewer.characterId };
+  const cutOwn = cutRollEvents(ownRows, reader);
+  ownRows.length = 0;
+  ownRows.push(...cutOwn);
+  if (viewer.characterId) {
+    const seenRolls = await prisma.campaignEvent.findMany({
+      where: {
+        campaignId, type: 'roll', payload: { contains: `"${viewer.characterId}":` },
+        ...(cursor || after ? { createdAt: { ...(cursor ? { lt: cursor } : {}), ...(after ? { gt: after } : {}) } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+    });
+    const have = new Set(ownRows.map((r) => r.id));
+    const others: FeedApiEvent[] = seenRolls.filter((row) => !have.has(row.id)).map((row) => ({
+      id: row.id, campaignId: row.campaignId, sessionId: row.sessionId,
+      type: row.type as TerminalEventType, actor: row.actor as TerminalActor,
+      actorUserId: row.actorUserId, actorName: row.actorName,
+      characterId: row.characterId, characterName: row.characterName,
+      payload: JSON.parse(row.payload) as TerminalPayload, createdAt: row.createdAt.toISOString(),
+    }));
+    ownRows.push(...cutRollEvents(others, reader));
+  }
 
   // The character's memory of everything else.
   const memRows: FeedApiEvent[] = [];

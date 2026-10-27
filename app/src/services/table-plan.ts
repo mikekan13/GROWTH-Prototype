@@ -43,6 +43,8 @@ export interface PlannedStimulus {
   via?: string[];
   /** The Watcher voiced this listener's own act or words in it. */
   own?: boolean;
+  /** What is written on a thing the line has the listener read, exactly (HW8 run 6) — handed beside the stretch, never through the mirror. */
+  reads?: string;
 }
 
 /** The out-of-character rules that are safe to act on when the words were spoken, not typed. */
