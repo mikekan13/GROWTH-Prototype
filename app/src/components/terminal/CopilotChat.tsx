@@ -87,7 +87,7 @@ export default function CopilotChat({ campaignId, visible, username, userRole }:
       const res = await fetch(`/api/campaigns/${campaignId}/copilot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg }),
+        body: JSON.stringify({ prompt: { source: 'GM_TEXT', text: msg } }),
       });
 
       if (res.ok) {

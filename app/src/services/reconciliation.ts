@@ -51,6 +51,7 @@ import {
   matchCandidate,
   overlap,
   presenceNeeds,
+  worldAlreadyAnswers,
   unfinishedLine,
   titleCase,
   type PlanItem,
@@ -58,6 +59,7 @@ import {
   textToRerender,
 } from '@/services/reconciliation-rules';
 import { parseChain } from '@/daya/chain';
+import { answeredLines, familiarityLines, itemLine, memoryKeys, touchingMemories } from '@/services/reconciliation-context';
 
 export interface TableActorLike { userId: string; username?: string; role: string }
 
@@ -89,29 +91,42 @@ function parseRow(row: { id: string; status: string; kinds: string; summary: str
 
 // ── The read ─────────────────────────────────────────────────────────────
 
-async function simStateSummary(campaignId: string, listeners: Array<{ id: string; name: string }>) {
+async function simStateSummary(campaignId: string, listeners: Array<{ id: string; name: string }>, message = '') {
   const lines: string[] = [];
+  const memoryLines: string[] = [];
+  const familiarity: string[] = [];
   for (const l of listeners) {
     const rel = await prisma.entityRelationship.findFirst({ where: { sourceId: l.id, relationshipType: 'located_at' }, select: { targetId: true } });
     const loc = rel ? await prisma.location.findUnique({ where: { id: rel.targetId }, select: { name: true, data: true } }) : null;
     let desc = '';
     try { desc = loc ? String((JSON.parse(loc.data) as { description?: string }).description ?? '').slice(0, 200) : ''; } catch { /* none */ }
     const here = rel ? await prisma.entityRelationship.findMany({ where: { targetId: rel.targetId, relationshipType: 'located_at', sourceId: { not: l.id } }, select: { sourceId: true } }) : [];
-    const names = here.length ? (await prisma.character.findMany({ where: { id: { in: here.map((h) => h.sourceId) } }, select: { name: true } })).map((c) => c.name) : [];
+    const hereChars = here.length ? await prisma.character.findMany({ where: { id: { in: here.map((h) => h.sourceId) } }, select: { id: true, name: true } }) : [];
+    const names = hereChars.map((c) => c.name);
     // What he has on him (HW6 2026-10-25: the pizza on Kristopher's ledger was "a new presence" to JEWL every
     // line, because nothing told him what anyone was holding).
-    const held = await prisma.campaignItem.findMany({ where: { campaignId, holderId: l.id, status: { notIn: ['DESTROYED', 'CONSUMED', 'LOST'] } }, select: { name: true }, take: 40 });
+    const held = await prisma.campaignItem.findMany({ where: { campaignId, holderId: l.id, status: { notIn: ['DESTROYED', 'CONSUMED', 'LOST'] } }, select: { name: true, data: true }, take: 40 });
     // And what lies in the room with him (HW8 2026-10-25: "checks the receipt" — no receipt on him, none in the hall;
     // JEWL let it through and the being read a "Paid" stamp off a thing the world never had).
-    const inRoom = rel ? await prisma.campaignItem.findMany({ where: { campaignId, locationId: rel.targetId, holderId: null, status: { notIn: ['DESTROYED', 'CONSUMED', 'LOST'] } }, select: { name: true }, take: 40 }) : [];
-    if (inRoom.length) lines.push(`  things in that room: ${inRoom.map((i) => i.name).join(', ')}`);
+    const inRoom = rel ? await prisma.campaignItem.findMany({ where: { campaignId, locationId: rel.targetId, holderId: null, status: { notIn: ['DESTROYED', 'CONSUMED', 'LOST'] } }, select: { name: true, data: true }, take: 40 }) : [];
+    if (inRoom.length) lines.push(`  things in that room: ${inRoom.map((i) => itemLine(i.name, i.data)).join('; ')}`);
     // And what he OWNS elsewhere — the deed, an `owns` edge (HW8 run 5 2026-10-26: JEWL asked about "his car" and spun
     // up a second one; the 2017 Ford Fusion Energi was his all along, held by nobody, parked nowhere on the canvas).
     const deeds = await prisma.entityRelationship.findMany({ where: { sourceId: l.id, relationshipType: 'owns' }, select: { targetId: true } });
     const owned = deeds.length ? await prisma.campaignItem.findMany({ where: { id: { in: deeds.map((d) => d.targetId) }, status: { notIn: ['DESTROYED', 'CONSUMED', 'LOST'] } }, select: { name: true, holderId: true, data: true } }) : [];
-    const elsewhere = owned.filter((o) => o.holderId !== l.id).map((o) => { let tags: string[] = []; try { tags = ((JSON.parse(o.data) as { tags?: unknown }).tags as string[]) ?? []; } catch { tags = []; } return tags.length ? `${o.name} (${tags.slice(0, 3).join(', ')})` : o.name; });
+    const elsewhere = owned.filter((o) => o.holderId !== l.id).map((o) => { let tags: string[] = []; try { tags = ((JSON.parse(o.data) as { tags?: unknown }).tags as string[]) ?? []; } catch { tags = []; } const line = itemLine(o.name, o.data); return tags.length ? `${line} [${tags.slice(0, 3).join(', ')}]` : line; });
     if (elsewhere.length) lines.push(`  owns, not on him: ${elsewhere.join(', ')}`);
-    lines.push(`${l.name}: ${loc ? `at "${loc.name}"${desc ? ` — ${desc}` : ''}` : 'nowhere on the canvas'}${names.length ? `; also present: ${names.join(', ')}` : '; no one else present'}${held.length ? `; holding: ${held.map((h) => h.name).join(', ')}` : '; holding nothing'}`);
+    // What he remembers that touches this line, and how well he knows who is here.
+    const entity = await prisma.dayaEntity.findFirst({ where: { characterId: l.id }, select: { id: true } });
+    if (entity) {
+      const mems = await prisma.dayaMemoryEntry.findMany({ where: { entityId: entity.id }, orderBy: { realTime: 'desc' }, take: 200, select: { content: true } });
+      const hits = touchingMemories(mems.map((m) => m.content), memoryKeys(message, [...names, ...listeners.map((x) => x.name)]));
+      if (hits.length) memoryLines.push(`what ${l.name} remembers:\n${hits.map((h) => `    - ${h}`).join('\n')}`);
+      const nameOf = new Map<string, string>([...hereChars.map((c) => [c.id, c.name] as [string, string]), ...listeners.map((x) => [x.id, x.name] as [string, string])]);
+      const fam = await prisma.familiarity.findMany({ where: { campaignId, perceiverId: entity.id, subjectId: { in: [...nameOf.keys()].filter((k) => k !== l.id) } }, select: { subjectId: true, aspectKind: true, score: true } });
+      familiarity.push(...familiarityLines(fam.map((f) => ({ perceiver: l.name, subject: nameOf.get(f.subjectId) ?? f.subjectId, aspectKind: f.aspectKind, score: f.score }))));
+    }
+    lines.push(`${l.name}: ${loc ? `at "${loc.name}"${desc ? ` — ${desc}` : ''}` : 'nowhere on the canvas'}${names.length ? `; also present: ${names.join(', ')}` : '; no one else present'}${held.length ? `; holding: ${held.map((h) => itemLine(h.name, h.data)).join('; ')}` : '; holding nothing'}`);
   }
   const locations = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { name: true, status: true }, take: 60 });
   const npcs = await prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { name: true }, take: 60 });
@@ -128,7 +143,11 @@ async function simStateSummary(campaignId: string, listeners: Array<{ id: string
     try { message = String((JSON.parse(r.payload) as { message?: string }).message ?? ''); } catch { message = ''; }
     return message ? `- ${r.characterName ?? 'a being'}: ${message.slice(0, 200)}` : null;
   }).filter((x): x is string => !!x);
+  const answered = await prisma.reconciliation.findMany({ where: { campaignId, answer: { not: null } }, orderBy: { createdAt: 'desc' }, take: 5, select: { message: true, answer: true } });
   return {
+    memories: memoryLines.join('\n') || '(none touch this line)',
+    familiarity: familiarity.join('\n') || '(none recorded)',
+    told: answeredLines(answered.reverse()).join('\n') || '(nothing yet)',
     beings: lines.join('\n') || '(no awake beings at the table)',
     locations: locations.map((l) => `${l.name} [${l.status.toLowerCase()}]`).join('; ') || '(none)',
     npcs: npcs.map((n) => n.name).join(', ') || '(none)',
@@ -139,13 +158,13 @@ async function simStateSummary(campaignId: string, listeners: Array<{ id: string
 
 /** The model half of JEWL's read. Never throws; returns null when the C tier is unavailable. */
 async function jewlRead(campaignId: string, message: string, listeners: Array<{ id: string; name: string }>): Promise<JewlRead | null> {
-  const state = await simStateSummary(campaignId, listeners);
+  const state = await simStateSummary(campaignId, listeners, message);
   try {
     const res = await chat({
       tier: 'C', subsystem: 'reconciliation', contentClass: 'fiction',
       messages: [
-        { role: 'system', content: `You are JEWL, the copilot running the table underneath a GROWTH Watcher (the GM). Before a line of narration becomes canon you read it against the simulated world. Decide whether it is DIFFERENT ENOUGH from the sim to stop and ask — the Watcher may have misspoken, or may be improvising somewhere new. Ordinary additive narration inside the current scene is NOT a discrepancy. Kinds: relocation (a being is narrated somewhere other than where the sim has it), new_presence (a person the roster lacks is here and matters), new_thing (the narration has someone hold, read, hand over, get into or handle a THING — a receipt, a key, a note, a bag, a car — that is on no one's holding list, not among the things in the room and not in what he owns elsewhere: the world does not have it, so no being can know what it is or what is written on it; ask the Watcher what it is and what it says or shows. A thing he OWNS elsewhere — his car, his coat at the hotel — is his: getting into his car is not a new thing), contradicted_fact (the narration contradicts what the world holds), contradiction (the Watcher contradicts his own recent narration), continuity (a jump the scene did not set up). Respond with ONLY JSON: {"discrepant": boolean, "kinds": string[], "summary": one plain sentence of what differs, "question": one or two sentences in JEWL's own voice to the Watcher — plain, unbothered, ending by asking whether it was a mistake or whether we are going somewhere new, "needs": [{"kind": "location"|"npc"|"item", "name": short name the narration implies, "description": what the narration says about it, "holder": for an item, the name of the character holding it, else null}], "relocate": boolean (true when the awake beings should now be at the narrated place)}. needs lists only what the world would have to HAVE for this narration to be true and does not already have.` },
-        { role: 'user', content: `AWAKE BEINGS AND WHERE THE SIM HAS THEM:\n${state.beings}\n\nPLACES THE CAMPAIGN HAS:\n${state.locations}\n\nPEOPLE THE CAMPAIGN HAS:\n${state.npcs}\n\nTHE WATCHER'S RECENT NARRATION:\n${state.recent}\n\nWHAT THE BEINGS THEMSELVES JUST DID AND SAID (these are canon too — the Watcher's next line is read as following them):\n${state.acts}\n\nNEW NARRATION:\n${message}` },
+        { role: 'system', content: `You are JEWL, the copilot running the table underneath a GROWTH Watcher (the GM). Before a line of narration becomes canon you read it against the simulated world. Decide whether it is DIFFERENT ENOUGH from the sim to stop and ask — the Watcher may have misspoken, or may be improvising somewhere new. Ordinary additive narration inside the current scene is NOT a discrepancy. Kinds: relocation (a being is narrated somewhere other than where the sim has it), new_presence (a person the roster lacks is here and matters), new_thing (the narration has someone hold, read, hand over, get into or handle a THING — a receipt, a key, a note, a bag, a car — that is on no one's holding list, not among the things in the room and not in what he owns elsewhere: the world does not have it, so no being can know what it is or what is written on it; ask the Watcher what it is and what it says or shows. A thing he OWNS elsewhere — his car, his coat at the hotel — is his: getting into his car is not a new thing), contradicted_fact (the narration contradicts what the world holds), contradiction (the Watcher contradicts his own recent narration), continuity (a jump the scene did not set up). Respond with ONLY JSON: {"discrepant": boolean, "kinds": string[], "summary": one plain sentence of what differs, "question": one or two sentences in JEWL's own voice to the Watcher — plain, unbothered, ending by asking whether it was a mistake or whether we are going somewhere new, "needs": [{"kind": "location"|"npc"|"item", "name": short name the narration implies, "description": what the narration says about it, "holder": for an item, the name of the character holding it, else null}], "relocate": boolean (true when the awake beings should now be at the narrated place)}. needs lists only what the world would have to HAVE for this narration to be true and does not already have. HOW TO CHECK BEFORE YOU STOP: the lists below carry the TEXT written on things ("text written on it"), what each being remembers that touches the line, and how well the beings know each other. You may call something unknown ONLY when it is absent from ALL of: what the beings hold, the things in the room, what they own elsewhere, the text written on those things, the beings' memories, and the Watcher's earlier answers. Knowing a NAME is not a new thing when that name is printed on a thing the being holds or is in his memory (a receipt reading CUSTOMER: VIOLET means he knows her first name). A stop MUST say in its summary what you checked ("I checked the receipt's text and Kristopher's memories; neither ..."). Never assert a negative you did not check; if the lists do not settle it, do not stop.` },
+        { role: 'user', content: `AWAKE BEINGS AND WHERE THE SIM HAS THEM:\n${state.beings}\n\nPLACES THE CAMPAIGN HAS:\n${state.locations}\n\nPEOPLE THE CAMPAIGN HAS:\n${state.npcs}\n\nTHE WATCHER'S RECENT NARRATION:\n${state.recent}\n\nWHAT THE BEINGS THEMSELVES JUST DID AND SAID (these are canon too — the Watcher's next line is read as following them):\n${state.acts}\n\nWHAT THE BEINGS REMEMBER THAT TOUCHES THIS LINE:\n${state.memories}\n\nHOW WELL THEY KNOW EACH OTHER:\n${state.familiarity}\n\nTHE WATCHER TOLD JEWL EARLIER (do not ask these again):\n${state.told}\n\nNEW NARRATION:\n${message}` },
       ],
       maxTokens: 500, temperature: 0,
     });
@@ -229,6 +248,8 @@ export async function readNarration(
     else needs.push(r);
   }
   const plan = await planNeeds(campaignId, needs);
+  // Every need is a thing the world already has and nobody moves: nothing to ask (the Chess Pizza receipt, 2026-10-26).
+  if (worldAlreadyAnswers(plan, [...kinds], read?.relocate ?? false, rule.length)) return null;
   const est = estimatePlan(plan);
   const economy = await getCampaignEconomy(campaignId);
   const summary = read?.summary || (rule.length ? `${rule.map((r) => r.name).join(', ')} — no one the world knows.` : 'The narration differs from the sim.');
@@ -259,7 +280,7 @@ async function holdWallet(campaignId: string) {
  * narration relocated them. Returns the ticket, now CONFIRMED (or REFUSED if
  * the estimate does not fit the campaign's fluid KRMA).
  */
-export async function confirmReconciliation(campaignId: string, actor: TableActorLike, ticketId: string): Promise<ReconTicket & { created: Array<{ kind: string; id: string; name: string }>; moved: string[]; bridge?: BridgeResult | null; refusedReason?: string }> {
+export async function confirmReconciliation(campaignId: string, actor: TableActorLike, ticketId: string, answer?: string): Promise<ReconTicket & { created: Array<{ kind: string; id: string; name: string }>; moved: string[]; bridge?: BridgeResult | null; refusedReason?: string }> {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true } });
   if (!campaign) throw new NotFoundError('Campaign not found');
   if (!canManageCampaign(actor.userId, actor.role, campaign)) throw new ForbiddenError('Only the Watcher answers JEWL');
@@ -354,19 +375,19 @@ export async function confirmReconciliation(campaignId: string, actor: TableActo
     } catch (err) { console.warn('[reconciliation] bridge failed; the jump stands unbridged', err); }
   }
 
-  const updated = await prisma.reconciliation.update({ where: { id: row.id }, data: { status: 'CONFIRMED', holdTxId, holdWalletId, resolvedAt: new Date(), plan: JSON.stringify(plan.map((p) => ({ ...p, createdId: created.find((c) => c.kind === p.kind && c.name === p.name)?.id ?? null, ...(bridge ? { bridge: { parentEventId: bridge.parentEventId, elapsedMinutes: bridge.elapsedMinutes, steps: bridge.stepEventIds.length } } : {}) }))) } });
+  const updated = await prisma.reconciliation.update({ where: { id: row.id }, data: { status: 'CONFIRMED', answer: answer?.trim() || null, holdTxId, holdWalletId, resolvedAt: new Date(), plan: JSON.stringify(plan.map((p) => ({ ...p, createdId: created.find((c) => c.kind === p.kind && c.name === p.name)?.id ?? null, ...(bridge ? { bridge: { parentEventId: bridge.parentEventId, elapsedMinutes: bridge.elapsedMinutes, steps: bridge.stepEventIds.length } } : {}) }))) } });
   return { ...parseRow(updated, fluid - row.estimateKrma), created, moved, bridge };
 }
 
 /** The Watcher takes it back: a mistake. Nothing was written. */
-export async function dismissReconciliation(campaignId: string, actor: TableActorLike, ticketId: string): Promise<ReconTicket> {
+export async function dismissReconciliation(campaignId: string, actor: TableActorLike, ticketId: string, answer?: string): Promise<ReconTicket> {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true } });
   if (!campaign) throw new NotFoundError('Campaign not found');
   if (!canManageCampaign(actor.userId, actor.role, campaign)) throw new ForbiddenError('Only the Watcher answers JEWL');
   const row = await prisma.reconciliation.findUnique({ where: { id: ticketId } });
   if (!row || row.campaignId !== campaignId) throw new NotFoundError('No such reconciliation');
   if (row.status !== 'PENDING') throw new ValidationError(`Reconciliation is ${row.status}`);
-  const updated = await prisma.reconciliation.update({ where: { id: row.id }, data: { status: 'DISMISSED', resolvedAt: new Date() } });
+  const updated = await prisma.reconciliation.update({ where: { id: row.id }, data: { status: 'DISMISSED', answer: answer?.trim() || null, resolvedAt: new Date() } });
   return parseRow(updated, 0);
 }
 
@@ -447,7 +468,9 @@ export async function listReconciliations(campaignId: string, actor: TableActorL
   if (!campaign) throw new NotFoundError('Campaign not found');
   if (!canManageCampaign(actor.userId, actor.role, campaign)) throw new ForbiddenError("JEWL's ledger is the Watcher's");
   const rows = await prisma.reconciliation.findMany({ where: { campaignId, ...(status ? { status } : {}) }, orderBy: { createdAt: 'desc' }, take: 50 });
-  return rows.map((r) => parseRow(r, 0));
+  const economy = await getCampaignEconomy(campaignId);
+  const fluid = Number(economy.fluid);
+  return rows.map((r) => parseRow(r, fluid));
 }
 
 // ── Corrections after the fact ───────────────────────────────────────────

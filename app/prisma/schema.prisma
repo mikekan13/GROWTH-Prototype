@@ -63,6 +63,7 @@ model Reconciliation {
   holdTxId     String?
   settledKrma  Int?
   canonEventId String?   // the narration event, once confirmed and written
+  answer       String?   // what the Watcher told JEWL when he answered (fed back into JEWL's next read)
   createdBy    String    // userId (the Watcher)
   createdAt    DateTime  @default(now())
   resolvedAt   DateTime?

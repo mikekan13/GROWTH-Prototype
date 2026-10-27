@@ -13,7 +13,7 @@ describe('unfinishedLine — a line that stops mid-word (HW8 run 2)', () => {
     expect(unfinishedLine('He waits')).toBeNull();
   });
 });
-import { matchCandidate, presenceNeeds, estimatePlan, isCemented, titleCase, textToRerender, IMPROV_TUNING, type PlanItem } from './reconciliation-rules';
+import { worldAlreadyAnswers, matchCandidate, presenceNeeds, estimatePlan, isCemented, titleCase, textToRerender, IMPROV_TUNING, type PlanItem } from './reconciliation-rules';
 import { parseTableProse } from './table-prose';
 
 const places = [
@@ -80,5 +80,19 @@ describe('textToRerender — a memory is a rendering of every row in its chain (
   it('rows the chain names but that are gone are skipped; nothing left means nothing to render', () => {
     expect(textToRerender(['gone', 'c1'], rows)).toBe('The lamp goes out.');
     expect(textToRerender(['gone'], rows)).toBe('');
+  });
+});
+
+describe('worldAlreadyAnswers — the Chess Pizza receipt (2026-10-26)', () => {
+  const matched: PlanItem = { kind: 'item', name: 'Receipt', description: 'a receipt', matchId: 'r1', matchName: 'Chess Pizza receipt', baseKrma: 0 };
+  it('does not stop the table when the only need is an item the world already has', () => {
+    expect(worldAlreadyAnswers([matched], ['new_thing'], false, 0)).toBe(true);
+  });
+  it('still stops for a relocation, a stub, a person, or a contradiction', () => {
+    expect(worldAlreadyAnswers([matched], ['new_thing'], true, 0)).toBe(false);
+    expect(worldAlreadyAnswers([{ ...matched, matchId: null, matchName: null, baseKrma: 50 }], ['new_thing'], false, 0)).toBe(false);
+    expect(worldAlreadyAnswers([matched], ['new_thing', 'contradicted_fact'], false, 0)).toBe(false);
+    expect(worldAlreadyAnswers([matched], ['new_thing'], false, 1)).toBe(false);
+    expect(worldAlreadyAnswers([], [], false, 0)).toBe(false);
   });
 });

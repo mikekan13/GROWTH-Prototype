@@ -144,6 +144,16 @@ export function textToRerender(refs: string[], rows: CanonRowNow[]): string {
   return texts.join('\n');
 }
 
+/**
+ * A catch the world already answers (Mike 2026-10-26, the Chess Pizza receipt): every need is an ITEM that matched an
+ * existing one, nobody is relocated, and the read named no contradiction or jump. Nothing to ask; the table goes on. Pure.
+ */
+export function worldAlreadyAnswers(plan: PlanItem[], kinds: ReconKind[], relocate: boolean, ruleNeeds: number): boolean {
+  if (relocate || ruleNeeds > 0 || plan.length === 0) return false;
+  if (!plan.every((p) => p.kind === 'item' && !!p.matchId)) return false;
+  return !kinds.some((k) => k !== 'new_thing');
+}
+
 export function isCemented(load: { memories: number; vines: number; laterEvents: number }): boolean {
   return load.memories + load.vines + load.laterEvents >= IMPROV_TUNING.cementLoad;
 }
