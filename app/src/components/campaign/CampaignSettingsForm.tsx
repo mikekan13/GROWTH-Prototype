@@ -88,6 +88,11 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
   // Recursive genesis (2026-10-16): every person JEWL seeds gets her own
   // sketch + sail walk in the background. Default ON.
   const [aiRecursiveGenesis, setAiRecursiveGenesis] = useState(initialData.aiSettings.recursiveGenesis !== false);
+  // How a being's thoughts read in the out-of-session novel view (Mike 2026-10-26). Default 'inner'.
+  const [aiThoughtStyle, setAiThoughtStyle] = useState<'inner' | 'narrator'>(initialData.aiSettings.thoughtStyle === 'narrator' ? 'narrator' : 'inner');
+  // Rolls as popup + card (2026-10-26): the Watcher's beings default to AI-chosen Effort; a Trailblazer's popup times out to the AI.
+  const [aiRollEffort, setAiRollEffort] = useState<'ai' | 'manual'>(initialData.aiSettings.rollEffort === 'manual' ? 'manual' : 'ai');
+  const [aiRollTimeout, setAiRollTimeout] = useState<number>(initialData.aiSettings.rollTimeoutSec ?? 60);
   const [savingAI, setSavingAI] = useState(false);
 
   function setOverride(feature: AIFeature, choice: 'default' | AIProviderChoice) {
@@ -113,6 +118,9 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
           localVisionModel: aiVisionModel.trim() || undefined,
           localTextModel: aiTextModel.trim() || undefined,
           recursiveGenesis: aiRecursiveGenesis,
+          thoughtStyle: aiThoughtStyle,
+          rollEffort: aiRollEffort,
+          rollTimeoutSec: Math.min(600, Math.max(10, Math.round(aiRollTimeout) || 60)),
         }),
       });
       if (!res.ok) {
@@ -574,6 +582,54 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
             </span>
           </span>
         </label>
+
+        <div>
+          <label className={labelClass}>Thoughts in the novel view</label>
+          <select
+            value={aiThoughtStyle}
+            onChange={e => setAiThoughtStyle(e.target.value === 'narrator' ? 'narrator' : 'inner')}
+            className={inputClass}
+            data-setting="thoughtStyle"
+          >
+            <option value="inner">The being&apos;s own words, an inner line</option>
+            <option value="narrator">Reported in the narrator&apos;s voice</option>
+          </select>
+          <span className="block text-[10px] text-white/40 leading-snug mt-1">
+            Out of a session the Terminal reads as a novel. Inner = &ldquo;I know this door.&rdquo; in italics; narrator = &ldquo;He knew this door.&rdquo;
+          </span>
+        </div>
+
+        <div>
+          <label className={labelClass}>Effort on rolls for your beings</label>
+          <select
+            value={aiRollEffort}
+            onChange={e => setAiRollEffort(e.target.value === 'manual' ? 'manual' : 'ai')}
+            className={inputClass}
+            data-setting="rollEffort"
+          >
+            <option value="ai">The AI chooses (rolls resolve at once)</option>
+            <option value="manual">I set it (a roll popup opens for me)</option>
+          </select>
+          <span className="block text-[10px] text-white/40 leading-snug mt-1">
+            Applies to beings you control. A Trailblazer always sets their own Effort.
+          </span>
+        </div>
+
+        <div>
+          <label className={labelClass}>Trailblazer roll timeout (seconds)</label>
+          <input
+            type="number"
+            min={10}
+            max={600}
+            value={aiRollTimeout}
+            onChange={e => setAiRollTimeout(Number(e.target.value))}
+            className={inputClass}
+            data-setting="rollTimeoutSec"
+          />
+          <span className="block text-[10px] text-white/40 leading-snug mt-1">
+            If a player does not answer their roll popup in time, the AI chooses their Effort and the card says so.
+          </span>
+        </div>
 
         <button
           type="button"

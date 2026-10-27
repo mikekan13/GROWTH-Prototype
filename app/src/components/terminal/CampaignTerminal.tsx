@@ -25,7 +25,15 @@ import { withNarration, feedKeep, isFeedLine } from './table-feed/feed-split';
 import MechanicalLog from './MechanicalLog';
 import type { FeedEntity } from './table-feed/TableFeedRows';
 import EncounterPanel from './EncounterPanel';
-import SessionWarmupOverlay from './SessionWarmupOverlay';
+import JewlInterruptPopup from '@/components/jewl/JewlInterruptPopup';
+import RollPopup from '@/components/roll/RollPopup';
+import { useRollPrompts } from '@/components/roll/useRollPrompts';
+import { useJewlHeld } from '@/components/jewl/useJewlHeld';
+import NovelView from './novel/NovelView';
+import type { ThoughtStyle } from './novel/compose-novel';
+import WarmupStage from './warmup/WarmupStage';
+import WarmupTicker from './warmup/WarmupTicker';
+import { useWarmup } from './warmup/useWarmup';
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -74,7 +82,7 @@ function filterToTypes(filter: TerminalFilter): string[] | undefined {
   switch (filter) {
     case 'all': return undefined;
     case 'chat': return ['chat'];
-    case 'dice': return ['dice_roll'];
+    case 'dice': return ['dice_roll', 'roll'];
     case 'changes': return ['changelog'];
     case 'ai': return ['ai_message'];
     case 'events': return ['game_event', 'command'];
@@ -135,10 +143,6 @@ export default function CampaignTerminal({
   const [reverting, setReverting] = useState<string | null>(null);
   const [sessions, setSessions] = useState<GameSessionInfo[]>([]);
   const [activeSession, setActiveSession] = useState<GameSessionInfo | null>(null);
-  // Session-start loading screen (Mike 2026-10-01): shown once per active
-  // session, for the GM, while the self-hosted core cold-starts.
-  const [warmup, setWarmup] = useState<{ startedAt: string; number: number } | null>(null);
-  const warmupSeenRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const commandInputRef = useRef<CommandInputHandle>(null);
 
@@ -184,27 +188,38 @@ export default function CampaignTerminal({
   }, []);
 
 
-  // A session just became active (started here, or already live on a reload):
-  // one lane check; if the core is not answering yet, raise the loading screen.
+  // Session start (Mike 2026-10-26): while the pod warms, the black novel view glitches toward the in-session look
+  // and the speak bar is a locked ticker (components/terminal/warmup). Replaces the old modal overlay.
+  const warm = useWarmup(campaignId, isGM ? activeSession : null);
+  const warming = warm.mode !== 'idle';
+
+  // JEWL's stop (2026-10-26): the hook + popup live here so a PENDING ticket shows in any session state, not only
+  // while the speak bar is mounted. The speak bar registers its re-send / restore entries below.
+  const speakApi = useRef<{ send: (m: string, t: string | null) => Promise<void>; restoreWords: (m: string) => void; note: (n: string) => void } | null>(null);
+  const jewl = useJewlHeld({
+    campaignId,
+    resend: (message, ticketId) => speakApi.current?.send(message, ticketId) ?? Promise.resolve(),
+    restoreWords: (message) => speakApi.current?.restoreWords(message),
+    onNote: (n) => speakApi.current?.note(n),
+  });
+
+  // Rolls at the table (2026-10-26): the popup for whoever owns a roll's choices; the card arrives through the feed.
+  const roll = useRollPrompts(campaignId, (n) => speakApi.current?.note(n));
+
+  // How thoughts read in the novel view: the GM's setting (ai-settings.thoughtStyle), default 'inner'.
+  const [thoughtStyle, setThoughtStyle] = useState<ThoughtStyle>('inner');
   useEffect(() => {
-    if (!activeSession || !isGM) return;
-    if (warmupSeenRef.current === activeSession.id) return;
-    warmupSeenRef.current = activeSession.id;
-    const { id, startedAt, number } = activeSession;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/campaigns/${campaignId}/lane`);
-        if (!res.ok || cancelled) return;
-        const lane = (await res.json()) as { phase: string };
-        if (cancelled || warmupSeenRef.current !== id) return;
-        if (lane.phase !== 'ready' && lane.phase !== 'disabled') setWarmup({ startedAt, number });
-      } catch { /* the speak bar's status strip still covers it */ }
+        const res = await fetch(`/api/campaigns/${campaignId}/ai-settings`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { settings?: { thoughtStyle?: string } };
+        if (!cancelled) setThoughtStyle(data.settings?.thoughtStyle === 'narrator' ? 'narrator' : 'inner');
+      } catch { /* default */ }
     })();
     return () => { cancelled = true; };
-  }, [activeSession, isGM, campaignId]);
-  useEffect(() => { if (!activeSession) setWarmup(null); }, [activeSession]);
-  const closeWarmup = useCallback(() => setWarmup(null), []);
+  }, [campaignId]);
 
   // ── Fetch merged events ──────────────────────────────────────────────────
 
@@ -947,6 +962,27 @@ export default function CampaignTerminal({
     return narrated.events.filter(e => isFeedLine(e, sessions) && matchEvent(e, q)).length;
   }, [narrated, sessions, query, searching]);
 
+  // The black novel view (Mike 2026-10-26): out of a session the record reads as a novel; at session start the same
+  // view sits over the live feed as the loading screen. The Watcher's truth record is omniscient; a character's
+  // view (a Trailblazer, or the Watcher's view-as) is that character in first person.
+  const novelOnly = !activeSession && !searching;
+  const novelEvents = useMemo(() => narrated.events.filter((e) => feedKeep(e)), [narrated]);
+  const novelViewer = useMemo(() => {
+    if (viewAs) { const c = (tableEntities ?? []).find((e) => e.id === viewAs); return c ? { id: c.id, name: c.name } : null; }
+    return !isGM && character ? { id: character.id, name: character.name } : null;
+  }, [viewAs, tableEntities, isGM, character]);
+  const novelEl = (
+    <NovelView
+      campaignId={campaignId}
+      events={novelEvents}
+      entities={tableEntities ?? []}
+      perceived={perceivedFeed}
+      viewer={novelViewer}
+      thoughtStyle={thoughtStyle}
+      loading={loading}
+    />
+  );
+
   const refreshEvents = useCallback(() => { void fetchEvents(); }, [fetchEvents]);
 
   // The encounter folds into the tree (no tab): its running state is matched to
@@ -989,7 +1025,15 @@ export default function CampaignTerminal({
 
   const bebas = 'var(--font-bebas-neue), Bebas Neue, sans-serif';
   const mono = 'var(--font-terminal), Consolas, monospace';
-  const tabStyle = (on: boolean): React.CSSProperties => ({
+  // Out of a session the WHOLE drawer is the black terminal look (Mike 2026-10-26): white on black in Consolas,
+  // KRMA gold as the one accent. In a session everything is as it was.
+  const black = !activeSession;
+  const rule = 'rgba(255,255,255,0.35)';
+  const tabStyle = (on: boolean): React.CSSProperties => black ? ({
+    fontFamily: mono, fontSize: 14, letterSpacing: '0.08em', textTransform: 'uppercase', height: 36, padding: '0 10px', border: 0,
+    whiteSpace: 'nowrap', cursor: 'pointer', flex: 'none', background: 'none', color: on ? '#ffcc78' : '#fff',
+    boxShadow: on ? 'inset 0 -3px 0 #ffcc78' : undefined,
+  }) : ({
     fontFamily: bebas, fontSize: 19, letterSpacing: '0.07em', height: 36, padding: '3px 9px 0', border: 0,
     whiteSpace: 'nowrap', cursor: 'pointer', flex: 'none',
     background: on ? '#002f6c' : 'none', color: on ? '#ffcc78' : '#002f6c', transform: on ? 'rotate(-1deg)' : undefined,
@@ -998,21 +1042,19 @@ export default function CampaignTerminal({
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: '#cfe2f2' }} data-drawer>
-      {warmup && isGM && (
-        <SessionWarmupOverlay
-          campaignId={campaignId}
-          startedAt={warmup.startedAt}
-          sessionNumber={warmup.number}
-          onReady={closeWarmup}
-          onDismiss={closeWarmup}
-        />
+    <div className="h-full flex flex-col" style={{ backgroundColor: black ? '#000' : '#cfe2f2' }} data-drawer data-chrome={black ? 'black' : 'session'}>
+      {black && <style>{'[data-chrome="black"] input::placeholder{color:rgba(255,255,255,.55)}[data-chrome="black"] select option,[data-chrome="black"] select optgroup{background:#000;color:#fff}'}</style>}
+      {roll.current && (
+        <RollPopup key={roll.current.checkId} prompt={roll.current} answering={roll.answering} onThrow={(a, at) => void roll.throwDie(a, at)} onExpire={roll.expire} />
+      )}
+      {isGM && jewl.held && (
+        <JewlInterruptPopup ticket={jewl.held} answering={jewl.answering} onAnswer={(action, words) => void jewl.answer(action, words)} />
       )}
 
       {/* Header (v7 tab row): the feed · JEWL · ◆ state · session switch (GM) · fold. */}
       <div role="tablist" aria-label="Terminal drawer" data-drawer-tabs style={{
         display: 'flex', alignItems: 'center', height: 42, flex: 'none', padding: '0 0 0 6px', gap: 2,
-        background: '#CBD9E8', borderBottom: '3px solid #002f6c', overflow: 'hidden',
+        background: black ? '#000' : '#CBD9E8', borderBottom: black ? `1px solid ${rule}` : '3px solid #002f6c', overflow: 'hidden',
       }}>
         <button role="tab" aria-selected={terminalMode === 'terminal'} onClick={() => setTerminalMode('terminal')} style={tabStyle(terminalMode === 'terminal')}>Terminal</button>
         <button role="tab" aria-selected={terminalMode === 'copilot'} onClick={() => setTerminalMode('copilot')} style={tabStyle(terminalMode === 'copilot')}>jEWL</button>
@@ -1023,7 +1065,7 @@ export default function CampaignTerminal({
             title={tableFeedLive
               ? (tableFeedLive.holding ? 'Holding an unfinished sentence for the next chunk' : 'The mic is feeding the table')
               : `Session ${activeSession!.number} is live`}
-            style={{ fontFamily: bebas, fontSize: 17, letterSpacing: '0.05em', color: '#002f6c', whiteSpace: 'nowrap', flex: 'none', paddingTop: 3 }}
+            style={{ fontFamily: black ? mono : bebas, fontSize: black ? 13 : 17, letterSpacing: '0.05em', color: black ? '#fff' : '#002f6c', whiteSpace: 'nowrap', flex: 'none', paddingTop: 3 }}
           >
             <span style={{ fontFamily: mono, fontSize: 13, verticalAlign: '1px', marginRight: 3, color: tableFeedLive ? (tableFeedLive.holding ? '#b07a00' : '#2f6fb0') : '#0f6e5e' }}>{'◆'}</span>
             {tableFeedLive ? `Table · ${tableFeedLive.heard}` : `Live · S${activeSession!.number}`}
@@ -1031,9 +1073,9 @@ export default function CampaignTerminal({
         )}
         {isGM && (
           <button onClick={() => void toggleSession()} disabled={sessionBusy} data-no-hold title={activeSession ? 'End the session' : 'Start a session'} style={{
-            fontFamily: bebas, fontSize: 16, letterSpacing: '0.06em', height: 36, minWidth: 36, padding: '2px 8px 0', border: 0, cursor: 'pointer', flex: 'none',
-            whiteSpace: 'nowrap', background: 'none', color: activeSession ? '#b0303b' : '#0f6e5e',
-            boxShadow: `inset 0 0 0 2px ${activeSession ? '#b0303b' : '#0f6e5e'}`, marginLeft: 4,
+            fontFamily: black ? mono : bebas, fontSize: black ? 13 : 16, letterSpacing: '0.06em', height: 36, minWidth: 36, padding: black ? '0 8px' : '2px 8px 0', border: 0, cursor: 'pointer', flex: 'none',
+            whiteSpace: 'nowrap', background: 'none', color: black ? '#ffcc78' : activeSession ? '#b0303b' : '#0f6e5e',
+            boxShadow: `inset 0 0 0 2px ${black ? '#ffcc78' : activeSession ? '#b0303b' : '#0f6e5e'}`, marginLeft: 4,
           }}>
             {sessionBusy ? '…' : activeSession ? '■ End' : '▶ Session'}
           </button>
@@ -1049,12 +1091,12 @@ export default function CampaignTerminal({
         )}
         <span
           title={connected ? `Live${connectedUsers?.length ? ` — ${connectedUsers.map(u => u.username).join(', ')}` : ''}` : 'Disconnected (polling)'}
-          style={{ fontFamily: mono, fontSize: 12, color: connected ? '#0f6e5e' : '#6b7380', whiteSpace: 'nowrap', flex: 'none', marginLeft: 6 }}
+          style={{ fontFamily: mono, fontSize: 12, color: black ? '#fff' : connected ? '#0f6e5e' : '#6b7380', whiteSpace: 'nowrap', flex: 'none', marginLeft: 6 }}
         >
           {connected ? '◈' : '○'}
         </span>
         {onClose && (
-          <button aria-label="Fold the terminal" data-no-hold onClick={onClose} style={{ width: 40, height: 36, flex: 'none', border: 0, background: 'none', color: '#002f6c', fontSize: 16, cursor: 'pointer' }}>{'▾'}</button>
+          <button aria-label="Fold the terminal" data-no-hold onClick={onClose} style={{ width: 40, height: 36, flex: 'none', border: 0, background: 'none', color: black ? '#fff' : '#002f6c', fontSize: 16, cursor: 'pointer' }}>{'▾'}</button>
         )}
       </div>
 
@@ -1068,13 +1110,13 @@ export default function CampaignTerminal({
       {/* JEWL — his own tab (Mike 2026-10-08): the conversation, or the Log of mechanics. */}
       {terminalMode === 'copilot' && (
         <div role="tablist" aria-label="jEWL view" data-jewl-view style={{
-          display: 'flex', flex: 'none', gap: 6, padding: '6px 10px 6px 14px', background: '#cfe2f2', borderBottom: '1px solid rgba(0,47,108,0.25)',
+          display: 'flex', flex: 'none', gap: 6, padding: '6px 10px 6px 14px', background: black ? '#000' : '#cfe2f2', borderBottom: black ? `1px solid ${rule}` : '1px solid rgba(0,47,108,0.25)',
         }}>
           {(['conversation', 'log'] as const).map(v => (
             <button key={v} role="tab" aria-selected={jewlView === v} data-no-hold onClick={() => { setJewlView(v); if (v === 'conversation') setLogReveal(null); }} style={{
-              minHeight: 36, padding: '2px 10px 0', border: 0, cursor: 'pointer', fontFamily: bebas, fontSize: 17, letterSpacing: '0.06em',
-              background: jewlView === v ? '#000' : 'transparent', color: jewlView === v ? '#f5f4ef' : '#002f6c',
-              boxShadow: jewlView === v ? undefined : 'inset 0 0 0 1.5px #002f6c',
+              minHeight: 36, padding: black ? '0 10px' : '2px 10px 0', border: 0, cursor: 'pointer', fontFamily: black ? mono : bebas, fontSize: black ? 13 : 17, letterSpacing: '0.06em',
+              background: black ? 'transparent' : jewlView === v ? '#000' : 'transparent', color: black ? (jewlView === v ? '#ffcc78' : '#fff') : jewlView === v ? '#f5f4ef' : '#002f6c',
+              boxShadow: black ? `inset 0 0 0 1px ${jewlView === v ? '#ffcc78' : rule}` : jewlView === v ? undefined : 'inset 0 0 0 1.5px #002f6c',
             }}>
               {v === 'conversation' ? 'Conversation' : 'Log'}
             </button>
@@ -1110,7 +1152,7 @@ export default function CampaignTerminal({
 
       {terminalMode === 'terminal' && (<>
         {/* One search field over the feed: matching lines, their folds opened. */}
-        <div style={{ flex: 'none', padding: '6px 10px 6px 14px', background: '#cfe2f2', borderBottom: '1px solid rgba(0,47,108,0.25)' }}>
+        <div style={{ flex: 'none', padding: '6px 10px 6px 14px', background: black ? '#000' : '#cfe2f2', borderBottom: black ? `1px solid ${rule}` : '1px solid rgba(0,47,108,0.25)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
               type="search"
@@ -1122,15 +1164,16 @@ export default function CampaignTerminal({
               data-feed-search
               style={{
                 flex: 1, minWidth: 0, height: 36, outline: 0, padding: '0 8px',
-                fontFamily: mono, color: '#000', background: '#fff', border: 0, borderLeft: '4px solid #002f6c',
+                fontFamily: mono, color: black ? '#fff' : '#000', background: black ? '#000' : '#fff', border: 0, borderLeft: black ? `1px solid ${rule}` : '4px solid #002f6c',
+                ...(black ? { boxShadow: `inset 0 0 0 1px ${rule}` } : {}),
               }}
             />
             {viewAsOffered && (
-              <ViewAsPicker characters={viewAsCharacters} value={viewAs} onChange={setViewAs} />
+              <ViewAsPicker characters={viewAsCharacters} value={viewAs} onChange={setViewAs} black={black} />
             )}
           </div>
           {searching && (
-            <div data-search-status style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, fontFamily: mono, fontSize: 12, color: '#393937' }}>
+            <div data-search-status style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, fontFamily: mono, fontSize: 12, color: black ? '#fff' : '#393937' }}>
               <span>{hits} match{hits === 1 ? '' : 'es'} in loaded history{olderCursor ? ' — earlier history is not searched yet' : ''}</span>
               {olderCursor && (
                 <button onClick={() => void loadOlder()} disabled={loadingOlder} data-no-hold style={{
@@ -1143,12 +1186,14 @@ export default function CampaignTerminal({
           )}
         </div>
 
+        <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
         <div
           ref={scrollRef}
           onScroll={onFeedScroll}
-          className="flex-1 overflow-y-auto overflow-x-hidden"
-          style={{ backgroundColor: '#cfe2f2', minHeight: 0 }}
+          className="h-full overflow-y-auto overflow-x-hidden"
+          style={{ backgroundColor: novelOnly ? '#000' : '#cfe2f2', minHeight: 0 }}
           data-feed-scroll
+          data-terminal-look={novelOnly ? 'novel' : 'session'}
         >
           {olderCursor && !searching && (
             <div style={{ padding: '8px 12px 0 14px' }}>
@@ -1161,8 +1206,9 @@ export default function CampaignTerminal({
             </div>
           )}
           {!olderCursor && !loading && !searching && feedEvents.length > 0 && (
-            <div style={{ padding: '10px 14px 0', fontFamily: mono, fontSize: 12, color: '#393937' }}>[BEGINNING OF THE RECORD]</div>
+            <div style={{ padding: '10px 14px 0', fontFamily: mono, fontSize: 12, color: novelOnly ? 'rgba(255,255,255,0.6)' : '#393937' }}>[BEGINNING OF THE RECORD]</div>
           )}
+          {novelOnly ? novelEl : (<>
           <TableFeed
             campaignId={campaignId}
             events={narrated.events}
@@ -1194,6 +1240,12 @@ export default function CampaignTerminal({
               if (nearBottom) el.scrollTop = el.scrollHeight;
             }}
           />
+          </>)}
+        </div>
+        {/* Session start: the black novel glitches away over the live feed as the pod loads (warmup/). */}
+        {warming && (
+          <WarmupStage progress={warm.mode === 'finishing' ? 1 : warm.progress}>{novelEl}</WarmupStage>
+        )}
         </div>
 
         {/* Input only in play: the GM narrates through the speak bar; a
@@ -1202,7 +1254,23 @@ export default function CampaignTerminal({
         {/* The planning board (inspect chips): who is about to do what, until the GM's next move commits it. */}
         {activeSession && <PlanningChips campaignId={campaignId} entities={tableEntities} />}
         {activeSession && (isGM ? (
-          <TableSpeakBar campaignId={campaignId} onEvent={refreshEvents} />
+          <TableSpeakBar
+            campaignId={campaignId}
+            onEvent={refreshEvents}
+            held={jewl.held}
+            onHold={jewl.setHeld}
+            register={(api) => { speakApi.current = api; }}
+            warmup={warm.mode === 'warming' ? (
+              <WarmupTicker
+                campaignId={campaignId}
+                viewer={viewAs ?? 'watcher'}
+                progress={warm.progress}
+                offline={warm.phase === 'offline'}
+                gpu={warm.gpu}
+                onDismiss={warm.dismiss}
+              />
+            ) : undefined}
+          />
         ) : (
           <CommandInput
             ref={commandInputRef}

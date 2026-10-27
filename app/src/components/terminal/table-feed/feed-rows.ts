@@ -18,8 +18,9 @@
  * text with the same preprocessor the engine uses (services/table-prose, pure).
  */
 import type {
-  TerminalEvent, ChatPayload, GameEventPayload, DiceRollPayload, CommandPayload, AIMessagePayload, ChangeLogPayload,
+  TerminalEvent, ChatPayload, GameEventPayload, DiceRollPayload, CommandPayload, AIMessagePayload, ChangeLogPayload, RollPayload,
 } from '@/types/terminal';
+import { chosenNote, HINT_WORD } from '@/lib/roll-card';
 import { parseSegments, mergeAdjacent, type FeedSegment } from '@/lib/feed-segments';
 import { parseTableProse, characterCards } from '@/services/table-prose';
 import { foldSpokenBeats } from '../SpokenBeatBlock';
@@ -85,7 +86,30 @@ export interface BeatRowModel extends RowBase {
   lastTimestamp: string;
 }
 
-export type FeedRowModel = CharacterRowModel | NarrationRowModel | BarRowModel | WithdrawnRowModel | BeatRowModel;
+/**
+ * A ROLL CARD (Mike 2026-10-26): the event sentence, then the readout bars, cut to what this viewer perceived —
+ * 'watcher' sees everything (DR included), 'full' the readout, 'event' only the sentence. Never the DR for a player.
+ */
+export interface RollRowModel extends RowBase {
+  type: 'roll';
+  rollId: string;
+  level: 'watcher' | 'full' | 'event';
+  event: string;
+  actorId: string;
+  actorName: string;
+  /** Readout bars, one per line (empty at level 'event'). */
+  lines: string[];
+  /** 'PASS' | 'FAIL' for a readout that shows the result. */
+  result: 'PASS' | 'FAIL' | null;
+  /** How the Effort was chosen, when not by the owner's hand. */
+  note: string | null;
+  /** For the novel: the skill when the actor had one (not at 'event'), the Effort spent, whether it worked (null at 'event'). */
+  skill: string | null;
+  effort: number;
+  success: boolean | null;
+}
+
+export type FeedRowModel = CharacterRowModel | NarrationRowModel | BarRowModel | WithdrawnRowModel | BeatRowModel | RollRowModel;
 
 export interface RosterName { id: string; name: string }
 
@@ -165,6 +189,29 @@ function diceRow(e: TerminalEvent, p: DiceRollPayload): BarRowModel {
   return { type: 'check', key: e.id, timestamp: e.timestamp, lines: [`${who}${p.context}`, `rolled ${p.total}${vs}${verdict}`] };
 }
 
+const cap1 = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+
+/** A roll payload (already cut to its reader by the server) -> its card. Pure. */
+export function rollRow(e: TerminalEvent, p: RollPayload): RollRowModel | null {
+  const level: RollRowModel['level'] = p.view === 'event' ? 'event' : p.view === 'watcher' ? 'watcher' : 'full';
+  const base = { type: 'roll' as const, key: e.id, timestamp: e.timestamp, cycle: p.cycle, rollId: p.rollId, level, event: p.event, actorId: p.actorId, actorName: p.actorName };
+  if (!p.event?.trim()) return null;
+  if (level === 'event') return { ...base, lines: [], result: null, note: null, skill: null, effort: 0, success: null };
+  const skill = p.isSkilled && p.skillName ? p.skillName : `${cap1(p.governor)} (unskilled)`;
+  const sd = p.sd ? `SD ${p.sd.die.startsWith('flat') ? `+${p.sd.value}` : `${p.sd.die} ${p.sd.value}`}${p.hint ? ` (${HINT_WORD[p.hint]})` : ''}` : null;
+  const effort = `Effort ${p.effort}${p.effort && p.effortAttribute ? ` (${p.effortAttribute})` : ''}`;
+  const fd = p.fd ? `FD ${p.fd.die} ${p.fd.value}` : null;
+  const flat = p.traitFlat ? `traits ${p.traitFlat > 0 ? '+' : ''}${p.traitFlat}` : null;
+  const result: 'PASS' | 'FAIL' = p.success ? 'PASS' : 'FAIL';
+  const lines = [
+    `${p.actorName} · ${skill}`,
+    [sd, effort, fd, flat].filter(Boolean).join(' · '),
+    `total ${p.total}${level === 'watcher' && p.dr !== undefined ? ` vs DR ${p.dr}` : ''} · ${result}${p.margin !== undefined ? ` (${p.margin >= 0 ? '+' : ''}${p.margin})` : ''}`,
+  ];
+  if (level === 'watcher' && p.dr !== undefined) lines.push(p.drBy === 'sim' ? 'DR suggested by the sim' : 'DR set by the Watcher');
+  return { ...base, lines, result, note: chosenNote(p), skill: p.isSkilled && p.skillName ? p.skillName : null, effort: p.effort, success: p.success };
+}
+
 function gameEventRow(e: TerminalEvent, p: GameEventPayload): FeedRowModel | null {
   const text = p.description?.trim();
   if (!text || !p.eventType) return null;
@@ -194,6 +241,7 @@ export function eventRows(e: TerminalEvent, roster: RosterName[]): FeedRowModel[
       if (p.eventType === 'declaration' && p.description?.trim()) return declarationRows(e, p, roster);
       { const r = gameEventRow(e, p); return r ? [r] : []; }
     case 'dice_roll': return [diceRow(e, p as DiceRollPayload)];
+    case 'roll': { const r = rollRow(e, p as RollPayload); return r ? [r] : []; }
     case 'command': {
       const c = p as CommandPayload;
       return [{ type: 'system', key: e.id, timestamp: e.timestamp, lines: [`> ${c.input}`, ...(c.result ? c.result.split('\n') : [])] }];

@@ -149,3 +149,38 @@ describe("a being's beat, built up (scene-builder 2026-10-25)", () => {
     expect(rows[0]).toMatchObject({ type: 'character', segments: [{ kind: 'thought', text: 'The salt stings.' }] });
   });
 });
+
+describe('roll cards', () => {
+  const base = { kind: 'roll' as const, rollId: 'r1', event: 'Kristopher tries to force the lock.', actorId: 'k', actorName: 'Kristopher', isSkilled: false, governor: 'clout', sd: { die: 'flat:0', value: 0 }, hint: 'purple' as const, fd: { die: 'd6', value: 4 }, effort: 2, effortAttribute: '2 clout', total: 6, success: false, margin: -4, chosenBy: 'player' as const, cycle: 0.2 };
+  const roll = (p: Record<string, unknown>) => ev({ ...base, ...p } as unknown as TerminalPayload, { characterId: 'k', characterName: 'Kristopher' });
+
+  it('the Watcher reads the whole readout, DR and who fixed it', () => {
+    const [row] = eventRows(roll({ view: 'watcher', dr: 10, drBy: 'sim' }), roster);
+    expect(row).toMatchObject({ type: 'roll', level: 'watcher', event: 'Kristopher tries to force the lock.', result: 'FAIL', skill: null, effort: 2 });
+    const lines = (row as { lines: string[] }).lines;
+    expect(lines[0]).toBe('Kristopher · Clout (unskilled)');
+    expect(lines[1]).toContain('Effort 2 (2 clout)');
+    expect(lines[1]).toContain('FD d6 4');
+    expect(lines[2]).toBe('total 6 vs DR 10 · FAIL (-4)');
+    expect(lines[3]).toBe('DR suggested by the sim');
+  });
+  it('a player sees the readout and the colour hint but never the DR', () => {
+    const [row] = eventRows(roll({ view: 'full' }), roster);
+    const text = (row as { lines: string[] }).lines.join(' | ');
+    expect(text).toContain('moderate');
+    expect(text).not.toContain('DR');
+    expect(text).toContain('total 6 · FAIL (-4)');
+  });
+  it('a hearer gets the sentence alone', () => {
+    const [row] = eventRows(roll({ view: 'event', success: false }), roster);
+    expect(row).toMatchObject({ type: 'roll', level: 'event', lines: [], result: null, success: null });
+  });
+  it('the timeout note rides on the card', () => {
+    const [row] = eventRows(roll({ view: 'full', chosenBy: 'ai-timeout' }), roster);
+    expect((row as { note: string }).note).toBe('(chosen for Kristopher — no answer in time)');
+  });
+  it('a roll is a story card, not a Log mechanic', async () => {
+    const { mechanicalKind } = await import('./feed-split');
+    expect(mechanicalKind(roll({ view: 'full' }))).toBeNull();
+  });
+});

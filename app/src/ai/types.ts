@@ -45,7 +45,25 @@ export interface CampaignAISettings {
    * the Watcher may turn it off per campaign.
    */
   recursiveGenesis?: boolean;
+  /**
+   * How a being's thoughts appear in the out-of-session novel view (Mike 2026-10-26):
+   * 'inner' = the being's own words as an italic inner line; 'narrator' = reported in the narrator's voice.
+   * Default 'inner'.
+   */
+  thoughtStyle?: ThoughtStyleSetting;
+  /**
+   * Who sets Effort on a roll for a being the Watcher controls (Mike 2026-10-26): 'ai' (default) = the sim chooses
+   * and the roll resolves at once; 'manual' = the Watcher gets the roll popup. A Trailblazer always sets their own.
+   */
+  rollEffort?: RollEffortSetting;
+  /** Seconds a Trailblazer has to answer a roll popup before the AI chooses for them (default 60). */
+  rollTimeoutSec?: number;
 }
+
+export type RollEffortSetting = 'ai' | 'manual';
+export const DEFAULT_ROLL_TIMEOUT_SEC = 60;
+
+export type ThoughtStyleSetting = 'inner' | 'narrator';
 
 /** Is recursive genesis on for these settings? Pure — default ON. */
 export function recursiveGenesisEnabled(settings: Pick<CampaignAISettings, 'recursiveGenesis'> | null | undefined): boolean {

@@ -30,6 +30,12 @@ const EffortWagerModal = dynamic(() => import('@/components/campaign/EffortWager
 const ContractsDock = dynamic(() => import('@/components/canvas/ContractsDock'), { ssr: false });
 const DeathSaveDialog = dynamic(() => import('@/components/character/DeathSaveDialog'), { ssr: false });
 
+/** The sheet's sex: identity.sex or physicalDescription.gender (same reading as services/table-speak sexFromSheet). */
+function sheetSex(data: Record<string, unknown> | null | undefined): string | null {
+  const id = (data as { identity?: { sex?: string; physicalDescription?: { gender?: string } } } | null | undefined)?.identity;
+  return id?.sex || id?.physicalDescription?.gender || null;
+}
+
 interface CanvasNode {
   id: string;
   type: 'character' | 'npc' | 'location' | 'quest' | 'item';
@@ -178,7 +184,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   }, []);
   // The TABLE feed's world: portraits for the chips, names for the entity spans.
   const tableEntities = useMemo<FeedEntity[]>(() => nodes.flatMap((n): FeedEntity[] => {
-    if (n.type === 'character' || n.type === 'npc') return [{ id: n.id, name: n.name, kind: n.type, portrait: n.portrait ?? null, status: n.status }];
+    if (n.type === 'character' || n.type === 'npc') return [{ id: n.id, name: n.name, kind: n.type, portrait: n.portrait ?? null, status: n.status, sex: sheetSex(n.characterData) }];
     if (n.type === 'location') return [{ id: n.id, name: n.name, kind: 'location', subtype: n.locationType, description: n.locationData?.description }];
     if (n.type === 'item') return [{ id: n.id, name: n.name, kind: 'item', subtype: n.itemType, where: n.holderName ?? n.locationName, description: n.itemData?.description }];
     return [];
@@ -294,7 +300,9 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
       // Handle effort wager prompts — show modal to the player
       if (data.kind === 'effort_wager_prompt') {
-        setPendingWager(data);
+        // A roll at the table (popup + card, 2026-10-26) opens in the Terminal's roll popup, not the canvas modal.
+        if (data.tableRoll) window.dispatchEvent(new CustomEvent('growth:roll-prompt', { detail: data }));
+        else setPendingWager(data);
       }
 
       // Clear contested state when checks resolve

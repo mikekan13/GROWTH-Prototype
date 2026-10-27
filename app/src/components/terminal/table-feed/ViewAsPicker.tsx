@@ -30,7 +30,9 @@ export function writeViewAs(campaignId: string, userId: string, characterId: str
 const bebas = 'var(--font-bebas-neue), Bebas Neue, sans-serif';
 const mono = 'var(--font-terminal), Consolas, monospace';
 
-export default function ViewAsPicker({ characters, value, onChange }: {
+export default function ViewAsPicker({ characters, value, onChange, black = false }: {
+  /** Out of a session the whole drawer is white on black (2026-10-26). */
+  black?: boolean;
   characters: ViewAsCharacter[];
   value: string | null;
   onChange: (characterId: string | null) => void;
@@ -41,7 +43,7 @@ export default function ViewAsPicker({ characters, value, onChange }: {
     <label data-view-as style={{ display: 'flex', alignItems: 'stretch', flex: '0 1 auto', minWidth: 0, height: 36 }}>
       <span style={{
         flex: 'none', display: 'flex', alignItems: 'center', padding: '2px 7px 0',
-        background: '#002f6c', color: '#ffcc78', fontFamily: bebas, fontSize: 15, letterSpacing: '0.06em', whiteSpace: 'nowrap',
+        background: black ? '#000' : '#002f6c', color: black ? '#fff' : '#ffcc78', fontFamily: black ? mono : bebas, fontSize: black ? 12 : 15, letterSpacing: '0.06em', whiteSpace: 'nowrap',
       }}>
         SEEN BY
       </span>
@@ -52,7 +54,7 @@ export default function ViewAsPicker({ characters, value, onChange }: {
         className="text-[16px] md:text-[14px]"
         style={{
           minWidth: 0, maxWidth: 170, height: 36, padding: '0 4px', border: 0, borderRadius: 0,
-          fontFamily: mono, color: '#000', background: value ? '#fff' : '#f5f4ef', boxShadow: 'inset 0 0 0 1.5px #002f6c',
+          fontFamily: mono, color: black ? '#fff' : '#000', background: black ? '#000' : value ? '#fff' : '#f5f4ef', boxShadow: black ? 'inset 0 0 0 1px rgba(255,255,255,0.45)' : 'inset 0 0 0 1.5px #002f6c',
         }}
       >
         <option value="">Truth record</option>

@@ -13,27 +13,16 @@
  * only, never in the record.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import type { JewlTicket } from '@/components/jewl/useJewlHeld';
 
 interface RosterCharacter {
   id: string;
   name: string;
 }
 
-interface ReconTicket {
-  id: string;
-  status: string;
-  kinds: string[];
-  summary: string;
-  question: string;
-  plan: Array<{ kind: string; name: string; matchId: string | null; matchName: string | null; baseKrma: number }>;
-  estimateKrma: number;
-  fluidKrma: number;
-  message: string;
-}
-
 interface ProseResponse {
   /** JEWL stopped the table — answer him (continue = improvising; take it back = mistake). */
-  held?: ReconTicket;
+  held?: JewlTicket;
   canonEventId: string | null;
   /** Split loop (U2c-3): typed lines that were NOT recorded and NOT heard by
    *  beings — out-of-character asides, check calls. The GM must see these, or
@@ -55,9 +44,21 @@ type CoreStatus = 'unknown' | 'ready' | 'warming' | 'offline' | 'disabled';
 export default function TableSpeakBar({
   campaignId,
   onEvent,
+  warmup,
+  held = null,
+  onHold,
+  register,
 }: {
   campaignId: string;
   onEvent?: () => void;
+  /** Session-start warm-up (2026-10-26): while given, the bar is LOCKED and this ticker stands in its place. */
+  warmup?: React.ReactNode;
+  /** JEWL's stop (hook + popup live in CampaignTerminal, 2026-10-26): while a ticket is held the box waits. */
+  held?: JewlTicket | null;
+  /** A /table POST came back { held }: hand the ticket up. */
+  onHold?: (ticket: JewlTicket) => void;
+  /** Gives the terminal this bar's re-send / put-the-words-back / note entries (null on unmount). */
+  register?: (api: { send: (message: string, ticketId: string | null) => Promise<void>; restoreWords: (message: string) => void; note: (n: string) => void } | null) => void;
 }) {
   const [dayaActive, setDayaActive] = useState<RosterCharacter[]>([]);
   const [value, setValue] = useState('');
@@ -66,9 +67,12 @@ export default function TableSpeakBar({
   const [note, setNote] = useState<string | null>(null);
   /** Lines the last send dropped on purpose (see ProseResponse.ignored). Cleared on the next send. */
   const [ignored, setIgnored] = useState<string[] | null>(null);
-  const [held, setHeld] = useState<ReconTicket | null>(null);
-  const [answering, setAnswering] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // JEWL's stop: the popup is mounted by CampaignTerminal; it re-sends the held words / restores them through this.
+  useEffect(() => {
+    register?.({ send: (message, ticketId) => send(message, ticketId), restoreWords: (message) => { setValue(message); inputRef.current?.focus(); }, note: setNote });
+  });
+  useEffect(() => () => register?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Roster on mount — only to know whom to warm and who is awake.
   useEffect(() => {
@@ -138,7 +142,7 @@ export default function TableSpeakBar({
       const result = json as ProseResponse;
       if (result.held) {
         // JEWL caught it: nothing was written. The words wait in the box until the Watcher answers.
-        setHeld(result.held);
+        onHold?.(result.held);
         return;
       }
       // A being that only LISTENED answers ok with detail 'listening' — that says
@@ -173,35 +177,6 @@ export default function TableSpeakBar({
     }
   }
 
-  // The Watcher answers JEWL's popup.
-  async function answerJewl(action: 'confirm' | 'dismiss') {
-    if (!held || answering) return;
-    setAnswering(true);
-    try {
-      const res = await fetch(`/api/campaigns/${campaignId}/reconcile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ticketId: held.id }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setNote(json.error ?? 'JEWL did not get that'); return; }
-      const ticket = json.ticket as ReconTicket & { created?: Array<{ kind: string; name: string }>; moved?: string[]; bridge?: { elapsedMinutes: number; stepEventIds: string[] } | null; refusedReason?: string };
-      const message = held.message;
-      setHeld(null);
-      if (action === 'dismiss') { setValue(message); inputRef.current?.focus(); return; }
-      if (ticket.status === 'REFUSED') { setNote(ticket.refusedReason ?? 'The world cannot afford this.'); setValue(message); return; }
-      const spun = (ticket.created ?? []).map((c) => c.name).join(', ');
-      const moved = (ticket.moved ?? []).join(', ');
-      const bridged = ticket.bridge ? `; the sim bridged the jump (${ticket.bridge.elapsedMinutes} min, ${ticket.bridge.stepEventIds.length} steps)` : '';
-      if (spun || moved) setNote(`JEWL spun up ${spun || 'nothing new'}${moved ? `; ${moved} now there` : ''}${bridged} — holding ${ticket.estimateKrma} KRMA until it sticks`);
-      await send(message, ticket.id);
-    } catch (err) {
-      setNote(err instanceof Error ? err.message : String(err));
-    } finally {
-      setAnswering(false);
-    }
-  }
-
   const awake = dayaActive.map((d) => d.name).join(', ');
 
   // Look: the approved drawer mockup (2026-10-07 v7) — off-white bar under a
@@ -212,28 +187,7 @@ export default function TableSpeakBar({
   const strip: React.CSSProperties = { fontFamily: mono, fontSize: 12, lineHeight: 1.5, margin: '0 0 6px' };
   return (
     <div style={{ flex: 'none', backgroundColor: '#fafaf8', borderTop: '3px solid #000', padding: '8px 10px 10px' }}>
-      {/* JEWL's catch — the table holds until the Watcher answers (Mike 09-26) */}
-      {held && (
-        <div data-jewl-held style={{ marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <p style={{ flex: 1, minWidth: 0, margin: 0, fontFamily: mono, fontWeight: 700, fontSize: 13, lineHeight: 1.55 }}>
-              <span style={{ background: '#383837', color: '#f5f4ef', padding: '1px 5px', WebkitBoxDecorationBreak: 'clone', boxDecorationBreak: 'clone' }}>[jEWL]: {held.question}</span>
-            </p>
-            <button onClick={() => void answerJewl('confirm')} disabled={answering} title="We're going somewhere new — JEWL spins it up" style={{ fontFamily: bebas, fontSize: 18, letterSpacing: '0.05em', height: 36, padding: '3px 10px 0', border: 0, whiteSpace: 'nowrap', background: '#002f6c', color: '#ffcc78', cursor: 'pointer' }}>
-              {answering ? '…' : 'New'}
-            </button>
-            <button onClick={() => void answerJewl('dismiss')} disabled={answering} title="My mistake — take it back" style={{ fontFamily: bebas, fontSize: 18, letterSpacing: '0.05em', height: 36, padding: '3px 10px 0', border: 0, whiteSpace: 'nowrap', background: 'none', color: '#002f6c', boxShadow: 'inset 0 0 0 2px #002f6c', cursor: 'pointer' }}>
-              My mistake
-            </button>
-          </div>
-          {held.plan.length > 0 && (
-            <div style={{ ...strip, margin: '4px 0 0', color: '#393937' }}>
-              {held.plan.map((p) => (p.matchId ? `${p.name} → ${p.matchName} (already here)` : `${p.name} → new ${p.kind}`)).join(' · ')}
-              {held.estimateKrma > 0 && ` · hold ${held.estimateKrma} of ${held.fluidKrma} fluid KRMA`}
-            </div>
-          )}
-        </div>
-      )}
+      {/* JEWL's catch — the table holds until the Watcher answers in the popup (Mike 09-26, 10-26) */}
       {/* No control toggles here (Mike 2026-10-24): the Watcher voices whom the Watcher voices,
           and whoever is not voiced plays itself. Control is contextual, not a switch. */}
       {/* GM-only status strip — infra truth, never part of the table record */}
@@ -251,6 +205,7 @@ export default function TableSpeakBar({
           not heard: {ignored.map((t) => (t.length > 60 ? t.slice(0, 57) + '…' : t)).join(' · ')}
         </div>
       )}
+      {warmup ? warmup : (
       <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
         <textarea
           ref={inputRef}
@@ -287,6 +242,7 @@ export default function TableSpeakBar({
           {sending ? '…' : 'Send'}
         </button>
       </div>
+      )}
     </div>
   );
 }

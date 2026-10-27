@@ -11,7 +11,7 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { segmentMarks, splitEntities, presentCycle, realClock, type FeedSegment, type FeedTimescale, type EntityName } from '@/lib/feed-segments';
-import type { FeedRowModel, CharacterRowModel, NarrationRowModel, BarRowModel, WithdrawnRowModel, BeatRowModel, Via } from './feed-rows';
+import type { FeedRowModel, CharacterRowModel, NarrationRowModel, BarRowModel, WithdrawnRowModel, BeatRowModel, RollRowModel, Via } from './feed-rows';
 import { splitPerceived } from '@/lib/perceived-text';
 import type { PerceivedFact } from '@/types/terminal';
 
@@ -27,6 +27,8 @@ export interface FeedEntity {
   where?: string;
   description?: string;
   status?: string;
+  /** The sheet's sex (identity.sex / physicalDescription.gender), for characters — the novel view's he/she. */
+  sex?: string | null;
   /** Perceived feed: what the viewer knows of each known aspect, at their fidelity. Present = the tooltip shows ONLY these. */
   known?: PerceivedFact[];
 }
@@ -179,7 +181,7 @@ function EntitySpan({ entity, text, source }: { entity: FeedEntity; text: string
 }
 
 /** Plain text with every named thing in the world turned into an entity span. */
-function EntityText({ text, exclude, source }: { text: string; exclude?: string[]; source: string }) {
+export function EntityText({ text, exclude, source }: { text: string; exclude?: string[]; source: string }) {
   const { entities, names, perceived } = useContext(FeedContext);
   const pieces = useMemo(() => (perceived ? [] : splitEntities(text, names, exclude ?? [])), [perceived, text, names, exclude]);
   if (perceived) {
@@ -363,6 +365,25 @@ export function BarRow({ row }: { row: BarRowModel }) {
   );
 }
 
+/** A roll card: the event sentence, then the readout bars as far as this viewer perceived them. */
+export function RollRow({ row }: { row: RollRowModel }) {
+  const attrs = useRowAttrs(row.key);
+  return (
+    <div className="row bx roll" data-row="roll" data-level={row.level} {...attrs}>
+      <div className="body">
+        <div className="line"><EntityText text={row.event} source={`a roll · ${hhmm(row.timestamp)}`} /></div>
+        {row.lines.map((l, i) => (
+          <div className="line" key={i}>
+            <span className={`bar${i === 2 && row.result ? ` ${row.result === 'PASS' ? 'pass' : 'fail'}` : ''}`}>{i === 0 ? '[ROLL] ' : ''}{l}</span>
+          </div>
+        ))}
+        {row.note && <div className="line"><span className="bar note">{row.note}</span></div>}
+      </div>
+      <div className="side"><LogLink refs={row.logRefs} /></div>
+    </div>
+  );
+}
+
 export function WithdrawnRow({ row }: { row: WithdrawnRowModel }) {
   const attrs = useRowAttrs(row.key);
   return (
@@ -402,6 +423,7 @@ export function FeedRow({ row }: { row: FeedRowModel }) {
     case 'narration': return <NarrationRow row={row} />;
     case 'withdrawn': return <WithdrawnRow row={row} />;
     case 'beat': return <BeatRow row={row} />;
+    case 'roll': return <RollRow row={row} />;
     default: return <BarRow row={row} />;
   }
 }

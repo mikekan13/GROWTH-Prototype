@@ -87,6 +87,12 @@ export const TABLE_FEED_CSS = `
 .tf .event .bar{background:#000;color:var(--tf-paper)}
 .tf .jewl .bar{background:var(--tf-bar);color:var(--tf-paper);font-size:13px}
 .tf .sys .bar{background:var(--tf-teal);color:#222;font-size:13px}
+/* roll card (2026-10-26): the event line, then the readout in the Terminal's assessment bars; pass teal, fail coral */
+.tf .row.roll{margin-top:14px}
+.tf .roll .bar{background:#000;color:var(--tf-paper);font-size:13px}
+.tf .roll .bar.pass{background:var(--tf-teal);color:#001a14}
+.tf .roll .bar.fail{background:var(--tf-coral);color:var(--tf-navy)}
+.tf .roll .bar.note{background:var(--tf-bar);font-style:italic}
 
 /* withdrawn: strike + coral Bebas correction (p 63) */
 .tf .gone .line,.tf .gone .seg,.tf .gone .bar{text-decoration:line-through;text-decoration-thickness:2px}
