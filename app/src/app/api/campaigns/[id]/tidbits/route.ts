@@ -19,7 +19,7 @@ export async function GET(
     const parsed = tidbitsQuerySchema.safeParse({ viewer: request.nextUrl.searchParams.get('viewer') ?? '' });
     if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? 'viewer is required');
     const result = await getTidbits({ id: session.user.id, role: session.user.role }, campaignId, parsed.data);
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: { 'Content-Type': 'application/json; charset=utf-8' } });
   } catch (error) {
     return errorResponse(error);
   }

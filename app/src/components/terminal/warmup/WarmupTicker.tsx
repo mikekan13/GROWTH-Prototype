@@ -10,11 +10,12 @@
  * An unreachable core is stated plainly (the old overlay's "offline" case) with the way out.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { patternStability, barSpan } from './lane-progress';
+import { patternStability, halfSpan } from './lane-progress';
 
 const MONO = 'var(--font-terminal), Consolas, monospace';
-const TIDBIT_MS = 5200;
-const READOUT_MS = 4200;
+/** Dwell times: a tidbit stays long enough to read; the readout is a glance. */
+const TIDBIT_MS = 7000;
+const READOUT_MS = 4000;
 
 interface Props {
   campaignId: string;
@@ -23,10 +24,9 @@ interface Props {
   progress: number;
   offline: boolean;
   gpu?: string | null;
-  onDismiss: () => void;
 }
 
-export default function WarmupTicker({ campaignId, viewer, progress, offline, gpu, onDismiss }: Props) {
+export default function WarmupTicker({ campaignId, viewer, progress, offline, gpu }: Props) {
   const [tidbits, setTidbits] = useState<string[]>([]);
   const [mode, setMode] = useState<'tidbit' | 'readout'>('tidbit');
   const [idx, setIdx] = useState(0);
@@ -56,8 +56,10 @@ export default function WarmupTicker({ campaignId, viewer, progress, offline, gp
   }, [mode, tidbits.length]);
 
   const s = patternStability(progress);
-  const { left, width } = barSpan(progress);
+  const half = halfSpan(progress);
   const showTidbit = mode === 'tidbit' && tidbits.length > 0 && !offline;
+
+  const numStyle: React.CSSProperties = { flex: 'none', minWidth: 48, fontVariantNumeric: 'tabular-nums', fontSize: 15 };
 
   return (
     <div
@@ -68,34 +70,30 @@ export default function WarmupTicker({ campaignId, viewer, progress, offline, gp
       aria-label="The table is loading; typing is locked"
       style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 56, padding: '0 14px', background: '#000', color: '#fff', fontFamily: MONO, fontSize: 14 }}
     >
+      {/* The two numbers hold the far edges and never leave; only the glitch-out removes the whole ticker. */}
+      <span data-ps-left style={{ ...numStyle, textAlign: 'left' }}>{s.left}</span>
       <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
         {offline ? (
           <div style={{ fontSize: 13, lineHeight: 1.45 }}>
             <strong style={{ color: '#f7525f' }}>THE CORE IS UNREACHABLE.</strong>{' '}
-            The lane did not answer at the network level{gpu ? ` (last seen on ${gpu})` : ''}. The table still records, but no one at it will respond.
+            The lane did not answer{gpu ? ` (last seen on ${gpu})` : ''}.
           </div>
         ) : showTidbit ? (
           <div key={idx} style={{ lineHeight: 1.45, animation: 'ws-tidbit .6s ease-out' }}>{tidbits[idx % tidbits.length]}</div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%', maxWidth: 560, margin: '0 auto' }} data-pattern-stability>
-            <span style={{ letterSpacing: '0.16em', fontSize: 11, whiteSpace: 'nowrap' }}>PATTERN STABILITY</span>
-            <span data-ps-left style={{ minWidth: 44, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{s.left}</span>
-            <div style={{ position: 'relative', flex: 1, height: 10, borderLeft: '1px solid rgba(255,255,255,.35)', borderRight: '1px solid rgba(255,255,255,.35)' }}>
-              <div style={{ position: 'absolute', top: 2, bottom: 2, left: `${left}%`, width: `${width}%`, background: '#fff' }} />
+          // -40  ====[PATTERN STABILITY]====  40 — the label splits the bar; each half is anchored at the label and shrinks toward it.
+          <div data-pattern-stability style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-end' }}>
+              <div data-ps-half="left" style={{ width: `${half}%`, overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'right', direction: 'rtl' }}>{'='.repeat(160)}</div>
             </div>
-            <span data-ps-right style={{ minWidth: 44, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>+{s.right}</span>
+            <span style={{ flex: 'none', whiteSpace: 'nowrap', letterSpacing: '0.04em' }}>[PATTERN STABILITY]</span>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-start' }}>
+              <div data-ps-half="right" style={{ width: `${half}%`, overflow: 'hidden', whiteSpace: 'nowrap' }}>{'='.repeat(160)}</div>
+            </div>
           </div>
         )}
       </div>
-      <button
-        type="button"
-        onClick={onDismiss}
-        data-no-hold
-        style={{ flex: 'none', minHeight: 36, padding: '0 10px', border: '1px solid rgba(255,255,255,.4)', background: 'transparent', color: '#fff', fontFamily: MONO, fontSize: 11, letterSpacing: '0.1em', cursor: 'pointer' }}
-        title="Stop waiting and set up the table; the first line of the night will still wait for the core"
-      >
-        PREPARE MEANWHILE
-      </button>
+      <span data-ps-right style={{ ...numStyle, textAlign: 'right' }}>{s.right > 0 ? `+${s.right}` : '0'}</span>
       <style>{'@keyframes ws-tidbit{from{opacity:0}to{opacity:1}}'}</style>
     </div>
   );

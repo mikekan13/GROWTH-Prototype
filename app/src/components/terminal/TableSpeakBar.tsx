@@ -191,7 +191,7 @@ export default function TableSpeakBar({
       {/* No control toggles here (Mike 2026-10-24): the Watcher voices whom the Watcher voices,
           and whoever is not voiced plays itself. Control is contextual, not a switch. */}
       {/* GM-only status strip — infra truth, never part of the table record */}
-      {(note || coreStatus === 'warming' || sending) && (
+      {!warmup && (note || coreStatus === 'warming' || sending) && (
         <div style={{ ...strip, color: '#7a4a00' }}>
           {sending
             ? `The table is responding…${coreStatus !== 'ready' ? ' (core warming from cold, first response can take minutes)' : ''}`

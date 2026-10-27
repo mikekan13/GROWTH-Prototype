@@ -57,6 +57,15 @@ export function barSpan(progress: number): { left: number; width: number } {
   return { left: (100 - width) / 2, width };
 }
 
+/**
+ * The readout `-40  ====[PATTERN STABILITY]====  40`: the label sits dead centre and splits the bar in two. Each half is
+ * anchored at the label and extends outward toward its number; its length, as a percent of its own cell, shrinks toward
+ * the label as that number closes on 0. Both halves are always equal — the label never moves and they never grow.
+ */
+export function halfSpan(progress: number): number {
+  return (1 - Math.min(1, Math.max(0, progress))) * 100;
+}
+
 /** One smoothing step: ease toward the target, never backwards, at least a visible crawl while behind. */
 export function stepProgress(current: number, target: number | null, dtMs: number): number {
   if (target === null || target <= current) return current;

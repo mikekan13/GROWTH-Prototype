@@ -1274,7 +1274,6 @@ export default function CampaignTerminal({
                 progress={warm.progress}
                 offline={warm.phase === 'offline'}
                 gpu={warm.gpu}
-                onDismiss={warm.dismiss}
               />
             ) : undefined}
           />

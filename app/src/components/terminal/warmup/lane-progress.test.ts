@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { laneTarget, barSpan, patternStability, stepProgress, bandStates } from './lane-progress';
+import { laneTarget, barSpan, halfSpan, patternStability, stepProgress, bandStates } from './lane-progress';
 
 describe('laneTarget', () => {
   it('ready and disabled are complete; offline holds', () => {
@@ -62,6 +62,19 @@ describe('barSpan', () => {
       expect(b.width).toBeLessThan(prev);
       prev = b.width;
     }
+  });
+});
+
+describe('halfSpan', () => {
+  it('each half starts full, shrinks toward the label, and is gone at full load', () => {
+    expect(halfSpan(0)).toBe(100);
+    expect(halfSpan(0.25)).toBe(75);
+    expect(halfSpan(1)).toBe(0);
+    expect(halfSpan(2)).toBe(0);
+  });
+  it('never grows as progress rises', () => {
+    let prev = 101;
+    for (let p = 0; p <= 1.0001; p += 0.05) { const w = halfSpan(p); expect(w).toBeLessThan(prev); prev = w; }
   });
 });
 
