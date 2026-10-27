@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { factsForActor, splitHeld, heldLines, subjectHead } from './facts-for-actor';
+import { factsForActor, splitHeld, heldLines, subjectHead, readHeldIn } from './facts-for-actor';
 
 const facts = [
   { subjectKey: 'violet_apartment.door', fact: 'Entry door, deadbolt and knob lock, both locked.' },
@@ -79,5 +79,38 @@ describe('what is written on a held thing is told to the being (HW8 2026-10-25)'
     expect(lines[1]).toBe('You have on you: Chess Pizza receipt.');
     expect(lines[2]).toBe(['Written on the Chess Pizza receipt:', 'TOTAL DUE 22.97', 'NOT PAID'].join('\n'));
     expect(heldLines(h, { written: false })).toHaveLength(2);
+  });
+});
+
+describe('facts for a beat (HW8 run 6)', () => {
+  const many = [
+    ...Array.from({ length: 14 }, (_, i) => ({ subjectKey: `junk_${i}`, fact: `Old fact number ${i} about nothing.` })),
+    { subjectKey: 'entry_door', fact: 'closed, locked from the inside' },
+    { subjectKey: 'spare_key', fact: 'The spare key is in the kitchenette junk drawer.' },
+  ];
+  it('ranked puts what the beat touches first, so a cut of ten never loses the door', () => {
+    const out = factsForActor(many, { actorName: 'Violet', otherNames: [], intent: 'Violet? I have a pizza. Entry door key', ranked: true });
+    expect(out.slice(0, 2).map((f) => f.subjectKey).sort()).toEqual(['entry_door', 'spare_key']);
+    // unranked keeps the old order (oldest first) — the door would be last
+    const plain = factsForActor(many, { actorName: 'Violet', otherNames: [], intent: 'zzz', cap: 100 });
+    expect(plain.at(-1)?.subjectKey).toBe('spare_key');
+  });
+  it('heldLines { described } tells a being where a thing it holds is; off by default', () => {
+    const h = splitHeld([{ name: 'Chess Pizza receipt', data: JSON.stringify({ description: 'Taped to the lid of the pizza box.' }) }]);
+    expect(h.described).toEqual([{ name: 'Chess Pizza receipt', description: 'Taped to the lid of the pizza box.' }]);
+    expect(heldLines(h)).toHaveLength(2);
+    expect(heldLines(h, { described: true }).at(-1)).toBe('The Chess Pizza receipt: Taped to the lid of the pizza box.');
+  });
+});
+
+describe('what the line has the being READ (HW8 run 6)', () => {
+  const written = [
+    { name: 'Chess Pizza receipt', text: '*** NOT PAID — COLLECT 22.97 ***' },
+    { name: 'Orthodox prayer rope', text: 'Lord Jesus Christ, Son of God, have mercy on me, a sinner.' },
+  ];
+  it('"looks at the receipt to see if she paid" puts the receipt\'s own text in front of him; the prayer rope is not read', () => {
+    expect(readHeldIn('He looks at the receipt to see if she paid already.', written).map((w) => w.name)).toEqual(['Chess Pizza receipt']);
+    expect(readHeldIn('He steadies his thoughts again with the prayer.', written)).toEqual([]);
+    expect(readHeldIn('He knocks on the door.', written)).toEqual([]);
   });
 });

@@ -10,6 +10,12 @@ describe('time the GM states (Mike 2026-10-24: "if the GM says 2 hours go by the
     expect(statedDurationSeconds('Seven weeks pass.')).toBe(7 * 7 * 86400);
     expect(statedDurationSeconds('Half an hour later.')).toBe(1800);
   });
+  it('a wait "for 30 seconds" is a stated span (HW8 run 6); a quoted "for a minute" is not', () => {
+    expect(statedDurationSeconds('Kristopher waits in the hallway for 30 seconds and then knocks again.')).toBe(30);
+    expect(statedDurationSeconds('He waits for two minutes, then tries the handle.')).toBe(120);
+    expect(statedDurationSeconds('"Wait for 30 seconds," she says.')).toBeNull();
+    expect(lineDuration('gm-line', 'Kristopher waits in the hallway for 30 seconds and then knocks.')).toEqual({ seconds: 30, source: 'stated' });
+  });
   it('reads parts of the day against the local hour', () => {
     expect(statedDurationSeconds('The next morning, light through the blinds.', { localHour: 22 })).toBe(9 * 3600);
     expect(statedDurationSeconds('Later that night she still has not opened the door.', { localHour: 15 })).toBe(4 * 3600);

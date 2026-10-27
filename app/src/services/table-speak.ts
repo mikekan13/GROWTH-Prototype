@@ -31,6 +31,8 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { assertLawfulInput } from '@/services/lawful-intake';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { createCampaignEvent } from '@/services/campaign-event';
+import { detectActiveCheck } from '@/lib/active-check';
+import { startTableRoll } from '@/services/table-roll';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { converseWithEntity, listenToTable, answerAtTable, type ConverseStatus, type TableListenOutcome } from '@/daya/conversation';
 import { sceneBuilderOn, buildScene, buildBeingCard, sceneFacts, clockLine, nameHead, type SeedParts } from '@/services/scene-builder';
@@ -62,6 +64,10 @@ import type { ListenImpulse } from '@/daya/prompts/roles/spirit';
 import { recordBeingThought } from '@/services/being-thought';
 import { statedStretchOf, simulateStatedStretch } from '@/services/table-timeskip';
 import { resolveIntent } from '@/daya/adjudicator';
+import { recentVoiceOf, recentCardTextsOf } from '@/daya/voice-history';
+import { markAddressedByName } from '@/daya/name-addressed';
+import { splitHeld, readHeldIn } from '@/daya/facts-for-actor';
+import { cueCoverage } from '@/daya/ladder';
 
 export interface TableActor {
   userId: string;
@@ -133,6 +139,7 @@ function preListenVoiced(
   parsed: { thoughts?: ProseThought[] },
   actors: Record<string, OwnVoiceActor>,
   ids: string[],
+  readings: Map<string, string> = new Map(),
 ): Map<string, Promise<TableListenOutcome>> {
   const out = new Map<string, Promise<TableListenOutcome>>();
   const hearBeat = plan.beats.find((b): b is Extract<TableBeat, { type: 'hear' }> => b.type === 'hear');
@@ -149,15 +156,35 @@ function preListenVoiced(
     // HELD REACTIONS (Mike 2026-10-25: "held until the next story beat — just like a turn of combat"): what he heard another being say since his last beat, and what went through him then, ride into this beat.
     const held = heldReactions.get(id);
     if (held?.length) {
-      content += held.map((h) => `\nSince your last beat you heard:\n- ${h.heard}\nand what went through you then:\n- ${h.thought}`).join('');
+      content += held.map((h) => `\nSince you last acted, you heard:\n- ${h.heard}\nand what went through you then:\n- ${h.thought}`).join('');
       console.log(`[held-reaction] ${id}: blended ${held.length} into the next beat`);
       heldReactions.delete(id);
     }
     const me = actors[id];
     if (me) content = ownVoice(content, me);
+    // WHAT HE READS (HW8 run 6: the line had him look at the receipt "to see if she paid already"; his voice said the tab was settled
+    // while the paper said NOT PAID): the text in his hand rides beside the stretch (not through the mirror), exactly as written.
+    const reading = readings.get(id);
     // Exactly what hear() would hand it: its senses ride along only when the reach pass is on (then it is 'self' by rule).
-    const stim: PlannedStimulus = { source: s?.source ?? (words ? 'dialogue' : 'perception'), content, own: true, ...(perceptionReachOn() ? { via: ['self'] } : {}) };
+    const stim: PlannedStimulus = { source: s?.source ?? (words ? 'dialogue' : 'perception'), content, own: true, ...(reading ? { reads: reading } : {}), ...(perceptionReachOn() ? { via: ['self'] } : {}) };
     out.set(id, listenToTable(id, actor.role, stim));
+  }
+  return out;
+}
+
+/**
+ * When the Watcher's line has a being READ or look at a thing it holds, what is written on the thing (`data.text`) is put in front
+ * of it as what it reads, exactly. A being that misreads what is in its hand is the being's misread — but the text is there to be
+ * read, not guessed. Never throws.
+ */
+export async function readingsFor(ids: string[], seedText: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (const id of ids) {
+    try {
+      const rows = await prisma.campaignItem.findMany({ where: { holderId: id, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 });
+      const read = readHeldIn(seedText, splitHeld(rows ?? []).written ?? []);
+      if (read.length) out.set(id, read.map((w) => `What you read on the ${w.name}, exactly as it is written:\n${w.text}`).join('\n'));
+    } catch { /* nothing to read */ }
   }
   return out;
 }
@@ -187,33 +214,48 @@ const heldReactions = new Map<string, Array<{ heard: string; thought: string; at
 const HELD_CAP = 3;
 
 /** THE REPLAY (Mike 2026-10-25): sentence-level normal form — lowercase, whitespace collapsed, trailing punctuation off. */
-const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[\s.!?…"'”’)\]]+$/u, '').trim();
+// Markdown emphasis and the model's quote marks are not part of a sentence (HW8 run 6: "it just *is*." came back as "it just is.").
+const norm = (s: string) => s.toLowerCase().replace(/[*_`]/g, '').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').replace(/[\s.!?…"')\]]+$/u, '').trim();
+/** A sentence of five or more words whose content words are (≥ 0.9) all in one earlier sentence is the same sentence said again. */
+const SAME_SENTENCE_FLOOR = 0.9;
+const sameSentenceAgain = (s: string, previous: string[]): boolean => {
+  if (previous.some((p) => norm(p) === norm(s))) return true;
+  if (s.trim().split(/\s+/).length < 5) return false;
+  return previous.some((p) => p.trim().split(/\s+/).length >= 5 && cueCoverage(s, p) >= SAME_SENTENCE_FLOOR);
+};
 
 /** The thought without any sentence it already thought verbatim in `previous`. Empty when every sentence repeats. */
 export function withoutRepeats(thought: string, previous: string[]): string {
-  const seen = new Set(previous.flatMap((p) => splitSentences(p).map(norm)).filter(Boolean));
-  if (!seen.size) return thought.trim();
-  return splitSentences(thought).filter((s) => !seen.has(norm(s))).join(' ').trim();
+  const sentences = previous.flatMap((p) => splitSentences(p)).filter(Boolean);
+  if (!sentences.length) return thought.trim();
+  return splitSentences(thought).filter((s) => !sameSentenceAgain(s, sentences)).join(' ').trim();
+}
+
+/**
+ * THE REPLAY, on the CARD (HW8 run 6): the standing-beat card repeated "The wood doesn't vibrate; it just *is*." from the card
+ * before it. The built card's scene and thought / action segments are held against the being's last three thoughts, monologues
+ * and cards; a repeated sentence is dropped, and a card with nothing left is `null` (it is not posted). Speech is never touched. Pure.
+ */
+export function cardWithoutRepeats<C extends { scene: string | null; segments: Array<{ kind: 'action' | 'thought' | 'speech'; text: string }> }>(card: C, previous: string[]): C | null {
+  const scene = card.scene ? withoutRepeats(card.scene, previous) : '';
+  const segments = card.segments
+    .map((s) => (s.kind === 'speech' ? s : { ...s, text: withoutRepeats(s.text, previous) }))
+    .filter((s) => s.text.trim());
+  if (!scene && !segments.length) return null;
+  return { ...card, scene: scene || null, segments };
 }
 
 /** The being's last `n` recorded thoughts on this campaign (newest first). Never throws. */
 export async function recentThoughtsOf(campaignId: string, characterId: string, n = 3): Promise<string[]> {
-  try {
-    const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'being_thought', characterId }, orderBy: { createdAt: 'desc' }, take: n, select: { payload: true } });
-    const out = rows.map((r) => { try { return (JSON.parse(r.payload) as { thought?: string }).thought ?? ''; } catch { return ''; } }).filter(Boolean);
-    // THE REPLAY, second source (HW8 run 5, 2026-10-26): a voiced being's pre-listen monologue lives in the declaration payload
-    // (`monologues: [{actorId, text}]`), not in a being_thought row — the last 3 declarations count too.
-    try {
-      const decls = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'game_event', payload: { contains: '"monologues"' } }, orderBy: { createdAt: 'desc' }, take: 3, select: { payload: true } });
-      for (const d of decls ?? []) {
-        try {
-          const ms = (JSON.parse(d.payload) as { monologues?: Array<{ actorId?: string; text?: string }> }).monologues ?? [];
-          for (const m of ms) if (m.actorId === characterId && m.text?.trim()) out.push(m.text.trim());
-        } catch { /* skip */ }
-      }
-    } catch { /* non-fatal */ }
-    return out;
-  } catch { return []; }
+  return recentVoiceOf(campaignId, characterId, n);
+}
+
+/** How long a being's line waits for its own thought card to be on the page first — the cloud build alone is allowed 30 s (HW8 run 6: 8 s let "It's open." go up 7 s before her card). */
+export const CARD_WAIT_MS = 45_000;
+/** Wait for a card (bounded, non-fatal): the line that follows goes up after it. */
+export async function awaitCard(card: Promise<void> | undefined, ms = CARD_WAIT_MS): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try { await Promise.race([card ?? Promise.resolve(), new Promise<void>((r) => { timer = setTimeout(r, ms); })]); } catch { /* non-fatal */ } finally { clearTimeout(timer); }
 }
 
 /**
@@ -627,7 +669,7 @@ export async function speakProse(
       feed: { via: 'typed', raw: message, narration: parsed.narration, speech: parsed.quotes, actions: parsed.actions },
     });
     canonEventId = declared.event.id;
-    narratedActs(campaignId, parsed.actions);
+    narratedActs(campaignId, parsed.actions, actor);
   }
   for (const q of parsed.quotes) {
     try {
@@ -814,13 +856,16 @@ async function runBeats(
     // His own act, in his own person: "I knock again", not a stranger knocking (HW6 2026-10-25).
     const me = own ? truth.actors?.[listenerId] : undefined;
     if (me) content = ownVoice(content, me);
+    // WHO SAID WHOSE NAME (HW8 run 6): "Violet?" in his mouth is HIS saying HER name — not her thought opening on "Kristopher."
+    const hearerName = listeners.find((l) => l.id === listenerId)?.name ?? '';
+    if (!own && hearerName) content = markAddressedByName(content, hearerName);
     const carried: PlannedStimulus = { ...stimulus, content, ...(via ? { via } : {}), ...(own ? { own: true } : {}) };
     // A voiced being already listening to this beat (the page was built from its monologue): take that, once.
     const pre = truth.preListened?.get(listenerId);
     if (pre) truth.preListened!.delete(listenerId);
     let cardDone: () => void = () => {};
     cardPosted.set(listenerId, new Promise<void>((r) => { cardDone = r; }));
-    void (pre ?? (unnamed ? unnamed.then((c) => listenToTable(listenerId, actor.role, { ...carried, content: c })) : listenToTable(listenerId, actor.role, carried)))
+    void (pre ?? (unnamed ? unnamed.then((c) => listenToTable(listenerId, actor.role, { ...carried, content: hearerName ? markAddressedByName(c, hearerName) : c })) : listenToTable(listenerId, actor.role, carried)))
       .then(async (outcome) => {
         if (outcome.status !== 'ok') {
           console.warn(`[table-speak] ${listenerId} could not listen: ${outcome.status}${outcome.detail ? ` (${outcome.detail})` : ''}`);
@@ -846,10 +891,19 @@ async function runBeats(
             heldReactions.set(listenerId, held.slice(-HELD_CAP));
             console.log(`[held-reaction] ${name}: held (${Math.min(held.length, HELD_CAP)})`);
           }
-          const card = !repeat && !holding && sceneBuilderOn() && thought && !own
+          let card = !repeat && !holding && sceneBuilderOn() && thought && !own
             ? await buildBeingCard(campaignId, { id: listenerId, name }, carried.content, thought, await sceneFacts(campaignId, [listenerId])).catch(() => null)
             : null;
-          if (!repeat && !holding) await recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
+          // THE REPLAY, on the card (HW8 run 6): a sentence the being's last three thoughts or cards already carried is dropped from
+          // this one (the standing beat repeated one verbatim); a card with nothing left is not posted.
+          let cardRepeat = false;
+          if (card) {
+            const previous = [...await recentThoughtsOf(campaignId, listenerId), ...await recentCardTextsOf(campaignId, listenerId)];
+            const deduped = cardWithoutRepeats(card, previous);
+            if (!deduped) { cardRepeat = true; console.log(`[table-speak] ${name}: the whole card was a repeat — not posted`); }
+            card = deduped;
+          }
+          if (!repeat && !holding && !cardRepeat) await recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
             characterId: listenerId,
             characterName: name,
             heard: carried.content,
@@ -883,6 +937,7 @@ async function runBeats(
   // stored noticed=false, no listening). Nothing on the answer clock waits for it: a being that is asked
   // to answer before its verdict is in takes the waiting stretches as heard (flushed below), as before.
   const reachOn = perceptionReachOn();
+  const judgements = new Map<string, ReturnType<typeof judgeCanonReach>>();
   const waiting = new Map<string, Array<() => void>>();
   // The ask waits for the verdict on the stretch that carried it (HW5 2026-10-25: Violet, asked at once, was
   // handed every plea "as before" and answered a man the judge had ruled she could not hear from inside).
@@ -917,7 +972,7 @@ async function runBeats(
       const clock = (await clockLine(campaignId))?.replace(/^\[clock\]\s*/, '') ?? null;
       const where = await prisma.entityRelationship.findFirst({ where: { sourceId: listenerId, relationshipType: 'located_at' }, select: { targetId: true } });
       const room = where ? await prisma.location.findUnique({ where: { id: where.targetId }, select: { name: true } }) : null;
-      const content = [clock ? `It is ${clock}.` : null, room ? `You are in the ${nameHead(room.name)}.` : null, 'Nothing from beyond the room has reached you this moment.'].filter(Boolean).join(' ');
+      const content = [clock ? `It is ${clock}.` : null, room ? `You are in the ${nameHead(room.name)}.` : null, 'Nothing from beyond the room has reached you just now.'].filter(Boolean).join(' ');
       console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: ${content}`);
       hear(listenerId, { source: 'perception', content }, { verdict: { beingId: listenerId, reaches: true, via: ['sight'], noticed: true, salience: 0.3 }, source: 'stub' }, undefined, truthId);
     } catch (err) { console.warn('[standing-beat] failed (non-fatal):', err instanceof Error ? err.message : err); }
@@ -984,7 +1039,13 @@ async function runBeats(
     // The judge reads the WHOLE public stretch — the narration and the words spoken in it (HW8 run 2: "He breaks the
     // silence." was judged alone, made no sound, and his "Is everything ok?" inherited the verdict: she never heard him).
     const judgedRun = judgeWith ? withoutThoughts(judgeWith, thoughts) : publicRun;
-    const judged = judgeCanonReach(campaignId, reachEventOf(judgedRun, truthId, truthId === truth.primary ? truth.actorId ?? null : null), toJudge);
+    // ONE VERDICT PER (STRETCH, BEING) (HW8 run 6: every stretch was judged twice per being — $0.20 of a $0.28 run): the same event text
+    // for the same beings on the same truth reuses the verdict it already asked for.
+    const event = reachEventOf(judgedRun, truthId, truthId === truth.primary ? truth.actorId ?? null : null);
+    const judgeKey = `${truthId ?? ''}|${event.text}|${[...toJudge].sort().join(',')}`;
+    let judged = judgements.get(judgeKey);
+    if (judged) console.log(`[perception-reach] verdict reused for ${toJudge.map(nameOf).join(', ')} (the stretch was already judged)`);
+    else { judged = judgeCanonReach(campaignId, event, toJudge); judgements.set(judgeKey, judged); }
     const prior = reachChains.get(campaignId) ?? Promise.resolve();
     const next = prior.then(() => judged).then(async (j) => {
       const refs = new Map<string, EventRefs>();
@@ -1039,7 +1100,7 @@ async function runBeats(
     // The being's line costs the world its seconds (table-clock) before it is on the record.
     if (line && (action.kind === 'speak' || action.kind === 'act')) await advanceClockForLine(campaignId, action.kind === 'speak' ? 'being-speech' : 'being-act', action.content ?? line);
     // CARD ORDER: its own thought card goes up before its line (bounded wait, non-fatal).
-    await Promise.race([cardPosted.get(listenerId) ?? Promise.resolve(), new Promise<void>((r) => setTimeout(r, 8000))]).catch(() => {});
+    await awaitCard(cardPosted.get(listenerId));
     if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(action) });
     // What it did settles what it meant to do.
     // Only a DOING settles what it meant to do (HW8 run 2: "I'm just getting the tip" closed "give it to him as the tip").
@@ -1103,10 +1164,15 @@ async function runBeats(
   // Everything the line put into the world — what was done and what was said — is one stretch for the reach judge.
   const publicStretch: TableUtterance[] = beats.flatMap((b) => (b.type === 'hear' ? b.utterances : b.type === 'spoken' ? [b.utterance] : []));
   const hasHearBeat = beats.some((b) => b.type === 'hear');
+  let stretchHeard = false;
   for (const beat of orderBeats(beats)) {
     if (beat.type === 'hear') {
       const by = oneSpeakerOf(beat.utterances);
       for (const l of listeners) if (l.id !== by) askSource.set(l.id, by);
+      // The first hear beat hands over the WHOLE public stretch (every hear beat's words are in it): a second hear beat would judge
+      // the same stretch again for every being (HW8 run 6).
+      if (stretchHeard) continue;
+      stretchHeard = true;
       // HER CARD GETS HIS WORDS (HW8 run 5, 2026-10-26): the whole public stretch is the stimulus — the hearing filter keeps a
       // speech line whole — so a hearer's card is built on the words, not on "Someone speaks up." while she answers them.
       gatedHear(publicStretch, listeners.map((l) => l.id), impulseAskFor(beat), truth.primary, new Map(), true, publicStretch);
@@ -1184,7 +1250,7 @@ async function speakProseSplit(
   let blended: Set<string> | undefined;
   if (sceneBuilderOn() && narration !== null && (narrated || hasActions)) {
     const voicedHere = voicedIn(parsed).filter((id) => listeners.some((l) => l.id === id));
-    preListened = preListenVoiced(actor, plan, parsed, actorsById, voicedHere);
+    preListened = preListenVoiced(actor, plan, parsed, actorsById, voicedHere, await readingsFor(voicedHere, parsed.full));
     const monologues = await monologuesWithin(preListened, PRELISTEN_WAIT_MS, campaignId);
     const seed: SeedParts = { full: parsed.full, narration: narrated ? parsed.narration : null, actions: parsed.actions ?? [], thoughts: parsed.thoughts ?? [], quotes: parsed.quotes };
     const focus = [...new Set([soleActor(parsed), ...voicedHere].filter((x): x is string => !!x))];
@@ -1208,7 +1274,7 @@ async function speakProseSplit(
       feed: { via: 'typed', raw: message, ...feedParts },
     });
     canonEventId = declared.event.id;
-    narratedActs(campaignId, parsed.actions);
+    narratedActs(campaignId, parsed.actions, actor);
   }
   for (const q of parsed.quotes) {
     try {
@@ -1288,11 +1354,19 @@ async function liveStatedTime(campaignId: string, actor: TableActor, adv: Awaite
  * no check, the words stand, the model names what it did to doors, hands and rooms, and world-apply
  * lands it. Fire-and-forget: the table never waits on it; what the map refuses is logged.
  */
-function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined): void {
+function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined, gm?: { userId: string; username: string }): void {
   for (const a of actions ?? []) {
     if (!a.actorId || !a.text.trim()) continue;
     // What the Watcher had it do settles what it meant to do (intentions, 2026-10-25).
     settleByAct(campaignId, a.actorId, a.text);
+    // ROLLS AT THE TABLE (2026-10-26): a deliberate inspection / search / listen-closely, or an attempt the Watcher frames as
+    // uncertain ("tries to"), is a real check — the popup for its owner and the card. The world does NOT take the words as done:
+    // the Watcher narrates the result. Passive noticing, reading, knocking, walking are never checks.
+    if (gm && detectActiveCheck(a.text)) {
+      void startTableRoll(campaignId, { id: gm.userId, username: gm.username }, { characterId: a.actorId, text: a.text })
+        .catch((err) => console.warn(`[table-speak] roll for ${a.actorLabel} not started (non-fatal):`, err instanceof Error ? err.message : err));
+      continue;
+    }
     void feedCycle(campaignId)
       .then((cycle) => resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: a.text, cycle: cycle ?? 0, narrated: true }))
       .then((r) => {

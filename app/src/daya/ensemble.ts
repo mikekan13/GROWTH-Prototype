@@ -32,6 +32,11 @@ import { render, type Observer, type BiasProfile, type VoiceParams, type AffectV
 import { currentFacts, type WorldFactRecord } from './world-ledger';
 import { factsForActor, splitHeld, heldLines } from './facts-for-actor';
 import { perceive } from './perceive';
+import { filterVoice, droppedLog, hasLightFact } from './voice-filter';
+import { recentVoiceOf } from './voice-history';
+import { nameIsHers } from './name-addressed';
+import { claimVsFact, factHint, type FactLine } from './claim-vs-fact';
+import { actorMap } from '@/services/world-apply';
 import { resolveIntent, type AdjudicationResult, type MechanicsRollHook } from './adjudicator';
 import { enforceSeal } from './seal';
 import { runJewlToolAction } from './jewl-action';
@@ -359,7 +364,7 @@ const ACT_CHAIN_CAP = 1;
  * The facts a being acts against: its own, its place's and the things', never
  * another character's (facts-for-actor). The intent picks what comes first.
  */
-async function actorFacts(ctx: EntityContext, intent: string): Promise<WorldFactRecord[]> {
+async function actorFacts(ctx: EntityContext, intent: string, opts: { ranked?: boolean; cap?: number } = {}): Promise<WorldFactRecord[]> {
   if (!ctx.campaignId) return [];
   const [all, others] = await Promise.all([
     currentFacts(ctx.campaignId),
@@ -367,7 +372,31 @@ async function actorFacts(ctx: EntityContext, intent: string): Promise<WorldFact
       .then(() => prisma.character.findMany({ where: { campaignId: ctx.campaignId!, id: { not: ctx.characterId }, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { name: true } }))
       .catch((): Array<{ name: string }> => []),
   ]);
-  return factsForActor(all, { actorName: ctx.name, otherNames: others.map((o) => o.name), intent });
+  return factsForActor(all, { actorName: ctx.name, otherNames: others.map((o) => o.name), intent, ...(opts.ranked ? { ranked: true } : {}), ...(opts.cap ? { cap: opts.cap } : {}) });
+}
+
+/**
+ * THE FACTS A BEAT TOUCHES, for the voice (HW8 run 6: Violet said "It's open." with the entry door closed and locked on the record;
+ * the voice imagined a glass door and a key in hand — the facts were not in what it read). The ask / stretch picks the facts, the
+ * doors of the being's own room and the things it holds name more (so the door the ask arrived through is never cut as "oldest"),
+ * and the map's own door states ride as authoritative lines. Never throws; an unreadable world is no facts.
+ */
+async function beatFacts(ctx: EntityContext, cue: string, heldNames: string[] = []): Promise<{ lines: string[]; records: FactLine[]; hasLight: boolean }> {
+  try {
+    const map = ctx.campaignId ? await actorMap(ctx.characterId).catch(() => null) : null;
+    const doorNames = (map?.doors ?? []).map((d) => d.name);
+    // A door brings its lock and its keys with it (the voice held "my own key" — the spare is in a drawer on the record).
+    const doorKin = doorNames.length ? ['lock', 'deadbolt', 'key', 'keys'] : [];
+    const ranked = await actorFacts(ctx, [cue, ...doorNames, ...doorKin, ...heldNames].join(' '), { ranked: true, cap: 400 });
+    const records: FactLine[] = ranked.map((f) => ({ subjectKey: f.subjectKey, fact: f.fact }));
+    const doorLines = (map?.doors ?? []).map((d) => `the ${d.name} (between ${d.between.join(' and ')}) is ${d.state}`);
+    for (const d of map?.doors ?? []) records.push({ subjectKey: d.name, fact: d.state });
+    const lines = [
+      ...doorLines,
+      ...ranked.slice(0, 12).map((f) => `${f.subjectKey}: ${f.fact.length > 200 ? `${f.fact.slice(0, 197)}…` : f.fact}`),
+    ];
+    return { lines, records, hasLight: ranked.length === 0 ? true : hasLightFact(ranked.map((f) => `${f.subjectKey} ${f.fact}`)) };
+  } catch { return { lines: [], records: [], hasLight: true }; }
 }
 
 async function runStimulusPipeline(
@@ -798,6 +827,8 @@ export interface TableStimulus {
   via?: string[];
   /** The Watcher voiced this being's own act or words: it is its own doing, not something watched. */
   own?: boolean;
+  /** What is written on a thing this stretch has the being read, exactly (HW8 run 6): put to it as the text in its hand, not mirrored. */
+  reads?: string;
 }
 
 export interface ListenTimings {
@@ -850,7 +881,7 @@ export async function listenStimulus(
   // "He walks back to the door and knocks with frustration" as a stranger's, and his perception of it was
   // written half in the third person). The mirror and the memory carry it as his.
   const own = stimulus.own === true || (stimulus.via?.includes('self') ?? false);
-  const raw = own ? `Your own doing, as the Watcher voiced it: ${stimulus.content}` : stimulus.content;
+  const raw = own ? `Your own doing, as it was told to you: ${stimulus.content}` : stimulus.content;
   // The mirror. The place is taken in once; after that a stretch carries only itself and what changed there.
   let content = raw;
   let standing: ListenTimings['standing'] = 'raw';
@@ -930,6 +961,15 @@ export async function listenStimulus(
   let innerState = prior?.innerState ?? '';
   let innerUpdated = false;
   let impulse: ListenImpulse = 'stay';
+  // THE VOICE'S GROUND (HW8 run 6): what the beat touches in the world (the door, the keys, the receipt — a voice that was never
+  // given them invents a glass door and a key in hand), what it holds and what each thing is, and what it has already thought
+  // (the filter's memory). All best-effort: a lookup that fails leaves the section empty.
+  const heldRows = await Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: characterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 })).catch((): Array<{ name: string; data: string | null }> => []);
+  const [priorVoice, ground] = await Promise.all([
+    ctx.campaignId ? recentVoiceOf(ctx.campaignId, characterId, 30).catch((): string[] => []) : Promise.resolve([] as string[]),
+    omniscient ? Promise.resolve({ lines: [] as string[], records: [] as FactLine[], hasLight: true }) : beatFacts(ctx, stimulus.content, (heldRows ?? []).map((h) => h.name)),
+  ]);
+  const heldNow = omniscient ? [] : heldLines(splitHeld(heldRows ?? []), { described: true, written: false });
   // How long it has let things sit, in the world's time (table-clock): part of what it feels.
   const sinceOwn = ctx.campaignId ? await sinceOwnInWords(ctx.campaignId, ctx.entityDaId, prior?.lastOwnCycle ?? null).catch(() => null) : null;
   try {
@@ -946,14 +986,24 @@ export async function listenStimulus(
       heard: fullTake ? 'You are only now taking in where you are.' : content,
       sinceOwn,
       sensesNote: sensesNoteFor(stimulus.via, own),
+      facts: ground.lines.slice(0, 10),
+      held: heldNow,
+      reads: stimulus.reads,
     });
     const raw = (await chat({ tier: 'L1', subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS }, overrides)).text.trim();
     // The last line is the being's own say on breaking in; only the thought is kept as its inner state.
     const split = splitImpulse(raw);
     impulse = split.impulse;
     const sealed = omniscient ? { text: split.thought, usedFallback: false } : await enforceSeal(split.thought, { entityId: ctx.entityDaId, subsystem: 'spirit_listen', fallback: '' });
-    if (!sealed.usedFallback && sealed.text) {
-      innerState = sealed.text;
+    // THE VOICE FILTER (HW8 run 6): the table's words, stock images, counting nobody gave it, light with no light fact, and a
+    // sentence already thought are dropped before anything downstream (the scene builder, the feed) sees the monologue.
+    const voiced = (!sealed.usedFallback && sealed.text && !omniscient)
+      ? filterVoice(sealed.text, { prior: priorVoice, heard: stimulus.content, hasLightFact: ground.hasLight })
+      : { text: sealed.text, dropped: [] };
+    const log = droppedLog(ctx.name, 'monologue', voiced.dropped);
+    if (log) console.log(log);
+    if (!sealed.usedFallback && voiced.text) {
+      innerState = voiced.text;
       innerUpdated = true;
     }
   } catch (err) {
@@ -990,7 +1040,8 @@ interface QueuedListen {
 /** Stretches joined in the order they were said; narration anywhere in them makes the whole a perception. */
 function joinStimuli(batch: TableStimulus[]): TableStimulus {
   if (batch.length === 1) return batch[0];
-  return { source: batch.some((b) => b.source === 'perception') ? 'perception' : 'dialogue', content: batch.map((b) => b.content).join('\n') };
+  const reads = batch.map((b) => b.reads).filter(Boolean).join('\n');
+  return { source: batch.some((b) => b.source === 'perception') ? 'perception' : 'dialogue', content: batch.map((b) => b.content).join('\n'), ...(reads ? { reads } : {}) };
 }
 
 const listenQueue = new ListenQueue<QueuedListen>(async (characterId, batch) => {
@@ -1152,7 +1203,9 @@ export async function answerAsk(
   let spoken: { source: 'dialogue'; prose: string; standing: 'full' | 'new' } | null = null;
   let askArg: SpiritAsk = { kind: 'turn' };
   if (ask.kind === 'spoken') {
-    spoken = { source: 'dialogue', ...(await unvoiced({ source: 'dialogue', content: `${ask.by}: ${ask.text}` })) };
+    // WHO SAID WHOSE NAME (HW8 run 6: "Violet?" in his mouth became "Kristopher." in her thought): when the words carry the hearer's own name, the line says so.
+    const named = nameIsHers(ask.text, ctx.name) ? `${ask.by} says your name — "${ask.text}"` : `${ask.by}: ${ask.text}`;
+    spoken = { source: 'dialogue', ...(await unvoiced({ source: 'dialogue', content: named })) };
     askArg = { kind: 'spoken', heard: spoken.prose || 'Someone is speaking to you, but you cannot make out the words.' };
   }
   const spokenHeard = spoken?.prose || null;
@@ -1175,7 +1228,8 @@ export async function answerAsk(
   // memory against the ask, what it has on it, and the facts the ask touches. All three are
   // best-effort — a lookup that fails leaves the section empty, never stops the answer.
   const cue = ask.kind === 'spoken' ? `${ask.by}: ${ask.text}` : (heard.at(-1) ?? state.standingScene ?? '');
-  const [answerRecall, heldRows, askFacts] = await Promise.all([
+  const heldPromise = Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: characterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 })).catch((): Array<{ name: string; data: string | null }> => []);
+  const [answerRecall, heldRows, askGround, priorVoice] = await Promise.all([
     (async () => {
       if (!cue.trim()) return state.recallBlock;
       try {
@@ -1189,11 +1243,13 @@ export async function answerAsk(
         return [meant, r.prose ?? r.failedFeel ?? state.recallBlock].filter(Boolean).join(' ');
       } catch { return state.recallBlock; }
     })(),
-    Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: characterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 })).catch((): Array<{ name: string; data: string | null }> => []),
-    actorFacts(ctx, cue).catch((): WorldFactRecord[] => []),
+    heldPromise,
+    // The facts the ask touches — and the doors of her own room and the things she holds (HW8 run 6), ranked so the cut keeps them.
+    heldPromise.then((rows) => beatFacts(ctx, cue, (rows ?? []).map((h) => h.name))),
+    ctx.campaignId && ctx.persona.omniscient !== true ? recentVoiceOf(ctx.campaignId, characterId, 30).catch((): string[] => []) : Promise.resolve([] as string[]),
   ]);
-  const heldText = heldLines(splitHeld(heldRows));
-  const factLines = askFacts.slice(0, 10).map((f) => `${f.subjectKey}: ${f.fact.length > 200 ? `${f.fact.slice(0, 197)}…` : f.fact}`);
+  const heldText = heldLines(splitHeld(heldRows ?? []), { described: true });
+  const factLines = askGround.lines.slice(0, 14);
   const prompt = buildSpiritAnsweringPrompt({
     name: ctx.name,
     identityNarrative: ctx.persona.identityNarrative ?? `${ctx.name}, living her own life, day to day.`,
@@ -1289,6 +1345,29 @@ export async function answerAsk(
     }
     revoiced = true;
   }
+  // CLAIM VS FACT (HW8 run 6: behind her closed, locked entry door Violet said "It's open."). The never-guess check's deterministic
+  // first half: a line asserting a state (open / locked / dark…) of a thing whose fact says the opposite is re-voiced once with the
+  // fact quoted; a second contradiction keeps the words and logs, so the GM sees it. Her model check below reads the same facts.
+  if (line.kind === 'speak' && line.content.trim()) {
+    const askContext = [ask.kind === 'spoken' ? ask.text : '', ...heard.slice(-2)].join(' ');
+    const contra = claimVsFact(line.content, askGround.records, askContext);
+    if (contra) {
+      console.warn(`[daya/ensemble] claim vs fact for ${ctx.name} — revoicing: "${line.content.slice(0, 80)}" against ${contra.subjectKey}: ${contra.fact}`);
+      if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'guess', rule: 'claim-vs-fact' });
+      try {
+        const sealed = await enforceSeal((await answerCall({ hint: factHint(line.content, contra), stop: false })).text, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
+        const second = sealed.usedFallback ? { kind: 'rest' as GateKind, content: '' } : readLine(sealed.text);
+        if (second.kind === 'speak' && second.content.trim()) {
+          const still = claimVsFact(second.content, askGround.records, askContext);
+          if (still) console.warn(`[daya/ensemble] claim vs fact — ${ctx.name} still says "${second.content.slice(0, 80)}" against ${still.subjectKey}: ${still.fact}. The words stand (the GM sees this).`);
+        }
+        line = second;
+      } catch (err) {
+        console.warn('[daya/ensemble] claim vs fact revoice failed; the words stand — claim vs fact (non-fatal):', err);
+      }
+      revoiced = true;
+    }
+  }
   // NEVER GUESS, CHECKED (HW5 2026-10-25: "I think I left it on the counter" with the cash on her; "I paid you,
   // didn't I?" with his voice in her memory saying she had not — the law was in the prompt and the line still
   // filled the gap). A guess is re-voiced once with the gap named; a second guess lets the moment sit.
@@ -1311,6 +1390,19 @@ export async function answerAsk(
         console.warn('[daya/ensemble] guess revoice failed; the moment sits (non-fatal):', err);
         line = { kind: 'rest', content: '' };
       }
+      revoiced = true;
+    }
+  }
+  // THE VOICE FILTER (HW8 run 6) on what the being says or does: the table's words, stock images, counting, light with no light fact,
+  // a sentence already thought — dropped, logged; nothing left means it lets the moment pass. An act only loses the table's words
+  // ("knocks three times" is a doing, not a count).
+  if ((line.kind === 'speak' || line.kind === 'act') && line.content.trim() && ctx.persona.omniscient !== true) {
+    const f = filterVoice(line.content, { prior: priorVoice, heard: heardTexts.join(' '), hasLightFact: askGround.hasLight, rules: line.kind === 'act' ? 'vocab' : 'all' });
+    if (f.dropped.length) {
+      const log = droppedLog(ctx.name, line.kind === 'speak' ? 'answer' : 'act', f.dropped);
+      if (log) console.log(log);
+      if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'guess', rule: 'voice-filter' });
+      line = f.text ? { kind: line.kind, content: f.text } : { kind: 'rest', content: '' };
       revoiced = true;
     }
   }

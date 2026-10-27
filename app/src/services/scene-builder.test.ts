@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { onlyDerived, pinToSeed, cardsFromSeed, clockInWords, fromInnerVoice, nameHead, isSpeechTagAct, lightOf, withoutRepeatedHour, dropEchoedThoughts, reattachDanglers, withoutLightLabel, physicalDoingToAct, type SeedParts } from './scene-builder';
+import { onlyDerived, pinToSeed, cardsFromSeed, clockInWords, fromInnerVoice, nameHead, isSpeechTagAct, lightOf, withoutRepeatedHour, dropEchoedThoughts, reattachDanglers, withoutLightLabel, physicalDoingToAct, invertsVoice, statedThoughtSentences, withoutRestatedStage, type SeedParts } from './scene-builder';
 
 describe('nameHead / isSpeechTagAct (HW8 run 2)', () => {
   it('takes the name before its qualifier', () => {
@@ -155,5 +155,40 @@ describe('physicalDoingToAct — a doing in his voice becomes an act (HW8 run 5,
     expect(physicalDoingToAct('I adjust the cross, feeling the wood grain against my sternum.', 'Kristopher')).toBe('Kristopher adjusts the cross, feeling the wood grain against his sternum.');
     expect(physicalDoingToAct('The wood grain under my palm is rough, familiar.', 'Kristopher')).toBe('The wood grain under his palm is rough, familiar.');
     expect(physicalDoingToAct('The silence stretches.', 'Kristopher')).toBeNull();
+  });
+});
+
+describe('a thought is never inverted or patched with the world\'s truth (HW8 run 6)', () => {
+  const voice = "The ink is dry. The tab is settled. She's already moved on";
+  it('"She hasn\'t moved on at all." is the voice turned inside out and fails; the voice\'s own sentence passes', () => {
+    expect(invertsVoice("She hasn't moved on at all.", voice)).toBe(true);
+    expect(invertsVoice("She's already moved on.", voice)).toBe(false);
+    expect(fromInnerVoice("She hasn't moved on at all.", voice)).toBeNull();
+    expect(fromInnerVoice("The ink is dry. The tab is settled.", voice)).toBe('The ink is dry. The tab is settled.');
+  });
+  it('the receipt\'s text is not his voice: "Not paid — collect 22.97." fails against what he actually thought', () => {
+    expect(fromInnerVoice('Not paid — collect 22.97. She hasn\'t moved on at all.', voice)).toBeNull();
+  });
+});
+
+describe('statedThoughtSentences — what the Watcher voiced as his mind is kept (HW8 run 6)', () => {
+  const seed = ['He remembers this woman and thinks she is pretty.', 'Was that him or the voice he wonders?', 'Who was she?', 'He steadies his thoughts again with the prayer.'];
+  it('a mental-state sentence and the questions running on from it', () => {
+    expect(statedThoughtSentences(seed)).toEqual(['He remembers this woman and thinks she is pretty.', 'Was that him or the voice he wonders?', 'Who was she?']);
+  });
+  it('a question after an act is no thought of his', () => {
+    expect(statedThoughtSentences(['He knocks twice.', 'Who is there?'])).toEqual([]);
+  });
+});
+
+describe('withoutRestatedStage — the page remembers itself, scene lines included (HW8 run 6)', () => {
+  const page = ["Kristopher stands outside Violet's door under a single caged bulb.", 'About half past seven in the evening, mid October.'];
+  it('drops a sentence that restates where he stands or the bulb; keeps what is new', () => {
+    expect(withoutRestatedStage("Kristopher stands at Violet's door. A latch clicks somewhere inside.", page)).toBe('A latch clicks somewhere inside.');
+    expect(withoutRestatedStage('One caged bulb burns above the landing.', page)).toBe('One caged bulb burns above the landing.');
+    expect(withoutRestatedStage("Kristopher stands outside Violet's door under a single caged bulb.", page)).toBe('');
+  });
+  it('an empty page changes nothing', () => {
+    expect(withoutRestatedStage('He stands at the door.', [])).toBe('He stands at the door.');
   });
 });

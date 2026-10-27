@@ -68,7 +68,11 @@ export function statedDurationSeconds(text: string, ctx: StatedDurationContext =
     const u = UNIT_SECONDS[unitWord] ?? UNIT_SECONDS[unitWord.replace(/s$/, '')];
     // "a minute" alone ("give me a minute") is speech, not a jump: a span needs a passing verb or a leading "after/about…".
     const whole = m[0];
-    const stated = SPAN_VERB_RE.test(whole) || /\b(pass|go by|later)\b/i.test(t.slice((m.index ?? 0) + whole.length, (m.index ?? 0) + whole.length + 24));
+    // "waits in the hallway for 30 seconds and then…" (HW8 run 6): a span the narration says an act lasts — "for/over/within N units" outside any quoted speech.
+    const before = t.slice(0, m.index ?? 0);
+    const outsideQuotes = ((before.match(/["“”]/g) ?? []).length % 2) === 0;
+    const lasts = outsideQuotes && /\b(?:for|over|within|another)\s*$/i.test(before) && !/^(?:a|an)$/i.test(m[1].trim());
+    const stated = lasts || SPAN_VERB_RE.test(whole) ||/\b(pass|go by|later)\b/i.test(t.slice((m.index ?? 0) + whole.length, (m.index ?? 0) + whole.length + 24));
     if (n !== null && u && stated) return Math.round(n * u);
   }
   if (/\b(a long while|a good while|a while) (passes|goes by|later)\b/i.test(t)) return 15 * 60;

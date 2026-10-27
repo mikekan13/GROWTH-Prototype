@@ -90,14 +90,14 @@ describe('buildSpiritAnsweringPrompt — one line, first words first', () => {
 
   it('a turn handed over by the table', () => {
     const prompt = buildSpiritAnsweringPrompt({ ...base, ask: { kind: 'turn' } });
-    expect(prompt).toContain('The moment has come to you.');
+    expect(prompt).toContain('It is down to you now.');
     expect(prompt).toContain('A stranger shakes off the rain.\nHe looks straight at you.');
     expect(prompt).toContain(base.innerState);
   });
   it('being spoken to carries the line exactly as it reached the being', () => {
     const prompt = buildSpiritAnsweringPrompt({ ...base, ask: { kind: 'spoken', heard: 'Oren: "You the pilot?"' } });
     expect(prompt).toContain('You are being spoken to, right now:\nOren: "You the pilot?"');
-    expect(prompt).not.toContain('The moment has come to you.');
+    expect(prompt).not.toContain('It is down to you now.');
   });
   it('asks for exactly one line and no thinking aloud', () => {
     const prompt = buildSpiritAnsweringPrompt({ ...base, ask: { kind: 'turn' } });

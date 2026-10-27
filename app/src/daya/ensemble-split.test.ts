@@ -67,6 +67,7 @@ import { listenStimulus, listenAtTable, answerAsk } from './ensemble';
 import { forgetListening, getListening, ANSWER_LISTEN_CAP_MS } from './listening';
 import { STREAM_STOPPED_NOTE } from './model-client';
 import { wake } from './events';
+import { currentFacts } from './world-ledger';
 
 // ── a fake lane ─────────────────────────────────────────────────────────────
 
@@ -220,7 +221,7 @@ describe('answerAsk — one short streamed call at the ask', () => {
     expect(lane.calls[1].prompt).toContain('Her line: "Who are you?"');
     expect(lane.calls[0].prompt).toContain('He looks like trouble. Keep the bar between us.');
     expect(lane.calls[0].prompt).toContain('[the room] The door bangs open.');
-    expect(lane.calls[0].prompt).toContain('The moment has come to you.');
+    expect(lane.calls[0].prompt).toContain('It is down to you now.');
 
     expect(events.map((e) => e.phase)).toEqual(['start', 'partial', 'partial', 'partial', 'final']);
     expect(events.filter((e) => e.phase === 'partial').map((e) => (e as { text: string }).text)).toEqual(['Who', 'Who are', 'Who are you?']);
@@ -349,6 +350,53 @@ describe('answerAsk — one short streamed call at the ask', () => {
     expect(second.action).toEqual({ kind: 'rest' });
     await second.after;
     expect(store.memories).toEqual([]);
+  });
+
+  it('CLAIM VS FACT (HW8 run 6): "It\'s open." against a closed, locked door is re-voiced once with the fact quoted; a second contradiction stands, logged', async () => {
+    const door = { subjectKey: 'entry_door', fact: 'closed, locked from the inside; the deadbolt is untouched' };
+    vi.mocked(currentFacts).mockResolvedValue([door] as never);
+    try {
+      const lane = fakeLane({ answers: [['Say:', " It's", ' open.'], ["Say: It's locked. I'm not opening it."]] });
+      await listened(lane);
+      const { events, onEvent } = collect();
+      const result = await answerAsk('mara', { kind: 'spoken', by: 'Oren', text: 'Open the door, I have a pizza!' }, { onEvent, overrides: { fetchImpl: lane.fetchImpl } });
+      expect(lane.calls.filter((c) => c.kind === 'answer').map((c) => c.hinted)).toEqual([false, true]);
+      const hinted = lane.calls.find((c) => c.kind === 'answer' && c.hinted)!;
+      expect(hinted.prompt).toContain('closed, locked from the inside');
+      expect(lane.calls.find((c) => c.kind === 'answer')!.prompt).toContain('entry_door: closed, locked from the inside');
+      expect(events.find((e) => e.phase === 'retract')).toMatchObject({ reason: 'guess', rule: 'claim-vs-fact' });
+      expect(result.action).toEqual({ kind: 'speak', content: "It's locked. I'm not opening it." });
+
+      // still contradicting after the second take: the words stand, and it is logged for the GM
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const lane2 = fakeLane({ answers: [["Say: It's open."], ["Say: It's open, come in."]] });
+      forgetListening();
+      await listened(lane2);
+      const second = await answerAsk('mara', { kind: 'spoken', by: 'Oren', text: 'Open the door!' }, { overrides: { fetchImpl: lane2.fetchImpl } });
+      expect(second.action).toEqual({ kind: 'speak', content: "It's open, come in." });
+      expect(warn.mock.calls.some((c) => String(c[0]).includes('[daya/ensemble] claim vs fact') && String(c[0]).includes('still says'))).toBe(true);
+      warn.mockRestore();
+    } finally {
+      vi.mocked(currentFacts).mockResolvedValue([]);
+    }
+  });
+
+  it('VOICE FILTER (HW8 run 6): the table\'s words are dropped from the monologue and from the answer', async () => {
+    const lane = fakeLane({ listen: 'I am waiting for the next beat. The wood is cold under my palm.' });
+    await listenStimulus('mara', { source: 'perception', content: 'He knocks.' }, { fetchImpl: lane.fetchImpl });
+    expect(getListening('mara')?.innerState).toBe('The wood is cold under my palm.');
+    const lane2 = fakeLane({ answers: [['Say: I wait for the next instruction from the quiet. Not tonight.']] });
+    const out = await answerAsk('mara', { kind: 'turn' }, { overrides: { fetchImpl: lane2.fetchImpl } });
+    expect(out.action).toEqual({ kind: 'speak', content: 'Not tonight.' });
+  });
+
+  it('WHO SAID WHOSE NAME (HW8 run 6): words carrying the hearer\'s own name are handed over as "says your name"', async () => {
+    const lane = fakeLane({ answers: [['Say: Coming.']] });
+    await listened(lane);
+    store.perceived.length = 0;
+    await answerAsk('mara', { kind: 'spoken', by: 'Oren', text: 'Mara? I have a pizza for you.' }, { overrides: { fetchImpl: lane.fetchImpl } });
+    expect(store.perceived.some((p) => p.stimulus === 'Oren says your name — "Mara? I have a pizza for you."')).toBe(true);
+    expect(lane.calls.find((c) => c.kind === 'answer')!.prompt).toContain('a name inside them is whoever the speaker is addressing');
   });
 
   it('D2 — an ask that lands mid-listen waits only up to the cap, then goes on with the unvoiced mirror', async () => {

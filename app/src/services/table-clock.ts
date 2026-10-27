@@ -64,6 +64,7 @@ export async function advanceClockForLine(campaignId: string, kind: ActKind, tex
     const localHour = cycleToLocalDate(now, ts).hour ?? 12;
     const d = lineDuration(kind, text, { localHour });
     if (d.seconds <= 0) return fallback('nothing');
+    if (d.source === 'stated') console.log(`[table-clock] ${kind}: the line states ${d.seconds}s — the clock moves by it`);
     const r = await advanceClockBySim(campaignId, d.seconds, `table:${kind}${d.source === 'stated' ? ':stated' : ''}`);
     // A stated jump is a scene break: write it down now, with its sweeps, rather than batching it with the small stuff.
     if (d.source === 'stated' && d.seconds >= 60) await flushSimClock(campaignId).catch(() => null);

@@ -24,6 +24,7 @@ const w = vi.hoisted(() => ({
   listen: vi.fn(),
   answer: vi.fn(),
   readNarration: vi.fn(),
+  judge: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -57,6 +58,7 @@ vi.mock('@/services/canon', () => ({
   attachTruthToMemory: vi.fn(async (memoryId: string, canonEventId: string, extra: string[] = []) => { w.attached.push({ memoryId, canonEventId }); w.extras[memoryId] = extra; return true; }),
   attachTruthToRecentMemories: vi.fn(async () => 0),
 }));
+vi.mock('@/services/perception-reach', async (orig) => ({ ...(await orig<typeof import('@/services/perception-reach')>()), judgeCanonReach: w.judge }));
 vi.mock('@/services/reconciliation', () => ({
   readNarration: w.readNarration,
   takeConfirmed: vi.fn(async (_c: string, id: string) => ({ id })),
@@ -64,7 +66,7 @@ vi.mock('@/services/reconciliation', () => ({
   cementCheck: vi.fn(async () => {}),
 }));
 
-import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom, reachEventOf, withoutThoughts, withoutRepeats, waitsFor, orderBeats } from './table-speak';
+import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom, reachEventOf, withoutThoughts, withoutRepeats, waitsFor, orderBeats, cardWithoutRepeats, awaitCard, CARD_WAIT_MS, readingsFor } from './table-speak';
 
 describe("reachEventOf — the Watcher's prose act is its actor's own event (HW5 2026-10-25)", () => {
   const narr = (text: string) => ({ text, kind: 'narration' as const, to: null, speaker: null, expectsReply: false, ambiguous: false, rule: 'x' });
@@ -561,5 +563,92 @@ describe('orderBeats — hear beats first, the rest in order (HW8 run 5, 2026-10
   it('moves a quote that precedes its narration behind the hear beat', () => {
     const out = orderBeats([{ type: 'spoken', n: 1 }, { type: 'hear', n: 2 }, { type: 'turn', n: 3 }]);
     expect(out.map((b) => b.n)).toEqual([2, 1, 3]);
+  });
+});
+
+describe('withoutRepeats / cardWithoutRepeats — the replay, sentence by sentence, on every path (HW8 run 6)', () => {
+  it('markdown emphasis and curly quotes are not part of a sentence', () => {
+    expect(withoutRepeats("The wood doesn't vibrate; it just is. Something shifts.", ["The wood doesn't vibrate; it just *is*."])).toBe('Something shifts.');
+  });
+  it('a near-verbatim re-set of a long sentence is the same sentence', () => {
+    expect(withoutRepeats('The caged bulb above the landing hums softly.', ['The caged bulb above the landing hums softly, steady.'])).toBe('');
+    expect(withoutRepeats('Short one.', ['Short one!'])).toBe('');
+    expect(withoutRepeats('A different thing entirely happens here today.', ['The caged bulb above the landing hums softly.'])).toBe('A different thing entirely happens here today.');
+  });
+  it('a card loses the sentences it repeats; speech is never touched; a card with nothing left is null', () => {
+    const prev = ["The wood doesn't vibrate; it just *is*.", 'Violet holds still behind the door.'];
+    const card = { scene: 'Violet holds still behind the door.', segments: [{ kind: 'thought' as const, text: "The wood doesn't vibrate; it just is. Something shifts in the hall." }, { kind: 'speech' as const, text: 'Violet holds still behind the door.' }] };
+    expect(cardWithoutRepeats(card, prev)).toEqual({ scene: null, segments: [{ kind: 'thought', text: 'Something shifts in the hall.' }, { kind: 'speech', text: 'Violet holds still behind the door.' }] });
+    expect(cardWithoutRepeats({ scene: 'Violet holds still behind the door.', segments: [{ kind: 'thought', text: "The wood doesn't vibrate; it just is." }] }, prev)).toBeNull();
+  });
+});
+
+describe('awaitCard — a being\'s line goes up after its own card (HW8 run 6)', () => {
+  it('waits for a card that is slower than the old 8 s cap would have allowed, but never past the cap', async () => {
+    let done = false;
+    const slow = new Promise<void>((r) => setTimeout(() => { done = true; r(); }, 30));
+    await awaitCard(slow, 1000);
+    expect(done).toBe(true);
+    const t0 = Date.now();
+    await awaitCard(new Promise<void>(() => {}), 40);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(35);
+    await awaitCard(undefined, 10);
+    expect(CARD_WAIT_MS).toBeGreaterThan(30_000);
+  });
+});
+
+describe('readingsFor — the text in his hand is put in front of the being who reads it (HW8 run 6)', () => {
+  it('"looks at the receipt" gives the receipt\'s data.text exactly; nothing for a line that reads nothing', async () => {
+    const { prisma } = await import('@/lib/db');
+    (prisma as unknown as { campaignItem: unknown }).campaignItem = {
+      findMany: vi.fn(async () => [
+        { name: 'Chess Pizza receipt', data: JSON.stringify({ text: '*** NOT PAID — COLLECT 22.97 ***' }) },
+        { name: 'Orthodox prayer rope', data: JSON.stringify({ text: 'Lord Jesus Christ, have mercy on me.' }) },
+      ]),
+    };
+    try {
+      const read = await readingsFor(['kris'], 'He looks at the receipt to see if she paid already.');
+      expect(read.get('kris')).toBe('What you read on the Chess Pizza receipt, exactly as it is written:\n*** NOT PAID — COLLECT 22.97 ***');
+      expect((await readingsFor(['kris'], 'He knocks on the door.')).size).toBe(0);
+    } finally {
+      delete (prisma as unknown as { campaignItem?: unknown }).campaignItem;
+    }
+  });
+});
+
+describe('the engine at the table, run 6 (HW8)', () => {
+  beforeEach(() => { process.env.TABLE_SPLIT_LOOP = 'on'; process.env.SCENE_BUILDER = 'off'; });
+
+  it('a line with two hear beats around a quote is judged ONCE per being (the adjudicator was $0.20 of a $0.28 run)', async () => {
+    process.env.PERCEPTION_REACH = 'on';
+    w.judge.mockReset().mockImplementation(async (_c: string, _e: unknown, ids: string[]) => ({
+      verdicts: new Map(ids.map((id) => [id, { beingId: id, reaches: true, via: ['hearing'], noticed: true, salience: 0.9 }])),
+      source: 'model', beings: [],
+    }));
+    await speakProse('camp', actor, { message: 'The door bangs open. Tess: "Mara, you the pilot?" Rain comes in.' });
+    await flush(); await flush();
+    expect(w.judge).toHaveBeenCalledTimes(1);
+  });
+
+  it('the hearer\'s own name inside a quote is marked "says your name" (HW8 run 6)', async () => {
+    await speakProse('camp', actor, { message: 'The door bangs open. Tess: "Mara, you the pilot?"' });
+    await flush(); await flush();
+    const toMara = w.listen.mock.calls.filter((c) => c[0] === 'mara').map((c) => c[2].content as string);
+    expect(toMara.some((c) => c.includes('Tess says your name — "Mara, you the pilot?"'))).toBe(true);
+    const toOren = w.listen.mock.calls.filter((c) => c[0] === 'oren').map((c) => c[2].content as string);
+    expect(toOren.some((c) => c.includes('says your name'))).toBe(false);
+  });
+
+  it('her line goes up AFTER her own thought card on the hear → answer path (HW8 run 6)', async () => {
+    w.listen.mockImplementation(async (id: string) => {
+      if (id === 'mara') await new Promise((r) => setTimeout(r, 60));
+      return { status: 'ok', listened: { status: 'listened', memoryEntryId: `listen-mem-${id}`, thought: 'The wood is cold.', impulse: 'stay' } };
+    });
+    answerWith({ mara: { kind: 'speak', content: 'Who is there?' } });
+    await speakProse('camp', actor, { message: 'The door bangs open. Mara, what do you do?' });
+    await flush(); await flush();
+    const order = w.chats.filter((c) => c.characterId === 'mara').map((c) => c.actor);
+    expect(order.indexOf('system')).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf('system')).toBeLessThan(order.indexOf('ai_copilot'));
   });
 });

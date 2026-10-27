@@ -54,7 +54,7 @@ ${args.desiresBlock}
 What just happened:
 ${args.stimulus}
 
-Live this moment. Think as yourself — half-thoughts, associations, feelings —
+Live this. Think as yourself — half-thoughts, associations, feelings —
 then do ONE thing: say something, do something, turn your attention somewhere,
 or let it pass. Speak only as yourself, from inside your own life. What you
 don't know, you don't know; what makes no sense to you, meets your honest
@@ -85,7 +85,22 @@ export interface SpiritListeningArgs {
   sinceOwn?: string | null;
   /** What the senses allow of this stretch (sensesNoteFor), or null when nothing need be said. */
   sensesNote?: string | null;
+  /** The world's facts this stretch touches (HW8 run 6: the voice invented a glass door, a key in hand — the facts were never in its prompt). */
+  facts?: string[];
+  /** What the being has on it, with what each thing is. */
+  held?: string[];
+  /** What is written on a thing this stretch has the being read, exactly as written (HW8 run 6). */
+  reads?: string;
 }
+
+/**
+ * A line of every prompt the being reads (HW8 run 6): the quoted words are the speaker's; a name inside them is whoever he
+ * addressed — "Kristopher says 'Violet?'" is Kristopher naming her, not her naming him.
+ */
+export const QUOTED_WORDS_NOTE = "Quoted words are the speaker's own; a name inside them is whoever the speaker is addressing, not the speaker.";
+
+/** The in-world words for the voice: never the table's (beat, stimulus, instruction, scene). */
+export const IN_WORLD_NOTE = 'Think and speak only in the words of your own life — what just happened, what you notice, what you do now. Never count knocks, seconds or minutes you were not given a number for. Say nothing about light or dark unless the facts above say how the room is lit. Do not reach for stock images that could fit any scene — say what is specific to this one.';
 
 export const LISTENING_MAX_TOKENS = 140;
 
@@ -97,7 +112,7 @@ export const LISTENING_MAX_TOKENS = 140;
  */
 export function sensesNoteFor(via: string[] | undefined, own: boolean): string | null {
   if (own || via?.includes('self')) {
-    return 'This is your OWN doing, voiced for you by the Watcher: you did this, you said this. Take it as your own act and your own words — what it was like from inside — not as something you watched someone else do.';
+    return 'This is your OWN doing, told to you as yours: you did this, you said this. Take it as your own act and your own words — what it was like from inside — not as something you watched someone else do.';
   }
   if (!via?.length) return null;
   if (!via.includes('sight') && via.includes('hearing')) {
@@ -146,10 +161,11 @@ ${args.desiresBlock}
 What has been going through your mind:
 ${args.innerSoFar || 'Nothing yet — you have only just started paying attention.'}
 
-What just reached you:
+${args.held?.length ? `What you have on you:\n${args.held.join('\n')}\n\n` : ''}${args.facts?.length ? `What the world holds true about this (check it before you imagine anything — a thing not here or in your memory is not known to you):\n${args.facts.join('\n')}\n\n` : ''}What just reached you:
 ${args.heard}
-${args.sensesNote ? `\n${args.sensesNote}\n` : ''}${args.sinceOwn ? `\nTime, as you feel it: it has been ${args.sinceOwn} since you last said or did anything.\n` : ''}
-Nobody is waiting on you; the moment is still unfolding. Take it in. Write
+${QUOTED_WORDS_NOTE}
+${args.reads ? `\nWhat you read, exactly as it is written — the text in your hand; read it as it is, do not guess at it or remember it differently:\n${args.reads}\n` : ''}${args.sensesNote ? `\n${args.sensesNote}\n` : ''}${args.sinceOwn ? `\nTime, as you feel it: it has been ${args.sinceOwn} since you last said or did anything.\n` : ''}
+Nobody is waiting on you; things are still unfolding. ${IN_WORLD_NOTE} Take it in. Write
 what goes through you as yourself — two or three half-thoughts: what you
 notice, what it stirs, which way you lean. What you don't know, you don't know.
 Do not speak aloud and do not act. Thoughts only, under sixty words.
@@ -221,12 +237,14 @@ export const NEVER_GUESS_BLOCK = `What you know is below: your senses, your memo
 world's facts. Say only what you know. Where a thing is, what was said, what
 happened — if it is not here and not in your memory, you do not know it: say
 so, or check (look, feel your pocket, ask) instead of inventing. You may be
-wrong or lie as yourself, but never fill a gap with a guess.`;
+wrong or lie as yourself, but never fill a gap with a guess. Where words are
+written on something you hold, the text in your hand is what it says: read it as
+it is written, do not guess at it.`;
 
 export function buildSpiritAnsweringPrompt(args: SpiritAnsweringArgs): string {
   const turn = args.ask.kind === 'spoken'
     ? `You are being spoken to, right now:\n${args.ask.heard}`
-    : 'The moment has come to you. Everyone is waiting to see what you do.';
+    : 'It is down to you now. The others are waiting to see what you do.';
   return `You are ${args.name}. Not playing ${args.name} — you are her, from the inside.
 
 Who you are: ${args.identityNarrative}
@@ -245,7 +263,7 @@ ${args.sinceOwn ? `\nTime, as you feel it: it has been ${args.sinceOwn} since yo
 What has been going through your mind:
 ${args.innerState || 'You have not had time to think.'}
 
-What memory gives you, checked against this moment:
+What memory gives you, checked against what is happening:
 ${args.recallBlock || 'Nothing in particular comes to mind.'}
 
 What you have on you:
@@ -259,9 +277,10 @@ Before you answer about where a thing is, what you have, what you did or what
 happened: read what you have on you, what memory gives you and the facts above
 first. If it is not there, you do not know it — say so, or check.
 
+${QUOTED_WORDS_NOTE}
 ${turn}
 
-You have already thought it through. Answer now, as yourself, in ONE line and
+${IN_WORLD_NOTE} You have already thought it through. Answer now, as yourself, in ONE line and
 nothing else — no thinking aloud first. Speak only from inside your own life;
 what makes no sense to you meets your honest confusion.
 Format: exactly one line starting with Say: (what you say aloud, one or two
@@ -291,7 +310,7 @@ export function buildGroundingCheckPrompt(args: GroundingCheckArgs): string {
 What she has just heard and seen:
 ${args.heard.length ? args.heard.join('\n') : '(nothing new)'}
 
-What her memory gave her for this moment:
+What her memory gave her for what is happening:
 ${args.recallBlock || '(nothing in particular)'}
 
 What she has on her:
