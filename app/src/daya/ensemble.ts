@@ -32,11 +32,15 @@ import { render, type Observer, type BiasProfile, type VoiceParams, type AffectV
 import { currentFacts, type WorldFactRecord } from './world-ledger';
 import { factsForActor, splitHeld, heldLines } from './facts-for-actor';
 import { perceive } from './perceive';
-import { filterVoice, droppedLog, hasLightFact } from './voice-filter';
-import { recentVoiceOf } from './voice-history';
-import { nameIsHers } from './name-addressed';
+import { filterVoice, droppedLog, hasLightFact, isSpokenRepeat } from './voice-filter';
+import { competingSpecific, specificsHint } from './specifics';
+import { presenceFacts, knowsLine } from './presence-facts';
+import { recentSpokenOf, recentVoiceOf } from './voice-history';
+import { nameIsHers, unmarkAddressed } from './name-addressed';
 import { claimVsFact, factHint, type FactLine } from './claim-vs-fact';
-import { actorMap } from '@/services/world-apply';
+import { actorMap, whereOthersStand } from '@/services/world-apply';
+import { splitSentences } from '@/services/table-prose';
+import { getFamiliarity, familiarityAt } from '@/services/familiarity';
 import { resolveIntent, type AdjudicationResult, type MechanicsRollHook } from './adjudicator';
 import { enforceSeal } from './seal';
 import { runJewlToolAction } from './jewl-action';
@@ -50,6 +54,7 @@ import {
   splitImpulse,
   isEcho,
   SPIRIT_ECHO_HINT,
+  SPIRIT_REPLAY_HINT,
   type ListenImpulse,
   LISTENING_MAX_TOKENS,
   ANSWERING_MAX_TOKENS,
@@ -381,22 +386,41 @@ async function actorFacts(ctx: EntityContext, intent: string, opts: { ranked?: b
  * doors of the being's own room and the things it holds name more (so the door the ask arrived through is never cut as "oldest"),
  * and the map's own door states ride as authoritative lines. Never throws; an unreadable world is no facts.
  */
-async function beatFacts(ctx: EntityContext, cue: string, heldNames: string[] = []): Promise<{ lines: string[]; records: FactLine[]; hasLight: boolean }> {
+async function beatFacts(ctx: EntityContext, cue: string, heldNames: string[] = []): Promise<{ lines: string[]; records: FactLine[]; hasLight: boolean; noOneInView: boolean; absentNames: string[] }> {
   try {
+    // READ FRESH EVERY BEAT (HW8 run 7 #1d): nothing here is cached across beats - the door's state comes from the live map each call.
     const map = ctx.campaignId ? await actorMap(ctx.characterId).catch(() => null) : null;
     const doorNames = (map?.doors ?? []).map((d) => d.name);
-    // A door brings its lock and its keys with it (the voice held "my own key" — the spare is in a drawer on the record).
+    // A door brings its lock and its keys with it (the voice held "my own key" - the spare is in a drawer on the record).
     const doorKin = doorNames.length ? ['lock', 'deadbolt', 'key', 'keys'] : [];
     const ranked = await actorFacts(ctx, [cue, ...doorNames, ...doorKin, ...heldNames].join(' '), { ranked: true, cap: 400 });
     const records: FactLine[] = ranked.map((f) => ({ subjectKey: f.subjectKey, fact: f.fact }));
-    const doorLines = (map?.doors ?? []).map((d) => `the ${d.name} (between ${d.between.join(' and ')}) is ${d.state}`);
+    // The door's state, plainly, for both beings: "The entry door is open." / "closed and locked."
+    const doorLines = (map?.doors ?? []).map((d) => `The ${d.name.replace(/_/g, ' ').replace(/^the\s+/i, '')} (between ${d.between.join(' and ')}) is ${d.state === 'locked' ? 'closed and locked' : d.state}.`);
     for (const d of map?.doors ?? []) records.push({ subjectKey: d.name, fact: d.state });
+    // Who is in sight, who is not, and what the being knows of them - every beat.
+    let presence = { lines: [] as string[], noOneInView: false, absentNames: [] as string[] };
+    const knows: string[] = [];
+    if (ctx.campaignId && map) {
+      const others = await whereOthersStand(ctx.campaignId, ctx.characterId, map).catch(() => []);
+      presence = presenceFacts(map.roomName, others);
+      for (const o of others) {
+        const [idf, app] = await Promise.all([
+          getFamiliarity(ctx.entityDaId, o.id, 'identity').catch(() => null),
+          getFamiliarity(ctx.entityDaId, o.id, 'appearance').catch(() => null),
+        ]);
+        const line = knowsLine(o.name, idf ? familiarityAt(idf, ctx.cycle) : 0, app ? familiarityAt(app, ctx.cycle) : 0);
+        if (line) knows.push(line);
+      }
+    }
     const lines = [
       ...doorLines,
-      ...ranked.slice(0, 12).map((f) => `${f.subjectKey}: ${f.fact.length > 200 ? `${f.fact.slice(0, 197)}…` : f.fact}`),
+      ...presence.lines,
+      ...knows,
+      ...ranked.slice(0, 12).map((f) => `${f.subjectKey}: ${f.fact.length > 200 ? `${f.fact.slice(0, 197)}...` : f.fact}`),
     ];
-    return { lines, records, hasLight: ranked.length === 0 ? true : hasLightFact(ranked.map((f) => `${f.subjectKey} ${f.fact}`)) };
-  } catch { return { lines: [], records: [], hasLight: true }; }
+    return { lines, records, hasLight: ranked.length === 0 ? true : hasLightFact(ranked.map((f) => `${f.subjectKey} ${f.fact}`)), noOneInView: presence.noOneInView, absentNames: presence.absentNames };
+  } catch { return { lines: [], records: [], hasLight: true, noOneInView: false, absentNames: [] }; }
 }
 
 async function runStimulusPipeline(
@@ -907,7 +931,7 @@ export async function listenStimulus(
   const desiresPending = buildDesiresBlockForCharacter(characterId);
 
   const [ingest, desiresBlock] = await Promise.all([
-    ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: stimulus.source, content, extraClassification: mirrorAudit }, overrides),
+    ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: stimulus.source, content: unmarkAddressed(content), extraClassification: mirrorAudit }, overrides),
     desiresPending,
   ]);
   const tIngested = Date.now();
@@ -967,9 +991,9 @@ export async function listenStimulus(
   const heldRows = await Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: characterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 })).catch((): Array<{ name: string; data: string | null }> => []);
   const [priorVoice, ground] = await Promise.all([
     ctx.campaignId ? recentVoiceOf(ctx.campaignId, characterId, 30).catch((): string[] => []) : Promise.resolve([] as string[]),
-    omniscient ? Promise.resolve({ lines: [] as string[], records: [] as FactLine[], hasLight: true }) : beatFacts(ctx, stimulus.content, (heldRows ?? []).map((h) => h.name)),
+    omniscient ? Promise.resolve({ lines: [] as string[], records: [] as FactLine[], hasLight: true, noOneInView: false, absentNames: [] as string[] }) : beatFacts(ctx, stimulus.content, (heldRows ?? []).map((h) => h.name)),
   ]);
-  const heldNow = omniscient ? [] : heldLines(splitHeld(heldRows ?? []), { described: true, written: false });
+  const heldNow = omniscient ? [] : heldLines(splitHeld(heldRows ?? []), { described: true, written: false, placed: true });
   // How long it has let things sit, in the world's time (table-clock): part of what it feels.
   const sinceOwn = ctx.campaignId ? await sinceOwnInWords(ctx.campaignId, ctx.entityDaId, prior?.lastOwnCycle ?? null).catch(() => null) : null;
   try {
@@ -998,10 +1022,26 @@ export async function listenStimulus(
     // THE VOICE FILTER (HW8 run 6): the table's words, stock images, counting nobody gave it, light with no light fact, and a
     // sentence already thought are dropped before anything downstream (the scene builder, the feed) sees the monologue.
     const voiced = (!sealed.usedFallback && sealed.text && !omniscient)
-      ? filterVoice(sealed.text, { prior: priorVoice, heard: stimulus.content, hasLightFact: ground.hasLight })
+      ? filterVoice(sealed.text, { prior: priorVoice, heard: stimulus.content, hasLightFact: ground.hasLight, facts: ground.lines, noOneInView: ground.noOneInView, absentNames: ground.absentNames, heldNames: (heldRows ?? []).map((h) => h.name) })
       : { text: sealed.text, dropped: [] };
     const log = droppedLog(ctx.name, 'monologue', voiced.dropped);
     if (log) console.log(log);
+    // A SPECIFIC THAT COMPETES WITH WHAT IT RECALLED (HW8 run 7 #6): re-voiced once with the memory quoted; a second miss drops the sentence.
+    if (voiced.text && !omniscient && !sealed.usedFallback) {
+      const knowledge = [recallBlock, ...ground.lines, ...heldNow];
+      const bad = splitSentences(voiced.text).map((x) => ({ x, c: competingSpecific(x, knowledge) })).find((y) => y.c);
+      if (bad?.c) {
+        console.warn(`[daya/ensemble] ${ctx.name} monologue: "${bad.x.slice(0, 80)}" competes with memory (${bad.c.claimed.join(',')} vs ${bad.c.known.join(',')}) - re-voicing once`);
+        let again = '';
+        try {
+          const second = (await chat({ tier: 'L1', subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }, { role: 'user', content: specificsHint(bad.c) }], maxTokens: LISTENING_MAX_TOKENS }, overrides)).text.trim();
+          again = filterVoice(splitImpulse(second).thought, { prior: priorVoice, heard: stimulus.content, hasLightFact: ground.hasLight }).text;
+        } catch (err) { console.warn('[daya/ensemble] specifics re-voice failed (non-fatal):', err instanceof Error ? err.message : err); }
+        const rechecked = again && !splitSentences(again).some((x) => competingSpecific(x, knowledge));
+        voiced.text = rechecked ? again : splitSentences(voiced.text).filter((x) => !competingSpecific(x, knowledge)).join(' ');
+        if (!rechecked) console.log(`[daya/ensemble] ${ctx.name} monologue: the competing sentence is dropped`);
+      }
+    }
     if (!sealed.usedFallback && voiced.text) {
       innerState = voiced.text;
       innerUpdated = true;
@@ -1106,6 +1146,8 @@ export interface AnswerAfter {
   outcome?: string;
   /** The map refused the act (a locked door), or its check failed: the intent line misleads without a follow-up. */
   outcomeDiffers?: boolean;
+  /** The map/fact changes the act landed (`door "entry_door" → open`): the page says what the world did (HW8 run 7). */
+  worldChanges?: string[];
 }
 
 /** Same steps as the 'act' branch of runStimulusPipeline; fold the two together when the serial path is retired. */
@@ -1248,7 +1290,7 @@ export async function answerAsk(
     heldPromise.then((rows) => beatFacts(ctx, cue, (rows ?? []).map((h) => h.name))),
     ctx.campaignId && ctx.persona.omniscient !== true ? recentVoiceOf(ctx.campaignId, characterId, 30).catch((): string[] => []) : Promise.resolve([] as string[]),
   ]);
-  const heldText = heldLines(splitHeld(heldRows ?? []), { described: true });
+  const heldText = heldLines(splitHeld(heldRows ?? []), { described: true, placed: true });
   const factLines = askGround.lines.slice(0, 14);
   const prompt = buildSpiritAnsweringPrompt({
     name: ctx.name,
@@ -1397,12 +1439,30 @@ export async function answerAsk(
   // a sentence already thought — dropped, logged; nothing left means it lets the moment pass. An act only loses the table's words
   // ("knocks three times" is a doing, not a count).
   if ((line.kind === 'speak' || line.kind === 'act') && line.content.trim() && ctx.persona.omniscient !== true) {
-    const f = filterVoice(line.content, { prior: priorVoice, heard: heardTexts.join(' '), hasLightFact: askGround.hasLight, rules: line.kind === 'act' ? 'vocab' : 'all' });
+    const f = filterVoice(line.content, { prior: priorVoice, heard: heardTexts.join(' '), hasLightFact: askGround.hasLight, facts: askGround.lines, noOneInView: askGround.noOneInView, absentNames: askGround.absentNames, heldNames: (heldRows ?? []).map((h) => h.name), rules: line.kind === 'act' ? 'vocab' : 'all' });
     if (f.dropped.length) {
       const log = droppedLog(ctx.name, line.kind === 'speak' ? 'answer' : 'act', f.dropped);
       if (log) console.log(log);
       if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'guess', rule: 'voice-filter' });
       line = f.text ? { kind: line.kind, content: f.text } : { kind: 'rest', content: '' };
+      revoiced = true;
+    }
+  }
+  // THE ANSWER REPLAY (HW8 run 7 #7: "I'm fine, just... checking the lock." said twice verbatim): a line (fuzzily) one of her last three
+  // spoken lines is re-voiced once with "you already said that"; still a repeat, and she stays silent.
+  if (line.kind === 'speak' && line.content.trim() && ctx.campaignId && ctx.persona.omniscient !== true) {
+    const saidBefore = await recentSpokenOf(ctx.campaignId, characterId, 3);
+    if (isSpokenRepeat(line.content, saidBefore)) {
+      console.warn(`[daya/ensemble] ${ctx.name} repeated a line - re-voicing once: "${line.content.slice(0, 80)}"`);
+      if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'echo', rule: 'answer-replay' });
+      try {
+        const sealed = await enforceSeal((await answerCall({ hint: SPIRIT_REPLAY_HINT, stop: false })).text, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
+        const second = sealed.usedFallback ? { kind: 'rest' as GateKind, content: '' } : readLine(sealed.text);
+        line = second.kind === 'speak' && isSpokenRepeat(second.content, saidBefore) ? { kind: 'rest', content: '' } : second;
+      } catch (err) {
+        console.warn('[daya/ensemble] replay revoice failed; she stays silent (non-fatal):', err);
+        line = { kind: 'rest', content: '' };
+      }
       revoiced = true;
     }
   }
@@ -1426,7 +1486,7 @@ export async function answerAsk(
       const unstored = [...takenBackHeard, ...(spoken ? [spoken] : [])];
       for (const h of unstored) {
         if (!h.prose) continue;
-        const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: h.source, content: h.prose, extraClassification: { mirror: { voiced: false, standing: h.standing } } }, overrides);
+        const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: h.source, content: unmarkAddressed(h.prose), extraClassification: { mirror: { voiced: false, standing: h.standing } } }, overrides);
         if (ingest.persisted) out.memoryEntryId = ingest.memoryEntryId;
       }
       if (line.kind === 'speak') {
@@ -1446,6 +1506,7 @@ export async function answerAsk(
         if (adjudication) {
           out.outcome = adjudication.outcome;
           out.outcomeDiffers = adjudication.mapBlocked === true || (adjudication.roll ? !adjudication.roll.success : false);
+          if (adjudication.effects?.applied?.length) out.worldChanges = adjudication.effects.applied;
         }
       }
       // ((thought)) segments in its own line are thought: known subjects in them are refreshed (familiarity-thought).

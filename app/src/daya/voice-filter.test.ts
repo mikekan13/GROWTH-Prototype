@@ -26,13 +26,34 @@ describe('voice filter — stock images (HW8 run 6)', () => {
     const r = filterVoice('A held breath in the hall. He is still there.', { prior: ['I hold a held breath behind the door.'] });
     expect(r.text).toBe('He is still there.');
   });
-  it('drops an image once it has appeared twice in the history, even when not recent', () => {
-    const prior = ['One.', 'Two.', 'Three.', 'Dust motes turn in the lamp.', 'Dust motes again, always.'];
-    expect(filterVoice('Dust motes. The floor creaks.', { prior }).text).toBe('The floor creaks.');
-    expect(filterVoice('Dust motes. The floor creaks.', { prior: prior.slice(0, 4) }).text).toBe('Dust motes. The floor creaks.');
+  it('drops a repeat-rule image once it has appeared twice in the history, even when not recent', () => {
+    const prior = ['One.', 'Two.', 'Three.', 'The weight of the air in the lamp.', 'The weight of the air again, always.'];
+    expect(filterVoice('The weight of the air. The floor creaks.', { prior }).text).toBe('The floor creaks.');
+    expect(filterVoice('The weight of the air. The floor creaks.', { prior: prior.slice(0, 4) }).text).toBe('The weight of the air. The floor creaks.');
   });
-  it('an image once is fine, twice in one go is not', () => {
-    expect(filterVoice('Dust motes drift. Dust motes everywhere.').text).toBe('Dust motes drift.');
+  it('a repeat-rule image once is fine, twice in one go is not', () => {
+    expect(filterVoice('The weight of the air settles. The weight of the air is everywhere.').text).toBe('The weight of the air settles.');
+  });
+  it('HW8 run 7 #11: the always-dropped stock images go on first use, repeat or not', () => {
+    for (const bad of ['Statue-still, he waits.', 'Dust motes turn in the light.', 'He holds his breath.', 'It presses against my eardrums.', 'A hum in the teeth.', 'Suspended ash hangs in it.', 'The dead light of the bulb.']) {
+      expect(filterVoice(`${bad} The floor creaks.`).text).toBe('The floor creaks.');
+    }
+  });
+  it('#11: "the glass" for a door no fact calls glass is dropped; a fact that says so keeps it', () => {
+    expect(filterVoice('The glass is a barrier I chose to put up at her door. I wait.', { facts: ['entry_door: wood, painted green'] }).text).toBe('I wait.');
+    expect(filterVoice('Her door glass is cold under my knuckles.', { facts: ['entry_door: a glass-panelled door'] }).text).toBe('Her door glass is cold under my knuckles.');
+  });
+  it('#5: a known absent being placed in view with no one present is dropped', () => {
+    const r = filterVoice('She matches the name on the receipt. Her purple hair catches the harsh yellow light, vivid against the drab hallway. I breathe.', { noOneInView: true, absentNames: ['Violet'] });
+    expect(r.text).toBe('She matches the name on the receipt. I breathe.');
+    expect(r.dropped[0].why).toMatch(/absent being in view/);
+    expect(filterVoice('The sight of her anchors me.', { noOneInView: true }).text).toBe('');
+    expect(filterVoice('The sight of her anchors me.', { noOneInView: false }).text).toBe('The sight of her anchors me.');
+  });
+  it('#8: a HELD thing placed on the shelf or across the room is dropped', () => {
+    const held = ['Five-dollar bill with her number'];
+    expect(filterVoice('The folded bill is waiting on the shelf, five feet away. It is in my hand.', { heldNames: held }).text).toBe('It is in my hand.');
+    expect(filterVoice('The mug sits on the shelf.', { heldNames: held }).text).toBe('The mug sits on the shelf.');
   });
 });
 
@@ -76,5 +97,21 @@ describe('voice filter — a count the stretch itself made is licensed in any fo
   it('an act loses only the table\'s words ("knocks three times" is a doing)', () => {
     expect(filterVoice('I knock three times.', { rules: 'vocab' }).text).toBe('I knock three times.');
     expect(filterVoice('I wait for the next beat.', { rules: 'vocab' }).text).toBe('');
+  });
+});
+
+import { isSpokenRepeat } from './voice-filter';
+import { heldLines, splitHeld } from './facts-for-actor';
+describe('answer replay (HW8 run 7 #7)', () => {
+  it('a line identical, or nearly, to one of her last three spoken lines is a repeat', () => {
+    const before = ['Who is it?', "I'm fine, just... checking the lock."];
+    expect(isSpokenRepeat("I'm fine, just checking the lock!", before)).toBe(true);
+    expect(isSpokenRepeat('Leave it at the door, please.', before)).toBe(false);
+  });
+});
+describe('held things are stated as held (HW8 run 7 #8)', () => {
+  it('the per-beat facts say what she holds is with her, never on a shelf', () => {
+    const lines = heldLines(splitHeld([{ name: 'Five-dollar bill with her number', data: null }]), { placed: true });
+    expect(lines.join(' ')).toMatch(/Held, not set down anywhere: Five-dollar bill with her number - with you.*never on a shelf/);
   });
 });

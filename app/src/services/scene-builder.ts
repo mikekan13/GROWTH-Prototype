@@ -29,7 +29,8 @@ import { presentCycle, type FeedTimescale } from '@/lib/feed-segments';
 import type { CalendarSpec } from '@/types/time';
 import { splitSentences, type ProseAction, type ProseQuote, type ProseThought } from '@/services/table-prose';
 import { cueCoverage } from '@/daya/ladder';
-import { filterVoice } from '@/daya/voice-filter';
+import { filterVoice, hasLightFact } from '@/daya/voice-filter';
+import { withoutNothingLines } from '@/daya/did-not-hear';
 
 export function sceneBuilderOn(): boolean {
   return process.env.SCENE_BUILDER !== 'off';
@@ -51,6 +52,8 @@ export interface BuiltSegment {
   text: string;
   /** The seed sentence this derives from (verbatim) — a viewer's feed shows only what reached them. */
   sentence: string;
+  /** A thought only: the same thought in a narrator's voice (third person, past tense), no new content word (HW8 run 7). */
+  narrated?: string;
 }
 
 export interface BuiltCard { actorId: string; actorLabel: string; segments: BuiltSegment[] }
@@ -116,7 +119,7 @@ export function withoutRepeatedHour(scene: string, page: string[]): string {
   return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : rest;
 }
 
-type CardSeg = { kind: 'action' | 'thought' | 'speech'; text: string };
+type CardSeg = { kind: 'action' | 'thought' | 'speech'; text: string; narrated?: string };
 const ECHO_FLOOR = 0.7;
 /**
  * Each sentence of a monologue goes to ONE segment: a thought whose sentences all echo an act of the same card is the
@@ -208,6 +211,20 @@ export function physicalDoingToAct(sentence: string, actorLabel: string, possess
   return out;
 }
 
+/**
+ * The light-without-a-fact rule on a BUILT CARD (HW8 run 7 #11: "in the dark" x3 on cards). The [clock] line's after-dark label is the
+ * hour, not a lamp: only a fact about the room (a bulb, a switch, a window, lit / dark) licenses light or dark words. Pure.
+ */
+export function cardLight(factLines: string[]): boolean {
+  return hasLightFact(factLines.filter((l) => !l.startsWith('[clock]')));
+}
+
+const HOUR_ONLY_RE = /^(?:it(?:'s| is)\s+)?(?:(?:about|almost|just|nearly|a little after|half past|quarter (?:past|to)|coming up on)\s+)*(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2}(?::\d{2})?)(?:\s+o['’]clock)?(?:\s+(?:in the (?:morning|afternoon|evening)|at night|pm|am))?[.!…]*$/i;
+/** A sentence that is only the hour ("Seven o'clock.") - the page gives the hour, a being card does not (HW8 run 7 #13). Pure. */
+export function isBareHour(sentence: string): boolean {
+  return HOUR_ONLY_RE.test(sentence.trim());
+}
+
 const INNER_VOICE_FLOOR = 0.3;
 /**
  * A thought on the page comes from the being's inner voice this beat — its listening monologue and what the seed said it
@@ -243,7 +260,38 @@ export function invertsVoice(sentence: string, voice: string): boolean {
   return NEGATION_RE.test(sentence) !== NEGATION_RE.test(best);
 }
 
-const MENTAL_RE = /\b(?:think|thinks|thought|wonder|wonders|wondering|remember|remembers|recall|recalls|realiz\w+|realis\w+|know|knows|imagin\w+|hope|hopes|fear|fears|feel|feels|decid\w+|suspect\w*|ask(?:s)? (?:himself|herself|themselves))\b/i;
+const NARRATED_STOP = new Set(['that', 'this', 'with', 'from', 'have', 'been', 'were', 'what', 'when', 'then', 'than', 'they', 'them', 'there', 'their', 'would', 'could', 'should', 'about', 'into', 'just', 'only', 'even', 'still', 'some', 'does', 'did', 'was', 'her', 'his', 'she', 'him', 'had', 'the', 'and', 'but', 'for', 'not', 'who', 'whom', 'which', 'himself', 'herself', 'themselves']);
+const stemOf = (w: string) => w.toLowerCase().replace(/[^a-z]/g, '').slice(0, 3);
+/**
+ * A narrated form of a thought must bring in no content word the thought lacks (the fromInnerVoice floor, reversed): every content
+ * word of `narrated` (4+ letters, not a function word) shares its first three letters with a word of `text` - so tense and person
+ * may change ("know" -> "knew"), nothing new may appear. Pure.
+ */
+export function narratedIsFaithful(text: string, narrated: string): boolean {
+  const textWords = (text.match(/[A-Za-z']+/g) ?? []).map((w) => w.toLowerCase().replace(/[^a-z]/g, '')).filter(Boolean);
+  const have = new Set(textWords.map(stemOf));
+  const words = (narrated.match(/[A-Za-z']+/g) ?? []).map((w) => w.replace(/'s$/i, '')).filter((w) => w.length >= 4 && !NARRATED_STOP.has(w.toLowerCase()));
+  return words.every((w) => {
+    const lw = w.toLowerCase();
+    if (have.has(stemOf(lw))) return true;
+    return textWords.some((t) => editDistance(lw, t) <= (lw.length >= 7 ? 2 : 1));
+  });
+}
+function editDistance(a: string, b: string): number {
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)] as number[]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+/** The model's `narrated` for a thought segment, or undefined (logged) when it is missing or brings in something new. */
+export function takeNarrated(text: string, narrated: unknown, who: string): string | undefined {
+  if (typeof narrated !== 'string' || !narrated.trim()) { console.log(`[scene-builder] no narrated form from the model for ${who}'s thought`); return undefined; }
+  if (!narratedIsFaithful(text, narrated)) { console.log(`[scene-builder] narrated form for ${who} brings in a word the thought lacks - left undefined: ${narrated.slice(0, 120)}`); return undefined; }
+  return narrated.trim();
+}
+
+const MENTAL_RE = /\b(?:think|thinks|thought|wonder|wonders|wondering|remember|remembers|recall|recalls|realiz\w+|realis\w+|know|knows|imagin\w+|hope|hopes|fear|fears|feel|feels|decid\w+|suspect\w*|ask(?:s)? (?:himself|herself|themselves)|notic\w+|sens(?:e|es|ed)|(?:does(?:n['’]t| not)|did(?:n['’]t| not)) (?:know|understand|realis\w+|realiz\w+)|ca(?:n['’]t|nnot) (?:stop|help|shake|tell)|(?:is|was)(?:n['’]t| not) sure|not normal)\b/i;
 const sameSentence = (a: string, b: string) => a.toLowerCase().replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim() === b.toLowerCase().replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
 
 /**
@@ -257,7 +305,7 @@ export function statedThoughtSentences(seedSentences: string[]): string[] {
   let afterMental = false;
   for (const s of seedSentences) {
     if (MENTAL_RE.test(s)) { out.push(s); afterMental = true; continue; }
-    if (afterMental && /\?["”']?$/.test(s.trim())) { out.push(s); continue; }
+    if (afterMental && (/\?["”']?$/.test(s.trim()) || s.trim().split(/\s+/).length <= 4)) { out.push(s); continue; }
     afterMental = false;
   }
   return out;
@@ -454,13 +502,15 @@ const SCENE_SYSTEM = `You build up a game master's seed line into a page of a no
 Rules — all of them, every time:
 - DERIVE, NEVER INVENT. Every sentence you write must be supported by the SEED or by a FACT line given. Do not add objects, people, weather, sounds, furniture, feelings, bodily details or events that are in neither ("the skin around them still raw" is an invention unless a fact says so). If the facts are thin, write less.
 - SCENE: 0 to 4 sentences that set the stage from the facts — the place, the hour, the door and its state, what the actor holds, what is written on a thing he reads. THE PAGE REMEMBERS ITSELF: when ALREADY ON THE PAGE is given, do not describe again what it already set (the room, its light, its fixtures, a thing's text) — write only what is NEW this beat: a changed hour, a changed door, a thing now held or read for the first time, who moved; when nothing changed, one short sentence or an empty scene. Never restate the actor's acts or thoughts in the scene. Use the world's names EXACTLY as given in NAMES (so the record can tag them). The hour as the [clock] line gives it, in words — never the calendar date, never a year, never digits. Light only from the facts: no daylight, dusk or sun unless a fact says so (an evening in autumn is dark; a lamp lights a room only if a fact lists it lit). The [clock] line's light (after dark / daylight) is a FACT to write from, never a label to paste.
+- NOTHING NEW = NO SCENE: when nothing is new this beat, "scene" is an empty string. Never write that nothing changed, nothing happened or nothing reached anyone ("Nothing on the landing has changed." is forbidden). When something happened that a character did NOT perceive, say what they missed from the narrator ("Violet did not hear him."); when truly nothing happened on that side, write nothing.
 - A thing the seed names that is not in the FACTS does not exist on the page: the actor reaches for it and does not find it, or the sentence stays as the seed put it. Never describe what it looks like or what is written on it.
 - ONE CARD PER ACTOR named in the seed, segments in the SEED's order:
   - action: third person, present tense, the actor as "He"/"She" or by name: "He wipes his eyes." Only acts the seed states. An ATTEMPT is not its outcome: "looking for the receipt" never becomes "finds the receipt", "reaches for the handle" never opens the door, "listens" never hears — the outcome is the Watcher's or the world's to give, never yours. Never count or number events (first/second/third knock) unless the seed or the monologue counts them. Never add a movement the text does not state (rising, turning, stepping) to get from one act to the next. A thought that looks FORWARD to an act ("the knock is coming") goes BEFORE that act in the card, never after it. Backstory inside a seed act ("from the tears he was crying in the car") is not an act — it belongs in the scene as a fact a bystander could see (red eyes), or nowhere.
   - thought: the actor's INNER VOICE, strictly first person ("I", "my"), free indirect, as he would think it — never "he"/"his" inside a thought, never reported ("He thinks it is odd" is wrong; "Only one apartment on the whole floor. Odd." is right). A prayer in his head is the prayer itself. A being's inner voice may count nothing it has not counted on the page: never number knocks or minutes. When a MONOLOGUE is given for an actor, blend it into his thoughts — it is his inner voice this beat; keep what the seed said he thought and let the monologue colour and extend it. A sentence of the monologue in which the actor PHYSICALLY does something ("the receipt crinkles in my fist", "my thumb rubs the ink", "my hand hovers") is not a thought: make it a small action segment in third person ("The receipt crinkles in his fist.") — unless it contradicts or undoes an act the seed states (the seed knocked: no hovering hand, no "I don't knock"), in which case drop it. A bare speech tag ("He speaks.") is never a segment: the speech segment is the record of it. A thought is TAKEN from the monologue and the seed's own thoughts word for word, or trimmed — you never reword it, never turn it inside out, never correct it with what the world says: if he misread a thing, that is his misread and it stands. What the seed states he thinks, wonders, remembers or feels, and the questions that run on from it, is his thought as the Watcher voiced it: keep it, in the first person.
   - speech: the words exactly as the seed quotes them.
 - Every segment carries "from": the SEED sentence it derives from, verbatim.
-- Output JSON only: {"scene": string, "cards": [{"actorId": string, "segments": [{"kind": "action"|"thought"|"speech", "text": string, "from": string}]}]}`;
+- Every THOUGHT segment also carries "narrated": the same thought reported by an omniscient narrator, third person, past tense, meaning kept, no added fact or image, about the same length or shorter ("I know this door." -> "He knew this door."). Action and speech segments carry none.
+- Output JSON only: {"scene": string, "cards": [{"actorId": string, "segments": [{"kind": "action"|"thought"|"speech", "text": string, "from": string, "narrated"?: string}]}]}`;
 
 function seedBlock(seed: SeedParts): string {
   const lines = [`SEED (as the Watcher wrote it):\n${seed.full}`, '', 'SEED PARTS (the table\'s parse):'];
@@ -512,10 +562,10 @@ export async function buildScene(
       opts.timeoutMs ?? SCENE_BUILD_TIMEOUT_MS,
       'scene build',
     );
-    const parsed = parseJson<{ scene?: unknown; cards?: Array<{ actorId?: unknown; segments?: Array<{ kind?: unknown; text?: unknown; from?: unknown }> }> }>(res.text);
+    const parsed = parseJson<{ scene?: unknown; cards?: Array<{ actorId?: unknown; segments?: Array<{ kind?: unknown; text?: unknown; from?: unknown; narrated?: unknown }> }> }>(res.text);
     if (!parsed) throw new Error('no JSON in the builder\'s answer');
     const known = [seed.full, ...facts.lines, ...facts.names.map((n) => n.name), ...[...monologues.values()]];
-    const scene = typeof parsed.scene === 'string' ? withoutRestatedStage(withoutLightLabel(onlyDerived(parsed.scene.trim(), known)), page) : '';
+    const scene = typeof parsed.scene === 'string' ? withoutNothingLines(withoutRestatedStage(withoutLightLabel(onlyDerived(parsed.scene.trim(), known)), page), splitSentences) : '';
     for (const [id, m] of monologues) console.log(`[scene-builder] inner voice of ${id}: ${m.replace(/\s+/g, ' ').slice(0, 400)}`);
     const labelOf = (id: string) => seed.actions.find((a) => a.actorId === id)?.actorLabel ?? seed.thoughts.find((t) => t.actorId === id)?.actorLabel ?? seed.quotes.find((q) => q.speakerId === id)?.speakerLabel ?? facts.names.find((n) => n.id === id)?.name ?? id;
     const cards: BuiltCard[] = [];
@@ -529,7 +579,8 @@ export async function buildScene(
         const text = kind === 'speech' ? s.text.trim() : onlyDerived(s.text.trim(), known);
         if (!text) continue;
         if (kind === 'action' && isSpeechTagAct(text)) continue;
-        segments.push({ kind, text, sentence: pinToSeed(typeof s.from === 'string' ? s.from : undefined, text, seedSentences) });
+        const narrated = kind === 'thought' ? takeNarrated(text, s.narrated, String(c.actorId)) : undefined;
+        segments.push({ kind, text, sentence: pinToSeed(typeof s.from === 'string' ? s.from : undefined, text, seedSentences), ...(narrated ? { narrated } : {}) });
       }
       // A thought is the being's own voice or nothing (fromInnerVoice). When the voice spoke and the builder lost all
       // of it, the monologue itself stands as the thought, where the builder had put one.
@@ -548,12 +599,14 @@ export async function buildScene(
       const vetted: BuiltSegment[] = [];
       let firstThoughtAt = -1;
       let keptThought = false;
-      for (const s of segments) {
+      for (let s of segments) {
+        // A GM-STATED THOUGHT the builder made an act of ("He doesn't know why he used her name.") is a thought: it goes where the Watcher put it.
+        if (s.kind === 'action' && stated.some((st) => sameSentence(st, s.sentence))) s = { ...s, kind: 'thought' };
         if (s.kind !== 'thought') { vetted.push(s); continue; }
         if (firstThoughtAt < 0) firstThoughtAt = vetted.length;
         if (stated.some((st) => sameSentence(st, s.sentence))) { vetted.push(s); keptThought = true; continue; }
         const kept = fromInnerVoice(s.text, voice);
-        if (kept) { vetted.push({ ...s, text: kept }); keptThought = true; }
+        if (kept) { vetted.push({ ...s, text: kept, ...(s.narrated && kept !== s.text && !narratedIsFaithful(kept, s.narrated) ? { narrated: undefined } : {}) }); keptThought = true; }
         else console.log(`[scene-builder] dropped a thought the voice of ${labelOf(c.actorId)} never had: ${s.text.slice(0, 160)}`);
       }
       if (firstThoughtAt >= 0 && !keptThought && voice) {
@@ -579,7 +632,7 @@ export async function buildScene(
       const heardHere = [seed.full, ...monologues.values()].join(' ');
       const cleaned = vetted.flatMap((s) => {
         if (s.kind === 'speech') return [s];
-        const text = filterVoice(s.text, { heard: heardHere, hasLightFact: true }).text;
+        const text = filterVoice(s.text, { heard: heardHere, hasLightFact: cardLight(facts.lines), facts: facts.lines }).text;
         return text ? [{ ...s, text }] : [];
       });
       if (cleaned.length) cards.push({ actorId: c.actorId, actorLabel: labelOf(c.actorId), segments: cleaned });
@@ -620,10 +673,12 @@ Given what reached the being (HEARD), the being's own listening monologue (its i
   - thought: its inner voice, first person, as it thinks it (keep its words; trim nothing that matters — never reword it, invert it, or correct it with the facts).
   - action: only what the monologue says the being PHYSICALLY does now (a hand toward the lock, holding still, a step back) — third person present: "She holds still." Perceptions and feelings are thoughts, not acts.
   - speech: only words the monologue says it says ALOUD, verbatim.
+- NOTHING NEW = NO SCENE: when nothing from beyond the being reached it, or nothing is new, "scene" is an empty string. Never write that nothing changed, nothing happened or nothing reached the being ("Nothing new has reached Violet from beyond the room.", "The knock has settled into silence." are forbidden).
 - DERIVE, NEVER INVENT.
-- Output JSON only: {"scene": string, "segments": [{"kind": "action"|"thought"|"speech", "text": string}]}`;
+- Every thought segment also carries "narrated": the same thought reported by an omniscient narrator, third person, past tense, meaning kept, no added fact or image, about the same length or shorter ("I know this door." -> "She knew this door."). Action and speech segments carry none.
+- Output JSON only: {"scene": string, "segments": [{"kind": "action"|"thought"|"speech", "text": string, "narrated"?: string}]}`;
 
-export interface BuiltBeingCard { scene: string | null; segments: Array<{ kind: 'action' | 'thought' | 'speech'; text: string }> }
+export interface BuiltBeingCard { scene: string | null; segments: Array<{ kind: 'action' | 'thought' | 'speech'; text: string; narrated?: string }> }
 
 /** A being's monologue → its scene line and its card. Null on failure (the monologue stands as one thought). Never throws. */
 export async function buildBeingCard(
@@ -656,10 +711,10 @@ export async function buildBeingCard(
       opts.timeoutMs ?? SCENE_BUILD_TIMEOUT_MS,
       'being card build',
     );
-    const parsed = parseJson<{ scene?: unknown; segments?: Array<{ kind?: unknown; text?: unknown }> }>(res.text);
+    const parsed = parseJson<{ scene?: unknown; segments?: Array<{ kind?: unknown; text?: unknown; narrated?: unknown }> }>(res.text);
     if (!parsed) throw new Error('no JSON in the builder\'s answer');
     const known = [heard, monologue, ...facts.lines, ...facts.names.map((n) => n.name)];
-    const scene = typeof parsed.scene === 'string' ? withoutRestatedStage(withoutRepeatedHour(withoutLightLabel(onlyDerived(parsed.scene.trim(), known)), page), page) : '';
+    const scene = typeof parsed.scene === 'string' ? withoutNothingLines(withoutRestatedStage(withoutRepeatedHour(withoutLightLabel(onlyDerived(parsed.scene.trim(), known)), page), page), splitSentences) : '';
     let segments: BuiltBeingCard['segments'] = [];
     let sceneClean = '';
     for (const s of parsed.segments ?? []) {
@@ -668,20 +723,25 @@ export async function buildBeingCard(
       if (!kind) continue;
       let text = kind === 'speech' ? s.text.trim() : onlyDerived(s.text.trim(), known);
       // A thought is the monologue's own voice, never reworded or inverted (HW8 run 6).
+      if (text && kind === 'thought' && splitSentences(text).some(isBareHour)) {
+        console.log(`[scene-builder] dropped an hour on ${being.name}'s card: ${text.slice(0, 120)}`);
+        text = splitSentences(text).filter((x) => !isBareHour(x)).join(' ');
+      }
       if (text && kind === 'thought') {
         const mine = fromInnerVoice(text, monologue);
         if (!mine) { console.log(`[scene-builder] dropped a thought ${being.name}'s voice never had: ${text.slice(0, 160)}`); text = ''; } else text = mine;
       }
-      if (text) segments.push({ kind, text });
+      const narrated = text && kind === 'thought' ? takeNarrated(text, s.narrated, being.name) : undefined;
+      if (text) segments.push({ kind, text, ...(narrated ? { narrated } : {}) });
     }
     segments = reattachDanglers(dropEchoedThoughts(segments));
     // No counting nobody gave it, no table words in the card (HW8 run 6: "Two knocks. Not three." on a standing-beat card).
     segments = segments.flatMap((s) => {
       if (s.kind === 'speech') return [s];
-      const text = filterVoice(s.text, { heard: `${heard} ${monologue}`, hasLightFact: true }).text;
+      const text = filterVoice(s.text, { heard: `${heard} ${monologue}`, hasLightFact: cardLight(facts.lines), facts: facts.lines }).text;
       return text ? [{ ...s, text }] : [];
     });
-    sceneClean = filterVoice(scene, { heard: `${heard} ${monologue}`, hasLightFact: true }).text;
+    sceneClean = filterVoice(scene, { heard: `${heard} ${monologue}`, hasLightFact: cardLight(facts.lines), facts: facts.lines }).text;
     if (!segments.length) segments.push({ kind: 'thought', text: monologue.trim() });
     console.log(`[scene-builder] ${being.name}'s card built in ${Date.now() - t0}ms: ${segments.length} segment(s)`);
     return { scene: sceneClean || null, segments };

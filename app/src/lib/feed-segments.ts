@@ -29,6 +29,8 @@ export interface FeedSegment {
   text: string;
   /** The sentence of the Watcher's line this segment came from (visible-form: shown to a viewer only when that sentence reached them). */
   source?: string;
+  /** A thought's omniscient third-person past-tense form, written once at card-build time (the novel's 'narrator' style prefers it). */
+  narrated?: string;
 }
 
 // One alternation, left to right: ::action::  ((thought))  "speech" / “speech”  *action*
@@ -89,7 +91,13 @@ export function mergeAdjacent<T extends { kind: string; text: string }>(segments
   const out: T[] = [];
   for (const s of segments) {
     const last = out[out.length - 1];
-    if (last && last.kind === s.kind && s.kind !== 'speech') out[out.length - 1] = { ...last, text: `${last.text.trim()} ${s.text.trim()}`.trim() };
+    if (last && last.kind === s.kind && s.kind !== 'speech') {
+      const merged: T & { narrated?: string } = { ...last, text: `${last.text.trim()} ${s.text.trim()}`.trim() };
+      // The narrated form joins only when every part has one; otherwise the merged text falls back to the transform.
+      const a = (last as { narrated?: string }).narrated, b = (s as { narrated?: string }).narrated;
+      if (a && b) merged.narrated = `${a.trim()} ${b.trim()}`.trim(); else delete merged.narrated;
+      out[out.length - 1] = merged;
+    }
     else out.push({ ...s });
   }
   return out;

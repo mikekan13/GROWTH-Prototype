@@ -24,6 +24,7 @@ import { chosenNote, HINT_WORD } from '@/lib/roll-card';
 import { parseSegments, mergeAdjacent, type FeedSegment } from '@/lib/feed-segments';
 import { parseTableProse, characterCards } from '@/services/table-prose';
 import { foldSpokenBeats } from '../SpokenBeatBlock';
+import { stripNonEvents } from '@/lib/non-event';
 
 export type Via = 'typed' | 'spoken' | 'being';
 /** Who voiced the line: the Watcher, a Trailblazer, or the being itself (DAYA). */
@@ -144,6 +145,7 @@ function declarationRows(e: TerminalEvent, p: GameEventPayload, roster: RosterNa
     narration = parsed.narration;
   }
   const rows: Array<NarrationRowModel | CharacterRowModel> = [];
+  if (narration) narration = stripNonEvents(narration) || null;
   if (narration && narration.trim()) {
     rows.push({ type: 'narration', key: e.id, timestamp: e.timestamp, cycle: p.cycle, text: narration.trim(), raw, via, voicedBy: e.actorName || null });
   }
@@ -152,7 +154,7 @@ function declarationRows(e: TerminalEvent, p: GameEventPayload, roster: RosterNa
   characterCards(p.description, { narration, speech, actions, thoughts }).forEach((card, i) => {
     rows.push({
       type: 'character', key: `${e.id}#c${i}`, timestamp: e.timestamp, cycle: p.cycle,
-      characterId: card.id, name: card.label, segments: mergeAdjacent(card.segments.map((s): FeedSegment => ({ kind: s.kind, text: s.text }))),
+      characterId: card.id, name: card.label, segments: mergeAdjacent(card.segments.map((s): FeedSegment => ({ kind: s.kind, text: s.text, ...((s as { narrated?: string }).narrated ? { narrated: (s as { narrated?: string }).narrated } : {}) }))),
       raw, via, voice: 'Watcher', voicedBy: e.actorName || null, fromNarration: true,
     });
   });
@@ -250,14 +252,16 @@ export function eventRows(e: TerminalEvent, roster: RosterName[]): FeedRowModel[
     // What went through a being while someone else had the floor: its ((thought)) row, Soul blue — the record
     // reads like a novel (Mike 2026-10-25), and a thought is in it. Only the Watcher and the being itself get these rows.
     case 'being_thought': {
-      const bp = p as { thought?: string; cycle?: number; scene?: string | null; segments?: Array<{ kind: FeedSegment['kind']; text: string }> };
+      const bp = p as { thought?: string; cycle?: number; scene?: string | null; segments?: Array<{ kind: FeedSegment['kind']; text: string; narrated?: string }> };
       const t = bp.thought?.trim();
       if (!t && !bp.segments?.length) return [];
       const rows: FeedRowModel[] = [];
       // Built up (scene-builder 2026-10-25): a prose line setting the being's side of the scene, then its card —
       // thoughts blue, what it did red, what it said purple.
-      if (bp.scene?.trim()) rows.push({ type: 'narration', key: `${e.id}#scene`, timestamp: e.timestamp, cycle: bp.cycle, text: bp.scene.trim(), raw: bp.scene.trim(), via: 'being', voicedBy: null });
-      const segments: FeedSegment[] = bp.segments?.length ? mergeAdjacent(bp.segments.map((s) => ({ kind: s.kind, text: s.text }))) : [{ kind: 'thought', text: t! }];
+      // A scene line that only says nothing changed / nothing reached the being is no row at all: the card stands alone.
+      const scene = bp.scene ? stripNonEvents(bp.scene) : '';
+      if (scene) rows.push({ type: 'narration', key: `${e.id}#scene`, timestamp: e.timestamp, cycle: bp.cycle, text: scene, raw: bp.scene!.trim(), via: 'being', voicedBy: null });
+      const segments: FeedSegment[] = bp.segments?.length ? mergeAdjacent(bp.segments.map((s) => ({ kind: s.kind, text: s.text, ...(s.narrated ? { narrated: s.narrated } : {}) }))) : [{ kind: 'thought', text: t! }];
       rows.push({
         type: 'character', key: e.id, timestamp: e.timestamp, cycle: bp.cycle,
         characterId: e.characterId ?? null, name: e.characterName || 'someone present', segments,

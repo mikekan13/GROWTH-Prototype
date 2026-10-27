@@ -92,10 +92,12 @@ export function splitHeld(rows: HeldRow[]): HeldSplit {
 }
 
 /** The lines a being is told about its own body. Second person; nothing invented. Pure. */
-export function heldLines(h: HeldSplit, opts: { written?: boolean; described?: boolean } = {}): string[] {
+export function heldLines(h: HeldSplit, opts: { written?: boolean; described?: boolean; placed?: boolean } = {}): string[] {
   const lines: string[] = [];
   lines.push(h.wearing.length ? `You are wearing: ${h.wearing.join(', ')}.` : 'You are wearing nothing but what is on your sheet as underwear.');
   lines.push(h.carrying.length ? `You have on you: ${h.carrying.join(', ')}.` : 'You carry nothing else.');
+  // WHERE WHAT YOU HOLD IS (HW8 run 7 #8: the bill went from the shelf to the pocket to the hand): held is with you, never somewhere else.
+  if (opts.placed && h.carrying.length) lines.push(`Held, not set down anywhere: ${h.carrying.join(', ')} - with you, in your hand or pocket; never on a shelf or across the room.`);
   // What is written on a thing you hold is yours to read (HW8 2026-10-25: the being read a "Paid" stamp off a receipt
   // it had never seen; now the receipt is real and says NOT PAID, and the being is told what it says).
   if (opts.written !== false) for (const w of h.written ?? []) lines.push(`Written on the ${w.name}:\n${w.text}`);

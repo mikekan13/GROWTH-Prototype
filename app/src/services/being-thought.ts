@@ -22,7 +22,7 @@ export interface BeingThoughtRecord {
   cycle?: number;
   /** Built up (scene-builder 2026-10-25): the being's side of the scene, and its monologue as a card. */
   scene?: string | null;
-  segments?: Array<{ kind: 'action' | 'thought' | 'speech'; text: string }>;
+  segments?: Array<{ kind: 'action' | 'thought' | 'speech'; text: string; narrated?: string }>;
 }
 
 /** Never throws: a record that fails to write is logged, the table does not notice. */
@@ -44,7 +44,7 @@ export async function recordBeingThought(campaignId: string, by: { userId: strin
         canonEventId: r.canonEventId,
         ...(r.cycle !== undefined ? { cycle: r.cycle } : {}),
         ...(r.scene ? { scene: r.scene.slice(0, 1200) } : {}),
-        ...(r.segments?.length ? { segments: r.segments.map((s) => ({ kind: s.kind, text: s.text.slice(0, 1500) })) } : {}),
+        ...(r.segments?.length ? { segments: r.segments.map((s) => ({ kind: s.kind, text: s.text.slice(0, 1500), ...(s.narrated ? { narrated: s.narrated.slice(0, 1500) } : {}) })) } : {}),
       },
     });
   } catch (err) {

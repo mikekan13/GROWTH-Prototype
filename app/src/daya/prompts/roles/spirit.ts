@@ -100,7 +100,7 @@ export interface SpiritListeningArgs {
 export const QUOTED_WORDS_NOTE = "Quoted words are the speaker's own; a name inside them is whoever the speaker is addressing, not the speaker.";
 
 /** The in-world words for the voice: never the table's (beat, stimulus, instruction, scene). */
-export const IN_WORLD_NOTE = 'Think and speak only in the words of your own life — what just happened, what you notice, what you do now. Never count knocks, seconds or minutes you were not given a number for. Say nothing about light or dark unless the facts above say how the room is lit. Do not reach for stock images that could fit any scene — say what is specific to this one.';
+export const IN_WORLD_NOTE = 'Think and speak only in the words of your own life — what just happened, what you notice, what you do now. Never count knocks, seconds or minutes you were not given a number for. Say nothing about light or dark unless the facts above say how the room is lit. Do not reach for stock images that could fit any scene — say what is specific to this one. A person you remember, or are told to think of, is NOT in front of you unless the facts above say they are in sight.';
 
 export const LISTENING_MAX_TOKENS = 140;
 
@@ -205,6 +205,7 @@ export interface SpiritAnsweringArgs {
 export const ANSWERING_MAX_TOKENS = 60;
 
 /** The hint for a second take when the first line only repeated what was heard. */
+export const SPIRIT_REPLAY_HINT = 'You already said that. Say something new, or stay silent.';
 export const SPIRIT_ECHO_HINT = 'Your first line only repeated what you had just heard. Those were his words, not yours. Answer again as yourself, in your own words — what YOU say or do about it.';
 
 const ECHO_STOP = new Set(['the', 'a', 'an', 'to', 'of', 'and', 'or', 'you', 'i', 'it', 'is', 'me', 'my', 'your', 'just', 'please', 'even', 'have', 'dont', "don't", 'not', 'for', 'in', 'on', 'at']);

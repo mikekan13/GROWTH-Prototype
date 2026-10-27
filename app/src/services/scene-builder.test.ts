@@ -192,3 +192,39 @@ describe('withoutRestatedStage — the page remembers itself, scene lines includ
     expect(withoutRestatedStage('He stands at the door.', [])).toBe('He stands at the door.');
   });
 });
+
+import { narratedIsFaithful, takeNarrated } from './scene-builder';
+describe('narrated thoughts (HW8 run 7 item 14) — a narrator form brings in nothing new', () => {
+  it('tense and person may change, content may not', () => {
+    expect(narratedIsFaithful('I know this door. I have been here before.', 'He knew this door. He had been here before.')).toBe(true);
+    expect(narratedIsFaithful('I know this door.', 'He knew this heavy door.')).toBe(false);
+  });
+  it('a missing or unfaithful form is left undefined', () => {
+    expect(takeNarrated('I know this door.', undefined, 'Kristopher')).toBeUndefined();
+    expect(takeNarrated('I know this door.', 'He feared the shadows.', 'Kristopher')).toBeUndefined();
+    expect(takeNarrated('I know this door.', ' He knew this door. ', 'Kristopher')).toBe('He knew this door.');
+  });
+});
+
+import { cardLight } from './scene-builder';
+describe('HW8 run 7 #9 / #11', () => {
+  it('statedThoughtSentences catches the mental verbs the GM used', () => {
+    const seed = ['He waits for the door to open.', "He doesn't know why he used her name.", 'Not normal.'];
+    expect(statedThoughtSentences(seed)).toEqual(["He doesn't know why he used her name.", 'Not normal.']);
+    expect(statedThoughtSentences(['He wonders if she is home.'])).toEqual(['He wonders if she is home.']);
+    expect(statedThoughtSentences(['He notices the bulb flicker.', 'He cannot stop staring.'])).toEqual(['He notices the bulb flicker.', 'He cannot stop staring.']);
+  });
+  it('the clock line\'s "after dark" is not a light fact; a bulb is', () => {
+    expect(cardLight(['[clock] about half past seven in the evening — after dark'])).toBe(false);
+    expect(cardLight(['[clock] x', '[fact · the place] A caged bulb lights the landing.'])).toBe(true);
+  });
+});
+
+import { isBareHour } from './scene-builder';
+describe('isBareHour (HW8 run 7 #13)', () => {
+  it('an hour alone is not a thought on a being card', () => {
+    expect(isBareHour("Seven o'clock.")).toBe(true);
+    expect(isBareHour('Half past seven.')).toBe(true);
+    expect(isBareHour('Seven pizzas, and not one of them mine.')).toBe(false);
+  });
+});

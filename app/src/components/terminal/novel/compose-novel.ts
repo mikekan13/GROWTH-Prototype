@@ -16,6 +16,7 @@
  * Text may carry perceived-feed tokens (`{@id|label}`, `{gap}`); they pass through untouched except that the viewer's
  * own token is replaced by the pronoun. Pure, client-safe.
  */
+import { isNothingLine, stripNonEvents } from '@/lib/non-event';
 import type { FeedRowModel, CharacterRowModel, RollRowModel } from '../table-feed/feed-rows';
 
 export type ThoughtStyle = 'inner' | 'narrator';
@@ -171,14 +172,16 @@ export function narratorise(text: string, speaker: { name: string; gender: Gende
     [/\bI['’](?:ll|d)\b/g, (_m, o, f) => `${cap(o, S, f)} would`],
     [/\bI am\b/g, (_m, o, f) => `${cap(o, S, f)} was`],
     [/\bI have\b/g, (_m, o, f) => `${cap(o, S, f)} had`],
-    [/\bI (?:do not|don['’]t)\b/g, (_m, o, f) => `${cap(o, S, f)} did not`],
-    [/\bI (?:can['’]t|cannot)\b/g, (_m, o, f) => `${cap(o, S, f)} could not`],
+    [/\bI (?:do not|don['’]t)\b/g, (_m, o, f) => `${cap(o, S, f)} didn't`],
+    [/\bI (?:can['’]t|cannot)\b/g, (_m, o, f) => `${cap(o, S, f)} couldn't`],
+    [/\bI won['’]t\b/g, (_m, o, f) => `${cap(o, S, f)} wouldn't`],
     [/\bI can\b/g, (_m, o, f) => `${cap(o, S, f)} could`],
     [/\bI will\b/g, (_m, o, f) => `${cap(o, S, f)} would`],
     [/\bI ([a-z]+)\b/g, (m, o, f) => {
       const w = m[1];
       const keep = ADVERBS.has(w) || MODALS.has(w) || w.endsWith('ly');
-      return `${cap(o, S, f)} ${keep ? w : pastTense(w)}`;
+      // Only verbs we know are put into the past; anything else is left as written rather than mangled.
+      return `${cap(o, S, f)} ${keep || !IRREGULAR_PAST[w] ? w : pastTense(w)}`;
     }],
   ];
   const parts = text.split(TOKEN_RE);
@@ -253,23 +256,43 @@ function speechLine(text: string, who: string): string {
   return `"${t}" ${who} ${verb}.`;
 }
 
-function cardRuns(row: CharacterRowModel, viewer: NovelViewer | null, genders: Map<string, Gender>, style: ThoughtStyle, sexes?: Map<string, Gender>): NovelRun[] {
+/** Does this text already name the character (full name, or the given name)? */
+function names(text: string | null, name: string): boolean {
+  if (!text) return false;
+  const first = name.trim().split(/\s+/)[0];
+  return new RegExp(`(^|[^\p{L}])(?:${escapeRe(name.trim())}|${escapeRe(first)})(?![\p{L}])`, 'iu').test(text);
+}
+
+function cardRuns(row: CharacterRowModel, viewer: NovelViewer | null, genders: Map<string, Gender>, style: ThoughtStyle, sexes?: Map<string, Gender>, scene: string | null = null): NovelRun[] {
   const own = !!viewer && ((!!viewer.id && row.characterId === viewer.id) || row.name === viewer.name);
   const gender = (row.characterId ? sexes?.get(row.characterId) : undefined) ?? sexes?.get(row.name) ?? genders.get(row.name) ?? null;
   const runs: NovelRun[] = [];
-  for (const s of row.segments) {
-    const clean = stripMarks(s.text);
-    if (!clean) continue;
+  const segs = row.segments.map((s) => ({ ...s, clean: stripMarks(s.text), used: false })).filter((s) => s.clean);
+  // Italic thoughts need an owner (Mike 2026-10-26: "it doesn't attribute anyone having the thought"). Until something
+  // in the card (or the scene line just before it) names the character, a thought is opened by the card's first act,
+  // else by a neutral clause. Once attributed, later thoughts in the card need nothing. Own thoughts are "I".
+  let attributed = own || style !== 'inner' || names(scene, row.name);
+  const actionText = (clean: string) => (own ? firstPerson(ensureStop(clean), { id: viewer!.id, name: row.name, gender }) : (viewer ? nameToFirstPerson(ensureStop(clean), viewer) : ensureStop(clean)));
+  for (const s of segs) {
+    if (s.used) continue;
     if (s.kind === 'action') {
-      const t = own ? firstPerson(ensureStop(clean), { id: viewer!.id, name: row.name, gender }) : (viewer ? nameToFirstPerson(ensureStop(clean), viewer) : ensureStop(clean));
-      runs.push({ text: `${t} ` });
+      runs.push({ text: `${actionText(s.clean)} ` });
+      attributed = true;
     } else if (s.kind === 'speech') {
-      const line = speechLine(clean, own ? 'I' : row.name);
-      if (line) runs.push({ text: `${line} ` });
+      const line = speechLine(s.clean, own ? 'I' : row.name);
+      if (line) { runs.push({ text: `${line} ` }); attributed = true; }
     } else if (own || style === 'inner') {
-      runs.push({ text: `${ensureStop(clean)} `, inner: true });
+      if (!attributed) {
+        const act = segs.find((x) => x.kind === 'action' && !x.used);
+        if (act) { act.used = true; runs.push({ text: `${actionText(act.clean)} ` }); }
+        else runs.push({ text: `${row.name} thought it over. ` });
+        attributed = true;
+      }
+      runs.push({ text: `${ensureStop(s.clean)} `, inner: true });
     } else {
-      runs.push({ text: `${ensureStop(narratorise(clean, { name: row.name, gender }))} ` });
+      // The model's own third-person past-tense form, written once at card-build time, wins; old rows fall back to the transform.
+      const told = s.narrated ? stripMarks(s.narrated) : '';
+      runs.push({ text: `${ensureStop(told || narratorise(s.clean, { name: row.name, gender }))} ` });
     }
   }
   return mergeRuns(runs);
@@ -294,10 +317,19 @@ export function rollRuns(row: RollRowModel, viewer: NovelViewer | null): NovelRu
   return [{ text: `${first} ${result}${cost}` }];
 }
 
+export { isNothingLine };
+
+function flatten(rows: FeedRowModel[]): FeedRowModel[] {
+  return rows.flatMap((r) => (r.type === 'beat' ? flatten(r.groups.flat()) : [r]));
+}
+
 export function composeNovel(rows: FeedRowModel[], viewer: NovelViewer | null, opts: NovelOpts = {}): NovelBlock[] {
   const style = opts.thoughtStyle ?? 'inner';
   const genders = gendersOf(rows);
+  const flat = flatten(rows);
   const blocks: NovelBlock[] = [];
+  let lastNarration: string | null = null; // the narration block just before a card (it may already name the character)
+  const said = new Set<string>();
   let lastLabel: string | null = null;
 
   const note = (cycle: number | undefined, key: string) => {
@@ -309,25 +341,62 @@ export function composeNovel(rows: FeedRowModel[], viewer: NovelViewer | null, o
     }
   };
 
-  const walk = (row: FeedRowModel) => {
+  const genderOfName = (name: string, id?: string | null): Gender => (id ? opts.sexes?.get(id) : undefined) ?? opts.sexes?.get(name) ?? genders.get(name) ?? null;
+
+  /**
+   * A non-event line is DROPPED (the card stands alone) — except, rarely, "<Name> did not hear him/her." when the
+   * preceding GM beat was ADDRESSED to the character whose card follows: a quote that names them, or a knock at a door.
+   */
+  const addressedTo = (r: CharacterRowModel, target: string): boolean => r.segments.some((s) =>
+    (s.kind === 'speech' && names(stripMarks(s.text), target)) || (s.kind === 'action' && /\bknock(?:s|ed|ing)?\b/i.test(s.text) && /\bdoor\b/i.test(s.text)));
+  const nothingLine = (i: number): { key: string; text: string } | null => {
+    const next = flat[i + 1];
+    if (!next || next.type !== 'character') return null;
+    for (let j = i - 1; j >= 0; j--) {
+      const r = flat[j];
+      if (r.type !== 'character' || !r.fromNarration) continue;
+      if (r.name === next.name) return null;
+      if (!addressedTo(r, next.name)) continue;
+      if (said.has(`${r.key}>${next.name}`)) return null;
+      said.add(`${r.key}>${next.name}`);
+      const g = genderOfName(r.name, r.characterId);
+      const him = g === 'he' ? 'him' : g === 'she' ? 'her' : r.name;
+      const who = viewer && ((!!viewer.id && next.characterId === viewer.id) || next.name === viewer.name) ? 'I' : next.name;
+      return { key: `${next.key}#nh`, text: `${who} did not hear ${him}.` };
+    }
+    return null;
+  };
+
+  const walk = (row: FeedRowModel, i: number) => {
     switch (row.type) {
       case 'narration': {
         const clean = stripMarks(row.text);
         if (!clean) return;
+        if (isNothingLine(clean)) {
+          const line = nothingLine(i);
+          lastNarration = null;
+          if (!line) return;
+          note(row.cycle, row.key);
+          blocks.push({ key: line.key, kind: 'para', runs: [{ text: line.text }] });
+          return;
+        }
+        const kept = stripNonEvents(clean);
+        if (!kept) return;
+        lastNarration = kept;
         note(row.cycle, row.key);
-        blocks.push({ key: row.key, kind: 'para', runs: [{ text: viewer ? nameToFirstPerson(clean, viewer) : clean }] });
+        blocks.push({ key: row.key, kind: 'para', runs: [{ text: viewer ? nameToFirstPerson(kept, viewer) : kept }] });
         return;
       }
       case 'character': {
-        const runs = cardRuns(row, viewer, genders, style, opts.sexes);
+        const runs = cardRuns(row, viewer, genders, style, opts.sexes, lastNarration);
+        lastNarration = null;
         if (runs.length === 0) return;
         note(row.cycle, row.key);
         blocks.push({ key: row.key, kind: 'para', runs: runs.map((r, i) => (i === runs.length - 1 ? { ...r, text: r.text.trimEnd() } : r)) });
         return;
       }
       case 'beat':
-        row.groups.forEach((g) => g.forEach(walk));
-        return;
+        return; // flattened above
       case 'roll': {
         // A roll reads as one or two sentences, as far as this viewpoint perceived it (the book leaves the dice out).
         const runs = rollRuns(row, viewer);
@@ -340,6 +409,6 @@ export function composeNovel(rows: FeedRowModel[], viewer: NovelViewer | null, o
         return; // checks, event bars, JEWL margin, system readouts, withdrawn lines: the book leaves the machinery out
     }
   };
-  rows.forEach(walk);
+  flat.forEach(walk);
   return blocks;
 }

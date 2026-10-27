@@ -16,7 +16,7 @@ export interface LaneLike {
 }
 
 export function laneTarget(lane: LaneLike | null, sincePhaseMs: number): number | null {
-  if (!lane) return 0.02;
+  if (!lane) return 0.02 + 0.08 * (1 - Math.exp(-Math.max(0, sincePhaseMs) / 20_000)); // no answer yet: a slow crawl so it is never dead
   switch (lane.phase) {
     case 'ready':
     case 'disabled':
@@ -45,6 +45,16 @@ export function patternStability(progress: number): { left: number; right: numbe
   const p = Math.min(1, Math.max(0, progress));
   const n = Math.round(100 * (1 - p));
   return { left: n === 0 ? 0 : -n, right: n, remaining: 1 - p };
+}
+
+/**
+ * The Pattern Stability bar: it shrinks from BOTH ENDS toward the centre as the numbers close — no swing, no bounce.
+ * Percent of the track: `left` is where it starts, `width` how long it is; both 0-length at the centre when done.
+ */
+export function barSpan(progress: number): { left: number; width: number } {
+  const p = Math.min(1, Math.max(0, progress));
+  const width = (1 - p) * 100;
+  return { left: (100 - width) / 2, width };
 }
 
 /** One smoothing step: ease toward the target, never backwards, at least a visible crawl while behind. */

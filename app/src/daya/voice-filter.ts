@@ -25,6 +25,14 @@ export interface VoiceFilterContext {
   heard?: string;
   /** Does any fact give the being's room a light state (a lamp, a bulb, a switch, lit / dark)? Unknown = true (never strip on a guess). */
   hasLightFact?: boolean;
+  /** Fact lines of the being's ground (room, doors, things) - a material the facts never name is not the voice's to name ("the glass" for a door no fact calls glass). */
+  facts?: string[];
+  /** HW8 run 7 #5: the facts say NO ONE is in sight of this being (door closed, alone on the landing): a sentence that puts a known absent being in view is dropped. */
+  noOneInView?: boolean;
+  /** Names of beings known to be absent, for the in-view rule (first names). */
+  absentNames?: string[];
+  /** HW8 run 7 #8: names of the things the being HOLDS - a sentence that places one on a shelf / across the room is dropped. */
+  heldNames?: string[];
   /** 'vocab' = only the table's words (a being's DOING: "knocks three times" is not a count). Default 'all'. */
   rules?: 'all' | 'vocab';
 }
@@ -45,13 +53,15 @@ const TABLE_VOCAB: Array<[RegExp, string]> = [
 ];
 
 // ── Stock images ──────────────────────────────────────────────────────────────
-const STOCK_IMAGES: Array<{ key: string; re: RegExp }> = [
-  { key: 'held breath', re: /\b(?:held\s+breath|breath\s+(?:held|caught)|hold(?:ing)?\s+(?:my|a|the)\s+breath|hold(?:ing)?\s+(?:her|his)\s+breath)\b/i },
-  { key: 'eardrums', re: /\beardrums?\b/i },
-  { key: 'dust motes', re: /\bdust\s+motes?\b|\bmotes?\s+of\s+dust\b/i },
-  { key: 'statue', re: /\bstatues?\b/i },
-  { key: 'hum in the teeth', re: /\bhum\b[^.!?]{0,40}\bteeth\b|\bteeth\b[^.!?]{0,40}\bhum\b/i },
+const STOCK_IMAGES: Array<{ key: string; re: RegExp; always?: boolean }> = [
+  { key: 'held breath', always: true, re: /\b(?:held\s+breath|breath\s+(?:held|caught)|(?:hold|holds|held|holding)\s+(?:my|your|a|the|her|his|their)\s+breath)\b/i },
+  { key: 'eardrums', always: true, re: /\beardrums?\b/i },
+  { key: 'dust motes', always: true, re: /\bdust\s+motes?\b|\bmotes?\s+of\s+dust\b/i },
+  { key: 'statue', always: true, re: /\bstatues?\b/i },
+  { key: 'hum in the teeth', always: true, re: /\bhum\b[^.!?]{0,40}\bteeth\b|\bteeth\b[^.!?]{0,40}\bhum\b/i },
   { key: 'vibration frequency', re: /\bvibrat\w*\b[^.!?]{0,60}\bfrequenc\w*\b|\bfrequenc\w*\b[^.!?]{0,60}\bvibrat\w*\b|\bdifferent\s+frequency\b/i },
+  { key: 'suspended ash', always: true, re: /\bsuspended\s+ash\b|\bash\s+(?:hanging|suspended)\b/i },
+  { key: 'dead light', always: true, re: /\bdead\s+light\b/i },
   { key: 'weight of the air', re: /\bweight\s+of\s+the\s+air\b|\bair\s+(?:feels\s+)?(?:thick|heavy)\s+with\b/i },
 ];
 
@@ -88,6 +98,37 @@ export function hasLightFact(factLines: string[]): boolean {
   return factLines.some((l) => LIGHT_FACT_RE.test(l));
 }
 
+// -- Materials, sight, held things (HW8 run 7) --
+const GLASS_RE = /\b(?:glass|windowpane|window-?pane|pane)\b/i;
+const DOOR_RE = /\bdoor\b/i;
+const IN_VIEW_RE = /\b(?:the\s+sight\s+of\s+(?:her|him|them)|(?:her|his)\s+(?:\w+\s+)?(?:hair|eyes|face|silhouette|figure|shape|shoulders|hands?)\s+(?:catch(?:es)?|gleam\w*|glint\w*|shin\w*|fram\w*|flash\w*|stand\w*|glow\w*)|(?:I|you)\s+(?:see|watch|look\s+at)\s+(?:her|him)\b|standing\s+(?:there|before\s+me|in\s+front\s+of\s+me))/i;
+/** A sentence that puts a being known to be absent in view ("the sight of her", "her hair catches the light"). Pure. */
+export function inViewOfAbsent(sentence: string, absentNames: string[]): boolean {
+  if (IN_VIEW_RE.test(sentence)) return true;
+  return absentNames.some((n) => n && new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b[^.!?]{0,40}\\b(?:stands?|standing|is\\s+there|is\\s+in\\s+front)\\b`, 'i').test(sentence) && /\b(?:I|my)\s+(?:see|watch)/i.test(sentence));
+}
+const ELSEWHERE_RE = /\b(?:on\s+the\s+(?:\w+\s+)?(?:shelf|counter|table|floor|desk|nightstand|dresser|sill)|across\s+the\s+room|(?:\w+\s+)?feet\s+away|over\s+there)\b/i;
+const HELD_STOP = new Set(['the', 'and', 'with', 'her', 'his', 'number', 'from']);
+/** A sentence that names a thing the being HOLDS and puts it somewhere else (on the shelf, across the room). Pure. */
+export function heldPlacedElsewhere(sentence: string, heldNames: string[]): boolean {
+  if (!ELSEWHERE_RE.test(sentence)) return false;
+  return heldNames.some((n) => n.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !HELD_STOP.has(w)).some((w) => new RegExp(`\\b${w}`, 'i').test(sentence)));
+}
+
+/** Is `line` (fuzzily) one of the being's last spoken lines? (HW8 run 7 #7) Pure. */
+export function isSpokenRepeat(line: string, previous: string[]): boolean {
+  const toks = (x: string) => new Set(norm(x).split(/[^a-z0-9']+/).filter(Boolean));
+  const a = toks(line);
+  if (!a.size) return false;
+  return previous.slice(0, 3).some((p) => {
+    const b = toks(p);
+    if (!b.size) return false;
+    let inter = 0;
+    for (const t of a) if (b.has(t)) inter++;
+    return inter / (a.size + b.size - inter) >= 0.8;
+  });
+}
+
 // ── Verbatim repeats ──────────────────────────────────────────────────────────
 const norm = (s: string) => s.toLowerCase().replace(/[*_`]/g, '').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').replace(/[\s.!?…"')\]]+$/u, '').replace(/^["'(\[]+/, '').trim();
 
@@ -110,12 +151,16 @@ export function filterVoice(text: string, ctx: VoiceFilterContext = {}): { text:
     if (ctx.rules === 'vocab') { kept.push(sentence); continue; }
     if (seenBefore.has(norm(sentence))) { drop('repeat of a recent thought'); continue; }
     const image = stockImageOf(sentence);
+    if (image && STOCK_IMAGES.find((i) => i.key === image)?.always) { drop(`stock image (always dropped): ${image}`); continue; }
     if (image) {
       if (countImage(image, recent) > 0) { drop(`stock image used in the last three thoughts: ${image}`); continue; }
       if (countImage(image, prior) >= 2) { drop(`stock image already used twice: ${image}`); continue; }
       if (usedNow.has(image)) { drop(`stock image twice in one go: ${image}`); continue; }
       usedNow.add(image);
     }
+    if (GLASS_RE.test(sentence) && DOOR_RE.test(sentence) && !(ctx.facts ?? []).some((f) => GLASS_RE.test(f))) { drop('a material no fact gives the door: glass'); continue; }
+    if (ctx.noOneInView && inViewOfAbsent(sentence, ctx.absentNames ?? [])) { drop('puts an absent being in view when the facts say no one is present'); continue; }
+    if (ctx.heldNames?.length && heldPlacedElsewhere(sentence, ctx.heldNames)) { drop('places a held thing somewhere it is not'); continue; }
     const count = sentence.match(COUNT_RE);
     if (count && !countedIn(count[0], heard)) { drop(`counting: ${count[0]}`); continue; }
     if (ctx.hasLightFact === false && LIGHT_RE.test(sentence) && !LIGHT_RE.test(heard)) { drop('light or dark with no light fact for the room'); continue; }

@@ -46,3 +46,22 @@ export async function recentCardTextsOf(campaignId: string, characterId: string,
     return out;
   } catch { return []; }
 }
+
+/**
+ * The being's last `n` SPOKEN lines (chat rows it posted), newest first - the answer replay's memory (HW8 run 7 #7: "I'm fine, just...
+ * checking the lock." twice verbatim). Acts (starred rows) are not speech. Never throws.
+ */
+export async function recentSpokenOf(campaignId: string, characterId: string, n = 3): Promise<string[]> {
+  try {
+    const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'chat', characterId }, orderBy: { createdAt: 'desc' }, take: n * 3, select: { payload: true } });
+    const out: string[] = [];
+    for (const r of rows ?? []) {
+      try {
+        const m = (JSON.parse(r.payload) as { message?: string }).message?.trim();
+        if (m && !/^\*.*\*$/.test(m)) out.push(m);
+      } catch { /* skip */ }
+      if (out.length >= n) break;
+    }
+    return out;
+  } catch { return []; }
+}

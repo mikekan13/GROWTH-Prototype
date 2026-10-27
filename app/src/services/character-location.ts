@@ -15,6 +15,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { snapCharacterToLocation } from '@/services/canvas-placement';
+import { broadcastEvent } from '@/lib/campaign-stream';
 
 export const moveCharacterToLocationSchema = z.object({
   characterId: z.string().min(1),
@@ -93,6 +94,13 @@ export async function moveCharacterToLocation(
     if (input.snapCanvas && input.locationId) {
       try { await snapCharacterToLocation(character.campaignId!, input.characterId, input.locationId); } catch (err) { console.warn('[character-location] canvas snap failed', err); }
     }
+    try {
+      broadcastEvent(character.campaignId!, {
+        kind: 'map_changed',
+        locationIds: [...result.fromLocationIds, ...(result.toLocationId ? [result.toLocationId] : [])],
+        characterIds: [result.characterId],
+      });
+    } catch { /* canvases re-read on their own */ }
     return result;
   });
 }

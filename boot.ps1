@@ -71,7 +71,9 @@ if (Test-Port 3000) {
     # once used heap passes 80% of this limit; at 3072 that fired three times
     # in an afternoon, so 4096 (threshold ~3.3 GB) — still stops a runaway.
     # Set just for this launch; whisper is unaffected.
-    $env:NODE_OPTIONS = '--max-old-space-size=4096'
+    # 2026-10-27: 4096 recycled the worker mid-beat on three play nights in a row (and every recycle
+    # resets the lane warm-up held in memory); raised to 6144 (threshold ~4.9 GB) with ~2.5 GB free at play.
+    $env:NODE_OPTIONS = '--max-old-space-size=6144'
     Start-Process -FilePath 'npm.cmd' `
         -ArgumentList 'run', 'dev' `
         -WorkingDirectory $AppDir `

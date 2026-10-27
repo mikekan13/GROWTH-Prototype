@@ -311,7 +311,7 @@ export async function resolveIntent(
   let effects: ApplyReport | undefined;
   const succeeded = !roll || roll.success;
   if (succeeded && parsed.effects?.length) {
-    effects = await applyActEffects(campaignId, entityCharacterId, parsed.effects).catch((err) => {
+    effects = await applyActEffects(campaignId, entityCharacterId, parsed.effects, intent).catch((err) => {
       console.error('[daya/adjudicator] applying act effects failed (non-fatal):', err);
       return { applied: [], refused: [`apply failed: ${err instanceof Error ? err.message : String(err)}`] };
     });

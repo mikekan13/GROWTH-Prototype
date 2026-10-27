@@ -59,3 +59,20 @@ export function familiarityLines(rows: FamiliarityRowLite[]): string[] {
 export function answeredLines(tickets: Array<{ message: string; answer: string | null }>): string[] {
   return tickets.filter((t) => t.answer && t.answer.trim()).map((t) => `- on "${clip(t.message.replace(/\s+/g, ' '), 140)}" the Watcher told JEWL: ${clip(t.answer!.trim(), 300)}`);
 }
+
+
+/**
+ * THE DOORS RIGHT NOW (HW8 run 7 #1c): the live state of each door of the awake beings' rooms, and what the beings changed lately
+ * (a door they opened, a thing they moved) - so a narration that waits for a door to open that the sim has OPEN since she opened it is
+ * a contradicted_fact JEWL stops on. Pure.
+ */
+export function doorStateLines(doors: Array<{ name: string; between: string[]; state: string }>, lately: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const d of doors) {
+    const line = `the ${d.name.replace(/_/g, ' ').replace(/^the\s+/i, '')} (between ${d.between.join(' and ')}) is ${d.state === 'locked' ? 'closed and locked' : d.state.toUpperCase() === 'OPEN' ? 'OPEN' : d.state}`;
+    if (!seen.has(line)) { seen.add(line); out.push(line); }
+  }
+  for (const l of lately) out.push(`recently: ${l}`);
+  return out;
+}

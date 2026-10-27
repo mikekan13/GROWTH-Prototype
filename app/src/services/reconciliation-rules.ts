@@ -13,6 +13,7 @@
  * Every number in IMPROV_TUNING is a PLACEHOLDER until Mike prices it.
  */
 import type { ParsedProse } from './table-prose';
+import { closeUnclosedQuote } from './table-prose';
 
 export type ReconKind = 'relocation' | 'new_presence' | 'new_thing' | 'contradicted_fact' | 'contradiction' | 'continuity' | 'unfinished';
 
@@ -32,6 +33,15 @@ export function unfinishedLine(message: string): string | null {
   const cut = last.length <= 2 && /^[a-z]+$/.test(last) && !COMMON_SHORT.has(last.toLowerCase());
   if (!dangling && !cut) return null;
   return words.slice(-5).join(' ');
+}
+
+/**
+ * A quote that is opened and never closed, with no third-person sentence to split it on (HW8 run 7 #3): the same half-sentence ask.
+ * (When there IS such a sentence, table-prose closes the quote itself.) Returns the quote's tail, or null. Pure.
+ */
+export function unclosedQuoteTail(message: string): string | null {
+  const r = closeUnclosedQuote(message, []);
+  return r.status === 'ambiguous' ? r.tail ?? null : null;
 }
 
 export interface PlanItem {

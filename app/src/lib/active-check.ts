@@ -17,6 +17,8 @@ const INSPECT_RE = /\b(inspect(?:s|ed|ing)?|examin(?:e|es|ed|ing)|scrutini[sz](?
 const SEARCH_RE = /\b(search(?:es|ed|ing)?|rummag(?:e|es|ed|ing)|ransack(?:s|ed|ing)?|combs? through|goes? through|feels? (?:around|along|for))\b/i;
 const LISTEN_RE = /\b(listens? (?:closely|carefully|intently|hard|for|at)|(?:presses|pressed|press) (?:an |her |his |their )?ear|strains? (?:to hear|her ears|his ears))\b/i;
 const ATTEMPT_RE = /\b(?:tries|try|trying|tried|attempts?|attempted|attempting) to\b/i;
+// A MEMORY is a RECALL, never a roll (Mike, 27 Oct): "tries to remember the price" asks what the being holds and remembers.
+const RECALL_RE = /\b(?:tries|try|trying|tried|attempts?|attempted|attempting) to (?:remember|recall|recollect|think of|work out|figure out|place|call to mind)\b/i;
 // Reading what is in hand, and the plainly passive, are never checks.
 const NOT_ACTIVE_RE = /^\s*(?:\w+\s+)?(?:reads?|notices?|hears?|sees?|spots?|glances?|smells?)\b/i;
 
@@ -25,12 +27,18 @@ export function detectActiveCheck(text: string): ActiveCheck | null {
   const t = text.replace(/[*_]/g, '').trim();
   if (!t) return null;
   if (NOT_ACTIVE_RE.test(t) && !ATTEMPT_RE.test(t)) return null;
+  if (isRecall(t)) return null;
   let m: RegExpMatchArray | null;
   if ((m = t.match(LISTEN_RE))) return { kind: 'listen', perceptual: true, match: m[0] };
   if ((m = t.match(SEARCH_RE))) return { kind: 'search', perceptual: true, match: m[0] };
   if ((m = t.match(INSPECT_RE))) return { kind: 'inspect', perceptual: true, match: m[0] };
   if ((m = t.match(ATTEMPT_RE))) return { kind: 'attempt', perceptual: false, match: m[0] };
   return null;
+}
+
+/** "tries to remember / recall / think of / work out / figure out / place (a name)" - a recall, never a check. Pure. */
+export function isRecall(text: string): boolean {
+  return RECALL_RE.test(text.replace(/[*_]/g, ''));
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -54,6 +62,8 @@ export function namedSkill<S extends { name: string }>(text: string, skills: S[]
  */
 export function governorFor(text: string, check: ActiveCheck): string {
   if (check.perceptual) return 'wisdom';
+  // Reading another being (is the lock really stuck, is she just nervous): insight - wisdom.
+  if (/\b(determine|tell (?:whether|if)|judge|gauge|sense|read (?:her|him|them)|make out whether)\b/i.test(text)) return 'wisdom';
   const t = text.toLowerCase();
   if (/\b(force|lift|push|pull|break|smash|climb|haul|pry|kick|shove|carry|heave|wrench)\b/.test(t)) return 'clout';
   if (/\b(sneak|slip|dodge|leap|jump|vault|catch|balance|dart|run|sprint|duck)\b/.test(t)) return 'celerity';

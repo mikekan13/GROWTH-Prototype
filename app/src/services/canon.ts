@@ -250,7 +250,7 @@ export interface DeclarationFeed {
   /** The listening monologues the builder blended into the cards, kept whole (HW8 2026-10-25: a being's own voice was kept nowhere once it was blended). */
   monologues?: Array<{ actorId: string; text: string }>;
   /** What the GM wrote a roster character as thinking — the record draws it as his ((thought)) (HW6 2026-10-25). `sentence` = as written. */
-  thoughts?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
+  thoughts?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string; narrated?: string }>;
 }
 
 /** The feed row's payload for a declaration: the canon text, its beat, the cycle it happened at, and what the table writer passed for the feed. Pure. */
@@ -265,7 +265,7 @@ export function declarationPayload(eventType: string, description: string, opts:
     ...(f.narration !== undefined ? { narration: f.narration } : {}),
     ...(f.speech ? { speech: f.speech.map((s) => ({ speakerId: s.speakerId, speakerLabel: s.speakerLabel, text: s.text })) } : {}),
     ...(f.actions?.length ? { actions: f.actions.map((a) => ({ actorId: a.actorId, actorLabel: a.actorLabel, text: a.text, ...(a.sentence ? { sentence: a.sentence } : {}) })) } : {}),
-    ...(f.thoughts?.length ? { thoughts: f.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text, ...(t.sentence ? { sentence: t.sentence } : {}) })) } : {}),
+    ...(f.thoughts?.length ? { thoughts: f.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text, ...(t.sentence ? { sentence: t.sentence } : {}), ...(t.narrated ? { narrated: t.narrated } : {}) })) } : {}),
     ...(f.built ? { built: true, seedNarration: f.seedNarration ?? null } : {}),
     ...(f.monologues?.length ? { monologues: f.monologues.map((m) => ({ actorId: m.actorId, text: m.text })) } : {}),
   };
@@ -320,7 +320,7 @@ export async function declareCanon(
       declaredBy: actor.userId,
       ...(input.beatId ? { beatId: input.beatId } : {}),
       ...(input.feed && (input.feed.speech || input.feed.actions?.length || input.feed.thoughts?.length)
-        ? { split: { narration: input.feed.narration ?? null, speech: input.feed.speech ?? [], actions: (input.feed.actions ?? []).map((a) => ({ actorId: a.actorId, actorLabel: a.actorLabel, text: a.text, ...(a.sentence ? { sentence: a.sentence } : {}) })), ...(input.feed.thoughts?.length ? { thoughts: input.feed.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text, ...(t.sentence ? { sentence: t.sentence } : {}) })) } : {}), ...(input.feed.built ? { built: true, seedNarration: input.feed.seedNarration ?? null } : {}) } }
+        ? { split: { narration: input.feed.narration ?? null, speech: input.feed.speech ?? [], actions: (input.feed.actions ?? []).map((a) => ({ actorId: a.actorId, actorLabel: a.actorLabel, text: a.text, ...(a.sentence ? { sentence: a.sentence } : {}) })), ...(input.feed.thoughts?.length ? { thoughts: input.feed.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text, ...(t.sentence ? { sentence: t.sentence } : {}), ...(t.narrated ? { narrated: t.narrated } : {}) })) } : {}), ...(input.feed.built ? { built: true, seedNarration: input.feed.seedNarration ?? null } : {}) } }
         : {}),
     },
     consequences: {},

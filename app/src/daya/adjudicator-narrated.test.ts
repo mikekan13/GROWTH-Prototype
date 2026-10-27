@@ -66,7 +66,7 @@ describe('a narrated act', () => {
     expect(r.outcome).toBe('walks slowly down the hall to the stairwell');
     expect(r.roll).toBeUndefined();
     expect(r.mapBlocked).toBeUndefined();
-    expect(h.apply).toHaveBeenCalledWith('c1', 'kris', [{ op: 'move', to: 'Stairwell' }]);
+    expect(h.apply).toHaveBeenCalledWith('c1', 'kris', [{ op: 'move', to: 'Stairwell' }], 'walks slowly down the hall to the stairwell');
     expect(r.effects?.applied).toEqual(['Kristopher → Stairwell']);
     // The locked-door pre-check is a being's gate, not the Watcher's.
     expect(h.lockedDoor).not.toHaveBeenCalled();

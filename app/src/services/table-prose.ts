@@ -153,7 +153,7 @@ export function actionBody(sentence: string, actor: ProseRosterEntry): string | 
 // Verbs of the mind: a sentence about a roster character whose verb is one of these is what goes THROUGH him,
 // not what he does (HW6 2026-10-25: "He thinks about just leaving but he remembers this woman" was his act, and
 // the reach judge, handed the whole line, read all of it as private thought — the spoken plea went down with it).
-const MENTAL_VERB_RE = /^(?:thinks|wonders|remembers|recalls|realizes|realises|considers|decides|knows|wants|wishes|hopes|fears|dreads|imagines|believes|doubts|suspects|figures|reckons|feels (?:like|that|as if)|tells (?:himself|herself)|reminds (?:himself|herself)|can(?:'|’)t help (?:thinking|wondering))\b/i;
+const MENTAL_VERB_RE = /^(?:thinks|wonders|remembers|recalls|realizes|realises|considers|decides|knows|wants|wishes|hopes|fears|dreads|imagines|believes|doubts|suspects|figures|reckons|feels (?:like|that|as if)|notices|senses|(?:does|did)(?:n['’]t| not) (?:know|understand|realise|realize)|(?:is|was)(?:n['’]t| not) sure|can(?:'|’)t (?:stop|shake)|tells (?:himself|herself)|reminds (?:himself|herself)|can(?:'|’)t help (?:thinking|wondering))\b/i;
 /** The body of an act is a thought when it opens with a verb of the mind. Pure. */
 export function isThoughtBody(body: string): boolean {
   return MENTAL_VERB_RE.test(body.trim());
@@ -428,7 +428,14 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
         // "After a minute, he knocks again.": the span is narration first; the rest is whoever it is about.
         const lead = leadingSpan(sentence);
         if (lead) { rest.push(lead.wait); sentence = lead.rest; actor = sentenceActor(sentence, roster, recent); }
-        if (!actor) { rest.push(sentence); lastKind = 'narration'; continue; }
+        if (!actor) {
+          // A short subject-less fragment right after a thought is the thought going on ("He doesn't know why he used her name. Not normal.").
+          const going = thoughts.at(-1);
+          if (going && lastKind === 'thought' && sentence.trim().split(/\s+/).length <= 4 && !/[?]$/.test(sentence.trim())) {
+            going.text = `${going.text.replace(/\.{3}$|…$/, '')} ${sentence}`.replace(/\s+/g, ' ').trim(); going.sentence = `${going.sentence} ${sentence}`; continue;
+          }
+          rest.push(sentence); lastKind = 'narration'; continue;
+        }
       }
       noteActor(actor);
       // "He waits a minute and then knocks again": the minute is narration (time passing), the knock his act.
@@ -576,4 +583,59 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
 
   const narration = narrationParts.join('\n').trim() || null;
   return { full, narration, quotes, ...(actions.length ? { actions } : {}), ...(thoughts.length ? { thoughts } : {}) };
+}
+
+
+// -- An unclosed quote (HW8 run 7 #3) -----------------------------------------------------------------------------------------------
+// The Watcher typed `Kristopher presses against the door. "Yeah you said that... I can leave it. He tries to determine if the lock is
+// actually stuck or if she is just nervous.` - no closing mark, so the last sentence rode inside the speech (his card SPOKE it and the
+// roll never fired). A quote that is never closed ends at the sentence BEFORE the first later sentence that is third person about a
+// roster name (or he / she / they) - the remainder is narration.
+
+export interface UnclosedQuoteResult {
+  text: string;
+  /** 'none' = every quote was closed; 'closed' = a closing mark was supplied; 'ambiguous' = unclosed with no third-person sentence to split on. */
+  status: 'none' | 'closed' | 'ambiguous';
+  /** The quote's tail (for JEWL's ask) when ambiguous. */
+  tail?: string;
+}
+
+const FIRST_OR_SECOND_RE = /\b(?:I|I'm|I'll|I've|you|your|you're|my|me|we|our|us)\b/i;
+
+/** Does the line carry an opening mark that is never closed? Returns its index and closing character, or null. Pure. */
+function unclosedAt(line: string): { at: number; closer: string } | null {
+  const straight = (line.match(/"/g) ?? []).length;
+  const opens = (line.match(/“/g) ?? []).length;
+  const closes = (line.match(/”/g) ?? []).length;
+  if (opens > closes) return { at: line.lastIndexOf('“'), closer: '”' };
+  if (straight % 2 === 1) return { at: line.lastIndexOf('"'), closer: '"' };
+  return null;
+}
+
+/** Close an unclosed quote at the third-person sentence that follows it, per line. Pure. */
+export function closeUnclosedQuote(message: string, rosterNames: string[]): UnclosedQuoteResult {
+  const firsts = rosterNames.map((n) => n.trim().split(/\s+/)[0]).filter((n) => n.length >= 2).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const thirdRe = new RegExp(`^(?:he|she|they${firsts.length ? `|${firsts.join('|')}` : ''})\\b\\s+(?!said\\b)`, 'i');
+  let status: UnclosedQuoteResult['status'] = 'none';
+  let tail: string | undefined;
+  const lines = message.split('\n').map((line) => {
+    const open = unclosedAt(line);
+    if (!open) return line;
+    const inside = line.slice(open.at + 1);
+    const parts = inside.match(/[^.!?…]+(?:[.!?…]+["”']?\s*)?/g) ?? [inside];
+    let consumed = 0;
+    for (let i = 0; i < parts.length; i++) {
+      const sentence = parts[i].trim();
+      if (i >= 1 && thirdRe.test(sentence) && !FIRST_OR_SECOND_RE.test(sentence)) {
+        const quoted = inside.slice(0, consumed).replace(/\s+$/, '');
+        status = status === 'ambiguous' ? 'ambiguous' : 'closed';
+        return `${line.slice(0, open.at + 1)}${quoted}${open.closer} ${inside.slice(consumed).replace(/^\s+/, '')}`.trimEnd();
+      }
+      consumed += parts[i].length;
+    }
+    status = 'ambiguous';
+    tail = inside.trim().slice(-80);
+    return line;
+  });
+  return { text: lines.join('\n'), status, ...(tail ? { tail } : {}) };
 }

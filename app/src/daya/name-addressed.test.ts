@@ -22,3 +22,11 @@ describe('who said whose name (HW8 run 6)', () => {
     expect(out.split('\n')).toEqual(['He knocks.', 'Kristopher says your name — "Violet?"', 'Kristopher: Hello.']);
   });
 });
+
+import { unmarkAddressed } from './name-addressed';
+describe('unmarkAddressed (HW8 run 7 #8) - the label does not leak into the stored memory', () => {
+  it('stores what she heard', () => {
+    expect(unmarkAddressed('Kristopher says your name — "hello? Violet? Pizza."')).toBe('Kristopher: "hello? Violet? Pizza."');
+    expect(unmarkAddressed('The bulb hums.')).toBe('The bulb hums.');
+  });
+});

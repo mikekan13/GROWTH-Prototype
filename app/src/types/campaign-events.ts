@@ -109,6 +109,13 @@ export interface CharacterUpdateEvent {
   fields: string[];            // Which top-level fields changed
 }
 
+/** The map changed server-side (a door's state, someone moved rooms) — every open canvas re-reads. */
+export interface MapChangedEvent {
+  kind: 'map_changed';
+  locationIds: string[];
+  characterIds: string[];
+}
+
 /** Portrait regenerated */
 export interface PortraitUpdateEvent {
   kind: 'portrait_update';
@@ -296,6 +303,7 @@ export type StreamEventData =
   | ConnectionEvent
   | StateSyncEvent
   | CharacterUpdateEvent
+  | MapChangedEvent
   | PortraitUpdateEvent
   | DeathSaveEvent
   | CastResultEvent

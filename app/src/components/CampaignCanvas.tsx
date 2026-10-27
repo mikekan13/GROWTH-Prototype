@@ -315,7 +315,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       }
 
       // Handle character updates — refresh the page data
-      if (data.kind === 'character_update') {
+      // map_changed: a door's state or a room move — the page re-reads Location.data and the located_at edges.
+      if (data.kind === 'character_update' || data.kind === 'map_changed') {
         requestRefresh();
       }
 

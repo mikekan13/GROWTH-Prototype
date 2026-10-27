@@ -29,6 +29,7 @@ import { parseOpenings, type DoorState } from '@/lib/canvas-geometry';
 import { placeItem } from '@/services/placement';
 import { moveCharacterToLocation } from '@/services/character-location';
 import { broadcastEvent } from '@/lib/campaign-stream';
+import { doorWritten, syncDoorFact } from '@/services/door-facts';
 
 export type ActEffect =
   | { op: 'door'; door: string; state: DoorState }
@@ -238,9 +239,12 @@ function findDoor(map: ActorMap, ref: string): MapDoor | null {
     ?? null;
 }
 
-/** Open / close / lock on the home's own data; the canvas's tap does the same thing. */
-async function writeDoorState(homeId: string, openingId: string, state: DoorState): Promise<void> {
-  const loc = await prisma.location.findUnique({ where: { id: homeId }, select: { data: true } });
+/**
+ * Open / close / lock on the home's own data; the canvas's tap does the same thing.
+ * The map is the one writer: the door's WorldFact follows it and every canvas is told (door-facts.ts).
+ */
+async function writeDoorState(campaignId: string, homeId: string, openingId: string, state: DoorState): Promise<void> {
+  const loc = await prisma.location.findUnique({ where: { id: homeId }, select: { name: true, data: true } });
   if (!loc) return;
   const data = parseData(loc.data);
   const openings = parseOpenings(data.openings);
@@ -248,6 +252,13 @@ async function writeDoorState(homeId: string, openingId: string, state: DoorStat
   if (!o) return;
   o.state = state;
   await prisma.location.update({ where: { id: homeId }, data: { data: JSON.stringify({ ...data, openings }) } });
+  await doorWritten(campaignId, { id: homeId, name: loc.name }, { name: o.name ?? 'Door', state });
+}
+
+/** The act's own words say the lock/bolt/latch was worked (so an open on a locked door is unlock-then-open). Pure. */
+const LOCK_WORKED_RE = /\b(?:unlock\w*|unbolt\w*|dead-?bolt\w*|bolt\w*|latch\w*|keys?|(?:turn|flip|slid|slide|draw|drew|drawn|retract|throw|threw|click|snap)\w*\s+(?:back\s+)?(?:the\s+)?(?:lock|bolt|deadbolt|latch))\b/i;
+export function actWorksTheLock(actText: string | undefined): boolean {
+  return !!actText && LOCK_WORKED_RE.test(actText);
 }
 
 async function findItemByName(campaignId: string, ref: string, where: Record<string, unknown>) {
@@ -266,7 +277,7 @@ export interface ApplyReport {
  * or is refused with a reason. One `character_update` broadcast at the end
  * when anything moved, so open canvases re-read.
  */
-export async function applyActEffects(campaignId: string, actorCharacterId: string, effects: ActEffect[]): Promise<ApplyReport> {
+export async function applyActEffects(campaignId: string, actorCharacterId: string, effects: ActEffect[], actText?: string): Promise<ApplyReport> {
   const report: ApplyReport = { applied: [], refused: [] };
   if (!effects.length) return report;
   const actor = await prisma.character.findUnique({ where: { id: actorCharacterId }, select: { id: true, name: true, campaignId: true, campaign: { select: { gmUserId: true } } } });
@@ -280,11 +291,30 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           if (!map) { report.refused.push(`door "${e.door}": the actor stands nowhere on the map`); break; }
           const d = findDoor(map, e.door);
           if (!d) { report.refused.push(`door "${e.door}": no such door touches ${map.roomName}`); break; }
-          if (d.state === 'locked' && e.state === 'open') { report.refused.push(`door "${d.name}": locked — it has to be unlocked before it opens`); break; }
-          if (d.state === e.state) { report.applied.push(`door "${d.name}" already ${e.state}`); break; }
-          await writeDoorState(d.homeId, d.id, e.state);
+          const homeRef = { name: map.home.name };
+          if (d.state === 'locked' && e.state === 'open') {
+            if (!actWorksTheLock(actText)) {
+              report.refused.push(`door "${d.name}": locked — it has to be unlocked before it opens`);
+              // The model's "open" fact for this door must not stand against the map.
+              await syncDoorFact(campaignId, homeRef, d).catch(() => undefined);
+              break;
+            }
+            // Compound act ("turns the deadbolt and then the knob"): unlock, then open.
+            await writeDoorState(campaignId, d.homeId, d.id, 'closed');
+            await writeDoorState(campaignId, d.homeId, d.id, 'open');
+            d.state = 'open';
+            report.applied.push(`door "${d.name}" unlocked, then opened`);
+            break;
+          }
+          if (d.state === e.state) {
+            report.applied.push(`door "${d.name}" already ${e.state}`);
+            await syncDoorFact(campaignId, homeRef, d).catch(() => undefined);
+            break;
+          }
+          const was = d.state;
+          await writeDoorState(campaignId, d.homeId, d.id, e.state);
           d.state = e.state;
-          report.applied.push(`door "${d.name}" → ${e.state}`);
+          report.applied.push(was === 'open' && e.state === 'locked' ? `door "${d.name}" shut, then locked` : `door "${d.name}" → ${e.state}`);
           break;
         }
         case 'take': {

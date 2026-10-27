@@ -30,3 +30,15 @@ export function markAddressedByName(content: string, hearerName: string): string
     return `${label.trim()} says your name — "${words.trim().replace(/^["“]|["”]$/g, '')}"`;
   }).join('\n');
 }
+
+const MARKED_LINE_RE = /^(.{1,60}?) says your name — "([\s\S]*)"$/;
+/**
+ * The label is for the PROMPT only (HW8 run 7 #8: her new memory read literally `Kristopher says your name — "hello? Violet? …"`).
+ * What is stored is what she heard: `Kristopher: "hello? Violet? …"`. Pure.
+ */
+export function unmarkAddressed(content: string): string {
+  return content.split('\n').map((line) => {
+    const m = MARKED_LINE_RE.exec(line);
+    return m ? `${m[1].trim()}: "${m[2]}"` : line;
+  }).join('\n');
+}

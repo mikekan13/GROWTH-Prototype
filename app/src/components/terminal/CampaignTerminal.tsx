@@ -1027,7 +1027,14 @@ export default function CampaignTerminal({
   const mono = 'var(--font-terminal), Consolas, monospace';
   // Out of a session the WHOLE drawer is the black terminal look (Mike 2026-10-26): white on black in Consolas,
   // KRMA gold as the one accent. In a session everything is as it was.
-  const black = !activeSession;
+  // It stays black through the whole warm-up and flickers to light with the feed on the final glitch-out.
+  const [flick, setFlick] = useState(0);
+  useEffect(() => {
+    if (warm.mode !== 'finishing') { setFlick(0); return; }
+    const t = setInterval(() => setFlick((n) => n + 1), 130);
+    return () => clearInterval(t);
+  }, [warm.mode]);
+  const black = warm.mode === 'warming' || (warm.mode === 'finishing' ? [1, 0, 1, 0, 0, 1, 0][flick] === 1 : !activeSession);
   const rule = 'rgba(255,255,255,0.35)';
   const tabStyle = (on: boolean): React.CSSProperties => black ? ({
     fontFamily: mono, fontSize: 14, letterSpacing: '0.08em', textTransform: 'uppercase', height: 36, padding: '0 10px', border: 0,

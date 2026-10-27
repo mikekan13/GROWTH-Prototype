@@ -23,6 +23,7 @@ import { DEFAULT_LEVEL, DEFAULT_SCALE_FT_PER_UNIT, GRID_FT, HALF_GRID_FT, cellCe
 import { updateLocation } from './location';
 import { setLocationGeometry, setTokenPosition } from './placement-geometry';
 import { moveCharacterToLocation } from './character-location';
+import { doorWritten } from './door-facts';
 
 const ftPoint = z.object({ x: z.number().min(0).max(5000), y: z.number().min(0).max(5000) });
 
@@ -81,6 +82,9 @@ export async function setDoorState(
   if (o.kind !== 'door') throw new ValidationError('Only a door opens, closes and locks');
   o.state = state;
   await updateLocation(homeId, campaignId, actor.userId, actor.role, { data: { ...data, openings } });
+  // The map is the one writer: the door's fact follows it, every canvas redraws.
+  const home = await prisma.location.findUnique({ where: { id: homeId }, select: { name: true } });
+  await doorWritten(campaignId, { id: homeId, name: home?.name ?? 'home' }, { name: o.name ?? 'Door', state });
   return o;
 }
 

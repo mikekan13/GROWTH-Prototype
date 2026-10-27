@@ -31,7 +31,8 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { assertLawfulInput } from '@/services/lawful-intake';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { createCampaignEvent } from '@/services/campaign-event';
-import { detectActiveCheck } from '@/lib/active-check';
+import { detectActiveCheck, isRecall } from '@/lib/active-check';
+import { resolveReferents } from '@/services/table-referents';
 import { startTableRoll } from '@/services/table-roll';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { converseWithEntity, listenToTable, answerAtTable, type ConverseStatus, type TableListenOutcome } from '@/daya/conversation';
@@ -56,12 +57,15 @@ import {
   recordDialogueCanon,
   recordUnattributedDialogueCanon,
 } from '@/services/canon';
-import { parseTableProse, splitSentences, type ProseQuote, type ProseRosterEntry, type ProseThought } from '@/services/table-prose';
+import { parseTableProse, splitSentences, closeUnclosedQuote, type ProseQuote, type ProseRosterEntry, type ProseThought } from '@/services/table-prose';
 import { ensureKeepalive } from '@/daya/l1-keepalive';
 import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, type ReconTicket } from '@/services/reconciliation';
 import { advanceClockForLine } from '@/services/table-clock';
 import type { ListenImpulse } from '@/daya/prompts/roles/spirit';
 import { recordBeingThought } from '@/services/being-thought';
+import { actorMap, whereOthersStand } from '@/services/world-apply';
+import { actInThirdPerson, worldChangeSentences } from '@/daya/act-card';
+import { didNotHear } from '@/daya/did-not-hear';
 import { statedStretchOf, simulateStatedStretch } from '@/services/table-timeskip';
 import { resolveIntent } from '@/daya/adjudicator';
 import { recentVoiceOf, recentCardTextsOf } from '@/daya/voice-history';
@@ -364,6 +368,55 @@ async function postChat(
   return event;
 }
 
+/**
+ * AN ACT ANSWER IS A CARD ACT (HW8 run 7, 2026-10-27: "*I turn the deadbolt…*" went up as a chat row with asterisks). The act goes on
+ * the being's card as an action segment, third person ("She turns the deadbolt…"), never as a chat / speech row.
+ */
+async function postActCard(
+  campaignId: string,
+  by: { userId: string; username: string },
+  being: { id: string; name: string; sex?: string | null },
+  content: string,
+): Promise<string | null> {
+  const text = actInThirdPerson(being.name, being.sex, content);
+  if (!text) return null;
+  await recordBeingThought(campaignId, by, {
+    characterId: being.id, characterName: being.name, heard: '', thought: text, impulse: 'act', canonEventId: null,
+    segments: [{ kind: 'action', text }],
+  });
+  return text;
+}
+
+/**
+ * A QUOTED LINE IS ALWAYS SOUND (HW8 run 7 #4: "Are you ok?" through a door ruled NOT REACHED and so NOT ASKED). True when the speaker
+ * is in the listener's room or at most ONE passage away (a door, open or shut, is no obstacle to a voice). Never throws.
+ */
+async function voiceCarries(campaignId: string, listenerId: string, speakerId: string | null): Promise<boolean> {
+  if (!speakerId || speakerId === listenerId) return false;
+  try {
+    const map = await actorMap(listenerId);
+    if (!map) return false;
+    const w = (await whereOthersStand(campaignId, listenerId, map)).find((r) => r.id === speakerId);
+    return !!w && w.route !== null && w.route.length <= 1;
+  } catch { return false; }
+}
+
+/** What the world did when a being's act changed a fact ("The entry door stands open."), said once on the page, from the change. */
+async function postWorldChange(campaignId: string, actor: TableActor, applied: string[]): Promise<void> {
+  const sentences = worldChangeSentences(applied);
+  if (sentences.length) await postSceneSentence(campaignId, actor, sentences.join(' '));
+}
+
+/** One narrator sentence on the page (a built declaration, no witnesses: it is the page's line, not a perception). */
+async function postSceneSentence(campaignId: string, actor: TableActor, narration: string): Promise<void> {
+  try {
+    await declareCanon(campaignId, actor, {
+      narration, kind: 'narration', actorId: null, locationId: null, witnessIds: [],
+      feed: { via: 'typed', raw: narration, narration, speech: [], actions: [], thoughts: [], built: true },
+    });
+  } catch (err) { console.warn('[table-speak] the change in the world was not said (non-fatal):', err instanceof Error ? err.message : err); }
+}
+
 /** An Attend worth a line names something: "The dust" is not a beat (hello world 2026-10-17). */
 const ATTEND_MIN_WORDS = 3;
 
@@ -598,7 +651,8 @@ async function deliverToTable(
       const line = actionToTableLine(listener.name, result.action);
       if (line) {
         if (result.action.kind === 'speak' || result.action.kind === 'act') await advanceClockForLine(campaignId, result.action.kind === 'speak' ? 'being-speech' : 'being-act', result.action.content ?? line);
-        await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(result.action) });
+        if (result.action.kind === 'act') await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listener.id, name: listener.name }, result.action.content?.trim() ?? '');
+        else await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(result.action) });
       }
     }
   }
@@ -896,6 +950,7 @@ async function runBeats(
             : null;
           // THE REPLAY, on the card (HW8 run 6): a sentence the being's last three thoughts or cards already carried is dropped from
           // this one (the standing beat repeated one verbatim); a card with nothing left is not posted.
+          if (card && standingIds.delete(listenerId)) card = { ...card, scene: null };
           let cardRepeat = false;
           if (card) {
             const previous = [...await recentThoughtsOf(campaignId, listenerId), ...await recentCardTextsOf(campaignId, listenerId)];
@@ -966,6 +1021,8 @@ async function runBeats(
   // her inside the apartment and given her a card. What is she doing before he knocks"): a being within the scene that
   // this line did NOT reach still lives the moment — it listens to where it is and the hour, and its side goes on the
   // page as a scene line and a card. Once per line, never for the being the Watcher voiced.
+  // A STANDING BEAT HAS NO SCENE LINE (Mike 2026-10-27): its card stands alone.
+  const standingIds = new Set<string>();
   const standingBeat = async (listenerId: string, truthId: string | null) => {
     if (process.env.STANDING_BEAT === 'off' || truthId !== truth.primary || voiced.has(listenerId)) return;
     try {
@@ -974,6 +1031,7 @@ async function runBeats(
       const room = where ? await prisma.location.findUnique({ where: { id: where.targetId }, select: { name: true } }) : null;
       const content = [clock ? `It is ${clock}.` : null, room ? `You are in the ${nameHead(room.name)}.` : null, 'Nothing from beyond the room has reached you just now.'].filter(Boolean).join(' ');
       console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: ${content}`);
+      standingIds.add(listenerId);
       hear(listenerId, { source: 'perception', content }, { verdict: { beingId: listenerId, reaches: true, via: ['sight'], noticed: true, salience: 0.3 }, source: 'stub' }, undefined, truthId);
     } catch (err) { console.warn('[standing-beat] failed (non-fatal):', err instanceof Error ? err.message : err); }
   };
@@ -1007,11 +1065,24 @@ async function runBeats(
     if (!reachOn) { for (const id of stims.keys()) hear(id, stims.get(id)!, undefined, askFor, truthId); return; }
     if (!stims.size) return;
     const delivered = new Set<string>();
+    const soundChecked = new Set<string>();
     const nameOf = (id: string) => listeners.find((l) => l.id === id)?.name ?? id;
     const settle = new Map<string, (v: ReachVerdict | null) => void>();
     if (askFor) for (const id of stims.keys()) verdictWaits.set(id, new Promise<ReachVerdict | null>((resolve) => settle.set(id, resolve)));
     const deliver = (id: string, verdict: ReachVerdict | null, source: ReachJudgement['source']) => {
       if (delivered.has(id)) return;
+      // A QUOTED LINE IS ALWAYS SOUND: the judge said no, but a voice crosses one door - hearing-only reach of the quote, never "NOT ASKED".
+      if (verdict && !verdict.reaches && !soundChecked.has(id)) {
+        const quote = publicRun.find((u) => u.kind === 'dialogue' && cuesFromText(u.text).volume !== 'whisper');
+        if (quote) {
+          soundChecked.add(id);
+          void voiceCarries(campaignId, id, quote.speaker?.id ?? truth.actorId ?? null).then((ok) => {
+            if (ok) console.log(`[perception-reach] ${nameOf(id)}: the judge said NOT REACHED, but a quoted line carries through a door - hearing only`);
+            deliver(id, ok ? { beingId: id, reaches: true, via: ['hearing'], noticed: true, salience: 0.7 } : verdict, ok ? 'stub' : source);
+          });
+          return;
+        }
+      }
       delivered.add(id);
       settle.get(id)?.(verdict);
       const stim = stims.get(id)!;
@@ -1026,7 +1097,11 @@ async function runBeats(
         return;
       }
       if (!verdict) { console.log(`[perception-reach] ${nameOf(id)}: no verdict (${source}) → heard as before ${what}`); hear(id, stim, undefined, askFor, truthId); return; }
-      if (!verdict.reaches) { console.log(`[perception-reach] ${nameOf(id)}: NOT REACHED (${source}) — nothing stored ${what}`); void standingBeat(id, truthId); return; }
+      if (!verdict.reaches) { console.log(`[perception-reach] ${nameOf(id)}: NOT REACHED (${source}) — nothing stored ${what}`);
+        // Addressed to this being (a quote that names them, a knock at their door) and it did not carry: the ONE line, nothing else.
+        const unheard = didNotHear({ id, name: nameOf(id) }, publicRun.map((u) => ({ text: u.text, kind: u.kind, speakerLabel: u.speaker?.label ?? null, speakerSex: u.speaker?.id ? truth.actors?.[u.speaker.id]?.sex ?? null : null, to: u.to && u.to.scope === 'named' && u.to.ids.includes(id) ? id : null })), truth.actorId ? truth.actors?.[truth.actorId]?.sex ?? null : null);
+        if (unheard && truthId === truth.primary) void postSceneSentence(campaignId, actor, unheard);
+        void standingBeat(id, truthId); return; }
       if (!verdict.noticed) { console.log(`[perception-reach] ${nameOf(id)}: reached via ${verdict.via.join('+')}, UNNOTICED (${source}) — stored noticed=false ${what}`); void storeUnnoticedAtTable(campaignId, id, stim, verdict, truthId); return; }
       console.log(`[perception-reach] ${nameOf(id)}: reached via ${verdict.via.join('+')}, noticed (${source}, salience ${verdict.salience.toFixed(2)}) ${what}`);
       hear(id, stim, { verdict, source }, askFor, truthId);
@@ -1101,7 +1176,9 @@ async function runBeats(
     if (line && (action.kind === 'speak' || action.kind === 'act')) await advanceClockForLine(campaignId, action.kind === 'speak' ? 'being-speech' : 'being-act', action.content ?? line);
     // CARD ORDER: its own thought card goes up before its line (bounded wait, non-fatal).
     await awaitCard(cardPosted.get(listenerId));
-    if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(action) });
+    // AN ACT ANSWER = A CARD ACT (run 7): never a chat / speech row; speech and attend keep their chat line.
+    if (line && action.kind === 'act') await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listener.id, name: listener.name, sex: truth.actors?.[listener.id]?.sex }, action.content?.trim() ?? '');
+    else if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(action) });
     // What it did settles what it meant to do.
     // Only a DOING settles what it meant to do (HW8 run 2: "I'm just getting the tip" closed "give it to him as the tip").
     if (action.kind === 'act' && action.content?.trim()) settleByAct(campaignId, listener.id, action.content.trim());
@@ -1145,8 +1222,10 @@ async function runBeats(
       // map refused it or its check failed, the table is told what actually happened (Mike 2026-10-17: a
       // locked door was "pushed open" and nothing said otherwise).
       if (action.kind === 'act' && stored.outcome && stored.outcomeDiffers) {
-        await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, `*${stored.outcome}*`, { via: 'being', raw: `Outcome: ${stored.outcome}` });
+        await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listener.id, name: listener.name, sex: truth.actors?.[listener.id]?.sex }, stored.outcome);
       }
+      // THE PAGE SAYS WHAT THE WORLD DID (run 7): a fact the act changed (the door opened) is one scene sentence, from the change.
+      if (action.kind === 'act' && stored.worldChanges?.length) await postWorldChange(campaignId, actor, stored.worldChanges);
     }).catch(() => {});
   };
   const answerAll = async (ids: string[], ask: TableAsk) => {
@@ -1206,15 +1285,33 @@ async function speakProseSplit(
   actor: TableActor,
   input: { message: string; locationId?: string | null; confirmTicketId?: string | null },
 ): Promise<TableProseResult> {
-  const message = input.message;
-  if (!input.confirmTicketId && await saidJustNow(campaignId, message)) {
+  const rawMessage = input.message;
+  let message = rawMessage;
+  if (!input.confirmTicketId && await saidJustNow(campaignId, rawMessage)) {
     throw new ValidationError('That exact line was said moments ago — nothing written twice. (A slow reply can make the page re-send; say something new.)');
   }
   const npcRoster = () => proseRoster(campaignId);
   const listeners = await activeListeners(campaignId);
   let roster = await npcRoster();
+  // AN UNCLOSED QUOTE (run 7 #3): it ends at the third-person sentence that follows; the rest is narration (an ambiguous one is JEWL's ask).
+  if (!input.confirmTicketId) {
+    const closed = closeUnclosedQuote(message, roster.map((r) => r.name));
+    if (closed.status === 'closed') { console.log('[table-prose] an unclosed quote was closed at the third-person sentence after it'); message = closed.text; }
+  }
   const proseCtx = { recentActors: await recentTableActors(campaignId, roster), lastVoiced: await lastVoicedActor(campaignId, roster) };
   let parsed = parseTableProse(message, roster, proseCtx);
+  // REFERENTS THE GM LEAVES TO THE WORLD (run 7 #10, #2): "tries to remember the price ... and says it through the door" - the value
+  // is what the receipt he holds (or his memory) says; when nothing holds it, he cannot. Resolved before the line is read.
+  {
+    const speaker = soleActor(parsed) ?? proseCtx.lastVoiced?.id ?? null;
+    const others = listeners.filter((l) => l.id !== speaker);
+    const resolved = await resolveReferents(campaignId, message, speaker, others.length === 1 ? others[0].name : null);
+    if (resolved.kind !== 'none') {
+      console.log(`[table-referents] ${resolved.kind}${resolved.value ? ` (${resolved.value})` : ''}: ${resolved.message.slice(0, 200)}`);
+      message = resolved.message;
+      parsed = parseTableProse(message, roster, proseCtx);
+    }
+  }
   const planFor = (npcs: typeof roster) => planTableTalk(readTableTalk(message, { present: listeners, npcs, prose: proseCtx }).utterances, 'typed');
   let plan = planFor(roster);
 
@@ -1260,7 +1357,7 @@ async function speakProseSplit(
         narration: built.scene,
         speech: parsed.quotes,
         actions: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'action').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence }))),
-        thoughts: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'thought').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence }))),
+        thoughts: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'thought').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence, ...(s.narrated ? { narrated: s.narrated } : {}) }))),
         built: true,
         seedNarration: narrated ? parsed.narration : null,
         monologues: [...monologues].map(([actorId, text]) => ({ actorId, text })),
@@ -1271,7 +1368,7 @@ async function speakProseSplit(
   if (narration !== null && (narrated || hasActions || parsed.quotes.length !== 1)) {
     const declared = await declareCanon(campaignId, actor, {
       narration, kind: 'narration', actorId: soleActor(parsed), locationId: input.locationId ?? null, witnessIds: [],
-      feed: { via: 'typed', raw: message, ...feedParts },
+      feed: { via: 'typed', raw: rawMessage, ...feedParts },
     });
     canonEventId = declared.event.id;
     narratedActs(campaignId, parsed.actions, actor);
@@ -1284,7 +1381,7 @@ async function speakProseSplit(
   }
   if (soloAttributed) {
     const q = parsed.quotes[0];
-    await postChat(campaignId, 'gm', actor.userId, actor.username, q.speakerId!, q.speakerLabel, q.text, { via: 'typed', raw: message });
+    await postChat(campaignId, 'gm', actor.userId, actor.username, q.speakerId!, q.speakerLabel, q.text, { via: 'typed', raw: rawMessage });
   }
   for (const u of plan.ignored) await markDropped(campaignId, actor, u.kind, u.rule, u.text);
 
@@ -1362,6 +1459,8 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
     // ROLLS AT THE TABLE (2026-10-26): a deliberate inspection / search / listen-closely, or an attempt the Watcher frames as
     // uncertain ("tries to"), is a real check — the popup for its owner and the card. The world does NOT take the words as done:
     // the Watcher narrates the result. Passive noticing, reading, knocking, walking are never checks.
+    // A MEMORY is a RECALL, never a roll (run 7 #2): the value was resolved into the line (table-referents); nothing is rolled or adjudicated.
+    if (isRecall(a.text)) continue;
     if (gm && detectActiveCheck(a.text)) {
       void startTableRoll(campaignId, { id: gm.userId, username: gm.username }, { characterId: a.actorId, text: a.text })
         .catch((err) => console.warn(`[table-speak] roll for ${a.actorLabel} not started (non-fatal):`, err instanceof Error ? err.message : err));

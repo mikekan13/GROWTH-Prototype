@@ -31,3 +31,11 @@ describe('what JEWL sees of the world', () => {
     expect(answeredLines([{ message: 'a', answer: null }, { message: 'He holds the receipt', answer: 'It says CUSTOMER: VIOLET' }])).toHaveLength(1);
   });
 });
+
+import { doorStateLines } from './reconciliation-context';
+describe('doorStateLines (HW8 run 7 #1c)', () => {
+  it('states the door open since she opened it, for JEWL to check narration against', () => {
+    const lines = doorStateLines([{ name: 'entry_door', between: ['landing', 'apartment'], state: 'open' }, { name: 'entry_door', between: ['landing', 'apartment'], state: 'open' }], ['Violet: She turns the deadbolt and then the knob.']);
+    expect(lines).toEqual(['the entry door (between landing and apartment) is OPEN', 'recently: Violet: She turns the deadbolt and then the knob.']);
+  });
+});

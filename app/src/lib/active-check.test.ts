@@ -61,3 +61,21 @@ describe('aiEffort — the sim chooses Effort', () => {
     expect(aiEffort({ sd: 1, fdMax: 4, dr: 30, pools, ceiling: 3 })).toEqual([]);
   });
 });
+
+import { isRecall } from './active-check';
+describe('a memory is a recall, never a roll (HW8 run 7 #2, Mike 27 Oct)', () => {
+  it('"tries to remember / recall / think of / work out / figure out / place" fires no check', () => {
+    for (const t of ['He tries to remember the price of the pizza and says it through the door.', 'She attempts to recall his name.', 'He tries to think of the word.', 'He tries to place her face.', 'She tries to figure out the total.']) {
+      expect(isRecall(t)).toBe(true);
+      expect(detectActiveCheck(t)).toBeNull();
+    }
+  });
+  it('inspect / listen closely / force / open / determine still roll', () => {
+    expect(detectActiveCheck('He presses an ear to the door.')).not.toBeNull();
+    expect(detectActiveCheck('He tries to force the lock.')).not.toBeNull();
+    const t = 'He tries to determine if the lock is actually stuck or if she is just nervous.';
+    const c = detectActiveCheck(t);
+    expect(c?.kind).toBe('attempt');
+    expect(governorFor(t, c!)).toBe('wisdom');
+  });
+});

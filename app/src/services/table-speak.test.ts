@@ -25,6 +25,8 @@ const w = vi.hoisted(() => ({
   answer: vi.fn(),
   readNarration: vi.fn(),
   judge: vi.fn(),
+  card: vi.fn(),
+  carry: null as null | { speakerId: string; route: unknown[] },
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -59,6 +61,20 @@ vi.mock('@/services/canon', () => ({
   attachTruthToRecentMemories: vi.fn(async () => 0),
 }));
 vi.mock('@/services/perception-reach', async (orig) => ({ ...(await orig<typeof import('@/services/perception-reach')>()), judgeCanonReach: w.judge }));
+vi.mock('@/services/world-apply', async (orig) => {
+  const real = await orig<typeof import('@/services/world-apply')>();
+  return {
+    ...real,
+    actorMap: async (id: string) => (w.carry ? { roomId: 'r', roomName: 'landing', home: { id: 'r', name: 'landing' }, doors: [] } : real.actorMap(id)),
+    whereOthersStand: async (c: string, id: string, m: unknown) => (w.carry ? [{ id: w.carry.speakerId, name: 'Tess', roomName: 'flat', route: w.carry.route }] : real.whereOthersStand(c, id, m as never)),
+  };
+});
+vi.mock('@/services/scene-builder', async (orig) => ({
+  ...(await orig<typeof import('@/services/scene-builder')>()),
+  buildBeingCard: w.card,
+  buildScene: vi.fn(async () => ({ scene: null, cards: [], source: 'seed' })),
+  sceneFacts: vi.fn(async () => ({ lines: [], names: [] })),
+}));
 vi.mock('@/services/reconciliation', () => ({
   readNarration: w.readNarration,
   takeConfirmed: vi.fn(async (_c: string, id: string) => ({ id })),
@@ -211,8 +227,10 @@ describe('speakProse — switch ON: listen while the GM has the floor, answer at
     expect(speaking.filter((b) => b.characterId === 'oren').map((b) => b.phase)).toEqual(['start', 'final']);
     expect(w.chats).toEqual(expect.arrayContaining([
       { actor: 'ai_copilot', characterId: 'mara', message: 'Who is there?' },
-      { actor: 'ai_copilot', characterId: 'oren', message: '*steps back*' },
     ]));
+    // AN ACT ANSWER IS A CARD ACT (HW8 run 7): Oren's act is an action segment on his card, never a chat row.
+    expect(w.chats.some((c) => c.characterId === 'oren' && c.message === '*steps back*')).toBe(false);
+    expect(w.payloads).toContainEqual(expect.objectContaining({ kind: 'being_thought', segments: [{ kind: 'action', text: 'Oren steps back.' }] }));
     expect(result.responses.map((r) => [r.characterId, r.status, r.actionKind])).toEqual([['mara', 'ok', 'speak'], ['oren', 'ok', 'act']]);
     // The record keeps the GM's text as given when nothing was ignored; Mara's words are canon dialogue too.
     expect(w.canon[0]).toEqual({ kind: 'narration', narration: 'The door bangs open. What do you do?' });
@@ -650,5 +668,51 @@ describe('the engine at the table, run 6 (HW8)', () => {
     const order = w.chats.filter((c) => c.characterId === 'mara').map((c) => c.actor);
     expect(order.indexOf('system')).toBeGreaterThanOrEqual(0);
     expect(order.indexOf('system')).toBeLessThan(order.indexOf('ai_copilot'));
+  });
+});
+
+describe('a silence has no scene line (HW8 run 7 item 12)', () => {
+  beforeEach(() => { process.env.TABLE_SPLIT_LOOP = 'on'; process.env.PERCEPTION_REACH = 'on'; process.env.SCENE_BUILDER = 'on'; });
+  const nothingReaches = () => w.judge.mockReset().mockImplementation(async (_c: string, _e: unknown, ids: string[]) => ({
+    verdicts: new Map(ids.map((id) => [id, { beingId: id, reaches: false, via: [], noticed: false, salience: 0 }])),
+    source: 'model', beings: [],
+  }));
+  it('an addressed quote that did not carry posts the one "did not hear" sentence; the standing beat card has no scene row', async () => {
+    nothingReaches();
+    const { prisma } = await import('@/lib/db');
+    (prisma as unknown as { entityRelationship: unknown }).entityRelationship = { findFirst: vi.fn(async () => null), findMany: vi.fn(async () => []) };
+    w.listen.mockImplementation(async (id: string) => ({ status: 'ok', listened: { status: 'listened', memoryEntryId: `m-${id}`, thought: 'The radiator ticks.', impulse: 'stay' } }));
+    w.card.mockReset().mockResolvedValue({ scene: 'Nothing on the landing has changed.', segments: [{ kind: 'thought', text: 'The radiator ticks.' }] });
+    await speakProse('camp', actor, { message: 'The door bangs open. Tess: "Mara, you the pilot?"' });
+    await flush(); await flush(); await flush();
+    expect(w.canon.filter((c) => c.kind === 'narration' && /^Mara did not hear/.test(c.narration ?? '')).length).toBeGreaterThan(0);
+    const cards = w.payloads.filter((p) => p.kind === 'being_thought');
+    expect(cards.length).toBeGreaterThan(0);
+    expect(cards.every((p) => !p.scene)).toBe(true);
+  });
+  it('an unaddressed line that did not reach posts no sentence at all', async () => {
+    nothingReaches();
+    w.card.mockReset().mockResolvedValue(null);
+    await speakProse('camp', actor, { message: 'The door bangs open. Rain comes in.' });
+    await flush(); await flush(); await flush();
+    expect(w.canon.filter((c) => /did not hear/.test(c.narration ?? ''))).toEqual([]);
+  });
+});
+
+describe('a quoted line is always sound (HW8 run 7 #4)', () => {
+  beforeEach(() => { process.env.TABLE_SPLIT_LOOP = 'on'; process.env.PERCEPTION_REACH = 'on'; process.env.SCENE_BUILDER = 'off'; });
+  afterEach(() => { w.carry = null; });
+  it('the judge says NOT REACHED for a quote one door away: she hears it by hearing and is asked', async () => {
+    const { prisma } = await import('@/lib/db');
+    (prisma as unknown as { dayaEntity: { findUnique: unknown } }).dayaEntity.findUnique = vi.fn(async () => null);
+    w.carry = { speakerId: 'tess', route: [{ kind: 'door', state: 'closed', name: 'entry_door' }] };
+    w.judge.mockReset().mockImplementation(async (_c: string, _e: unknown, ids: string[]) => ({
+      verdicts: new Map(ids.map((id) => [id, { beingId: id, reaches: false, via: [], noticed: false, salience: 0 }])),
+      source: 'model', beings: [],
+    }));
+    await speakProse('camp', actor, { message: 'Tess waits for the door to open and when it does not she speaks again. "Are you ok?" Mara, what do you do?' });
+    await flush(); await flush(); await flush();
+    const toMara = w.listen.mock.calls.filter((c) => c[0] === 'mara').map((c) => c[2].content as string);
+    expect(toMara.some((c) => c.includes('Are you ok?'))).toBe(true);
   });
 });

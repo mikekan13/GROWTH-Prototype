@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { laneTarget, patternStability, stepProgress, bandStates } from './lane-progress';
+import { laneTarget, barSpan, patternStability, stepProgress, bandStates } from './lane-progress';
 
 describe('laneTarget', () => {
   it('ready and disabled are complete; offline holds', () => {
@@ -45,6 +45,23 @@ describe('patternStability', () => {
   it('clamps', () => {
     expect(patternStability(2).right).toBe(0);
     expect(patternStability(-1).left).toBe(-100);
+  });
+});
+
+describe('barSpan', () => {
+  it('starts full width and shrinks symmetrically to nothing at the centre', () => {
+    expect(barSpan(0)).toEqual({ left: 0, width: 100 });
+    expect(barSpan(0.5)).toEqual({ left: 25, width: 50 });
+    expect(barSpan(1)).toEqual({ left: 50, width: 0 });
+  });
+  it('left + width/2 is always the centre (no swing) and width never grows', () => {
+    let prev = 101;
+    for (let p = 0; p <= 1.0001; p += 0.05) {
+      const b = barSpan(p);
+      expect(b.left + b.width / 2).toBeCloseTo(50);
+      expect(b.width).toBeLessThan(prev);
+      prev = b.width;
+    }
   });
 });
 

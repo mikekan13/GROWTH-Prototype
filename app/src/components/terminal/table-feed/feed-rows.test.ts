@@ -184,3 +184,37 @@ describe('roll cards', () => {
     expect(mechanicalKind(roll({ view: 'full' }))).toBeNull();
   });
 });
+
+describe('non-event scene lines are no row at all (Mike 2026-10-26)', () => {
+  const lines = [
+    'Nothing on the landing has changed.',
+    'Nothing on the Fourth-floor landing has changed.',
+    'Nothing new has reached Violet from beyond the room.',
+    'Nothing new has reached her from beyond the entry door.',
+    'The knock has settled into silence; nothing further reaches Violet through the locked entry door.',
+    'The knock has gone quiet; nothing from the landing reaches her now.',
+  ];
+  const being = (scene: string) => eventRows(ev({
+    kind: 'being_thought', heard: 'x', thought: 'Quiet.', impulse: 'stay', canonEventId: null, scene,
+    segments: [{ kind: 'thought', text: 'Quiet.' }],
+  } as never, { actor: 'system', characterId: 'violet', characterName: 'Violet' }), roster);
+
+  it.each(lines)('a being scene line "%s" is dropped; the card stands alone', (line) => {
+    const rows = being(line);
+    expect(rows.map((r) => r.type)).toEqual(['character']);
+  });
+
+  it('only the non-event sentence goes; a real one beside it stays', () => {
+    const rows = being('The lamp is on in the Main Room. Nothing on the landing has changed.');
+    expect(rows.map((r) => r.type)).toEqual(['narration', 'character']);
+    expect(rows[0]).toMatchObject({ text: 'The lamp is on in the Main Room.' });
+  });
+
+  it("a Watcher beat's narration sheds the same sentences", () => {
+    const rows = eventRows(ev({
+      kind: 'game_event', eventType: 'declaration', description: 'Warden knocks.', narration: 'Nothing on the landing has changed.',
+      speech: [], actions: [{ actorId: 'warden', actorLabel: 'Warden', text: 'Warden knocks', sentence: 'Warden knocks.' }], thoughts: [],
+    } as never), roster);
+    expect(rows.map((r) => r.type)).toEqual(['character']);
+  });
+});

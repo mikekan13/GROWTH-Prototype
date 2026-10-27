@@ -403,3 +403,32 @@ describe('the opening line (HW7 2026-10-25): the scene, then one card with his a
     expect(parseTableProse('Kristopher mutters under his breath. "Not today."', table).quotes[0]).toMatchObject({ speakerId: 'kris', text: 'Not today.' });
   });
 });
+
+import { closeUnclosedQuote } from './table-prose';
+import { unclosedQuoteTail } from './reconciliation-rules';
+describe('an unclosed quote (HW8 run 7 #3)', () => {
+  const roster = ['Kristopher', 'Violet'];
+  const line = 'Kristopher presses against the door. "Yeah you said that... Is it stuck or something? If you can\'t get it open you could slip the money under the door and I can leave it. He tries to determine if the lock is actually stuck or if she is just nervous.';
+  it('closes at the third-person sentence; the rest is narration', () => {
+    const r = closeUnclosedQuote(line, roster);
+    expect(r.status).toBe('closed');
+    expect(r.text).toContain('I can leave it." He tries to determine if the lock is actually stuck or if she is just nervous.');
+    const parsed = parseTableProse(r.text, roster.map((n) => ({ id: n.toLowerCase(), name: n })), {});
+    expect(parsed.quotes.map((q) => q.text).join(' ')).not.toMatch(/tries to determine/);
+  });
+  it('with no third-person sentence to split on it is ambiguous (JEWL asks)', () => {
+    const r = closeUnclosedQuote('Kristopher knocks. "Yeah you said that... I can leave it', roster);
+    expect(r.status).toBe('ambiguous');
+    expect(unclosedQuoteTail('Kristopher knocks. "Yeah you said that... I can leave it')).toMatch(/leave it$/);
+    expect(unclosedQuoteTail('He says "hello".')).toBeNull();
+  });
+});
+
+describe('a stated thought is kept out of the public stretch (HW8 run 7 #4, #9)', () => {
+  it("\"He doesn't know why he used her name. Not normal.\" is his thought, so the quote beside it is the whole public stretch", () => {
+    const roster = [{ id: 'k', name: 'Kristopher', sex: 'male' }, { id: 'v', name: 'Violet', sex: 'female' }];
+    const p = parseTableProse("Kristopher waits for the door to open and when it doesn't he speaks again. \"Are you ok?\" He doesn't know why he used her name. Not normal.", roster, { recentActors: [roster[0]] });
+    expect(p.thoughts?.map((t) => t.sentence).join(' ')).toMatch(/doesn't know why he used her name\. Not normal\./);
+    expect(p.quotes.map((q) => q.text)).toEqual(['Are you ok?']);
+  });
+});

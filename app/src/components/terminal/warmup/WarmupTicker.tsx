@@ -6,11 +6,11 @@
  *   (a) a random tidbit about GROWTH / the campaign from the viewer's perspective
  *       (GET /api/campaigns/[id]/tidbits?viewer=<characterId|watcher>, derived from data), and
  *   (b) "PATTERN STABILITY": the left number climbs −100 → 0, the right falls +100 → 0, and the bar between them
- *       swings left and right and narrows toward the centre until nothing is left (at full load).
+ *       shrinks from both ends toward the centre, no swing, until nothing is left (at full load).
  * An unreachable core is stated plainly (the old overlay's "offline" case) with the way out.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { patternStability } from './lane-progress';
+import { patternStability, barSpan } from './lane-progress';
 
 const MONO = 'var(--font-terminal), Consolas, monospace';
 const TIDBIT_MS = 5200;
@@ -30,7 +30,6 @@ export default function WarmupTicker({ campaignId, viewer, progress, offline, gp
   const [tidbits, setTidbits] = useState<string[]>([]);
   const [mode, setMode] = useState<'tidbit' | 'readout'>('tidbit');
   const [idx, setIdx] = useState(0);
-  const [swing, setSwing] = useState(0.5);
   const pRef = useRef(progress);
   pRef.current = progress;
 
@@ -56,19 +55,8 @@ export default function WarmupTicker({ campaignId, viewer, progress, offline, gp
     return () => clearTimeout(t);
   }, [mode, tidbits.length]);
 
-  // The swing, only while the readout shows.
-  useEffect(() => {
-    if (mode !== 'readout' || offline) return;
-    let raf = 0;
-    const t0 = performance.now();
-    const loop = (now: number) => { setSwing((Math.sin((now - t0) / 520) + 1) / 2); raf = requestAnimationFrame(loop); };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [mode, offline]);
-
   const s = patternStability(progress);
-  const width = s.remaining * 100;
-  const left = (100 - width) * swing;
+  const { left, width } = barSpan(progress);
   const showTidbit = mode === 'tidbit' && tidbits.length > 0 && !offline;
 
   return (
@@ -80,7 +68,7 @@ export default function WarmupTicker({ campaignId, viewer, progress, offline, gp
       aria-label="The table is loading; typing is locked"
       style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 56, padding: '0 14px', background: '#000', color: '#fff', fontFamily: MONO, fontSize: 14 }}
     >
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
         {offline ? (
           <div style={{ fontSize: 13, lineHeight: 1.45 }}>
             <strong style={{ color: '#f7525f' }}>THE CORE IS UNREACHABLE.</strong>{' '}
@@ -89,13 +77,13 @@ export default function WarmupTicker({ campaignId, viewer, progress, offline, gp
         ) : showTidbit ? (
           <div key={idx} style={{ lineHeight: 1.45, animation: 'ws-tidbit .6s ease-out' }}>{tidbits[idx % tidbits.length]}</div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }} data-pattern-stability>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, width: '100%', maxWidth: 560, margin: '0 auto' }} data-pattern-stability>
             <span style={{ letterSpacing: '0.16em', fontSize: 11, whiteSpace: 'nowrap' }}>PATTERN STABILITY</span>
-            <span data-ps-left style={{ minWidth: 44, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{s.left}</span>
+            <span data-ps-left style={{ minWidth: 44, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{s.left}</span>
             <div style={{ position: 'relative', flex: 1, height: 10, borderLeft: '1px solid rgba(255,255,255,.35)', borderRight: '1px solid rgba(255,255,255,.35)' }}>
               <div style={{ position: 'absolute', top: 2, bottom: 2, left: `${left}%`, width: `${width}%`, background: '#fff' }} />
             </div>
-            <span data-ps-right style={{ minWidth: 44, fontVariantNumeric: 'tabular-nums' }}>+{s.right}</span>
+            <span data-ps-right style={{ minWidth: 44, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>+{s.right}</span>
           </div>
         )}
       </div>
