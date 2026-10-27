@@ -18,6 +18,28 @@ def merged(segs):
             out.append({'kind': s['kind'], 'text': s['text']})
     return out
 
+def roll_line(ts, who, p):
+    ev = (p.get('event') or '').strip()
+    if len(ev) > 40: ev = ev[:40].rstrip() + '…'
+    parts = []
+    sd, fd = p.get('sd') or {}, p.get('fd') or {}
+    kind = 'skilled' if p.get('isSkilled') else 'unskilled'
+    gov = p.get('governor')
+    head = f"{kind} ({gov})" if gov else kind
+    if p.get('isSkilled') and sd.get('die') and not str(sd.get('die')).startswith('flat'):
+        parts.append(f"SD {sd['die']}={sd.get('value')}")
+    if fd.get('die'): parts.append(f"FD {fd['die']}={fd.get('value')}")
+    parts.append(f"effort {p.get('effort', 0)}")
+    total, dr = p.get('total'), p.get('dr')
+    sums = ' + '.join(parts)
+    if p.get('success') is None: verdict = ''
+    else:
+        m = p.get('margin')
+        verdict = f" → {'PASS' if p['success'] else 'FAIL'}" + (f" by {abs(m)}" if m is not None else '')
+    chosen = f" (effort chosen by {p['chosenBy']})" if p.get('chosenBy') else ''
+    vs = f" vs DR {dr}" if dr is not None else ''
+    return f"--- {ts} ROLL {who} — \"{ev}\": {head} {sums} = {total}{vs}{verdict}{chosen}"
+
 con = sqlite3.connect(DB)
 rows = con.execute("select strftime('%H:%M:%S',createdAt), type, coalesce(characterName, actor), payload from CampaignEvent where campaignId=? and createdAt > ? order by createdAt", (CAMP, since)).fetchall()
 for ts, t, who, raw in rows:
@@ -54,6 +76,9 @@ for ts, t, who, raw in rows:
         segs = p.get('segments') or [{'kind': 'thought', 'text': p.get('thought', '')}]
         for s in merged(segs):
             o, c = marks(s['kind']); print(f"  {o}{s['text']}{c}")
+    elif t == 'roll':
+        print()
+        print(roll_line(ts, who, p))
     elif t == 'chat':
         print(f"\n--- {ts} {who} says: \"{p.get('message')}\"")
     else:

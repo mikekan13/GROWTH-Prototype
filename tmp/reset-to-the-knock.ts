@@ -51,7 +51,8 @@ const dry = process.argv.includes('--dry');
   console.log((dry ? 'DRY RUN — would remove: ' : 'removing: ') + JSON.stringify(summary));
   if (dry) { process.exit(0); }
   mkdirSync('data/archive', { recursive: true });
-  const file = 'data/archive/reset-to-the-knock-2026-10-26-after-hw8e.json';
+  const label = (process.argv.find((a) => a.startsWith('--label=')) ?? '--label=').slice(8) || 'reset';
+  const file = `data/archive/reset-to-the-knock-${new Date().toISOString().replace(/[:.]/g, '-')}-${label}.json`; // never overwrite an earlier archive
   writeFileSync(file, JSON.stringify({ since: SINCE, intentions, events, canon, revisions, memories, history, facts, familiarity, famChanges, vines, recon, sessions, copilot, affect, located, pizza, clockBefore: campaign?.currentCycle }, null, 1));
   for (const f of facts) await p.worldFact.updateMany({ where: { supersededById: f.id }, data: { supersededById: null } });
   await p.worldFact.deleteMany({ where: { id: { in: facts.map((f: any) => f.id) } } });
