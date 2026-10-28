@@ -4,9 +4,10 @@
  * world (a room, a door, a person, a thing — never coordinates), the way is
  * found on the real map (lib/spatial: walls, openings, door states,
  * furniture), closed doors on the way are opened by the walker, a locked one
- * stops the walk at the door, the being's point and room are written, the
- * clock is charged for the distance, and every open canvas moves the token
- * along the walked path (`token_moved`).
+ * stops the walk at the door, the being's point and room are written, and
+ * every open canvas moves the token along the walked path (`token_moved`).
+ * The clock is never written by a walk: time passes by the Watcher's
+ * exposition (six seconds a round in combat); a walk fits inside it.
  *
  * Rulings: [[ruling-canvas-live-no-reloads-pathfinding-line-of-sight-2026-10-27]],
  * [[ruling-canvas-is-the-physical-map-overlay-cards-2026-10-17]],
@@ -23,7 +24,6 @@ import { findPath, pathSeconds, portalPassability, roomAt, roomByName, portalsOf
 import { loadWorldLevel, beingStanding, thingStanding, stampBeingPoint, roomIdOf, levelOfBeing } from '@/services/spatial-world';
 import { moveCharacterToLocation } from '@/services/character-location';
 import { writeDoorState } from '@/services/door-state';
-import { advanceClockBySim } from '@/services/time';
 
 export type MoveTarget =
   | { kind: 'room'; roomId: string }
@@ -177,9 +177,9 @@ export async function moveBeing(
       await moveCharacterToLocation(actor.campaign?.gmUserId ?? '', 'WATCHER', { characterId, locationId: toRoom.id, broadcast: false });
     }
     const placedAt = await stampBeingPoint(characterId, end);
-    if (seconds > 0) {
-      try { await advanceClockBySim(campaignId, seconds, `${actor.name} walks to ${dest.label}`); } catch (err) { console.warn('[being-movement] clock not advanced', err instanceof Error ? err.message : err); }
-    }
+    // The clock is NEVER written here (Mike 2026-10-28): time passes by the Watcher's exposition — or six
+    // seconds a round in combat — and a walk fits inside the time that passed. `seconds` is what the walk
+    // takes, for the table to read against the span, not a charge.
     try {
       broadcastEvent(campaignId, {
         kind: 'token_moved', entityId: characterId, entityType: 'character',

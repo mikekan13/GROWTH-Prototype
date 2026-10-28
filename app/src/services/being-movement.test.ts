@@ -5,7 +5,6 @@ vi.mock('@/lib/db', () => ({ prisma: {} }));
 vi.mock('@/lib/campaign-stream', () => ({ broadcastEvent: vi.fn() }));
 vi.mock('@/services/character-location', () => ({ moveCharacterToLocation: vi.fn() }));
 vi.mock('@/services/door-state', () => ({ writeDoorState: vi.fn() }));
-vi.mock('@/services/time', () => ({ advanceClockBySim: vi.fn() }));
 
 import { describeMove, type MoveReport } from './being-movement';
 import { polygonCentroid } from './spatial-world';
