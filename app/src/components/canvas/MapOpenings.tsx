@@ -8,10 +8,11 @@
  *             with its arc), a small lock when locked
  *   window  — the wall cut, two thin parallel panes
  *   archway / opening — the wall cut, a tick at each jamb
- * Hover = tooltip; a tap on a DOOR cycles closed → open → locked (PATCH, then
- * the canvas refreshes). Pure SVG + one hit box per opening.
+ * Hover = tooltip; a tap on a DOOR cycles closed → open → locked (PATCH; the
+ * server's door_changed event then redraws it in every browser, this one
+ * included — 2026-10-27, no reloads). Pure SVG + one hit box per opening.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { nextDoorState, type DoorState, type Opening } from '@/lib/canvas-geometry';
 
@@ -27,8 +28,11 @@ interface Props {
 }
 
 export default function MapOpenings({ campaignId, homeId, openings, canEdit }: Props) {
-  // Optimistic door states until the refresh lands.
+  // Optimistic door states until the server's state arrives; a prop change (the stream's
+  // door_changed applied to the model) always wins, so every browser converges on the truth.
   const [local, setLocal] = useState<Record<string, DoorState>>({});
+  const stateKey = openings.map(o => `${o.id}:${o.state ?? ''}`).join('|');
+  useEffect(() => { setLocal({}); }, [stateKey]);
 
   const tap = async (o: Opening) => {
     if (!canEdit || o.kind !== 'door') return;
@@ -39,7 +43,6 @@ export default function MapOpenings({ campaignId, homeId, openings, canEdit }: P
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: next }),
       });
       if (!res.ok) throw new Error(String(res.status));
-      window.dispatchEvent(new CustomEvent('growth:map-changed'));
     } catch {
       setLocal(prev => { const n = { ...prev }; delete n[o.id]; return n; });
     }

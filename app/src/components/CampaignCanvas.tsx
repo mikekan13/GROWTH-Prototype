@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { GrowthCharacter } from '@/types/growth';
@@ -10,7 +9,9 @@ import type { GrowthWorldItem } from '@/types/item';
 import { calculateCharacterTKV, calculateItemKV, calculateLocationKV, type HeldItemForTKV } from '@/lib/kv-calculator';
 import { recomputeAugments } from '@/lib/character-actions';
 import { BOARD_CHANGED_EVENT } from '@/components/terminal/PlanningChips';
-import type { CanvasFolder } from '@/types/canvas';
+import type { CanvasFolder, CanvasNode, Connection } from '@/types/canvas';
+import { applyLiveEvent, sameModel } from '@/components/canvas/live-model';
+import type { CanvasModel } from '@/services/canvas-model';
 import { defaultFootprintFromRect, fitPolygonToRect, footprintBounds } from '@/lib/canvas-geometry';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import CampaignHeader from '@/components/canvas/CampaignHeader';
@@ -34,45 +35,6 @@ const DeathSaveDialog = dynamic(() => import('@/components/character/DeathSaveDi
 function sheetSex(data: Record<string, unknown> | null | undefined): string | null {
   const id = (data as { identity?: { sex?: string; physicalDescription?: { gender?: string } } } | null | undefined)?.identity;
   return id?.sex || id?.physicalDescription?.gender || null;
-}
-
-interface CanvasNode {
-  id: string;
-  type: 'character' | 'npc' | 'location' | 'quest' | 'item';
-  name: string;
-  x: number;
-  y: number;
-  placedAt?: number;
-  status?: string;
-  color?: string;
-  portrait?: string | null;
-  /** BORN ≠ DONE (2026-10-12): born, official portrait still to come. */
-  awaitingImage?: boolean;
-  characterData?: Record<string, unknown> | null;
-  /** Character has a GodHead row (AI persona exists). */
-  hasAIPersona?: boolean;
-  /** AI is currently choosing this character's actions. */
-  aiActionMode?: boolean;
-  /** Current human owner/controller. Either a player or the GM's userId. */
-  controllerUserId?: string;
-  locationType?: string;
-  locationData?: GrowthLocation | null;
-  itemType?: string;
-  itemData?: GrowthWorldItem | null;
-  holderId?: string | null;
-  holderName?: string;
-  locationName?: string;
-  /** The map (2026-10-16): the item's located_at edge to its room, the room, and how many things it holds. */
-  tokenEdgeId?: string;
-  roomId?: string;
-  containsCount?: number;
-}
-
-interface Connection {
-  from: string;
-  to: string;
-  type: 'alliance' | 'conflict' | 'goal' | 'resistance' | 'opportunity' | 'owns' | 'located_at';
-  strength: number;
 }
 
 /** A campaign trailblazer the GM can assign as a character's controller. */
@@ -146,9 +108,16 @@ function applyLayoutEpochGate(campaignId: string, serverEpoch: number | undefine
   return true;
 }
 
-export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter, trailblazers, autoFolders, locatedAtEdges = [], entityNames = {} }: CampaignCanvasProps) {
+export default function CampaignCanvas({ campaign, nodes: initialNodes, connections: initialConnections, userId, username, userRole, userCharacter, trailblazers, autoFolders: initialAutoFolders, locatedAtEdges: initialLocatedAtEdges = [], entityNames: initialEntityNames = {} }: CampaignCanvasProps) {
   const [epochReloading] = useState(() => applyLayoutEpochGate(campaign.id, campaign.canvasLayoutEpoch));
   void epochReloading;
+  // The live model (2026-10-27, Mike: "no reloads"): the page seeds it once; after that the stream's
+  // typed events patch it in place and anything else re-FETCHES it (GET canvas-model) — never a
+  // navigation, never a page re-run. `nodes` keeps its own state below (many local writers).
+  const [connections, setConnections] = useState<Connection[]>(initialConnections);
+  const [autoFolders, setAutoFolders] = useState<CanvasFolder[]>(initialAutoFolders ?? []);
+  const [locatedAtEdges, setLocatedAtEdges] = useState<Array<{ child: string; parent: string }>>(initialLocatedAtEdges);
+  const [entityNames, setEntityNames] = useState<Record<string, string>>(initialEntityNames);
   const [activeTab, setActiveTab] = useState<Tab>('canvas');
   // In-canvas character selection: when set, the Character tab loads THIS character
   // instead of the user's own PC. Cleared when navigating to a non-character tab so
@@ -216,32 +185,33 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   }
   const [contestedState, setContestedState] = useState<ContestedState | null>(null);
 
-  const router = useRouter();
 
   // ── Refresh discipline (audit 2026-08-03) ──
-  // Unthrottled router.refresh() calls (JEWL working events, drop
+  // Unthrottled model re-fetches (JEWL working events, drop
   // persists, chip watchers) remounted the canvas every ~3-4s and yanked
   // gestures out from under the pointer. ALL background refreshes go
   // through this gate: min 4s apart, and NEVER while a canvas gesture is
   // live (RelationsCanvas stamps window.__growthLastGestureAt).
   const lastRefreshAtRef = useRef(0);
   const pendingRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set once reloadModel exists (it needs stampTKV, defined further down).
+  const reloadModelRef = useRef<() => Promise<void>>(async () => {});
   const requestRefresh = useCallback(() => {
     const attempt = () => {
       const lastGesture = (window as unknown as { __growthLastGestureAt?: number }).__growthLastGestureAt ?? 0;
       const gestureLive = Date.now() - lastGesture < 600;
       const since = Date.now() - lastRefreshAtRef.current;
-      if (gestureLive || since < 4000) {
+      if (gestureLive || since < 1000) {
         if (pendingRefreshRef.current) clearTimeout(pendingRefreshRef.current);
-        pendingRefreshRef.current = setTimeout(attempt, gestureLive ? 800 : Math.max(500, 4000 - since));
+        pendingRefreshRef.current = setTimeout(attempt, gestureLive ? 800 : Math.max(200, 1000 - since));
         return;
       }
       lastRefreshAtRef.current = Date.now();
       pendingRefreshRef.current = null;
-      router.refresh();
+      void reloadModelRef.current();
     };
     attempt();
-  }, [router]);
+  }, []);
 
   // ── Real-time SSE stream ──
   const streamEventsRef = useRef<TerminalEvent[]>([]);
@@ -314,10 +284,23 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         }
       }
 
-      // Handle character updates — refresh the page data
-      // map_changed: a door's state or a room move — the page re-reads Location.data and the located_at edges.
-      if (data.kind === 'character_update' || data.kind === 'map_changed') {
-        requestRefresh();
+      // The live map (2026-10-27): a token moved, a door changed, a thing changed hands — applied to
+      // the model in place. What the payload cannot describe (a new entity, a character's data) re-fetches
+      // the model through the gate. Never a navigation.
+      if (data.kind === 'token_moved' || data.kind === 'door_changed' || data.kind === 'item_changed'
+        || data.kind === 'character_update' || data.kind === 'map_changed') {
+        if (data.kind === 'token_moved') {
+          // The canvas layer animates it along the path (it must register the tween BEFORE the node moves).
+          window.dispatchEvent(new CustomEvent('growth:token-moved', { detail: data }));
+        }
+        const live = applyLiveEvent(liveRef.current, data);
+        if (live.changed) {
+          liveRef.current = live.model;
+          setNodes(live.model.nodes);
+          setAutoFolders(live.model.autoFolders);
+          setLocatedAtEdges(live.model.locatedAtEdges);
+        }
+        if (live.needsReload) requestRefresh();
       }
 
       // JEWL stage direction — relay to the canvas layer, which alone
@@ -478,12 +461,6 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     return () => window.removeEventListener('growth:crystallize-location', handler);
   }, []);
 
-  // The map changed server-side (a door opened, a place redrawn) — refresh through the gate.
-  useEffect(() => {
-    const handler = () => requestRefresh();
-    window.addEventListener('growth:map-changed', handler);
-    return () => window.removeEventListener('growth:map-changed', handler);
-  }, [requestRefresh]);
 
   const commitCrystallize = useCallback(async () => {
     if (!pendingLocationCommit) return;
@@ -501,13 +478,13 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         return;
       }
       setPendingLocationCommit(null);
-      router.refresh();
+      void reloadModelRef.current();
     } catch (err) {
       setCrystallizeErr(err instanceof Error ? err.message : 'Network error');
     } finally {
       setCrystallizing(false);
     }
-  }, [pendingLocationCommit, router]);
+  }, [pendingLocationCommit]);
 
   // ── Focal entity (drill-in navigation) ───────────────────────────────────
   // When set, the canvas shows only entities that are direct children of
@@ -954,10 +931,64 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     });
   }, [getHeldItemsForCharacter]);
 
-  // Sync local nodes when server re-fetches (e.g. after revert)
+  // Sync local nodes when the page renders fresh props (first paint).
   useEffect(() => {
     setNodes(stampTKV(initialNodes));
   }, [initialNodes, stampTKV]);
+
+  // What the stream's events patch: the model as this canvas holds it now.
+  const liveRef = useRef({ nodes, autoFolders, locatedAtEdges });
+  liveRef.current = { nodes, autoFolders, locatedAtEdges };
+
+  // Re-fetch the whole picture as DATA (GET canvas-model) and replace only what differs, so an
+  // unchanged fetch never re-lays the canvas. The only full reload left is the layout-epoch gate.
+  const reloadModel = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/campaigns/${campaign.id}/canvas-model`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const fresh = await res.json() as CanvasModel;
+      const stamped = stampTKV(fresh.nodes);
+      const current = liveRef.current;
+      if (!sameModel(current, { nodes: stamped, autoFolders: fresh.autoFolders, locatedAtEdges: fresh.locatedAtEdges })) {
+        liveRef.current = { nodes: stamped, autoFolders: fresh.autoFolders, locatedAtEdges: fresh.locatedAtEdges };
+        setNodes(stamped);
+        setAutoFolders(fresh.autoFolders);
+        setLocatedAtEdges(fresh.locatedAtEdges);
+      }
+      setConnections(prev => JSON.stringify(prev) === JSON.stringify(fresh.connections) ? prev : fresh.connections);
+      setEntityNames(prev => JSON.stringify(prev) === JSON.stringify(fresh.entityNames) ? prev : fresh.entityNames);
+    } catch { /* offline — the stream's next event or the next fetch shows truth */ }
+  }, [campaign.id, stampTKV]);
+  reloadModelRef.current = reloadModel;
+
+  // One write queue per card: a position write never overtakes the room-drop write it follows.
+  const writeChainRef = useRef(new Map<string, Promise<unknown>>());
+  const chainWrite = useCallback((nodeId: string, fn: () => Promise<void>) => {
+    const prev = writeChainRef.current.get(nodeId) ?? Promise.resolve();
+    const next = prev.then(fn).catch(() => {});
+    writeChainRef.current.set(nodeId, next);
+    return next;
+  }, []);
+  // A token's point on the map is server truth (2026-10-27): the GM's drag of a BEING is written
+  // (debounced per card) and broadcast, so every browser moves it. Items persist through onTokenMoved.
+  const positionTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const persistCharacterPosition = useCallback((nodeId: string, x: number, y: number) => {
+    const node = liveRef.current.nodes.find(n => n.id === nodeId);
+    if (!node || node.type !== 'character') return;
+    const timers = positionTimersRef.current;
+    const pending = timers.get(nodeId);
+    if (pending) clearTimeout(pending);
+    timers.set(nodeId, setTimeout(() => {
+      timers.delete(nodeId);
+      void chainWrite(nodeId, async () => {
+        await fetch(`/api/characters/${nodeId}/canvas-position`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: Math.round(x), y: Math.round(y) }),
+        });
+      });
+    }, 300));
+  }, [chainWrite]);
 
   // Debounced save: collect rapid changes and persist once after settling
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -1037,7 +1068,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         alert(data.error || 'Failed to create character');
         return;
       }
-      router.refresh();
+      void reloadModelRef.current();
       void fetch(`/api/campaigns/${campaign.id}/observation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1051,7 +1082,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id, router]);
+  }, [campaign.id]);
 
   // Right-click "Create NPC here" on a Location card. Prompts for a name,
   // POSTs a new character wired as a located_at child of the parent. The
@@ -1073,7 +1104,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       }
       const json = await res.json().catch(() => ({}));
       const newId: string | undefined = json?.character?.id;
-      router.refresh();
+      void reloadModelRef.current();
       // After the server-rendered page refreshes, pan the canvas camera to
       // either the new NPC or its parent folder so the user sees what they
       // just authored. RelationsCanvas listens for growth:focus-canvas-node
@@ -1087,7 +1118,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id, router]);
+  }, [campaign.id]);
 
   // Place (or reposition) an existing campaign character onto the canvas.
   // Optimistic: add/move the node locally so it appears instantly, then persist
@@ -1170,7 +1201,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         alert(data.error || 'Failed to create location');
         return;
       }
-      router.refresh();
+      void reloadModelRef.current();
       void fetch(`/api/campaigns/${campaign.id}/observation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1184,7 +1215,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id, router]);
+  }, [campaign.id]);
 
   const handleCreateItem = useCallback(async (name: string, type: string) => {
     try {
@@ -1198,7 +1229,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         alert(data.error || 'Failed to create item');
         return;
       }
-      router.refresh();
+      void reloadModelRef.current();
       void fetch(`/api/campaigns/${campaign.id}/observation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1212,7 +1243,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id, router]);
+  }, [campaign.id]);
 
   const handleDeleteLocation = useCallback(async (nodeId: string) => {
     if (!confirm('Delete this draft location?')) return;
@@ -1225,7 +1256,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         alert(data?.error || 'Failed to delete location');
         return;
       }
-      router.refresh();
+      void reloadModelRef.current();
       void fetch(`/api/campaigns/${campaign.id}/observation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1239,7 +1270,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id, nodes, router]);
+  }, [campaign.id, nodes]);
 
   /** EDIT commit from the JEWL dialog: merge the revised fields into the
    *  Location's existing data JSON (preserving canvas coords, timescale
@@ -1285,7 +1316,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         alert(data?.error || 'Failed to update location');
         return;
       }
-      router.refresh();
+      void reloadModelRef.current();
       void fetch(`/api/campaigns/${campaign.id}/observation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1299,7 +1330,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id, router]);
+  }, [campaign.id]);
 
   /** Dissolve an ACTIVE Location back to PLANNING — the weightier
    *  alternative to deletion for crystallized world-pieces
@@ -1318,18 +1349,18 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         alert(data?.error || 'Failed to dissolve location');
         return;
       }
-      router.refresh();
+      void reloadModelRef.current();
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id, router]);
+  }, [campaign.id]);
 
   const handleDeleteItem = useCallback(async (nodeId: string) => {
     if (!confirm('Delete this item?')) return;
     const snapshotName = nodes.find(n => n.id === nodeId)?.name ?? 'item';
     try {
       await fetch(`/api/campaigns/${campaign.id}/items/${nodeId}`, { method: 'DELETE' });
-      router.refresh();
+      void reloadModelRef.current();
       void fetch(`/api/campaigns/${campaign.id}/observation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1343,7 +1374,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id, nodes, router]);
+  }, [campaign.id, nodes]);
 
   const handleItemUpdate = useCallback(async (itemId: string, data: GrowthWorldItem) => {
     try {
@@ -1372,11 +1403,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         alert(err.error || 'Failed to place item');
         return;
       }
-      router.refresh();
+      void reloadModelRef.current();
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id, router]);
+  }, [campaign.id]);
 
   const handleItemTransfer = useCallback(async (itemId: string, holderId: string | null) => {
     try {
@@ -1421,7 +1452,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         const data = await res.json().catch(() => ({}));
         alert(data.error || 'Failed to remove from canvas');
         // Rollback by refetching from server.
-        router.refresh();
+        void reloadModelRef.current();
         return;
       }
       void fetch(`/api/campaigns/${campaign.id}/observation`, {
@@ -1436,9 +1467,9 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       }).catch(() => { /* best-effort observation */ });
     } catch {
       alert('Connection failed');
-      router.refresh();
+      void reloadModelRef.current();
     }
-  }, [campaign.id, nodes, router]);
+  }, [campaign.id, nodes]);
 
   // ── Resize handler ──────────────────────────────────────────────────────
 
@@ -1795,9 +1826,10 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             focalEntityId={focalEntityId}
             onDrillIn={setFocalEntityId}
             onFoldersChange={handleFoldersChange}
-            onRestComplete={() => router.refresh()}
-            onLocationReparented={() => router.refresh()}
-            onDropIntoLocation={async (nodeId, nodeType, locationId) => {
+            onRestComplete={() => void reloadModelRef.current()}
+            onLocationReparented={() => void reloadModelRef.current()}
+            onNodePositionChange={isGM ? persistCharacterPosition : undefined}
+            onDropIntoLocation={(nodeId, nodeType, locationId) => chainWrite(nodeId, async () => {
               // Persist the drop server-side — located_at edges are the
               // membership truth for location folders.
               try {
@@ -1815,8 +1847,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                   });
                 }
                 requestRefresh();
-              } catch { /* drop persist failed — next refresh shows truth */ }
-            }}
+              } catch { /* drop persist failed — next fetch shows truth */ }
+            })}
             onTokenMoved={async ({ itemId, edgeId, roomId, position, roomRect, footprint }) => {
               // The map (2026-10-16): a token's point is a fraction of its
               // room's footprint box. The box must be the rect the GM sees, so
@@ -2006,8 +2038,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
               visible={showTerminal}
               character={parsedCharacter}
               onCharacterUpdate={(charId, char, changes) => handleCharacterUpdate(charId, char, changes)}
-              onRevert={() => router.refresh()}
-              onRestComplete={() => router.refresh()}
+              onRevert={() => void reloadModelRef.current()}
+              onRestComplete={() => void reloadModelRef.current()}
               userId={userId}
               username={username}
               userRole={userRole}

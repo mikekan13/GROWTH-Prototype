@@ -31,4 +31,9 @@ describe('a wall is a wall (HW7 2026-10-25): sight does not cross a closed door'
     expect(throughWalls({ ...landing, locationId: 'main', locationName: 'Main Room' }, violet, v, doors)).toBe(v);
     expect(throughWalls(landing, violet, { ...v, via: ['self'] }, doors)).toMatchObject({ via: ['self'] });
   });
+  it('the map\'s own ray (2026-10-27) overrides the room rule: a clear line keeps sight across rooms, a blocked one strips it in the same room', () => {
+    const v = { beingId: 'violet', reaches: true, via: ['sight', 'hearing'], noticed: true, salience: 0.3 };
+    expect(throughWalls(landing, violet, v, doors, true)).toBe(v);
+    expect(throughWalls({ ...landing, locationId: 'main', locationName: 'Main Room' }, violet, v, [], false)).toMatchObject({ via: ['hearing'] });
+  });
 });

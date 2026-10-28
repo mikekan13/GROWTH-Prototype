@@ -11,6 +11,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/campaign-stream', () => ({ broadcastEvent: h.broadcast }));
 vi.mock('@/services/placement', () => ({ placeItem: vi.fn() }));
 vi.mock('@/services/character-location', () => ({ moveCharacterToLocation: vi.fn() }));
+vi.mock('@/services/being-movement', () => ({ resolveMoveRef: vi.fn(async () => null), moveBeing: vi.fn(), describeMove: vi.fn() }));
 vi.mock('@/daya/world-ledger', () => ({
   currentFacts: async () => h.facts.filter((f) => !f.supersededById),
   establishFact: async (campaignId: string, subjectKey: string, fact: string, cycle: number) => {
@@ -80,12 +81,12 @@ describe('compound door acts', () => {
 });
 
 describe('one writer for door state', () => {
-  it('a door write upserts the fact (one live row) and broadcasts map_changed', async () => {
+  it('a door write upserts the fact (one live row) and broadcasts door_changed', async () => {
     await applyActEffects('c1', 'vi', [{ op: 'door', door: 'Entry door', state: 'closed' }]);
     expect(doorState()).toBe('closed');
     expect(liveFacts()).toHaveLength(1);
     expect(liveFacts()[0].fact).toBe(doorFactText('Entry door', 'closed'));
-    expect(h.broadcast).toHaveBeenCalledWith('c1', { kind: 'map_changed', locationIds: ['apt'], characterIds: [] });
+    expect(h.broadcast).toHaveBeenCalledWith('c1', { kind: 'door_changed', locationId: 'apt', openingId: 'op-1', state: 'closed', name: 'Entry door' });
   });
   it('subject matching covers the three keys the sim used', () => {
     expect(speaksForDoor('entry_door', '', 'Entry door')).toBe(true);

@@ -15,6 +15,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { snapCharacterToLocation } from '@/services/canvas-placement';
+import { placeBeingInRoom } from '@/services/spatial-world';
 import { broadcastEvent } from '@/lib/campaign-stream';
 
 export const moveCharacterToLocationSchema = z.object({
@@ -23,8 +24,10 @@ export const moveCharacterToLocationSchema = z.object({
    *  (character becomes unanchored / off-canvas). */
   locationId: z.string().min(1).nullable(),
   note: z.string().max(500).optional(),
-  /** Also move the character's CARD beside the target location's card, so a narrated move is visible (Mike 09-26). */
+  /** Also place the character's TOKEN inside the target room on the map (its stand-spot by the way in), so a narrated move is visible (Mike 09-26; the map 2026-10-27). */
   snapCanvas: z.boolean().optional(),
+  /** false = the caller broadcasts its own, richer event (a walk's `token_moved`). Default true. */
+  broadcast: z.boolean().optional(),
 });
 
 export interface MoveCharacterResult {
@@ -91,16 +94,23 @@ export async function moveCharacterToLocation(
       toLocationId: input.locationId,
     };
   }).then(async (result) => {
+    let placed = false;
     if (input.snapCanvas && input.locationId) {
-      try { await snapCharacterToLocation(character.campaignId!, input.characterId, input.locationId); } catch (err) { console.warn('[character-location] canvas snap failed', err); }
+      // A drawn room: the token lands at the room's stand-spot and every canvas moves it (token_moved).
+      try { placed = await placeBeingInRoom(character.campaignId!, input.characterId, input.locationId, 'jewl'); } catch (err) { console.warn('[character-location] map placement failed', err); }
+      if (!placed) {
+        try { await snapCharacterToLocation(character.campaignId!, input.characterId, input.locationId); } catch (err) { console.warn('[character-location] canvas snap failed', err); }
+      }
     }
-    try {
-      broadcastEvent(character.campaignId!, {
-        kind: 'map_changed',
-        locationIds: [...result.fromLocationIds, ...(result.toLocationId ? [result.toLocationId] : [])],
-        characterIds: [result.characterId],
-      });
-    } catch { /* canvases re-read on their own */ }
+    if (input.broadcast !== false && !placed) {
+      try {
+        broadcastEvent(character.campaignId!, {
+          kind: 'map_changed',
+          locationIds: [...result.fromLocationIds, ...(result.toLocationId ? [result.toLocationId] : [])],
+          characterIds: [result.characterId],
+        });
+      } catch { /* canvases re-read on their own */ }
+    }
     return result;
   });
 }

@@ -4,6 +4,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({ prisma: {} }));
 vi.mock('@/services/placement', () => ({ placeItem: vi.fn() }));
 vi.mock('@/services/character-location', () => ({ moveCharacterToLocation: vi.fn() }));
+vi.mock('@/services/being-movement', () => ({ resolveMoveRef: vi.fn(async () => null), moveBeing: vi.fn(), describeMove: vi.fn() }));
 vi.mock('@/lib/campaign-stream', () => ({ broadcastEvent: vi.fn() }));
 
 import { mapFactLines, lockedDoorInTheWay, parseActEffects, passageGraph, routeBetween, passageInWords, whereaboutsLines, type ActorMap } from './world-apply';

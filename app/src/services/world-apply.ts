@@ -29,7 +29,9 @@ import { parseOpenings, type DoorState } from '@/lib/canvas-geometry';
 import { placeItem } from '@/services/placement';
 import { moveCharacterToLocation } from '@/services/character-location';
 import { broadcastEvent } from '@/lib/campaign-stream';
-import { doorWritten, syncDoorFact } from '@/services/door-facts';
+import { syncDoorFact } from '@/services/door-facts';
+import { writeDoorState } from '@/services/door-state';
+import { resolveMoveRef, moveBeing, describeMove } from '@/services/being-movement';
 
 export type ActEffect =
   | { op: 'door'; door: string; state: DoorState }
@@ -239,20 +241,14 @@ function findDoor(map: ActorMap, ref: string): MapDoor | null {
     ?? null;
 }
 
-/**
- * Open / close / lock on the home's own data; the canvas's tap does the same thing.
- * The map is the one writer: the door's WorldFact follows it and every canvas is told (door-facts.ts).
- */
-async function writeDoorState(campaignId: string, homeId: string, openingId: string, state: DoorState): Promise<void> {
-  const loc = await prisma.location.findUnique({ where: { id: homeId }, select: { name: true, data: true } });
-  if (!loc) return;
-  const data = parseData(loc.data);
-  const openings = parseOpenings(data.openings);
-  const o = openings.find((x) => x.id === openingId);
-  if (!o) return;
-  o.state = state;
-  await prisma.location.update({ where: { id: homeId }, data: { data: JSON.stringify({ ...data, openings }) } });
-  await doorWritten(campaignId, { id: homeId, name: loc.name }, { name: o.name ?? 'Door', state });
+/** A thing changed hands or rooms: every canvas moves its token in place (2026-10-27). Never throws. */
+async function itemChanged(campaignId: string, itemId: string): Promise<void> {
+  try {
+    const it = await prisma.campaignItem.findUnique({ where: { id: itemId }, select: { id: true, name: true, holderId: true, locationId: true } });
+    if (!it) return;
+    const holder = it.holderId ? await prisma.character.findUnique({ where: { id: it.holderId }, select: { name: true } }) : null;
+    broadcastEvent(campaignId, { kind: 'item_changed', itemId: it.id, itemName: it.name, holderId: it.holderId, holderName: holder?.name ?? null, locationId: it.locationId });
+  } catch { /* canvases re-read on their own */ }
 }
 
 /** The act's own words say the lock/bolt/latch was worked (so an open on a locked door is unlock-then-open). Pure. */
@@ -326,6 +322,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             prisma.campaignItem.update({ where: { id: item.id }, data: { holderId: actor.id, locationId: map.roomId } }),
           ]);
           report.applied.push(`${actor.name} now holds "${item.name}"`);
+          await itemChanged(campaignId, item.id);
           break;
         }
         case 'give': {
@@ -339,6 +336,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           if (map && toRel && toRel.targetId !== map.roomId) { report.refused.push(`give "${item.name}": ${to.name} is not in ${map.roomName}`); break; }
           await prisma.campaignItem.update({ where: { id: item.id }, data: { holderId: to.id, ...(toRel ? { locationId: toRel.targetId } : {}) } });
           report.applied.push(`"${item.name}" handed to ${to.name}`);
+          await itemChanged(campaignId, item.id);
           break;
         }
         case 'put': {
@@ -346,18 +344,29 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           if (!item) { report.refused.push(`put "${e.item}": ${actor.name} is not holding it`); break; }
           const r = await placeItem(campaignId, { item: item.id, into: e.into });
           report.applied.push(`"${item.name}" put ${r.into.kind === 'location' ? 'in' : 'into'} ${r.into.name}`);
+          await itemChanged(campaignId, item.id);
           break;
         }
         case 'move': {
-          const locs = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { id: true, name: true } });
-          const to = locs.find((l) => l.id === e.to) ?? locs.find((l) => l.name.toLowerCase() === e.to.trim().toLowerCase()) ?? locs.find((l) => e.to.toLowerCase().includes(l.name.toLowerCase()));
-          if (!to) { report.refused.push(`move: no place called "${e.to}"`); break; }
-          if (map && to.id === map.roomId) { report.applied.push(`already in ${to.name}`); break; }
-          // A step into the next room goes through its door; a locked one stops it.
-          const between = map?.doors.find((d) => d.between.some((b) => b.toLowerCase() === to.name.toLowerCase()));
-          if (between && between.state === 'locked') { report.refused.push(`move to ${to.name}: the ${between.name} is locked`); break; }
-          await moveCharacterToLocation(actor.campaign?.gmUserId ?? '', 'WATCHER', { characterId: actor.id, locationId: to.id });
-          report.applied.push(`${actor.name} → ${to.name}`);
+          // The being WALKS (2026-10-27): the target is a room, a door, a person or a thing; the way is
+          // found on the real map, closed doors open on the way, a locked one stops the walk at the door.
+          const resolved = await resolveMoveRef(campaignId, e.to, actor.id);
+          if (!resolved) {
+            // No map to walk on (a campaign with no footprints yet): fall back to filing the being in the room.
+            const locs = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { id: true, name: true } });
+            const to = locs.find((l) => l.id === e.to) ?? locs.find((l) => l.name.toLowerCase() === e.to.trim().toLowerCase()) ?? locs.find((l) => e.to.toLowerCase().includes(l.name.toLowerCase()));
+            if (!to) { report.refused.push(`move: nothing called "${e.to}" on the map`); break; }
+            if (map && to.id === map.roomId) { report.applied.push(`already in ${to.name}`); break; }
+            const between = map?.doors.find((d) => d.between.some((b) => b.toLowerCase() === to.name.toLowerCase()));
+            if (between && between.state === 'locked') { report.refused.push(`move to ${to.name}: the ${between.name} is locked`); break; }
+            await moveCharacterToLocation(actor.campaign?.gmUserId ?? '', 'WATCHER', { characterId: actor.id, locationId: to.id, snapCanvas: true });
+            report.applied.push(`${actor.name} → ${to.name}`);
+            map = await actorMap(actorCharacterId);
+            break;
+          }
+          const walk = await moveBeing(campaignId, actor.id, resolved.target, { cause: 'sim' });
+          if (walk.ok) report.applied.push(describeMove(actor.name, walk));
+          else report.refused.push(`move to ${resolved.label}: ${walk.reason ?? 'no way'}`);
           map = await actorMap(actorCharacterId);
           break;
         }

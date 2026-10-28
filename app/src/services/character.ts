@@ -360,6 +360,9 @@ export async function setCanvasPosition(
   };
   existing.canvasX = input.x;
   existing.canvasY = input.y;
+  // The GM's drag is server truth (2026-10-27): stamped so a canvas lets it beat an older local drag.
+  const placedAt = Date.now();
+  (existing as { canvasPlacedAt?: number }).canvasPlacedAt = placedAt;
   // Placing always overrides any prior hide — `place_character_on_canvas`
   // and the GM's drag gesture both mean "make this visible".
   if (existing.hiddenFromCanvas) delete existing.hiddenFromCanvas;
@@ -369,14 +372,21 @@ export async function setCanvasPosition(
     data: { data: JSON.stringify(existing) },
   });
 
-  // Tell the live canvas to re-fetch — without this the placement lands in the
-  // DB but the already-mounted canvas never shows the card (the 2026-06-20 bug).
+  // Every open canvas moves the token in place — without this the placement lands in the
+  // DB but the already-mounted canvas never shows it (the 2026-06-20 bug).
   if (character.campaignId) {
+    const room = await prisma.entityRelationship.findFirst({ where: { sourceId: characterId, relationshipType: 'located_at', targetType: 'LOCATION' }, select: { targetId: true } });
+    const roomRow = room ? await prisma.location.findUnique({ where: { id: room.targetId }, select: { name: true } }) : null;
     broadcastEvent(character.campaignId, {
-      kind: 'character_update',
-      characterId,
-      characterName: character.name,
-      fields: ['canvasX', 'canvasY'],
+      kind: 'token_moved',
+      entityId: characterId,
+      entityType: 'character',
+      x: input.x,
+      y: input.y,
+      placedAt,
+      roomId: room?.targetId ?? null,
+      roomName: roomRow?.name ?? null,
+      cause: 'gm',
     });
   }
 

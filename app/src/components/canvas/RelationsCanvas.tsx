@@ -28,6 +28,8 @@ import WorldItemCard, { type WorldItemNodeData } from "./WorldItemCard";
 import ItemToken, { itemTokenBox } from "./ItemToken";
 import LevelSwitcher from "./LevelSwitcher";
 import { TOKEN_DIAMETER, CHARACTER_TOKEN_DIAMETER, CHARACTER_TOKEN_LABEL, levelsPresent, visibleOnLevel, worldToFraction, type LeveledPlace, type Footprint, type TokenPosition, type Rect as GeoRect } from "@/lib/canvas-geometry";
+import { pointAlong, tweenDurationMs } from "./live-model";
+import type { TokenMovedEvent } from "@/types/campaign-events";
 import type { GrowthLocation } from "@/types/location";
 import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
@@ -1093,6 +1095,48 @@ export default function RelationsCanvas({
   foldersRef.current = folders;
   const nodePositionsRef = useRef(nodePositions);
   nodePositionsRef.current = nodePositions;
+
+  // ── Live token moves (2026-10-27, Mike: "something changes, it changes in everybody's browser") ──
+  // A token_moved event with a path walks the token along it (rAF tween); without one it snaps.
+  // While a token is walking it is "in hand": the props→positions sync and the settle pass leave it
+  // alone, and a user's own drag of it cancels the walk.
+  const tweensRef = useRef(new Map<string, { raf: number }>());
+  const cancelTween = useCallback((nodeId: string) => {
+    const t = tweensRef.current.get(nodeId);
+    if (!t) return;
+    cancelAnimationFrame(t.raf);
+    tweensRef.current.delete(nodeId);
+  }, []);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ev = (e as CustomEvent<TokenMovedEvent>).detail;
+      if (!ev || !ev.entityId) return;
+      const id = ev.entityId;
+      if (dragOffsetsRef.current.has(id)) return; // the user is holding it — their drag is the truth here
+      cancelTween(id);
+      const cur = nodePositionsRef.current.get(id);
+      const landed = { x: ev.x, y: ev.y, movedAt: ev.placedAt };
+      const already = !!cur && Math.abs(cur.x - ev.x) <= 1 && Math.abs(cur.y - ev.y) <= 1;
+      const path = Array.isArray(ev.path) && ev.path.length >= 2 ? ev.path : null;
+      if (already || !path) {
+        setNodePositions(prev => { const next = new Map(prev); next.set(id, landed); return next; });
+        return;
+      }
+      const duration = tweenDurationMs(path);
+      const start = performance.now();
+      const step = (now: number) => {
+        const t = Math.min(1, (now - start) / duration);
+        const p = pointAlong(path, t);
+        setNodePositions(prev => { const next = new Map(prev); next.set(id, t >= 1 ? landed : { x: p.x, y: p.y, movedAt: ev.placedAt }); return next; });
+        if (t >= 1) { tweensRef.current.delete(id); return; }
+        const entry = tweensRef.current.get(id);
+        if (entry) entry.raf = requestAnimationFrame(step);
+      };
+      tweensRef.current.set(id, { raf: requestAnimationFrame(step) });
+    };
+    window.addEventListener('growth:token-moved', handler);
+    return () => window.removeEventListener('growth:token-moved', handler);
+  }, [cancelTween]);
   const expandedNodesRef = useRef(expandedNodes);
   expandedNodesRef.current = expandedNodes;
   const dragOffsetsRef = useRef(dragOffsets);
@@ -1217,7 +1261,7 @@ export default function RelationsCanvas({
     for (const f of foldersList) if (!f.id.startsWith('auto-')) for (const nid of f.nodeIds) inManualFolder.add(nid);
     const sNodes: SettleNode[] = [];
     for (const n of nodes) {
-      if (n.type === 'location' || inManualFolder.has(n.id)) continue;
+      if (n.type === 'location' || inManualFolder.has(n.id) || tweensRef.current.has(n.id)) continue; // a walking token is in hand
       const pos = positions.get(n.id) ?? { x: n.x, y: n.y };
       const dims = getNodeDimensions(n.type, expanded.has(n.id));
       sNodes.push({ id: n.id, x: pos.x, y: pos.y, w: dims.width, topH: dims.topH, bottomH: dims.bottomH, folderId: folderOfNode.get(n.id) ?? null });
@@ -1813,6 +1857,7 @@ export default function RelationsCanvas({
     setNodePositions((prev) => {
       const next = new Map(prev);
       nodes.forEach((node) => {
+        if (tweensRef.current.has(node.id)) return; // walking its path — it lands there itself
         const stored = next.get(node.id);
         // Server wins when it placed this node more recently than the GM last
         // dragged it (JEWL organizing the canvas, the sim moving a being) —
@@ -3447,6 +3492,7 @@ export default function RelationsCanvas({
   // A person moved ON THE MAP — her TOKEN (2026-10-17; this was the card's
   // drag before the sheet became an overlay). Settle-once + drop-into-room.
   const commitCharacterMove = (nodeId: string, x: number, y: number) => {
+    cancelTween(nodeId); // the GM's hand beats the engine's walk
     beginTx('move'); // undo (2026-10-06)
     commitGroupDrag(nodeId);
     // Clamp party folder nodes above KRMA line
@@ -3500,6 +3546,7 @@ export default function RelationsCanvas({
     }
   };
   const dragCharacterOffset = (nodeId: string, offsetX: number, offsetY: number) => {
+    if (offsetX !== 0 || offsetY !== 0) cancelTween(nodeId);
     const clampedY = clampPartyDragY(nodeId, offsetY);
     applyGroupDragOffset(nodeId, offsetX, clampedY);
     checkFolderDropTarget(nodeId, offsetX, clampedY);

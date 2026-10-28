@@ -28,7 +28,7 @@ Respond with STRICT JSON only — no prose outside the JSON object — in exactl
              | { "op": "take", "item": <thing in the room> }
              | { "op": "give", "item": <thing in hand>, "to": <person present> }
              | { "op": "put", "item": <thing in hand>, "into": <room or container> }
-             | { "op": "move", "to": <room> } ]
+             | { "op": "move", "to": <room, door, person or thing the actor goes to> } ]
 }
 
 Rules:
@@ -43,6 +43,12 @@ Rules:
    touched or handed anything; a locked door is not passed. An act that
    needs them present happens toward the door or the empty room and reaches
    no one — say so in the outcome; never place them in the room.
+   MOVEMENT is a "move" effect whenever the actor's body ends somewhere
+   else: a step toward / up to / against a door is move → that door; going
+   to a person or a thing is move → its name; leaving for another room is
+   move → that room. The map walks the actor there: a closed door on the way
+   is opened by the walker, a LOCKED one stops the walk at the door. Never
+   invent distances or coordinates.
 1. Facts are law. Never contradict one. If the action touches something with
    no established fact, establish it conservatively (boring, plausible,
    room-appropriate) via factsToWrite.

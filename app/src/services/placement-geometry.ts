@@ -17,7 +17,8 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
 import { updateLocation } from '@/services/location';
-import { parseFootprint, type Footprint, type PassageLink, type TokenPosition } from '@/lib/canvas-geometry';
+import { parseFootprint, footprintBounds, fractionToWorld, type Footprint, type PassageLink, type TokenPosition } from '@/lib/canvas-geometry';
+import { broadcastEvent } from '@/lib/campaign-stream';
 
 const pointSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
 
@@ -104,7 +105,7 @@ export async function setTokenPosition(
   if (!parsed.success) throw new ValidationError('position must be {x,y} fractions in 0..1');
   const edge = await prisma.entityRelationship.findUnique({
     where: { id: edgeId },
-    select: { id: true, targetId: true, relationshipType: true, campaignId: true, data: true },
+    select: { id: true, sourceId: true, targetId: true, relationshipType: true, campaignId: true, data: true },
   });
   if (!edge || edge.targetId !== parentEntityId || edge.relationshipType !== 'located_at') {
     throw new NotFoundError('Contents edge not found');
@@ -116,5 +117,14 @@ export async function setTokenPosition(
   const positionAt = Date.now();
   const data = { ...parseData(edge.data), position: parsed.data.position, positionAt };
   await prisma.entityRelationship.update({ where: { id: edgeId }, data: { data: JSON.stringify(data) } });
+  // Every open canvas moves the thing's token in place (2026-10-27).
+  try {
+    const room = await prisma.location.findUnique({ where: { id: parentEntityId }, select: { name: true, data: true } });
+    const fp = room ? parseFootprint(parseData(room.data).footprint) : null;
+    if (room && fp) {
+      const world = fractionToWorld(parsed.data.position, footprintBounds(fp.points));
+      broadcastEvent(edge.campaignId, { kind: 'token_moved', entityId: edge.sourceId, entityType: 'item', x: world.x, y: world.y, placedAt: positionAt, roomId: parentEntityId, roomName: room.name, cause: 'gm' });
+    }
+  } catch { /* canvases re-read on their own */ }
   return { edgeId, position: parsed.data.position, positionAt };
 }

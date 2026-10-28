@@ -23,6 +23,8 @@ import { perceive } from '@/daya/perceive';
 import type { MemoryChain } from '@/daya/chain';
 import { laneReadiness } from '@/daya/l1-endpoint';
 import { actorMap, mapFactLines } from '@/services/world-apply';
+import { loadWorldLevel, beingStanding, levelOfBeing } from '@/services/spatial-world';
+import { lineOfSight } from '@/lib/spatial';
 import { decodePerceivedVia, encodePerceivedVia, mergePerceivedVia } from '@/daya/perceived-via';
 
 export { perceptionReachOn };
@@ -151,20 +153,48 @@ export interface WallDoor { name: string; between: string[]; state: string }
  * when an OPEN door or opening joins the two rooms; otherwise sight comes off its verdict, and a verdict left
  * with no sense does not reach. Rooms are matched by name, as the map names them. Pure.
  */
-export function throughWalls(event: ReachEvent, b: ReachBeing, v: ReachVerdict, doors: WallDoor[]): ReachVerdict {
+export function throughWalls(event: ReachEvent, b: ReachBeing, v: ReachVerdict, doors: WallDoor[], lineOfSight?: boolean): ReachVerdict {
   if (!v.reaches || v.via.includes('self')) return v;
-  if (!event.locationId || !b.locationId || event.locationId === b.locationId) return v;
-  const here = (b.locationName ?? '').toLowerCase();
-  const there = (event.locationName ?? '').toLowerCase();
-  if (!here || !there) return v;
-  const joins = doors.filter((d) => { const rooms = d.between.map((r) => r.toLowerCase()); return rooms.includes(here) && rooms.includes(there); });
-  const open = joins.some((d) => d.state === 'open');
-  if (open) return v;
+  // The map's own ray (2026-10-27): when both points are known, sight is a straight line against the walls
+  // and the doors as they stand — in the same room or not.
+  if (lineOfSight === true) return v;
+  if (lineOfSight === undefined) {
+    if (!event.locationId || !b.locationId || event.locationId === b.locationId) return v;
+    const here = (b.locationName ?? '').toLowerCase();
+    const there = (event.locationName ?? '').toLowerCase();
+    if (!here || !there) return v;
+    const joins = doors.filter((d) => { const rooms = d.between.map((r) => r.toLowerCase()); return rooms.includes(here) && rooms.includes(there); });
+    const open = joins.some((d) => d.state === 'open');
+    if (open) return v;
+  }
   const via = v.via.filter((s) => s !== 'sight');
   if (via.length === v.via.length) return v;
   if (!via.length) return { beingId: b.id, reaches: false, via: [], noticed: false, salience: 0 };
   const clarity = v.clarity ? Object.fromEntries(Object.entries(v.clarity).filter(([k]) => k !== 'sight')) : undefined;
   return { ...v, via, ...(clarity ? { clarity } : {}) };
+}
+
+/**
+ * Line of sight from the event's source to each being on the real map (lib/spatial): a straight ray against
+ * the walls, the doors as they stand, archways and windows letting it through. Only beings whose points are
+ * known get a verdict; the rest fall back to the room-name rule. Never throws.
+ */
+async function sightLines(campaignId: string, sourceId: string | null | undefined, beingIds: string[]): Promise<Map<string, boolean>> {
+  const out = new Map<string, boolean>();
+  if (!sourceId) return out;
+  try {
+    const { map } = await loadWorldLevel(campaignId, await levelOfBeing(sourceId));
+    if (!map.rooms.length) return out;
+    const src = await beingStanding(map, sourceId);
+    if (!src) return out;
+    for (const id of beingIds) {
+      if (id === sourceId) continue;
+      const s = await beingStanding(map, id);
+      if (!s) continue;
+      out.set(id, lineOfSight(map, src.point, s.point));
+    }
+  } catch (err) { console.warn('[perception-reach] line of sight unread (room rule applies)', err instanceof Error ? err.message : err); }
+  return out;
 }
 
 /** The doors around the event's source, as the adjudicator reads them (services/world-apply). Never throws. */
@@ -216,10 +246,11 @@ export async function judgeCanonReach(
   }
   if (j.source === 'fallback') console.warn(`[perception-reach] world-sim fell back to the stub after ${j.ms}ms: ${j.error}`);
   if (walls.length || event.locationId) {
+    const sight = opts.atScene ? new Map<string, boolean>() : await sightLines(campaignId, event.sourceId, beings.map((b) => b.id));
     for (const b of beings) {
       const v = j.verdicts.get(b.id);
       if (!v) continue;
-      const held = throughWalls(event, b, v, walls);
+      const held = throughWalls(event, b, v, walls, sight.get(b.id));
       if (held !== v) { console.log(`[perception-reach] ${b.name}: a wall is a wall — ${v.via.join('+')} → ${held.reaches ? held.via.join('+') : 'nothing'}`); j.verdicts.set(b.id, held); }
     }
   }

@@ -84,7 +84,7 @@ export async function setDoorState(
   await updateLocation(homeId, campaignId, actor.userId, actor.role, { data: { ...data, openings } });
   // The map is the one writer: the door's fact follows it, every canvas redraws.
   const home = await prisma.location.findUnique({ where: { id: homeId }, select: { name: true } });
-  await doorWritten(campaignId, { id: homeId, name: home?.name ?? 'home' }, { name: o.name ?? 'Door', state });
+  await doorWritten(campaignId, { id: homeId, name: home?.name ?? 'home' }, { id: o.id, name: o.name ?? 'Door', state });
   return o;
 }
 

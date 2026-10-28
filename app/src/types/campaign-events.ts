@@ -109,11 +109,60 @@ export interface CharacterUpdateEvent {
   fields: string[];            // Which top-level fields changed
 }
 
-/** The map changed server-side (a door's state, someone moved rooms) — every open canvas re-reads. */
+/** The map changed server-side in a way no payload below describes (coarse fallback) — every open canvas re-fetches the canvas model (never a page reload, 2026-10-27). */
 export interface MapChangedEvent {
   kind: 'map_changed';
   locationIds: string[];
   characterIds: string[];
+}
+
+// ── The live map (Mike 2026-10-27: "no reloads — something changes, it changes in everybody's browser") ──
+
+/**
+ * A token (a being, or a thing on a room's floor) moved on the map. Every open
+ * canvas moves it in place — along `path` when the engine walked it.
+ * Coordinates are world units (the footprint frame, 20 per foot).
+ */
+export interface TokenMovedEvent {
+  kind: 'token_moved';
+  entityId: string;
+  entityType: 'character' | 'item';
+  x: number;
+  y: number;
+  /** ms — the client lets a server placement beat an older local drag. */
+  placedAt: number;
+  /** The room (Location) the token now stands in; null = off the map. */
+  roomId: string | null;
+  roomName?: string | null;
+  /** The walked polyline (world units, from the old spot to the new) when the engine moved it. */
+  path?: Array<{ x: number; y: number }>;
+  /** Sim seconds the walk took. */
+  seconds?: number;
+  cause: 'sim' | 'gm' | 'jewl';
+}
+
+/** A door (or other opening) changed state on the map — the drawn door redraws in place. */
+export interface DoorChangedEvent {
+  kind: 'door_changed';
+  /** The HOME location that carries the opening. */
+  locationId: string;
+  openingId: string;
+  state: 'open' | 'closed' | 'locked';
+  name?: string;
+}
+
+/** A thing changed hands or rooms (taken, given, put down) — the token follows its holder or lands where it was put. */
+export interface ItemChangedEvent {
+  kind: 'item_changed';
+  itemId: string;
+  itemName?: string;
+  holderId: string | null;
+  holderName?: string | null;
+  /** The enclosing room; null when carried or unplaced. */
+  locationId: string | null;
+  x?: number;
+  y?: number;
+  placedAt?: number;
 }
 
 /** Portrait regenerated */
@@ -304,6 +353,9 @@ export type StreamEventData =
   | StateSyncEvent
   | CharacterUpdateEvent
   | MapChangedEvent
+  | TokenMovedEvent
+  | DoorChangedEvent
+  | ItemChangedEvent
   | PortraitUpdateEvent
   | DeathSaveEvent
   | CastResultEvent

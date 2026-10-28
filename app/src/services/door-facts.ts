@@ -56,12 +56,15 @@ export async function syncDoorFact(
   return 'written';
 }
 
-/** The tail of every door write: fact follows the map, canvases redraw. Never throws. */
+/** The tail of every door write: fact follows the map, canvases redraw the door in place (`door_changed`; `map_changed` only when the opening id is unknown). Never throws. */
 export async function doorWritten(
   campaignId: string,
   home: { id: string; name: string },
-  door: { name: string; state: DoorState },
+  door: { id?: string; name: string; state: DoorState },
 ): Promise<void> {
   try { await syncDoorFact(campaignId, home, door); } catch (err) { console.warn('[door-facts] fact sync failed', err); }
-  try { broadcastEvent(campaignId, { kind: 'map_changed', locationIds: [home.id], characterIds: [] }); } catch { /* canvases re-read on their own */ }
+  try {
+    if (door.id) broadcastEvent(campaignId, { kind: 'door_changed', locationId: home.id, openingId: door.id, state: door.state, name: door.name });
+    else broadcastEvent(campaignId, { kind: 'map_changed', locationIds: [home.id], characterIds: [] });
+  } catch { /* canvases re-read on their own */ }
 }

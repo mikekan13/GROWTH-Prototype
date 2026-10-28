@@ -26,7 +26,8 @@ export const moveCharacterTool: JewlTool = {
   inputSchema: moveCharacterToLocationSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const parsed = moveCharacterToLocationSchema.parse(input);
-    const result = await moveCharacterToLocation(ctx.actorId, ctx.actorRole, parsed);
+    // A narrated arrival lands the token inside the drawn room on every canvas (2026-10-27).
+    const result = await moveCharacterToLocation(ctx.actorId, ctx.actorRole, { snapCanvas: true, ...parsed });
     return {
       output: {
         characterId: result.characterId,

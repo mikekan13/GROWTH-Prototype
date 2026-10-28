@@ -3,6 +3,49 @@
  * Persisted to localStorage per campaign.
  */
 import type { Footprint, PassageLink, Opening } from '@/lib/canvas-geometry';
+import type { GrowthLocation } from '@/types/location';
+import type { GrowthWorldItem } from '@/types/item';
+
+/** A card / token on the canvas (built by services/canvas-model, drawn by RelationsCanvas). */
+export interface CanvasNode {
+  id: string;
+  type: 'character' | 'npc' | 'location' | 'quest' | 'item';
+  name: string;
+  x: number;
+  y: number;
+  placedAt?: number;
+  status?: string;
+  color?: string;
+  portrait?: string | null;
+  /** BORN ≠ DONE (2026-10-12): born, official portrait still to come. */
+  awaitingImage?: boolean;
+  characterData?: Record<string, unknown> | null;
+  /** Character has a GodHead row (AI persona exists). */
+  hasAIPersona?: boolean;
+  /** AI is currently choosing this character's actions. */
+  aiActionMode?: boolean;
+  /** Current human owner/controller. Either a player or the GM's userId. */
+  controllerUserId?: string;
+  locationType?: string;
+  locationData?: GrowthLocation | null;
+  itemType?: string;
+  itemData?: GrowthWorldItem | null;
+  holderId?: string | null;
+  holderName?: string;
+  locationName?: string;
+  /** The map (2026-10-16): the item's located_at edge to its room, the room, and how many things it holds. */
+  tokenEdgeId?: string;
+  roomId?: string;
+  containsCount?: number;
+}
+
+/** A tether between two canvas entities. */
+export interface Connection {
+  from: string;
+  to: string;
+  type: 'alliance' | 'conflict' | 'goal' | 'resistance' | 'opportunity' | 'owns' | 'located_at';
+  strength: number;
+}
 
 export interface CanvasFolder {
   id: string;
