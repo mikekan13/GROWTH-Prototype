@@ -11,6 +11,8 @@ import { recomputeAugments } from '@/lib/character-actions';
 import { BOARD_CHANGED_EVENT } from '@/components/terminal/PlanningChips';
 import type { CanvasFolder, CanvasNode, Connection } from '@/types/canvas';
 import { applyLiveEvent, sameModel } from '@/components/canvas/live-model';
+import { fogMapEventFor, isMapEvent } from '@/lib/fog-delivery';
+import { readViewAs } from '@/components/terminal/table-feed/ViewAsPicker';
 import type { CanvasModel } from '@/services/canvas-model';
 import { defaultFootprintFromRect, fitPolygonToRect, footprintBounds } from '@/lib/canvas-geometry';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
@@ -196,6 +198,24 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   const pendingRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Set once reloadModel exists (it needs stampTKV, defined further down).
   const reloadModelRef = useRef<() => Promise<void>>(async () => {});
+
+  // The map follows the terminal's viewpoint (Mike 2026-10-28: "when switching viewpoint on the terminal as a
+  // Watcher it should let you see that entity's view too"): the SEEN BY picker's choice (null = the truth)
+  // re-fetches the model as that character knows it, and live map events are fogged for them on the client
+  // (the truth connection receives every grade). Read once from the picker's own storage so a reload keeps it.
+  const viewAsRef = useRef<string | null>(null);
+  useEffect(() => {
+    viewAsRef.current = readViewAs(campaign.id, userId ?? 'anon');
+    if (viewAsRef.current) void reloadModelRef.current();
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<{ characterId: string | null }>).detail?.characterId ?? null;
+      if (id === viewAsRef.current) return;
+      viewAsRef.current = id;
+      void reloadModelRef.current();
+    };
+    window.addEventListener('growth:view-as', handler);
+    return () => window.removeEventListener('growth:view-as', handler);
+  }, [campaign.id, userId]);
   const requestRefresh = useCallback(() => {
     const attempt = () => {
       const lastGesture = (window as unknown as { __growthLastGestureAt?: number }).__growthLastGestureAt ?? 0;
@@ -287,13 +307,15 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       // The live map (2026-10-27): a token moved, a door changed, a thing changed hands — applied to
       // the model in place. What the payload cannot describe (a new entity, a character's data) re-fetches
       // the model through the gate. Never a navigation.
-      if (data.kind === 'token_moved' || data.kind === 'door_changed' || data.kind === 'item_changed'
-        || data.kind === 'character_update' || data.kind === 'map_changed') {
-        if (data.kind === 'token_moved') {
+      if (isMapEvent(data) || data.kind === 'character_update' || data.kind === 'map_changed') {
+        // Viewing the map as a character: the event reaches this canvas as that character would get it.
+        const shown = isMapEvent(data) && viewAsRef.current ? fogMapEventFor(data, viewAsRef.current) : data;
+        if (!shown) return;
+        if (shown.kind === 'token_moved') {
           // The canvas layer animates it along the path (it must register the tween BEFORE the node moves).
-          window.dispatchEvent(new CustomEvent('growth:token-moved', { detail: data }));
+          window.dispatchEvent(new CustomEvent('growth:token-moved', { detail: shown }));
         }
-        const live = applyLiveEvent(liveRef.current, data);
+        const live = applyLiveEvent(liveRef.current, shown);
         if (live.changed) {
           liveRef.current = live.model;
           setNodes(live.model.nodes);
@@ -931,9 +953,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     });
   }, [getHeldItemsForCharacter]);
 
-  // Sync local nodes when the page renders fresh props (first paint).
+  // Sync local nodes when the page renders fresh props (first paint). The page always renders the
+  // viewer's own picture; when the Watcher is viewing the map as a character, re-fetch that view on top.
   useEffect(() => {
     setNodes(stampTKV(initialNodes));
+    if (viewAsRef.current) void reloadModelRef.current();
   }, [initialNodes, stampTKV]);
 
   // What the stream's events patch: the model as this canvas holds it now.
@@ -944,7 +968,9 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   // unchanged fetch never re-lays the canvas. The only full reload left is the layout-epoch gate.
   const reloadModel = useCallback(async () => {
     try {
-      const res = await fetch(`/api/campaigns/${campaign.id}/canvas-model`, { cache: 'no-store' });
+      const viewAs = viewAsRef.current;
+      const res = await fetch(`/api/campaigns/${campaign.id}/canvas-model${viewAs ? `?viewAs=${encodeURIComponent(viewAs)}` : ''}`, { cache: 'no-store' });
+      if (viewAs !== viewAsRef.current) return; // the viewpoint changed meanwhile — never show one view's picture under another
       if (!res.ok) return;
       const fresh = await res.json() as CanvasModel;
       const stamped = stampTKV(fresh.nodes);

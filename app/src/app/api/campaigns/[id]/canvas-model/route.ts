@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 // folders, parent graph, names), served as data so an open canvas re-fetches instead of re-running the
 // page (Mike 2026-10-27: no reloads). Access: ADMIN/GODHEAD, the GM, or a joined member — the page's rule.
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -25,8 +25,10 @@ export async function GET(
     const isMember = campaign.members.some(m => m.userId === session.user.id && !['INTERESTED', 'REJECTED', REMOVED_STATUS].includes(m.status));
     if (!canEnterAdultCampaign(session.user, campaign)) throw new ForbiddenError('This table is 18+');
     if (!isAdmin && !isGM && !isMember) throw new ForbiddenError('Not a member of this campaign');
-    // Fog of war: a Trailblazer gets the map as their character last knew it.
-    const model = await assembleCanvasModelFor(campaign, session.user);
+    // Fog of war: a Trailblazer gets the map as their character last knew it; the Watcher may ask for it
+    // as any character (`?viewAs=` — the terminal's SEEN BY picker; viewAsViewer checks the right).
+    const viewAs = new URL(request.url).searchParams.get('viewAs') || undefined;
+    const model = await assembleCanvasModelFor(campaign, session.user, viewAs);
     return NextResponse.json(model, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return errorResponse(error);

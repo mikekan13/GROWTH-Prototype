@@ -4645,7 +4645,8 @@ export default function RelationsCanvas({
             return (
               <foreignObject
                 key={`char-token-${node.id}`}
-                opacity={carried?.kind === 'node' && carried.id === node.id ? 0.35 : undefined}
+                opacity={carried?.kind === 'node' && carried.id === node.id ? 0.35 : node.unseen ? 0.4 : undefined}
+                filter={node.unseen ? 'grayscale(1)' : undefined}
                 x={visualX - D / 2 - viewBox.width}
                 y={visualY - D / 2 - viewBox.height}
                 width={D + viewBox.width * 2}

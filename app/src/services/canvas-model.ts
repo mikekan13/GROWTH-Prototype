@@ -6,7 +6,7 @@
  * re-running the page. Pure assembly: no auth here (the page and the route
  * gate access), no side effects.
  */
-import { feedViewerFor } from '@/services/perceived-feed';
+import { feedViewerFor, viewAsViewer } from '@/services/perceived-feed';
 import { lastKnownFor, fogCanvasModel } from '@/services/last-known';
 import { prisma } from '@/lib/db';
 import { locationDepths } from '@/components/canvas/canvas-lod';
@@ -419,9 +419,10 @@ export async function buildCanvasModel(campaignId: string): Promise<CanvasModel 
  * perceived-feed viewer, the map as their character last knew it (services/last-known). A perceived viewer
  * with no character yet sees no tokens at all.
  */
-export async function assembleCanvasModelFor(campaign: CanvasCampaign, user: { id: string; role: string }): Promise<CanvasModel> {
+export async function assembleCanvasModelFor(campaign: CanvasCampaign, user: { id: string; role: string }, viewAs?: string | null): Promise<CanvasModel> {
   const model = await assembleCanvasModel(campaign);
-  const viewer = await feedViewerFor(campaign.id, user);
+  // `viewAs`: the Watcher sees the map as that character knows it (the terminal's SEEN BY picker; server-checked).
+  const viewer = viewAs ? await viewAsViewer(campaign.id, user, viewAs) : await feedViewerFor(campaign.id, user);
   if (viewer.mode === 'truth') return model;
   const rows = viewer.characterId ? await lastKnownFor(campaign.id, viewer.characterId) : [];
   return fogCanvasModel(model, viewer.characterId ?? '', rows);

@@ -131,7 +131,11 @@ export default function CampaignTerminal({
   const viewAsOffered = perceptionFeedOn() && (_userRole === 'WATCHER' || _userRole === 'GODHEAD' || _userRole === 'ADMIN');
   const viewer = _userId ?? 'anon';
   useEffect(() => { if (viewAsOffered) setViewAsState(readViewAs(campaignId, viewer)); }, [viewAsOffered, campaignId, viewer]);
-  const setViewAs = useCallback((id: string | null) => { writeViewAs(campaignId, viewer, id); setViewAsState(id); }, [campaignId, viewer]);
+  // The map follows the viewpoint (Mike 2026-10-28): the canvas listens and shows that character's fogged map.
+  const setViewAs = useCallback((id: string | null) => {
+    writeViewAs(campaignId, viewer, id); setViewAsState(id);
+    window.dispatchEvent(new CustomEvent('growth:view-as', { detail: { characterId: id } }));
+  }, [campaignId, viewer]);
   const viewAsRef = useRef<string | null>(null);
   viewAsRef.current = viewAs;
   const viewAsCharacters = useMemo<ViewAsCharacter[]>(() => (tableEntities ?? [])

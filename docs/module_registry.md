@@ -781,6 +781,8 @@ Mike: sight is one sense; a being lingers at its last known spot and sound updat
 - `services/canvas-model.assembleCanvasModelFor(campaign, user)` — truth for truth-record readers (`feedViewerFor`), else the fogged model; used by `app/campaign/[id]/page.tsx` and `GET /api/campaigns/[id]/canvas-model`.
 - `services/spatial-world.roomForFiled(map, filedId)` — a filing at a home shell resolves to the room at the home's centre (`LevelMap.homes`); used by `beingStanding` / `thingStanding`.
 - Tests: `services/last-known.test.ts` (fogging), `spatial-perception.test.ts` (+ visible door state), `campaign-stream.test.ts` (+ door state per viewer).
+- `lib/fog-delivery.ts` — `fogMapEventFor(data, characterId)` / `isMapEvent` (pure): one viewer's copy of a `token_moved` / `door_changed` / `item_changed`; used by `lib/campaign-stream.deliveryFor` and by `components/CampaignCanvas` when the Watcher views the map as a character.
+- The map follows the terminal's viewpoint: `ViewAsPicker` → `CampaignTerminal.setViewAs` dispatches `growth:view-as`; `CampaignCanvas` keeps `viewAsRef` (read from the picker's localStorage key on mount), re-fetches `canvas-model?viewAs=` on change and after a props re-sync, and fogs live map events client-side. `assembleCanvasModelFor(campaign, user, viewAs?)` resolves the viewer with `viewAsViewer` when asked.
 - Not yet: hearing by distance; facing/darkness; a perceived viewer with no character sees no tokens.
 
 ## Hello world 8, run 7 fixes — the door that diverged; recall not roll; the unclosed quote; no narration row for a standing beat; narrated thoughts; the map writes the door (2026-10-27)
