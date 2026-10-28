@@ -56,6 +56,8 @@ interface CanvasNode {
   portrait?: string | null;
   /** BORN ≠ DONE (2026-10-12): born, official portrait still to come. */
   awaitingImage?: boolean;
+  /** Fog of war (2026-10-28): this viewer only heard the token go here — drawn greyed at its last known room. */
+  unseen?: boolean;
   characterData?: Record<string, unknown> | null;
   /** Character has a GodHead row (AI persona exists). */
   hasAIPersona?: boolean;
@@ -3718,7 +3720,8 @@ export default function RelationsCanvas({
 
         <foreignObject
           key={`card-${node.id}`}
-          opacity={carried?.kind === 'node' && carried.id === node.id ? 0.35 : undefined}
+          opacity={carried?.kind === 'node' && carried.id === node.id ? 0.35 : node.unseen ? 0.4 : undefined}
+          filter={node.unseen ? 'grayscale(1)' : undefined}
           x={visualX - cardWidth / 2 - viewBox.width}
           y={visualY - cardHeight / 2 - viewBox.height}
           width={cardWidth + viewBox.width * 2}
@@ -4820,7 +4823,8 @@ export default function RelationsCanvas({
               )}
               <foreignObject
                 key={`item-${node.id}`}
-                opacity={carried?.kind === 'node' && carried.id === node.id ? 0.35 : undefined}
+                opacity={carried?.kind === 'node' && carried.id === node.id ? 0.35 : node.unseen ? 0.4 : undefined}
+                filter={node.unseen ? 'grayscale(1)' : undefined}
                 x={visualX - cardWidth / 2 - viewBox.width}
                 y={visualY - cardHeight / 2 - viewBox.height}
                 width={cardWidth + viewBox.width * 2}

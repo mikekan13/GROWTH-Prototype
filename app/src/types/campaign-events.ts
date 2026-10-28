@@ -139,7 +139,27 @@ export interface TokenMovedEvent {
   /** Sim seconds the walk took. */
   seconds?: number;
   cause: 'sim' | 'gm' | 'jewl';
+  /**
+   * Fog of war (Mike 2026-10-28: sight is one sense; a being lingers at its last known spot and sound updates it).
+   * What each character perceived of this move — set by the server before broadcast, read by the delivery
+   * filter (lib/campaign-stream deliveryFor), never sent to a perceived-feed viewer. Absent = no map, everyone sees.
+   */
+  perceivedBy?: PerceivedBy;
+  /** Where the room-grade delivery puts the token (the room's centre); stripped with `perceivedBy`. */
+  roomPoint?: { x: number; y: number };
+  /**
+   * How the receiving viewer knows this position: `point` (saw it) or `room` (heard / felt it — the token is
+   * drawn greyed at the room's centre). Absent = point (the truth record).
+   */
+  known?: 'point' | 'room';
 }
+
+/**
+ * What a character perceived of a map change: the point (sight), the room (sound, vibration — "someone
+ * moved in there"), or nothing (their map keeps the last known). Keyed by character id.
+ */
+export type PerceptionGrade = 'point' | 'room' | 'none';
+export type PerceivedBy = Record<string, PerceptionGrade>;
 
 /** A door (or other opening) changed state on the map — the drawn door redraws in place. */
 export interface DoorChangedEvent {
@@ -149,6 +169,8 @@ export interface DoorChangedEvent {
   openingId: string;
   state: 'open' | 'closed' | 'locked';
   name?: string;
+  /** Fog of war: who saw or heard the door change (see TokenMovedEvent.perceivedBy). A viewer who perceived nothing keeps the door as last known. */
+  perceivedBy?: PerceivedBy;
 }
 
 /** A thing changed hands or rooms (taken, given, put down) — the token follows its holder or lands where it was put. */
@@ -163,6 +185,10 @@ export interface ItemChangedEvent {
   x?: number;
   y?: number;
   placedAt?: number;
+  /** Fog of war: who saw (point) or heard (room: the change without its point) the thing move. */
+  perceivedBy?: PerceivedBy;
+  /** How the receiving viewer knows it (see TokenMovedEvent.known). */
+  known?: 'point' | 'room';
 }
 
 /** Portrait regenerated */

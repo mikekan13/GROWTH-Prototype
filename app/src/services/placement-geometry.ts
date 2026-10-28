@@ -19,6 +19,7 @@ import { canManageCampaign } from '@/lib/permissions';
 import { updateLocation } from '@/services/location';
 import { parseFootprint, footprintBounds, fractionToWorld, type Footprint, type PassageLink, type TokenPosition } from '@/lib/canvas-geometry';
 import { broadcastEvent } from '@/lib/campaign-stream';
+import { perceiveMapChange } from '@/services/spatial-perception';
 
 const pointSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
 
@@ -123,7 +124,8 @@ export async function setTokenPosition(
     const fp = room ? parseFootprint(parseData(room.data).footprint) : null;
     if (room && fp) {
       const world = fractionToWorld(parsed.data.position, footprintBounds(fp.points));
-      broadcastEvent(edge.campaignId, { kind: 'token_moved', entityId: edge.sourceId, entityType: 'item', x: world.x, y: world.y, placedAt: positionAt, roomId: parentEntityId, roomName: room.name, cause: 'gm' });
+      const seen = await perceiveMapChange(edge.campaignId, { kind: 'thing', entityId: edge.sourceId, at: world, roomId: parentEntityId });
+      broadcastEvent(edge.campaignId, { kind: 'token_moved', entityId: edge.sourceId, entityType: 'item', x: world.x, y: world.y, placedAt: positionAt, roomId: parentEntityId, roomName: room.name, cause: 'gm', ...seen });
     }
   } catch { /* canvases re-read on their own */ }
   return { edgeId, position: parsed.data.position, positionAt };

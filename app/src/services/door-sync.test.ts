@@ -12,6 +12,8 @@ vi.mock('@/lib/campaign-stream', () => ({ broadcastEvent: h.broadcast }));
 vi.mock('@/services/placement', () => ({ placeItem: vi.fn() }));
 vi.mock('@/services/character-location', () => ({ moveCharacterToLocation: vi.fn() }));
 vi.mock('@/services/being-movement', () => ({ resolveMoveRef: vi.fn(async () => null), moveBeing: vi.fn(), describeMove: vi.fn() }));
+vi.mock('@/services/spatial-perception', () => ({ perceiveMapChange: vi.fn(async () => undefined) }));
+vi.mock('@/services/spatial-world', () => ({ loadWorldLevel: vi.fn(async () => { throw new Error('no map'); }), levelOfLocation: vi.fn(async () => null), thingStanding: vi.fn(async () => null) }));
 vi.mock('@/daya/world-ledger', () => ({
   currentFacts: async () => h.facts.filter((f) => !f.supersededById),
   establishFact: async (campaignId: string, subjectKey: string, fact: string, cycle: number) => {

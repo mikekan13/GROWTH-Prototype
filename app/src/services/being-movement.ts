@@ -24,6 +24,7 @@ import { findPath, pathSeconds, portalPassability, roomAt, roomByName, portalsOf
 import { loadWorldLevel, beingStanding, thingStanding, stampBeingPoint, roomIdOf, levelOfBeing } from '@/services/spatial-world';
 import { moveCharacterToLocation } from '@/services/character-location';
 import { writeDoorState } from '@/services/door-state';
+import { perceiveMapChange } from '@/services/spatial-perception';
 
 export type MoveTarget =
   | { kind: 'room'; roomId: string }
@@ -181,10 +182,12 @@ export async function moveBeing(
     // seconds a round in combat — and a walk fits inside the time that passed. `seconds` is what the walk
     // takes, for the table to read against the span, not a charge.
     try {
+      // Fog of war: who saw the walk, who only heard it, who nothing (services/spatial-perception).
+      const seen = await perceiveMapChange(campaignId, { kind: 'being', entityId: characterId, at: end, roomId: toRoom?.id ?? null, path: path.points }, { map });
       broadcastEvent(campaignId, {
         kind: 'token_moved', entityId: characterId, entityType: 'character',
         x: end.x, y: end.y, placedAt, roomId: toRoom?.id ?? null, roomName: toRoom?.name ?? null,
-        path: path.points, seconds, cause: opts.cause,
+        path: path.points, seconds, cause: opts.cause, ...seen,
       });
     } catch { /* the canvases will re-read */ }
   }

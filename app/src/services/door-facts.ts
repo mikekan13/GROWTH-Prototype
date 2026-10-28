@@ -13,6 +13,7 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import { currentFacts, establishFact, supersede } from '@/daya/world-ledger';
 import { broadcastEvent } from '@/lib/campaign-stream';
+import { perceiveMapChange } from '@/services/spatial-perception';
 import type { DoorState } from '@/lib/canvas-geometry';
 
 export function slug(s: string): string {
@@ -64,7 +65,10 @@ export async function doorWritten(
 ): Promise<void> {
   try { await syncDoorFact(campaignId, home, door); } catch (err) { console.warn('[door-facts] fact sync failed', err); }
   try {
-    if (door.id) broadcastEvent(campaignId, { kind: 'door_changed', locationId: home.id, openingId: door.id, state: door.state, name: door.name });
-    else broadcastEvent(campaignId, { kind: 'map_changed', locationIds: [home.id], characterIds: [] });
+    if (door.id) {
+      // Fog of war: who saw or heard the door — a viewer who perceived nothing keeps it as last known.
+      const seen = await perceiveMapChange(campaignId, { kind: 'door', portalId: door.id, homeId: home.id });
+      broadcastEvent(campaignId, { kind: 'door_changed', locationId: home.id, openingId: door.id, state: door.state, name: door.name, ...seen });
+    } else broadcastEvent(campaignId, { kind: 'map_changed', locationIds: [home.id], characterIds: [] });
   } catch { /* canvases re-read on their own */ }
 }

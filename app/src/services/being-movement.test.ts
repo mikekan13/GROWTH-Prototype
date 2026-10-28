@@ -5,6 +5,7 @@ vi.mock('@/lib/db', () => ({ prisma: {} }));
 vi.mock('@/lib/campaign-stream', () => ({ broadcastEvent: vi.fn() }));
 vi.mock('@/services/character-location', () => ({ moveCharacterToLocation: vi.fn() }));
 vi.mock('@/services/door-state', () => ({ writeDoorState: vi.fn() }));
+vi.mock('@/services/spatial-perception', () => ({ perceiveMapChange: vi.fn(async () => undefined) }));
 
 import { describeMove, type MoveReport } from './being-movement';
 import { polygonCentroid } from './spatial-world';

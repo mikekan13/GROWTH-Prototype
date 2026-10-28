@@ -76,6 +76,8 @@ function applyTokenMoved(model: LiveModel, ev: TokenMovedEvent): LiveApply {
     x: ev.x,
     y: ev.y,
     placedAt: ev.placedAt,
+    // Fog of war: a move this viewer only heard draws the token greyed at the room's centre; one they saw clears it.
+    unseen: ev.known === 'room',
     ...(node.type === 'item' ? { roomId: ev.roomId ?? undefined, ...(roomName !== undefined ? { locationName: roomName ?? undefined } : {}) } : {}),
   };
   const nodes = model.nodes.slice();
@@ -122,6 +124,7 @@ function applyItemChanged(model: LiveModel, ev: ItemChangedEvent): LiveApply {
     roomId: ev.holderId ? undefined : ev.locationId ?? undefined,
     ...(typeof ev.x === 'number' && typeof ev.y === 'number' ? { x: ev.x, y: ev.y } : {}),
     ...(typeof ev.placedAt === 'number' ? { placedAt: ev.placedAt } : {}),
+    unseen: ev.known === 'room',
   };
   const nodes = model.nodes.slice();
   nodes[idx] = nextNode;
@@ -151,7 +154,7 @@ export function applyLiveEvent(model: LiveModel, event: StreamEventData): LiveAp
 /** A fetched model is the same picture when every node's id, place and placement stamp match, and folders match. */
 export function sameModel(a: LiveModel, b: LiveModel): boolean {
   if (a.nodes.length !== b.nodes.length || a.autoFolders.length !== b.autoFolders.length || a.locatedAtEdges.length !== b.locatedAtEdges.length) return false;
-  const key = (n: CanvasNode) => `${n.id}|${n.type}|${n.x}|${n.y}|${n.placedAt ?? ''}|${n.status ?? ''}|${n.holderId ?? ''}|${n.roomId ?? ''}|${n.name}|${n.portrait ?? ''}|${n.awaitingImage ? 1 : 0}`;
+  const key = (n: CanvasNode) => `${n.id}|${n.type}|${n.x}|${n.y}|${n.placedAt ?? ''}|${n.status ?? ''}|${n.holderId ?? ''}|${n.roomId ?? ''}|${n.name}|${n.portrait ?? ''}|${n.awaitingImage ? 1 : 0}|${n.unseen ? 1 : 0}`;
   for (let i = 0; i < a.nodes.length; i++) if (key(a.nodes[i]) !== key(b.nodes[i])) return false;
   const fkey = (f: CanvasFolder) => `${f.id}|${f.name}|${f.nodeIds.join(',')}|${f.posX ?? ''}|${f.posY ?? ''}|${f.placedAt ?? ''}|${JSON.stringify(f.locationInfo ?? null)}`;
   for (let i = 0; i < a.autoFolders.length; i++) if (fkey(a.autoFolders[i]) !== fkey(b.autoFolders[i])) return false;

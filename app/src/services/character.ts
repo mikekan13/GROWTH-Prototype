@@ -7,6 +7,7 @@ import { createChangeLogEntry } from '@/services/changelog';
 import { applyCreationGrants, loadMechanicsForgeItems, type AssignMechanicsInput } from '@/services/character-grants';
 import { emit as emitGodHeadEvent } from '@/services/godhead-dispatcher';
 import { broadcastEvent } from '@/lib/campaign-stream';
+import { perceiveMapChange } from '@/services/spatial-perception';
 import type { GrowthCharacter } from '@/types/growth';
 
 // --- Schemas ---
@@ -377,6 +378,8 @@ export async function setCanvasPosition(
   if (character.campaignId) {
     const room = await prisma.entityRelationship.findFirst({ where: { sourceId: characterId, relationshipType: 'located_at', targetType: 'LOCATION' }, select: { targetId: true } });
     const roomRow = room ? await prisma.location.findUnique({ where: { id: room.targetId }, select: { name: true } }) : null;
+    // Fog of war: a Trailblazer's map shows the drag only as far as their character perceives it.
+    const seen = await perceiveMapChange(character.campaignId, { kind: 'being', entityId: characterId, at: { x: input.x, y: input.y }, roomId: room?.targetId ?? null });
     broadcastEvent(character.campaignId, {
       kind: 'token_moved',
       entityId: characterId,
@@ -387,6 +390,7 @@ export async function setCanvasPosition(
       roomId: room?.targetId ?? null,
       roomName: roomRow?.name ?? null,
       cause: 'gm',
+      ...seen,
     });
   }
 

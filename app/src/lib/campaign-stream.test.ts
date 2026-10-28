@@ -54,3 +54,48 @@ describe('deliveryFor (perceived-feed connections)', () => {
     expect(deliveryFor({ userId: 'p1', perceived: { characterId: null } }, hb)).toBe(hb);
   });
 });
+
+describe('fog of war on the map (Mike 2026-10-28): token_moved / door_changed / item_changed per viewer', () => {
+  const move = (perceivedBy?: Record<string, 'point' | 'room' | 'none'>) => envelope({
+    kind: 'token_moved', entityId: 'violet', entityType: 'character', x: 150, y: 950, placedAt: 5, roomId: 'main', roomName: 'Main Room',
+    path: [{ x: 150, y: 650 }, { x: 150, y: 950 }], seconds: 4, cause: 'sim', ...(perceivedBy ? { perceivedBy, roomPoint: { x: 200, y: 800 } } : {}),
+  });
+  const kris = { userId: 'p1', perceived: { characterId: 'kris' } };
+
+  it('ungraded (no map) = everyone gets it; the truth record gets it whole', () => {
+    const e = move({ kris: 'none' });
+    expect(deliveryFor({ userId: 'gm' }, e)).toBe(e);
+    expect(deliveryFor(kris, move())?.data).toMatchObject({ kind: 'token_moved', x: 150, y: 950 });
+  });
+
+  it('seen = whole minus the grades; heard = the room centre, no path, known: room; nothing = not sent', () => {
+    const seen = deliveryFor(kris, move({ kris: 'point' }))!.data as Record<string, unknown>;
+    expect(seen).toMatchObject({ x: 150, y: 950, path: [{ x: 150, y: 650 }, { x: 150, y: 950 }] });
+    expect(seen.perceivedBy).toBeUndefined(); expect(seen.roomPoint).toBeUndefined();
+    const heard = deliveryFor(kris, move({ kris: 'room' }))!.data as Record<string, unknown>;
+    expect(heard).toMatchObject({ x: 200, y: 800, roomId: 'main', known: 'room' });
+    expect(heard.path).toBeUndefined(); expect(heard.seconds).toBeUndefined();
+    expect(deliveryFor(kris, move({ kris: 'none' }))).toBeNull();
+    expect(deliveryFor(kris, move({ violet: 'point' }))).toBeNull();
+  });
+
+  it('a viewer\'s own token always arrives whole', () => {
+    const own = deliveryFor({ userId: 'p2', perceived: { characterId: 'violet' } }, move({ violet: 'none' }))!.data;
+    expect(own).toMatchObject({ x: 150, y: 950 });
+  });
+
+  it('a door seen or heard arrives with its state; unperceived it is not sent', () => {
+    const door = (g: 'point' | 'room' | 'none') => envelope({ kind: 'door_changed', locationId: 'apt', openingId: 'op-1', state: 'open', name: 'Entry door', perceivedBy: { kris: g } });
+    expect(deliveryFor(kris, door('room'))!.data).toEqual({ kind: 'door_changed', locationId: 'apt', openingId: 'op-1', state: 'open', name: 'Entry door' });
+    expect(deliveryFor(kris, door('point'))!.data).toMatchObject({ state: 'open' });
+    expect(deliveryFor(kris, door('none'))).toBeNull();
+  });
+
+  it('a thing heard changing hands arrives without its point; the holder always sees it', () => {
+    const item = (perceivedBy: Record<string, 'point' | 'room' | 'none'>) => envelope({ kind: 'item_changed', itemId: 'bill', holderId: 'violet', locationId: null, x: 1, y: 2, perceivedBy });
+    const heard = deliveryFor(kris, item({ kris: 'room' }))!.data as Record<string, unknown>;
+    expect(heard).toMatchObject({ holderId: 'violet', known: 'room' }); expect(heard.x).toBeUndefined();
+    expect(deliveryFor(kris, item({ kris: 'none' }))).toBeNull();
+    expect(deliveryFor({ userId: 'p2', perceived: { characterId: 'violet' } }, item({ violet: 'none' }))!.data).toMatchObject({ x: 1, y: 2 });
+  });
+});

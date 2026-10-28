@@ -174,7 +174,10 @@ export async function placeBeingInRoom(campaignId: string, characterId: string, 
   const at = roomAt(map, from)?.id === room.id ? from : spotInRoom(map, room, from);
   const placedAt = await stampBeingPoint(characterId, at);
   try {
-    broadcastEvent(campaignId, { kind: 'token_moved', entityId: characterId, entityType: 'character', x: at.x, y: at.y, placedAt, roomId: room.id, roomName: room.name, cause });
+    // Fog of war (loaded late: spatial-perception reads this module).
+    const { perceiveMapChange } = await import('@/services/spatial-perception');
+    const seen = await perceiveMapChange(campaignId, { kind: 'being', entityId: characterId, at, roomId: room.id }, { map });
+    broadcastEvent(campaignId, { kind: 'token_moved', entityId: characterId, entityType: 'character', x: at.x, y: at.y, placedAt, roomId: room.id, roomName: room.name, cause, ...seen });
   } catch { /* canvases re-read on their own */ }
   return true;
 }

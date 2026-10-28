@@ -37,6 +37,8 @@ export interface CanvasNode {
   tokenEdgeId?: string;
   roomId?: string;
   containsCount?: number;
+  /** Fog of war (2026-10-28): this viewer's character has not seen the token here — it stands at its last known room, greyed. */
+  unseen?: boolean;
 }
 
 /** A tether between two canvas entities. */

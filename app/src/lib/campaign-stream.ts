@@ -74,9 +74,42 @@ export function deliveryFor(conn: Pick<SSEConnection, 'userId' | 'perceived'>, e
     case 'needs_input':
       // A question carries story; a perceived-feed viewer gets only the ones addressed to them.
       return event.targetUserId === conn.userId ? event : null;
+    // Fog of war on the map (Mike 2026-10-28): a Trailblazer's map is their character's perception. A move
+    // they saw arrives whole; one they only heard arrives as the room (token greyed at its centre); one they
+    // perceived nothing of is not sent — their map keeps the last known. Their own token always arrives whole.
+    case 'token_moved': {
+      const { perceivedBy, roomPoint, ...rest } = data;
+      if (!perceivedBy) return withData(rest);
+      const grade = mine(data.entityId) ? 'point' : gradeFor(perceivedBy, conn.perceived.characterId);
+      if (grade === 'none') return null;
+      if (grade === 'point') return withData(rest);
+      const { path: _path, seconds: _s, ...heard } = rest;
+      void _path; void _s;
+      return withData({ ...heard, ...(roomPoint ? { x: roomPoint.x, y: roomPoint.y } : {}), known: 'room' });
+    }
+    case 'door_changed': {
+      const { perceivedBy, ...rest } = data;
+      if (!perceivedBy) return withData(rest);
+      // Heard or seen, a door's new state is known either way.
+      return gradeFor(perceivedBy, conn.perceived.characterId) === 'none' ? null : withData(rest);
+    }
+    case 'item_changed': {
+      const { perceivedBy, ...rest } = data;
+      if (!perceivedBy) return withData(rest);
+      const grade = mine(data.holderId) ? 'point' : gradeFor(perceivedBy, conn.perceived.characterId);
+      if (grade === 'none') return null;
+      if (grade === 'point') return withData(rest);
+      const { x: _x, y: _y, ...heard } = rest;
+      void _x; void _y;
+      return withData({ ...heard, known: 'room' });
+    }
     default:
       return event;
   }
+}
+
+function gradeFor(perceivedBy: Record<string, 'point' | 'room' | 'none'>, characterId: string | null): 'point' | 'room' | 'none' {
+  return (characterId && perceivedBy[characterId]) || 'none';
 }
 
 // ── Global Singleton (survives HMR) ───────────────────────────────────────

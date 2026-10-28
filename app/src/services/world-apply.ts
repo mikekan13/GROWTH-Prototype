@@ -32,6 +32,8 @@ import { broadcastEvent } from '@/lib/campaign-stream';
 import { syncDoorFact } from '@/services/door-facts';
 import { writeDoorState } from '@/services/door-state';
 import { resolveMoveRef, moveBeing, describeMove } from '@/services/being-movement';
+import { loadWorldLevel, levelOfLocation, thingStanding } from '@/services/spatial-world';
+import { perceiveMapChange } from '@/services/spatial-perception';
 
 export type ActEffect =
   | { op: 'door'; door: string; state: DoorState }
@@ -247,7 +249,14 @@ async function itemChanged(campaignId: string, itemId: string): Promise<void> {
     const it = await prisma.campaignItem.findUnique({ where: { id: itemId }, select: { id: true, name: true, holderId: true, locationId: true } });
     if (!it) return;
     const holder = it.holderId ? await prisma.character.findUnique({ where: { id: it.holderId }, select: { name: true } }) : null;
-    broadcastEvent(campaignId, { kind: 'item_changed', itemId: it.id, itemName: it.name, holderId: it.holderId, holderName: holder?.name ?? null, locationId: it.locationId });
+    // Fog of war: graded where the thing now lies (on its holder, or its spot in the room).
+    let seen: Awaited<ReturnType<typeof perceiveMapChange>>;
+    try {
+      const { map } = await loadWorldLevel(campaignId, await levelOfLocation(it.locationId));
+      const standing = await thingStanding(map, it.id);
+      if (standing) seen = await perceiveMapChange(campaignId, { kind: 'thing', entityId: it.id, at: standing.point, roomId: standing.room?.id ?? it.locationId }, { map });
+    } catch { /* ungraded: everyone sees */ }
+    broadcastEvent(campaignId, { kind: 'item_changed', itemId: it.id, itemName: it.name, holderId: it.holderId, holderName: holder?.name ?? null, locationId: it.locationId, ...seen });
   } catch { /* canvases re-read on their own */ }
 }
 

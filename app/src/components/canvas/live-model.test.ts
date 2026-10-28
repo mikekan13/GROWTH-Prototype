@@ -137,3 +137,17 @@ describe('tween helpers', () => {
     expect(tweenDurationMs([{ x: 0, y: 0 }, { x: 5000, y: 0 }])).toBe(2500);
   });
 });
+
+describe('fog of war: a heard move greys the token at its last known room; a seen one clears it', () => {
+  it('known: room sets unseen; a later seen move clears it; sameModel tells them apart', () => {
+    const m = fixture();
+    const heard = applyLiveEvent(m, { kind: 'token_moved', entityId: 'violet', entityType: 'character', x: 200, y: 800, placedAt: 20, roomId: 'bath', roomName: 'bath', cause: 'sim', known: 'room' });
+    const v1 = heard.model.nodes.find(n => n.id === 'violet')!;
+    expect(v1.unseen).toBe(true); expect(v1.x).toBe(200);
+    expect(roomOfNode(heard.model, 'violet')?.id).toBe('auto-bath');
+    const seen = applyLiveEvent(heard.model, { kind: 'token_moved', entityId: 'violet', entityType: 'character', x: 50, y: 975, placedAt: 30, roomId: 'bath', roomName: 'bath', cause: 'sim' });
+    expect(seen.model.nodes.find(n => n.id === 'violet')!.unseen).toBe(false);
+    const same = { ...seen.model, nodes: seen.model.nodes.map(n => n.id === 'violet' ? { ...n, unseen: true } : n) };
+    expect(sameModel(seen.model, same)).toBe(false);
+  });
+});
