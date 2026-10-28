@@ -783,6 +783,8 @@ Mike: sight is one sense; a being lingers at its last known spot and sound updat
 - Tests: `services/last-known.test.ts` (fogging), `spatial-perception.test.ts` (+ visible door state), `campaign-stream.test.ts` (+ door state per viewer).
 - `lib/fog-delivery.ts` — `fogMapEventFor(data, characterId)` / `isMapEvent` (pure): one viewer's copy of a `token_moved` / `door_changed` / `item_changed`; used by `lib/campaign-stream.deliveryFor` and by `components/CampaignCanvas` when the Watcher views the map as a character.
 - The map follows the terminal's viewpoint: `ViewAsPicker` → `CampaignTerminal.setViewAs` dispatches `growth:view-as`; `CampaignCanvas` keeps `viewAsRef` (read from the picker's localStorage key on mount), re-fetches `canvas-model?viewAs=` on change and after a props re-sync, and fogs live map events client-side. `assembleCanvasModelFor(campaign, user, viewAs?)` resolves the viewer with `viewAsViewer` when asked.
+- `lib/spatial/pathfinding.findPath(map, from, to, { avoid?: Point[] })` — soft obstacles: +12 on the cell under another being, +4 on the ring around it; the smoother keeps 20 units (1 ft) of clearance from avoided points except at the run's own end. `services/being-movement.othersStanding` feeds the other beings' stored points.
+- `tmp/reset-to-the-knock.ts` — now also wipes `LastKnown` for the campaign and runs `lookAround` for every standing being (needs `--tsconfig ../tmp/tsconfig.recall.json`).
 - Not yet: hearing by distance; facing/darkness; a perceived viewer with no character sees no tokens.
 
 ## Hello world 8, run 7 fixes — the door that diverged; recall not roll; the unclosed quote; no narration row for a standing beat; narrated thoughts; the map writes the door (2026-10-27)

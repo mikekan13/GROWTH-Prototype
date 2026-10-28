@@ -110,3 +110,29 @@ describe('pathSeconds', () => {
     expect(pathSeconds(17.5, 'walk')).toBe(5);
   });
 });
+
+describe('tokens step around each other (2026-10-28)', () => {
+  it('a being standing on the straight line is skirted; without `avoid` the line is straight; a doorway with someone in it still passes', async () => {
+    const { fixture, P } = await import('./test-fixture');
+    const { findPath } = await import('./pathfinding');
+    const map = fixture({ entry: 'open' });
+    const from = P(60, 700), to = P(340, 1000);
+    const straight = findPath(map, from, to)!;
+    expect(straight.points.length).toBe(2);
+    const blocker = P(200, 850); // on the straight line
+    const around = findPath(map, from, to, { avoid: [blocker] })!;
+    const minDist = Math.min(...around.points.flatMap((p, i) => (i + 1 < around.points.length ? [segDist(blocker, p, around.points[i + 1])] : [])));
+    expect(minDist).toBeGreaterThanOrEqual(19); // about a foot from the person (shoulder to shoulder), never through them
+    expect(around.feet).toBeLessThan(straight.feet + 4); // a small detour, not a tour
+    // Someone standing in the entry doorway: the walker still gets through (soft, never a wall).
+    const inDoor = findPath(map, P(-100, 650), P(150, 650), { avoid: [P(5, 650)] })!;
+    expect(inDoor.blockedBy).toBeUndefined();
+    expect(inDoor.points[inDoor.points.length - 1]).toEqual(P(150, 650));
+  });
+});
+
+function segDist(p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
+  const dx = b.x - a.x, dy = b.y - a.y; const L2 = dx * dx + dy * dy;
+  const t = L2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}

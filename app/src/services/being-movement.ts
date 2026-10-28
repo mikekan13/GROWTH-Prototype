@@ -26,6 +26,16 @@ import { moveCharacterToLocation } from '@/services/character-location';
 import { writeDoorState } from '@/services/door-state';
 import { perceiveMapChange } from '@/services/spatial-perception';
 
+/** Where every other being of the campaign stands on this level (for the walker to step around). Never throws. */
+async function othersStanding(campaignId: string, exceptId: string, map: LevelMap): Promise<Point[]> {
+  try {
+    const rows = await prisma.character.findMany({ where: { campaignId, status: { notIn: ['DEAD', 'RETIRED'] }, id: { not: exceptId } }, select: { id: true } });
+    const out: Point[] = [];
+    for (const r of rows) { const s = await beingStanding(map, r.id); if (s?.stored) out.push(s.point); }
+    return out;
+  } catch { return []; }
+}
+
 export type MoveTarget =
   | { kind: 'room'; roomId: string }
   | { kind: 'portal'; portalId: string; homeId: string }
@@ -154,7 +164,8 @@ export async function moveBeing(
   const fromRoom = standing.room;
   const base = { label: dest.label, from, fromRoom: fromRoom?.name ?? null };
 
-  const path = findPath(map, from, dest.point);
+  // Other beings on the level are stepped around when there is room (soft, never a wall).
+  const path = findPath(map, from, dest.point, { avoid: await othersStanding(campaignId, characterId, map) });
   if (!path) return { ...empty(dest.label, `no way from ${fromRoom?.name ?? 'here'} to ${dest.label}`), ...base };
 
   // Doors the walker passes: a closed one is opened on the way (the one writer tells the facts and the canvases).
