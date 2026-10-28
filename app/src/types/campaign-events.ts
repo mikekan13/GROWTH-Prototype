@@ -171,6 +171,8 @@ export interface DoorChangedEvent {
   name?: string;
   /** Fog of war: who saw or heard the door change (see TokenMovedEvent.perceivedBy). A viewer who perceived nothing keeps the door as last known. */
   perceivedBy?: PerceivedBy;
+  /** The state each perceiving viewer can see — a locked door reads closed from outside its home. Stripped before delivery. */
+  visibleState?: Record<string, 'open' | 'closed' | 'locked'>;
 }
 
 /** A thing changed hands or rooms (taken, given, put down) — the token follows its holder or lands where it was put. */

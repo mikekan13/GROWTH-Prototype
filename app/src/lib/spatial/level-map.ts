@@ -132,13 +132,14 @@ export function buildLevelMap(input: LevelMapInput): LevelMap {
     onLevel.some(q => q !== p && q.fp.points.every(pt => insideOrOn(pt, p.fp.points)));
 
   const rooms: RoomPoly[] = [];
+  const homes: RoomPoly[] = [];
   let walls: WallSeg[] = [];
   const allPoints: Point[] = [];
   for (const p of onLevel) {
     const pts = p.fp.points;
     allPoints.push(...pts);
     for (let i = 0; i < pts.length; i++) walls.push({ a: pts[i], b: pts[(i + 1) % pts.length], ownerId: p.l.id, kind: 'wall' });
-    if (!isShell(p)) rooms.push({ id: p.l.id, name: p.l.name, points: pts, level, area: polygonArea(pts) });
+    (isShell(p) ? homes : rooms).push({ id: p.l.id, name: p.l.name, points: pts, level, area: polygonArea(pts) });
   }
   rooms.sort((a, b) => a.area - b.area);
 
@@ -168,7 +169,7 @@ export function buildLevelMap(input: LevelMapInput): LevelMap {
   const bounds: Rect = allPoints.length === 0
     ? { x: 0, y: 0, width: CELL_UNITS * 2, height: CELL_UNITS * 2 }
     : { x: b.x - CELL_UNITS, y: b.y - CELL_UNITS, width: b.width + 2 * CELL_UNITS, height: b.height + 2 * CELL_UNITS };
-  return { level, rooms, walls, portals, obstacles, bounds };
+  return { level, rooms, walls, portals, obstacles, bounds, homes };
 }
 
 // ── Queries ─────────────────────────────────────────────────────────────────

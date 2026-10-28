@@ -16,7 +16,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { parseFootprint, parseTokenPosition, footprintBounds, fractionToWorld, type Point } from '@/lib/canvas-geometry';
-import { buildLevelMap, roomAt, nearestWalkable, spotInRoom, type LevelMap, type RoomPoly } from '@/lib/spatial';
+import { buildLevelMap, roomAt, nearestWalkable, spotInRoom, insideOrOn, type LevelMap, type RoomPoly } from '@/lib/spatial';
 import { broadcastEvent } from '@/lib/campaign-stream';
 
 const REL = 'located_at';
@@ -107,6 +107,22 @@ export function roomCentre(map: LevelMap, room: RoomPoly): Point {
   return nearestWalkable(map, c, 12) ?? c;
 }
 
+/**
+ * The room a filed-at id stands for: the room itself, or — filed at a home shell (the apartment, not one of
+ * its rooms; the 2026-10-28 finding: twelve things filed at the apartment stood "nowhere") — the room its
+ * centre lies in, else its biggest room. Null when the id is no drawn place on this level.
+ */
+export function roomForFiled(map: LevelMap, filedId: string | null | undefined): RoomPoly | null {
+  if (!filedId) return null;
+  const room = map.rooms.find((r) => r.id === filedId);
+  if (room) return room;
+  const home = map.homes?.find((h) => h.id === filedId);
+  if (!home) return null;
+  const inside = map.rooms.filter((r) => insideOrOn(polygonCentroid(r.points), home.points));
+  if (!inside.length) return null;
+  return roomAt({ ...map, rooms: inside }, polygonCentroid(home.points)) ?? inside.reduce((a, b) => (b.area > a.area ? b : a));
+}
+
 export interface Standing {
   point: Point;
   room: RoomPoly | null;
@@ -125,7 +141,7 @@ export async function beingStanding(map: LevelMap, characterId: string): Promise
   const d = parseData(c.data);
   const stored = typeof d.canvasX === 'number' && typeof d.canvasY === 'number' ? { x: d.canvasX, y: d.canvasY } : null;
   const filedId = await roomIdOf(characterId);
-  const filed = filedId ? map.rooms.find((r) => r.id === filedId) ?? null : null;
+  const filed = roomForFiled(map, filedId);
   if (stored) {
     const at = roomAt(map, stored);
     if (at && (!filed || at.id === filed.id || containsRoom(map, filed, at))) return { point: stored, room: at, stored: true };
@@ -150,7 +166,7 @@ export async function thingStanding(map: LevelMap, itemId: string): Promise<Stan
   // Inside a container: where the container is.
   if (e && e.targetType !== 'LOCATION') return thingStanding(map, e.targetId);
   const roomId = e?.targetId ?? it.locationId;
-  const room = roomId ? map.rooms.find((r) => r.id === roomId) ?? null : null;
+  const room = roomForFiled(map, roomId);
   if (!room) return null;
   const pos = e ? parseTokenPosition(parseData(e.data).position) : null;
   if (pos) return { point: fractionToWorld(pos, footprintBounds(room.points)), room, stored: true };

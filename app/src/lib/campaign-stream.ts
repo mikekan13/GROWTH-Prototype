@@ -88,10 +88,12 @@ export function deliveryFor(conn: Pick<SSEConnection, 'userId' | 'perceived'>, e
       return withData({ ...heard, ...(roomPoint ? { x: roomPoint.x, y: roomPoint.y } : {}), known: 'room' });
     }
     case 'door_changed': {
-      const { perceivedBy, ...rest } = data;
+      const { perceivedBy, visibleState, ...rest } = data;
       if (!perceivedBy) return withData(rest);
-      // Heard or seen, a door's new state is known either way.
-      return gradeFor(perceivedBy, conn.perceived.characterId) === 'none' ? null : withData(rest);
+      // Heard or seen, a door's new state is known either way — as this viewer can see it (locked reads closed from outside).
+      if (gradeFor(perceivedBy, conn.perceived.characterId) === 'none') return null;
+      const seenAs = conn.perceived.characterId ? visibleState?.[conn.perceived.characterId] : undefined;
+      return withData(seenAs ? { ...rest, state: seenAs } : rest);
     }
     case 'item_changed': {
       const { perceivedBy, ...rest } = data;

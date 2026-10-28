@@ -20,7 +20,7 @@ export interface WallSeg { a: Point; b: Point; ownerId: string; kind: 'wall' | '
 /** A thing that takes up floor: its polygon in world units. */
 export interface Obstacle { id: string; name: string; points: Point[] }
 /** Everything the spatial helpers need for one storey. Treated as immutable — rebuild after a door changes. */
-export interface LevelMap { level: number; rooms: RoomPoly[]; walls: WallSeg[]; portals: Portal[]; obstacles: Obstacle[]; bounds: Rect }
+export interface LevelMap { level: number; rooms: RoomPoly[]; walls: WallSeg[]; portals: Portal[]; obstacles: Obstacle[]; bounds: Rect; /** Home shells on this level (a footprint wholly containing others): walls, not rooms. */ homes?: RoomPoly[] }
 /** What a portal lets through: movement, whether moving through it opens it, and sight. */
 export interface Passability { move: boolean; opens: boolean; sight: boolean }
 /** A found path: the smoothed polyline, its length in feet, the portals crossed in order, and the locked door it stopped at (if any). */

@@ -99,3 +99,12 @@ describe('fog of war on the map (Mike 2026-10-28): token_moved / door_changed / 
     expect(deliveryFor({ userId: 'p2', perceived: { characterId: 'violet' } }, item({ violet: 'none' }))!.data).toMatchObject({ x: 1, y: 2 });
   });
 });
+
+describe('fog of war: a door arrives in the state the viewer can see', () => {
+  it('locked reads closed for the viewer outside; the truth record keeps locked; nothing extra leaks', () => {
+    const e = envelope({ kind: 'door_changed', locationId: 'apt', openingId: 'op-1', state: 'locked', name: 'Entry door', perceivedBy: { kris: 'point', violet: 'point' }, visibleState: { kris: 'closed', violet: 'locked' } });
+    expect(deliveryFor({ userId: 'p1', perceived: { characterId: 'kris' } }, e)!.data).toEqual({ kind: 'door_changed', locationId: 'apt', openingId: 'op-1', state: 'closed', name: 'Entry door' });
+    expect(deliveryFor({ userId: 'p2', perceived: { characterId: 'violet' } }, e)!.data).toMatchObject({ state: 'locked' });
+    expect(deliveryFor({ userId: 'gm' }, e)).toBe(e);
+  });
+});

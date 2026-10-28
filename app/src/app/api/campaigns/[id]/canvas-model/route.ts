@@ -4,7 +4,7 @@ import { errorResponse } from '@/lib/api';
 import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { REMOVED_STATUS } from '@/services/maturity';
 import { canEnterAdultCampaign } from '@/lib/permissions';
-import { loadCanvasCampaign, assembleCanvasModel } from '@/services/canvas-model';
+import { loadCanvasCampaign, assembleCanvasModelFor } from '@/services/canvas-model';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,8 @@ export async function GET(
     const isMember = campaign.members.some(m => m.userId === session.user.id && !['INTERESTED', 'REJECTED', REMOVED_STATUS].includes(m.status));
     if (!canEnterAdultCampaign(session.user, campaign)) throw new ForbiddenError('This table is 18+');
     if (!isAdmin && !isGM && !isMember) throw new ForbiddenError('Not a member of this campaign');
-    const model = await assembleCanvasModel(campaign);
+    // Fog of war: a Trailblazer gets the map as their character last knew it.
+    const model = await assembleCanvasModelFor(campaign, session.user);
     return NextResponse.json(model, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return errorResponse(error);

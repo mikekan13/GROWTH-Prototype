@@ -1626,3 +1626,22 @@ model Currency {
   @@unique([campaignId, code])
   @@index([campaignId, status])
 }
+
+// Fog of war (Mike 2026-10-28): where a viewing character LAST KNEW a being, a thing or a door to be —
+// written when they see (point) or hear (room) it move; read to draw their map on load.
+model LastKnown {
+  id         String   @id @default(cuid())
+  campaignId String
+  viewerId   String   // the perceiving character
+  subjectId  String   // a Character / CampaignItem id, or an opening id (kind door)
+  kind       String   // being | thing | door
+  known      String   // point | room
+  x          Float?
+  y          Float?
+  roomId     String?
+  state      String?  // door: open | closed | locked
+  seenAt     DateTime @default(now())
+
+  @@unique([viewerId, subjectId])
+  @@index([campaignId, viewerId])
+}

@@ -254,7 +254,7 @@ async function itemChanged(campaignId: string, itemId: string): Promise<void> {
     try {
       const { map } = await loadWorldLevel(campaignId, await levelOfLocation(it.locationId));
       const standing = await thingStanding(map, it.id);
-      if (standing) seen = await perceiveMapChange(campaignId, { kind: 'thing', entityId: it.id, at: standing.point, roomId: standing.room?.id ?? it.locationId }, { map });
+      if (standing) seen = await perceiveMapChange(campaignId, { kind: 'thing', entityId: it.id, at: standing.point, roomId: standing.room?.id ?? it.locationId, stored: standing.stored }, { map });
     } catch { /* ungraded: everyone sees */ }
     broadcastEvent(campaignId, { kind: 'item_changed', itemId: it.id, itemName: it.name, holderId: it.holderId, holderName: holder?.name ?? null, locationId: it.locationId, ...seen });
   } catch { /* canvases re-read on their own */ }

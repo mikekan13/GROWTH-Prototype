@@ -53,3 +53,16 @@ describe('what a viewer perceives of a door', () => {
     expect(gradeDoor(map, standing(map, P(50, 975)), door)).toBe('none');
   });
 });
+
+describe('the state of a door as a viewer can see it', () => {
+  it('locked reads closed from the landing; locked from inside the apartment; open is open everywhere', async () => {
+    const { visibleDoorState } = await import('./spatial-perception');
+    const map = fixture({ entry: 'locked' });
+    const door = map.portals.find((p) => p.id === 'op-1')!;
+    expect(map.homes?.map((h) => h.id)).toEqual(['home']);
+    expect(visibleDoorState(map, standing(map, P(-100, 650)), door)).toBe('closed');
+    expect(visibleDoorState(map, standing(map, P(150, 650)), door)).toBe('locked');
+    const open = fixture({ entry: 'open' });
+    expect(visibleDoorState(open, standing(open, P(-100, 650)), open.portals.find((p) => p.id === 'op-1')!)).toBe('open');
+  });
+});

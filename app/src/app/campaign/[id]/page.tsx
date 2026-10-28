@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import CampaignCanvas from '@/components/CampaignCanvas';
 import { canEnterAdultCampaign } from '@/lib/permissions';
 import { REMOVED_STATUS } from '@/services/maturity';
-import { loadCanvasCampaign, assembleCanvasModel } from '@/services/canvas-model';
+import { loadCanvasCampaign, assembleCanvasModelFor } from '@/services/canvas-model';
 import AdultOnlyNotice from '@/components/maturity/AdultOnlyNotice';
 
 export default async function CampaignCanvasPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,7 +35,8 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     .filter(m => !['INTERESTED', 'REJECTED'].includes(m.status) && m.userId !== campaign.gmUserId)
     .map(m => ({ userId: m.user.id, username: m.user.username }));
 
-  const { nodes, connections, autoFolders, locatedAtEdges, entityNames } = await assembleCanvasModel(campaign);
+  // Fog of war (2026-10-28): a Trailblazer's first picture is the map as their character last knew it.
+  const { nodes, connections, autoFolders, locatedAtEdges, entityNames } = await assembleCanvasModelFor(campaign, session.user);
 
   const campaignData = {
     id: campaign.id,

@@ -776,7 +776,12 @@ Mike: sight is one sense; a being lingers at its last known spot and sound updat
 - Broadcast sites grading before they send: `being-movement.moveBeing`, `spatial-world.placeBeingInRoom` (late import — the grader reads this module), `character.setCanvasPosition`, `placement-geometry.setTokenPosition`, `world-apply.itemChanged`, `door-facts.doorWritten`.
 - Client: `components/canvas/live-model.ts` sets `CanvasNode.unseen` on `known: 'room'`; `RelationsCanvas` draws unseen cards/tokens greyed (0.4, greyscale). `types/canvas.ts` carries `unseen`.
 - Tests: `services/spatial-perception.test.ts`, `lib/campaign-stream.test.ts` (fog block), `components/canvas/live-model.test.ts` (fog block).
-- Not yet: the initial canvas model is ungraded (a reload reveals); hearing by distance; facing/darkness; persisted last-known per character.
+- `services/last-known.ts` — `recordPerceived(campaignId, subject, perceivedBy) → Set<viewerId changed>` (upsert per viewer with grade point/room; unchanged rows skipped), `lastKnownFor(campaignId, viewerId)`, `fogCanvasModel(model, viewerId, rows)` (pure: own token + own hands = truth; other tokens at last known, `unseen` when heard, absent when never perceived; held things follow a perceived holder; doors never perceived read closed; child places and non-token ids untouched). Model `LastKnown` (unique viewerId+subjectId).
+- `services/spatial-perception.ts` also: `lookAround(campaignId, viewerId, map, at)` (sight only; records + sends graded events to the viewer; `map_changed` for the viewer when something seen has no point of its own), `visibleDoorState(map, viewer, portal)` (locked reads closed outside the home). `perceiveMapChange` records last known for every grading viewer and looks around for a being that moved; door grades carry `visibleState` per viewer.
+- `services/canvas-model.assembleCanvasModelFor(campaign, user)` — truth for truth-record readers (`feedViewerFor`), else the fogged model; used by `app/campaign/[id]/page.tsx` and `GET /api/campaigns/[id]/canvas-model`.
+- `services/spatial-world.roomForFiled(map, filedId)` — a filing at a home shell resolves to the room at the home's centre (`LevelMap.homes`); used by `beingStanding` / `thingStanding`.
+- Tests: `services/last-known.test.ts` (fogging), `spatial-perception.test.ts` (+ visible door state), `campaign-stream.test.ts` (+ door state per viewer).
+- Not yet: hearing by distance; facing/darkness; a perceived viewer with no character sees no tokens.
 
 ## Hello world 8, run 7 fixes — the door that diverged; recall not roll; the unclosed quote; no narration row for a standing beat; narrated thoughts; the map writes the door (2026-10-27)
 

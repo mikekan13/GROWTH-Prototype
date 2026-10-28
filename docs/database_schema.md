@@ -637,3 +637,21 @@ Indexes: (campaignId, createdAt), (status, createdAt).
 - **Currency** — a campaign object, never forged: a stored-KRMA vehicle ("campaign might have 100 currencies… something the AI should manage for the GM"). `campaignId`, `name`, `code` (unique per campaign, uppercased), `symbol`, `krmaPerUnit` (Float: KRMA in ONE unit — a dollar has no fixed value, 1985 ≠ 2060; anchored on the KRMA value of objects in that time and place), `scope` (where/when tender), `note` (the anchor objects), `status` ACTIVE | RETIRED, `createdBy` (userId or 'jewl'). Written by `services/currency.ts` (establishCurrency = upsert by code, retireCurrency); JEWL tool `establish_currency`; `GET/POST /api/campaigns/[id]/currencies`.
 - **Character.data.wealth** (`GrowthWealth`, types/growth.ts) — the LEDGER, never a level (the 10-level Wealth stat is dead): `holdings[] {currencyId, code, amount, where?}` and `income[] {currencyId, code, amountPerYear, source}`. Written by `services/wealth.ts` (grantCash adds/takes per currency+where, floors at 0; setIncome replaces per currency+source); JEWL tools `grant_cash`, `set_income`; `GET /api/characters/[id]/wealth` returns the ledger + the life budget.
 - **ForgeItem root/branch data.accumulatedWealth** (Int 0..1000, default 0; `forge-schemas.ts` blockGrantFields) — a line INSIDE the block's TKV (`forge-pricing.ts priceRootBranch` adds it 1:1): the KRMA those years left her materially beyond the named `possessions` grants. Σ over a character's live roots + branches = her LIFE BUDGET (`services/life-budget.ts lifeBudget`: budget − KV of held/deeded CampaignItems that did not come from a named block grant − cash at each currency's rate). Stock blueprints are free; the instances are the GM's KRMA crystallized as objects. Ruling memory: `ruling-material-life-root-kv-crystallized-dollar-exchange-2026-10-16`.
+
+## LastKnown — fog of war on the map (Mike 2026-10-28; migration `20261028070000_last_known`)
+Where a viewing character LAST KNEW a being, a thing or a door to be. Written by `services/last-known.recordPerceived` when the grader (`services/spatial-perception`) says the viewer saw (point) or heard (room) a map change, or when the viewer looks around after moving; read by `fogCanvasModel` to draw the map a Trailblazer loads. The Watcher never reads it.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | String cuid | |
+| campaignId | String | |
+| viewerId | String | the perceiving Character |
+| subjectId | String | a Character / CampaignItem id, or an opening id (`kind` door) |
+| kind | String | `being` / `thing` / `door` |
+| known | String | `point` (seen) / `room` (heard) |
+| x, y | Float? | world units; null = keep the canvas's own layout position (a seen thing with no point of its own) |
+| roomId | String? | the Location the subject was last known in |
+| state | String? | doors: the state as THIS viewer could see it (locked reads closed from outside the home) |
+| seenAt | DateTime | |
+
+Unique `(viewerId, subjectId)`; index `(campaignId, viewerId)`. Rows are never deleted by play; a world reset should clear them (`tmp/fog-clear.ts`).
