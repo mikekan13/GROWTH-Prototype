@@ -97,6 +97,9 @@ export function roomsJoinedTo(map: LevelMap, room: RoomPoly): RoomPoly[] {
 export function gradeMove(map: LevelMap, viewer: Standing | null, change: Extract<MapChange, { kind: 'being' | 'thing' }>): PerceptionGrade {
   if (!viewer) return 'none';
   if (lineOfSight(map, viewer.point, change.at)) return 'point';
+  // A thing moving in the next room is a noise, not that thing: hearing names a being (footsteps, a voice),
+  // never which object was picked up or where it was put. Things are perceived by sight only.
+  if (change.kind === 'thing') return 'none';
   const room = change.roomId ? map.rooms.find((r) => r.id === change.roomId) ?? roomAt(map, change.at) : roomAt(map, change.at);
   // A glimpse on the way (past an open doorway) tells the viewer which way they went, not where they stopped.
   if (change.path?.some((p) => lineOfSight(map, viewer.point, p))) return 'room';

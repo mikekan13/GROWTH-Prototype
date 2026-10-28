@@ -66,3 +66,12 @@ describe('the state of a door as a viewer can see it', () => {
     expect(visibleDoorState(open, standing(open, P(-100, 650)), open.portals.find((p) => p.id === 'op-1')!)).toBe('open');
   });
 });
+
+describe('things are perceived by sight only', () => {
+  it('a thing moved behind a locked door is nothing to the viewer; a being moving there is heard', () => {
+    const map = fixture({ entry: 'locked' });
+    const kris = standing(map, P(-100, 650));
+    expect(gradeMove(map, kris, { kind: 'thing', entityId: 'phone', at: P(150, 650), roomId: 'main' })).toBe('none');
+    expect(gradeMove(map, kris, { kind: 'being', entityId: 'violet', at: P(150, 650), roomId: 'main' })).toBe('room');
+  });
+});
