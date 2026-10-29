@@ -53,6 +53,7 @@ The 3x3 attribute matrix. **CRITICAL: Soul and Spirit labels were swapped in Jan
 - Each attribute has: level, current pool, augment positive, augment negative
 - **Pool Max formula:** `level + augPos - augNeg`
 - **Frequency exception:** only `level + current` (no augments)
+- **Attribute scale (Mike 2026-10-29):** an average adult human sits **around 30** per attribute — a rubber band (some 25s, some 35s, maybe one 40, a few lower), never a flat 30. The 10-average seeds are under-scaled; re-basing them is a calibration pass Mike owns. Effort pools are the levels, so a 30 pool buys about three maxed wagers a day — tired by the end of a session, never able to max every roll.
 - **Overflow rule:** when any attribute hits 0, remaining damage overflows to Frequency
 - Frequency at 0 = Death's Door (Lady Death comes)
 
@@ -236,6 +237,7 @@ Magic is being reframed AWAY from occultism toward three compatible models:
 ## 7.5 COMBAT ACTION ECONOMY
 
 - **Grid:** standard 5ft squares (canvas-rendered encounter cards).
+- **Actions per round, per pillar:** `max(1, floor(sum of the pillar's attribute LEVELS / 75))` — Frequency excluded from Spirit. Divisor was 25; **75 since 2026-10-29** so a ~30-average human has three actions a round (one per pillar) and, at Celerity/5 squares per action, sprints 90 ft flat out in 6 s. Gods with many actions stay near-instant.
 - **ActionMod base = 0.** Modified only by items and traits.
 - **Cross-pillar actions:** generally not transferable. Any action CAN be used as movement.
 - **Multi-pillar skills:** usable, but Effort can only come from governors of the matching action type within a single roll.

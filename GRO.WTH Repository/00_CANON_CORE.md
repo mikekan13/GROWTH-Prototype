@@ -153,6 +153,15 @@ roll Fate Die (FD) → `SD + FD + flat mods + Effort` vs DR. Meet/exceed = succe
   6–7 = d6; 8–11 = d8; 12–19 = d12; 20 = d20.
 - **Total Max Potential = FD max + Skill Level** (caps the total added to a roll).
 - **Contested:** ties → defender wins; both offensive → initiative decides.
+- **Skill points (Mike 2026-10-17):** each pillar has `floor(sum of its attribute LEVELS ÷ 3)`
+  skill points. Spirit counts Flow + Focus only (Frequency is fluid KRMA, not levels), so
+  Spirit runs lower by design. Each learned skill **commits** one point per governor in that
+  governor's pillar (Clout + Celerity + Focus = 2 Body + 1 Spirit). Available = total −
+  committed; a new skill can be learned only if its points are available.
+- **Governor buffing (Mike 2026-10-17, not fully specified):** when a skill would level up,
+  you may instead pay **3 Frequency** to add a thematically fitting governor. The added
+  governor commits a skill point in its pillar, so one must be available. It opens the
+  skill to more attributes.
 
 **Terminal difficulty colors** (DR as % of Total Max Potential): Blue easy → Green
 moderate → Yellow hard → Orange very hard → **Red = beyond Total Max Potential
@@ -167,10 +176,18 @@ highly relevant −3 … irrelevant = impossible without Burning.
 by items/traits. Any action can be used as movement; cross-pillar actions generally
 non-transferable.
 
-**Actions per round** (r-2026-05-20-01) — uses LEVELS, not pools, min 1 each:
-- Body = `floor((Clout + Celerity + Constitution) / 25)`
-- Spirit = `floor((Flow + Focus) / 25)` — **Frequency EXCLUDED** (it's the life pool)
-- Soul = `floor((Willpower + Wisdom + Wit) / 25)`
+**Actions per round** (r-2026-05-20-01; divisor 25 → **75**, r-2026-10-29-01) — uses LEVELS, not pools, min 1 each:
+- Body = `floor((Clout + Celerity + Constitution) / 75)`
+- Spirit = `floor((Flow + Focus) / 75)` — **Frequency EXCLUDED** (it's the life pool)
+- Soul = `floor((Willpower + Wisdom + Wit) / 75)`
+
+**Attribute scale** (r-2026-10-29-01): an average adult human's attributes sit **around 30**, as a
+rubber band, not a flat line — some 25s, some 35s, perhaps one 40 and a few lower. The old 10-average
+seeds are under-scaled and will be re-based (calibration pass, Mike). With the 75 divisor a 30-ish human
+has one action per pillar (three a round) and moves Celerity/5 squares = ~30 ft per action; 90 ft flat
+out in a 6 s round is a real human sprint. Effort pools are the attribute levels, so a 30 pool buys
+about three maxed wagers a day. Short Rest's flat 1-point heal was written for the 10 scale and is to be
+rescaled (open); Long Rest still fully restores.
 
 **Multiple attacks per action** come from **Nectars/items only** — no universal
 skill-level multiplier (r-2026-06-09-02).
