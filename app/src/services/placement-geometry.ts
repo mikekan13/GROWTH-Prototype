@@ -126,6 +126,12 @@ export async function setTokenPosition(
       const world = fractionToWorld(parsed.data.position, footprintBounds(fp.points));
       const seen = await perceiveMapChange(edge.campaignId, { kind: 'thing', entityId: edge.sourceId, at: world, roomId: parentEntityId });
       broadcastEvent(edge.campaignId, { kind: 'token_moved', entityId: edge.sourceId, entityType: 'item', x: world.x, y: world.y, placedAt: positionAt, roomId: parentEntityId, roomName: room.name, cause: 'gm', ...seen });
+      // The GM moved a thing: every fact about where it stands follows the map (Mike 2026-10-29).
+      const { thingPlaced, cornersOf, roomContext } = await import('./thing-facts');
+      const { parseMapShape } = await import('@/lib/canvas-geometry');
+      const ctx = await roomContext(edge.campaignId, parentEntityId);
+      const item = await prisma.campaignItem.findUnique({ where: { id: edge.sourceId }, select: { id: true, name: true, data: true } });
+      if (ctx && item) await thingPlaced(edge.campaignId, { id: item.id, name: item.name }, ctx.room, ctx.portals, { at: world, corners: cornersOf(world, parseMapShape(parseData(item.data).mapShape)) }, ctx.others);
     }
   } catch { /* canvases re-read on their own */ }
   return { edgeId, position: parsed.data.position, positionAt };

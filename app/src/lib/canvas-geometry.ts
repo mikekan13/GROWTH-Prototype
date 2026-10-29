@@ -491,6 +491,21 @@ export function parseMapShape(raw: unknown): MapShape | null {
   return { points: out };
 }
 
+/**
+ * Does a thing's footprint (feet about its centre) lie inside the room (world units) — every corner in or on the
+ * polygon? A couch half through the bathroom wall is not placed (Mike 2026-10-29). Pure.
+ */
+export function shapeInsideRoom(centre: Point, shape: MapShape | null, room: Point[], ftPerUnit = DEFAULT_SCALE_FT_PER_UNIT, tolUnits = 1): boolean {
+  if (!shape) return pointInPolygon(centre, room);
+  const k = 1 / ftPerUnit;
+  return shape.points.every(p => {
+    const q = { x: centre.x + p.x * k, y: centre.y + p.y * k };
+    if (pointInPolygon(q, room)) return true;
+    // on the wall line counts as inside
+    return room.some((a, i) => { const b = room[(i + 1) % room.length]; return projectOnSegment(q, a, b).dist <= tolUnits; });
+  });
+}
+
 /** A thing whose long side reaches this many feet is drawn as its footprint (Mike 2026-10-29: "we should really have
  *  token sizes appropriate for what they are … a bed takes up more than 5×5 … they shouldn't be round"); smaller
  *  things (a lamp, a mug, a pen) are pins. Was 5 ft, which made a 4×2 desk a pin. */

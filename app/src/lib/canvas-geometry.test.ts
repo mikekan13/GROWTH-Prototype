@@ -204,3 +204,15 @@ describe('things take up space (2026-10-17)', () => {
     expect(drawsAsShape(null)).toBe(false);
   });
 });
+
+describe('a thing may not stick through a wall (2026-10-29)', () => {
+  it('a 3×7 couch at (4,14) ft in the L-shaped main room reaches into the bathroom alcove; at (4,11) it fits', async () => {
+    const { shapeInsideRoom, makeMapShape } = await import('./canvas-geometry');
+    const ft = (x: number, y: number) => ({ x: x * 20, y: y * 20 });
+    const main = [ft(0, 0), ft(15, 0), ft(15, 7.5), ft(20, 7.5), ft(20, 22.5), ft(5, 22.5), ft(5, 15), ft(0, 15)];
+    const couch = makeMapShape({ sizeFt: { w: 7, d: 3 }, rotation: 90 });
+    expect(shapeInsideRoom(ft(4, 14), couch, main)).toBe(false);
+    expect(shapeInsideRoom(ft(4, 11), couch, main)).toBe(true);
+    expect(shapeInsideRoom(ft(10, 21.5), makeMapShape({ sizeFt: { w: 4, d: 2 } }), main)).toBe(true); // against the window wall, on the line
+  });
+});

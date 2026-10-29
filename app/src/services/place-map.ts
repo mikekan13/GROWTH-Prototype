@@ -19,7 +19,8 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
-import { DEFAULT_LEVEL, DEFAULT_SCALE_FT_PER_UNIT, GRID_FT, HALF_GRID_FT, cellCentre, footprintBounds, gridSizedOpening, makeMapShape, openingSides, parseFootprint, parseOpenings, pointInPolygon, snapOpeningToWall, snapOutline, snapTo, wallEdges, worldToFraction, type DoorState, type Opening, type Point } from '@/lib/canvas-geometry';
+import { DEFAULT_LEVEL, DEFAULT_SCALE_FT_PER_UNIT, GRID_FT, HALF_GRID_FT, cellCentre, footprintBounds, gridSizedOpening, makeMapShape, openingSides, parseFootprint, parseOpenings, pointInPolygon, shapeInsideRoom, snapOpeningToWall, snapOutline, snapTo, wallEdges, worldToFraction, type DoorState, type Opening, type Point } from '@/lib/canvas-geometry';
+import { thingPlaced, cornersOf } from './thing-facts';
 import { updateLocation } from './location';
 import { setLocationGeometry, setTokenPosition } from './placement-geometry';
 import { moveCharacterToLocation } from './character-location';
@@ -206,13 +207,24 @@ export async function drawPlaceMap(
         report.errors.push(`"${item.name}" is in ${inRoom}, but (${t.atFt.x},${t.atFt.y}) ft is ${room ? `in ${room.name}` : 'outside every room'}`);
         continue;
       }
-      await setTokenPosition(room.id, edge.id, actor.userId, actor.role, worldToFraction(world, footprintBounds(room.points)));
-      // The floor space it takes (Mike 2026-10-17: "items can take up space too").
+      // The floor space it takes (Mike 2026-10-17: "items can take up space too") — and it must FIT: a couch half
+      // through the bathroom wall is refused, not drawn (2026-10-29).
       const shape = makeMapShape({ sizeFt: t.sizeFt, outlineFt: t.outlineFt, rotation: t.rotation });
+      if (shape && !shapeInsideRoom(world, shape, room.points)) {
+        const b = footprintBounds(shape.points);
+        const beyond = roomPolys.find(r => r.id !== room.id && shape.points.some(p => pointInPolygon({ x: world.x + p.x / DEFAULT_SCALE_FT_PER_UNIT, y: world.y + p.y / DEFAULT_SCALE_FT_PER_UNIT }, r.points)));
+        report.errors.push(`"${item.name}" (${b.width}×${b.height} ft at ${t.atFt.x},${t.atFt.y}) sticks through ${room.name}'s wall${beyond ? ` into ${beyond.name}` : ''} — move it, turn it or shrink it`);
+        continue;
+      }
+      await setTokenPosition(room.id, edge.id, actor.userId, actor.role, worldToFraction(world, footprintBounds(room.points)));
       if (shape) {
         const row = await prisma.campaignItem.findUnique({ where: { id: item.id }, select: { data: true } });
         await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify({ ...parseData(row?.data ?? null), mapShape: shape }) } });
       }
+      // Its facts follow the map (2026-10-29).
+      const roomsHere = roomPolys.map(r => ({ id: r.id, name: r.name, points: r.points }));
+      const portalsHere = parseOpenings((parseData((await prisma.location.findUnique({ where: { id: home.id }, select: { data: true } }))?.data ?? null)).openings).map(o => ({ name: o.name, kind: o.kind, a: o.a, b: o.b, between: o.between }));
+      await thingPlaced(campaignId, { id: item.id, name: item.name }, { id: room.id, name: room.name, points: room.points }, portalsHere, { at: world, corners: cornersOf(world, shape) }, roomsHere);
       report.placed.push(item.name);
       continue;
     }
