@@ -195,6 +195,8 @@ export async function moveBeing(
     try {
       // Fog of war: who saw the walk, who only heard it, who nothing (services/spatial-perception).
       const seen = await perceiveMapChange(campaignId, { kind: 'being', entityId: characterId, at: end, roomId: toRoom?.id ?? null, path: path.points }, { map });
+      // A walk ends somewhere: the position fact follows (Mike 2026-10-29).
+      { const { beingPlaced } = await import('@/services/thing-facts'); await beingPlaced(campaignId, { id: characterId, name: actor.name }, toRoom?.id ?? null, end); }
       broadcastEvent(campaignId, {
         kind: 'token_moved', entityId: characterId, entityType: 'character',
         x: end.x, y: end.y, placedAt, roomId: toRoom?.id ?? null, roomName: toRoom?.name ?? null,

@@ -112,7 +112,7 @@ export const LISTENING_MAX_TOKENS = 140;
  */
 export function sensesNoteFor(via: string[] | undefined, own: boolean): string | null {
   if (own || via?.includes('self')) {
-    return 'This is your OWN doing, told to you as yours: you did this, you said this. Take it as your own act and your own words — what it was like from inside — not as something you watched someone else do.';
+    return 'This is your OWN doing, told to you as yours: you did this, you said this. Take it as your own act and your own words — what it was like from inside — not as something you watched someone else do. It HAPPENED as told: if you knocked, the knock sounded; if you walked, you are there. Colour it from inside — never soften, delay or undo it (no hovering hand that does not strike).';
   }
   if (!via?.length) return null;
   if (!via.includes('sight') && via.includes('hearing')) {

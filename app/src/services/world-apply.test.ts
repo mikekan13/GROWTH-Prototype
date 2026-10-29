@@ -106,3 +106,11 @@ describe('who is where (HW4 2026-10-24: a five held out through a locked door)',
     expect(lines[2]).toBe('Nobody: nowhere on the map — not here.');
   });
 });
+
+describe('a sound effect (HW9, 2026-10-29)', () => {
+  it('parses {op:"sound", at, text} and caps the text', async () => {
+    const { parseActEffects } = await import('./world-apply');
+    expect(parseActEffects([{ op: 'sound', at: "Violet's phone", text: "Violet's phone rings in her pocket." }])).toEqual([{ op: 'sound', at: "Violet's phone", text: "Violet's phone rings in her pocket." }]);
+    expect(parseActEffects([{ op: 'sound', at: 'x' }])).toEqual([]);
+  });
+});

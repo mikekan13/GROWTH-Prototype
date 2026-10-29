@@ -1471,10 +1471,20 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
     }
     void feedCycle(campaignId)
       .then((cycle) => resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: a.text, cycle: cycle ?? 0, narrated: true }))
-      .then((r) => {
+      .then(async (r) => {
         const applied = r.effects?.applied ?? [];
         const refused = r.effects?.refused ?? [];
         if (applied.length || refused.length) console.log(`[table-speak] narrated act by ${a.actorLabel}: ${applied.join('; ') || 'nothing moved'}${refused.length ? ` · refused: ${refused.join('; ')}` : ''}`);
+        // THE WORLD ANSWERS THE ACT (HW9, Mike 2026-10-29: "it should have had the phone ring when I first had Kristopher
+        // call"): a sound the act caused elsewhere is narrated to the table by the world itself, as its own stretch — the
+        // reach judge places it at the thing (sim/senses/named-things), so the one holding the phone hears her phone and the
+        // caller hears a ring beyond the door.
+        for (const snd of r.effects?.sounds ?? []) {
+          if (!gm) break;
+          console.log(`[table-speak] the world sounds at ${snd.at}: ${snd.text}`);
+          await narrateAtTable(campaignId, { userId: gm.userId, username: gm.username, role: 'WATCHER' } as TableActor, { message: snd.text, locationId: snd.locationId ?? null })
+            .catch((err) => console.warn('[table-speak] the world\'s sound was not narrated (non-fatal):', err instanceof Error ? err.message : err));
+        }
       })
       .catch((err) => console.warn(`[table-speak] narrated act by ${a.actorLabel} not read by the world (non-fatal):`, err instanceof Error ? err.message : err));
   }

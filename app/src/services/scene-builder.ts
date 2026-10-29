@@ -613,9 +613,14 @@ export async function buildScene(
         const at = segments.find((s) => s.kind === 'thought')!;
         vetted.splice(firstThoughtAt, 0, { kind: 'thought', text: voice, sentence: at.sentence });
       }
-      // Physical doings in his voice become acts when nothing kept carries them (HW8 run 5 2026-10-26).
+      // Physical doings in his voice become acts when nothing kept carries them (HW8 run 5 2026-10-26) — but only when
+      // the Watcher gave him NO act this beat: the Watcher's act is the act, and a doing from the monologue beside it can
+      // only contradict it (HW9 2026-10-29: "He walks to the door and knocks" grew "His hand hovers, not quite striking"
+      // and the knock never sounded). With an act in the seed, the monologue's doings stay his inner voice.
       const mono = monologues.get(c.actorId) ?? '';
-      if (mono) {
+      const seedActs = seed.actions.filter((a) => a.actorId === c.actorId);
+      if (mono && seedActs.length) console.log(`[scene-builder] ${labelOf(c.actorId)}: the Watcher's act stands; the monologue's doings stay thoughts`);
+      if (mono && !seedActs.length) {
         const carried = vetted.filter((s) => s.kind === 'thought' || s.kind === 'action').map((s) => s.text);
         for (const sent of splitSentences(mono)) {
           if (carried.some((k) => Math.max(cueCoverage(sent, k), cueCoverage(k, sent)) >= 0.7)) continue;

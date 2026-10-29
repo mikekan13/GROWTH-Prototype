@@ -40,7 +40,9 @@ export type ActEffect =
   | { op: 'take'; item: string }
   | { op: 'give'; item: string; to: string }
   | { op: 'put'; item: string; into: string }
-  | { op: 'move'; to: string };
+  | { op: 'move'; to: string }
+  /** A sound the act causes somewhere other than the actor: a called phone rings where IT is, a thrown thing lands. */
+  | { op: 'sound'; at: string; text: string };
 
 export interface MapDoor {
   id: string;
@@ -275,6 +277,22 @@ async function findItemByName(campaignId: string, ref: string, where: Record<str
 export interface ApplyReport {
   applied: string[];
   refused: string[];
+  /** Sounds the act caused elsewhere, each placed: the table narrates them so whoever is there perceives them (HW9). */
+  sounds?: Array<{ text: string; at: string; locationId: string | null }>;
+}
+
+/** The thing or being a sound is said to be at, and the room it is in (a held thing is with its holder). Null when unknown. */
+async function soundSite(campaignId: string, at: string): Promise<{ name: string; locationId: string | null } | null> {
+  const key = at.trim().toLowerCase().replace(/^the\s+/, '');
+  const beings = await prisma.character.findMany({ where: { campaignId, status: { notIn: ['DEAD', 'RETIRED'] } }, select: { id: true, name: true } });
+  const items = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { id: true, name: true, holderId: true, locationId: true } });
+  const { matchNamedThings } = await import('@/sim/senses/named-things');
+  const { roomIdOf } = await import('@/services/spatial-world');
+  const being = beings.find((b) => b.name.toLowerCase() === key || b.name.toLowerCase().split(/\s+/)[0] === key);
+  if (being) return { name: being.name, locationId: await roomIdOf(being.id) };
+  const thing = items.find((i) => i.name.toLowerCase() === key || i.name.toLowerCase().replace(/^(?:the|her|his)\s+/, '') === key) ?? matchNamedThings(at, items, beings)[0];
+  if (!thing) return null;
+  return { name: thing.name, locationId: thing.holderId ? await roomIdOf(thing.holderId) : thing.locationId };
 }
 
 /**
@@ -292,6 +310,14 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
   for (const e of effects) {
     try {
       switch (e.op) {
+        case 'sound': {
+          // Where it sounds: the named thing (held → with its holder) or the named being; the text is what the table narrates.
+          const where = await soundSite(campaignId, e.at);
+          if (!where) { report.refused.push(`sound at "${e.at}": nothing by that name here`); break; }
+          (report.sounds ??= []).push({ text: e.text, at: where.name, locationId: where.locationId });
+          report.applied.push(`sound at ${where.name}: ${e.text}`);
+          break;
+        }
         case 'door': {
           if (!map) { report.refused.push(`door "${e.door}": the actor stands nowhere on the map`); break; }
           const d = findDoor(map, e.door);
@@ -405,6 +431,7 @@ export function parseActEffects(raw: unknown): ActEffect[] {
       case 'give': { const item = s(r.item); const to = s(r.to); if (item && to) out.push({ op: 'give', item, to }); break; }
       case 'put': { const item = s(r.item); const into = s(r.into); if (item && into) out.push({ op: 'put', item, into }); break; }
       case 'move': { const to = s(r.to); if (to) out.push({ op: 'move', to }); break; }
+      case 'sound': { const at = s(r.at); const text = s(r.text); if (at && text) out.push({ op: 'sound', at, text: text.slice(0, 240) }); break; }
       default: break;
     }
   }

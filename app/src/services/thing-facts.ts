@@ -205,3 +205,21 @@ export async function roomContext(campaignId: string, roomId: string): Promise<{
   const others: RoomLike[] = sibRows.flatMap((r) => { const f = parseFootprint(parse(r.data).footprint); return f && r.id !== roomId ? [{ id: r.id, name: r.name, points: f.points }] : []; });
   return { room: { id: row.id, name: row.name, points: fp.points }, portals, others };
 }
+
+/**
+ * A BEING's position fact (`<first name>_position`, as Violet's seed fact is keyed): one sentence derived from where it
+ * stands, rewritten on every GM drag or walk. Never throws.
+ */
+export async function beingPlaced(campaignId: string, being: { id: string; name: string }, roomId: string | null, at: Point): Promise<void> {
+  try {
+    if (!roomId) return;
+    const ctx = await roomContext(campaignId, roomId);
+    if (!ctx) return;
+    const sentence = placementSentence(being.name, ctx.room, ctx.portals, { at }, ctx.others).replace(/ stands in the (Fourth-floor landing|[^,]*landing|[^,]*hall)/, ' stands on the $1');
+    const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
+    const key = `${slug(being.name.split(/\s+/)[0])}_position`;
+    const cur = (await currentFacts(campaignId)).filter((f) => f.subjectKey === key);
+    if (!cur.length) await establishFact(campaignId, key, sentence, cycle);
+    else if (cur[0].fact !== sentence) await supersede(cur[0].id, { fact: sentence, cycle });
+  } catch (err) { console.warn('[thing-facts] position fact not written', err instanceof Error ? err.message : err); }
+}

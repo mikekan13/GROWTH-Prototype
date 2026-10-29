@@ -380,6 +380,8 @@ export async function setCanvasPosition(
     const roomRow = room ? await prisma.location.findUnique({ where: { id: room.targetId }, select: { name: true } }) : null;
     // Fog of war: a Trailblazer's map shows the drag only as far as their character perceives it.
     const seen = await perceiveMapChange(character.campaignId, { kind: 'being', entityId: characterId, at: { x: input.x, y: input.y }, roomId: room?.targetId ?? null });
+    // The GM moved a being: its position fact follows the map (Mike 2026-10-29).
+    { const { beingPlaced } = await import('@/services/thing-facts'); await beingPlaced(character.campaignId, { id: characterId, name: character.name }, room?.targetId ?? null, { x: input.x, y: input.y }); }
     broadcastEvent(character.campaignId, {
       kind: 'token_moved',
       entityId: characterId,
