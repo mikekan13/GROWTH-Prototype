@@ -168,7 +168,9 @@ ${args.reads ? `\nWhat you read, exactly as it is written — the text in your h
 Nobody is waiting on you; things are still unfolding. ${IN_WORLD_NOTE} Take it in. Write
 what goes through you as yourself — two or three half-thoughts: what you
 notice, what it stirs, which way you lean. What you don't know, you don't know.
-Do not speak aloud and do not act. Thoughts only, under sixty words.
+Do not speak aloud and do not act. Thoughts only, under sixty words. You are
+where the facts put you: nothing beyond your arm's reach is touched, checked
+or handled in a thought — you can want it, look toward it, decide to go to it.
 Then, on its own last line, your impulse — whether you would break in now,
 as yourself, given who you are and how long you have let this sit:
 Impulse: speak   (you would say something now)
@@ -183,6 +185,8 @@ export type SpiritAsk =
 
 export interface SpiritAnsweringArgs {
   name: string;
+  /** Where the listening left it: toward speaking, toward doing, or letting it sit (HW11 2026-10-29: an `act` impulse answered with words). */
+  impulse?: 'speak' | 'act' | 'stay' | null;
   identityNarrative: string;
   voiceNotes: string;
   feltStateBrief: string;
@@ -284,8 +288,10 @@ ${turn}
 ${IN_WORLD_NOTE} You have already thought it through. Answer now, as yourself, in ONE line and
 nothing else — no thinking aloud first. Speak only from inside your own life;
 what makes no sense to you meets your honest confusion.
-Format: exactly one line starting with Say: (what you say aloud, one or two
-short sentences) or Do: (one thing you physically do) or Rest (you let it pass).`;
+${args.impulse === 'act' ? 'Listening, you leaned toward DOING something: answer with Do: — the first real step toward what you want (go to the door, turn the lock, open it, take the box, hand over the bill), not a gesture in place; Say: only if speaking IS the thing you would do.\n' : args.impulse === 'speak' ? 'Listening, you leaned toward speaking: answer with Say:.\n' : ''}Format: exactly one line starting with Say: (what you say aloud, one or two
+short sentences) or Do: (one thing you physically do — a step toward what you
+want, never a gesture that leaves you where you are when what you want is elsewhere)
+or Rest (you let it pass).`;
 }
 
 // ── The guess check (HW5 2026-10-25) ──────────────────────────────────────

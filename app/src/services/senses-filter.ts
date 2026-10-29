@@ -33,8 +33,11 @@ function sentencesOf(line: string): string[] {
 // The subject of a sentence of prose, so the verbs after it can be read: "He", "Kristopher", "The man", "Someone".
 const SUBJECT_RE = /^((?:[Hh]e|[Ss]he|[Tt]hey|[Ss]omeone|[Ss]omebody|[Ii]t|(?:[Tt]he|[Aa]n?|[Ss]ome|[Aa]nother|[Hh]is|[Hh]er|[Tt]heir)\s+[\w-]+|[A-Z][\w'’-]*(?:\s+[A-Z][\w'’-]*)?))\s+(.+)$/;
 // "waits for a moment and then knocks again": predicates that share the subject.
-const PREDICATE_SPLIT_RE = /\s*,?\s*\b(?:and then|then|and|but)\s+(?=(?:(?:then|also|just|again|slowly|quietly|loudly|softly|suddenly|gently|finally)\s+)?[a-z]+s\b)/i;
-const ADVERB_RE = /^(?:then|also|just|again|slowly|quietly|loudly|softly|suddenly|gently|finally)\s+/i;
+// Any run of adverbs before the verb, not a list (HW11 2026-10-29: "Kristopher politely knocks on the door" reached Violet
+// as "a sound… too faint to make out" because "politely" was not on the list).
+const ADVERB_RUN = '(?:(?:[a-z]+ly|then|also|just|again|very|quite|rather|almost|nearly|really|still|once more|twice)\\s+)*';
+const PREDICATE_SPLIT_RE = new RegExp(`\\s*,?\\s*\\b(?:and then|then|and|but)\\s+(?=${ADVERB_RUN}[a-z]+s\\b)`, 'i');
+const ADVERB_RE = new RegExp(`^${ADVERB_RUN}`, 'i');
 
 // A sound verb that is done silently is not sound (HW8 run 5 2026-10-26: "He says the Jesus prayer in his mind" reached
 // Violet through the door on "says"). Tested per predicate, so "…in his mind and knocks" keeps the knock.
@@ -100,7 +103,7 @@ export function audibleOnly(content: string, via: string[] | undefined): string 
 }
 
 const UNPLACEABLE_SOUND = 'A sound from beyond the room, too faint to make out.';
-const FRAGMENT_RE = new RegExp(`(?<=(?:^|\\b(?:he|she|they|it|someone|somebody|and|then|but|who)|[A-Z][\\w'’-]*)\\s+(?:(?:then|also|just|again|slowly|quietly|loudly|softly|suddenly|gently|finally)\\s+)?)${SOUND_VERB_RE.source}[^,.;!?]*`, 'g');
+const FRAGMENT_RE = new RegExp(`(?<=(?:^|\\b(?:he|she|they|it|someone|somebody|and|then|but|who)|[A-Z][\\w'’-]*)\\s+${ADVERB_RUN})${SOUND_VERB_RE.source}[^,.;!?]*`, 'g');
 /** "Violets cell phone begins to ring." — a thing that sounds, with a noun-phrase subject the subject rule does not catch (HW9). */
 const THING_SOUND_RE = /^(?:[A-Z][\w'’]*s?\s+)?(?:[a-z-]+\s+){0,3}?([a-z-]+)\s+(?:(?:begins?|starts?|began|started)\s+to\s+)?(ring(?:s|ing)?|rang|buzz(?:es|ed|ing)?|chim(?:es|ed|ing)|beep(?:s|ed|ing)?|vibrat(?:es|ed|ing))\b/i;
 const thirdPerson = (v: string) => /^(?:ring|buzz|chime|beep|vibrate)$/i.test(v) ? (v.toLowerCase() === 'buzz' ? 'buzzes' : `${v.toLowerCase()}s`) : v.toLowerCase();

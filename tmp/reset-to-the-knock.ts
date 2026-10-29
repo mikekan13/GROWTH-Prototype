@@ -117,6 +117,16 @@ const dry = process.argv.includes('--dry');
     const { map } = await loadWorldLevel(CAMP);
     const ks = await beingStanding(map, KRIS);
     if (ks?.room) { await beingPlaced(CAMP, { id: KRIS, name: 'Kristopher' }, ks.room.id, ks.point); refacted++; }
+    // Violet's token goes back to the middle of the Main Room, where her seed fact has her ("on the worn path between the
+    // couch and the desk") — HW10 left her at the entry door. The walk broadcasts to every open canvas.
+    const { moveBeing } = await import('../app/src/services/being-movement');
+    const main = map.rooms.find((r) => r.id === MAIN_ROOM);
+    if (main) {
+      const cx = main.points.reduce((a, q) => a + q.x, 0) / main.points.length;
+      const cy = main.points.reduce((a, q) => a + q.y, 0) / main.points.length;
+      const walk = await moveBeing(CAMP, VIOLET, { kind: 'point', point: { x: cx, y: cy } }, { cause: 'gm' });
+      console.log(walk.ok ? `Violet → the middle of the Main Room (${walk.feet} ft)` : `Violet stays: ${walk.reason}`);
+    }
   } catch (e) { console.warn('facts-from-the-map skipped:', (e as Error).message); }
   console.log(`reset to the knock: archive ${file}; clock → ${CLOCK_AT_THE_KNOCK}; Violet → Main Room; pizza → Kristopher; entry door locked; last-known wiped (${wiped.count}) and ${looked} beings looked around; ${refacted} placement facts rebuilt from the map`);
   process.exit(0);

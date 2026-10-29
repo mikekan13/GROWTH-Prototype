@@ -15,10 +15,11 @@ describe('spotAtPortal', () => {
     const door = map.portals.find(p => p.id === 'op-1')!;
     const inside = spotAtPortal(map, door, P(200, 800));
     expect(roomAt(map, inside)?.name).toBe('Main Room');
-    expect(dist(inside, P(0, 650))).toBeLessThanOrEqual(1.5 * CELL_UNITS);
+    // GRID SNAP (HW11 2026-10-29): the centre of the 5-ft square beside the door, not a cell off the wall.
+    expect(inside).toEqual(P(50, 650));
     const outside = spotAtPortal(map, door, P(-100, 800));
     expect(roomAt(map, outside)?.name).toBe('Fourth-floor landing');
-    expect(dist(outside, P(0, 650))).toBeLessThanOrEqual(1.5 * CELL_UNITS);
+    expect(outside).toEqual(P(-50, 650));
   });
 });
 
@@ -37,7 +38,8 @@ describe('spotInRoom', () => {
     const map = fixture();
     const spot = spotInRoom(map, roomByName(map, 'Kitchenette')!, P(100, 650));
     expect(roomAt(map, spot)?.name).toBe('Kitchenette');
-    expect(spot.x).toBeLessThan(350);
+    // GRID SNAP (HW11): the square just inside the archway (the Kitchenette is one square wide: x 300–400).
+    expect(spot).toEqual(P(350, 650));
   });
 });
 
@@ -46,10 +48,12 @@ describe('spotBeside', () => {
     const map = fixture();
     const spot = spotBeside(map, P(200, 800), P(50, 650));
     const d = dist(spot, P(200, 800));
+    // GRID SNAP (HW11): the adjacent square's centre on the mover's side — about a square away, never the target's own square.
     expect(d).toBeGreaterThanOrEqual(1.5 * CELL_UNITS);
-    expect(d).toBeLessThanOrEqual(3.5 * CELL_UNITS);
+    expect(d).toBeLessThanOrEqual(5 * CELL_UNITS);
     expect(spot.x).toBeLessThan(200);
     expect(spot.y).toBeLessThan(800);
+    expect(spot).toEqual(P(150, 750));
   });
   it('steps outward until clear of a thing\'s footprint', () => {
     const map = fixture({ items: [{ id: 'table', name: 'Table', centre: P(200, 800), mapShapeFt: { points: [P(-3, -3), P(3, -3), P(3, 3), P(-3, 3)] } }] });

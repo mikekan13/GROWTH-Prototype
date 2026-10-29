@@ -7,6 +7,23 @@
 import type { Point } from '@/lib/canvas-geometry';
 import { pointInPolygon } from '@/lib/canvas-geometry';
 import { CELL_UNITS, UNITS_PER_FT } from './types';
+
+/** The map's square (GRID_FT = 5 ft): a being's token sits in one. */
+const SQUARE_UNITS = 5 * UNITS_PER_FT;
+/** The centre of the 5-ft square containing p. Pure. */
+export function squareCentre(p: Point): Point {
+  return { x: Math.floor(p.x / SQUARE_UNITS) * SQUARE_UNITS + SQUARE_UNITS / 2, y: Math.floor(p.y / SQUARE_UNITS) * SQUARE_UNITS + SQUARE_UNITS / 2 };
+}
+/** A square centre a token can stand on: strictly inside the room, in no obstacle, on a walkable cell. */
+function standableSquare(map: LevelMap, p: Point, room: RoomPoly | null): Point | null {
+  const c = squareCentre(p);
+  if (room && !pointInPolygon(c, room.points)) return null;
+  if (!room && !roomAt(map, c)) return null;
+  if (map.obstacles.some((o) => pointInPolygon(c, o.points))) return null;
+  // The nav grid is anchored to the map's bounds, so a square centre is rarely a cell centre: a walkable cell within one
+  // cell of it is enough — the token stands at the square's centre.
+  return nearestWalkable(map, c, 1) ? c : null;
+}
 import type { LevelMap, Portal, RoomPoly } from './types';
 import { insideOrOn, polygonCentroid, portalsOfRoom, roomAt, roomByName } from './level-map';
 import { cellCentre, cellIndex, cellXY, gridOf, snapToWalkable } from './nav-grid';
@@ -55,6 +72,11 @@ export function spotInRoom(map: LevelMap, room: RoomPoly, from: Point): Point {
   }
   if (best) {
     const { mid, n } = portalFrame(best);
+    // GRID SNAP (HW11 2026-10-29, Mike: "we need some grid snapping in place"): the square just inside the door.
+    for (const sign of [1, -1]) {
+      const sq = standableSquare(map, { x: mid.x + n.x * sign * SQUARE_UNITS / 2, y: mid.y + n.y * sign * SQUARE_UNITS / 2 }, room);
+      if (sq) return sq;
+    }
     for (const push of [1.5, 1, 0.5]) {
       for (const sign of [1, -1]) {
         const ideal = { x: mid.x + n.x * sign * push * CELL_UNITS, y: mid.y + n.y * sign * push * CELL_UNITS };
@@ -72,6 +94,13 @@ export function spotInRoom(map: LevelMap, room: RoomPoly, from: Point): Point {
 export function spotAtPortal(map: LevelMap, portal: Portal, from: Point): Point {
   const { mid, n } = portalFrame(portal);
   const fromRoom = roomAt(map, from);
+  // GRID SNAP (HW11 2026-10-29): the walker stands in the 5-ft square beside the door, on its own side — a cell (1 ft) off
+  // the wall put the round token into the door. Falls back to the cell when no square fits.
+  const squares = [1, -1].map((sign) => ({ sign, p: { x: mid.x + n.x * sign * SQUARE_UNITS / 2, y: mid.y + n.y * sign * SQUARE_UNITS / 2 } }));
+  const own = fromRoom ? squares.find((s) => roomAt(map, s.p)?.id === fromRoom.id) : undefined;
+  const bySide = own ?? squares.sort((a, b) => Math.hypot(a.p.x - from.x, a.p.y - from.y) - Math.hypot(b.p.x - from.x, b.p.y - from.y))[0];
+  const snapped = standableSquare(map, bySide.p, roomAt(map, bySide.p));
+  if (snapped) return snapped;
   const sides = [1, -1].map(sign => ({ x: mid.x + n.x * sign * CELL_UNITS, y: mid.y + n.y * sign * CELL_UNITS }));
   let pick = fromRoom ? sides.find(s => roomAt(map, s)?.id === fromRoom.id) : undefined;
   if (!pick) {
@@ -91,6 +120,9 @@ export function spotBeside(map: LevelMap, target: Point, from: Point, opts?: { d
   for (let k = 0; k < 20 && map.obstacles.some(o => pointInPolygon(ideal, o.points)); k++) {
     ideal = { x: ideal.x + u.x * CELL_UNITS / 2, y: ideal.y + u.y * CELL_UNITS / 2 };
   }
+  // GRID SNAP (HW11): the square the ideal spot falls in, when a token can stand there and it is not the target's own square.
+  const sq = standableSquare(map, ideal, roomAt(map, ideal));
+  if (sq && !(Math.abs(sq.x - squareCentre(target).x) < 1e-6 && Math.abs(sq.y - squareCentre(target).y) < 1e-6)) return sq;
   return nearestWalkable(map, ideal) ?? ideal;
 }
 

@@ -71,3 +71,10 @@ describe('a thing that rings (HW9, 2026-10-29)', () => {
     expect(audibleOnly('His work phone buzzes in his pocket.', ['hearing'])).toContain("Someone's phone buzzes.");
   });
 });
+
+describe('an adverb before the verb does not silence it (HW11 2026-10-29)', () => {
+  it('"Kristopher politely knocks on the door." is a knock', () => {
+    expect(audibleSentence('Kristopher politely knocks on the door.')).toBe('Kristopher politely knocks on the door.');
+    expect(audibleSentence('He waits patiently for a few moments and then very softly knocks again.')).toBe('He very softly knocks again.');
+  });
+});

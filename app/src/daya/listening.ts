@@ -43,6 +43,8 @@ export interface ListeningState {
   updatedAt: number;
   /** The campaign clock (cycles) when the being itself last spoke or acted; the scene tells it how long it has let things sit. */
   lastOwnCycle?: number;
+  /** Where the last listening left it (HW11 2026-10-29): the answer reads it — an `act` impulse answers with a doing. */
+  impulse?: 'speak' | 'act' | 'stay';
 }
 
 // In-process, per being. A restart means the next listen starts a fresh state.

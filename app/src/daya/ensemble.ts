@@ -387,6 +387,9 @@ async function actorFacts(ctx: EntityContext, intent: string, opts: { ranked?: b
  * doors of the being's own room and the things it holds name more (so the door the ask arrived through is never cut as "oldest"),
  * and the map's own door states ride as authoritative lines. Never throws; an unreadable world is no facts.
  */
+const MONEY_CUE_RE = /\b(?:pay|paid|paying|payment|money|cash|change|tip|owe|owes|owed|wallet|bill|total|receipt|price|cost)\b/i;
+const DUE_RE = /\b(?:still due|not paid|unpaid|cash on delivery|amount due|balance due|owed|to be paid)\b/i;
+
 async function beatFacts(ctx: EntityContext, cue: string, heldNames: string[] = []): Promise<{ lines: string[]; records: FactLine[]; hasLight: boolean; noOneInView: boolean; absentNames: string[] }> {
   try {
     // READ FRESH EVERY BEAT (HW8 run 7 #1d): nothing here is cached across beats - the door's state comes from the live map each call.
@@ -414,10 +417,29 @@ async function beatFacts(ctx: EntityContext, cue: string, heldNames: string[] = 
         if (line) knows.push(line);
       }
     }
+    // WHICH WAY THE MONEY GOES (HW11 2026-10-29: Kristopher "reached for his wallet" on "you haven't paid yet" — he is the
+    // one collecting). When the cue is about paying, a held thing whose record says the amount is still due settles it:
+    // its holder collects; the other party pays. Derived from the items' own data, no vocabulary of the scene.
+    const money: string[] = [];
+    if (ctx.campaignId && MONEY_CUE_RE.test(cue)) {
+      const items = await prisma.campaignItem.findMany({ where: { campaignId: ctx.campaignId, status: 'ACTIVE' }, select: { name: true, holderId: true, data: true } }).catch(() => []);
+      for (const it of items) {
+        let d: Record<string, unknown> = {};
+        try { d = it.data ? JSON.parse(it.data) : {}; } catch { d = {}; }
+        const text = [d.description, d.text, d.state].filter((x) => typeof x === 'string').join(' ');
+        if (!DUE_RE.test(text)) continue;
+        if (it.holderId === ctx.characterId) money.push(`The ${it.name.replace(/^the\s+/i, '')} in your hand says the amount is still due: YOU are the one collecting it — the money comes to you, you pay nothing here.`);
+        else {
+          const holder = it.holderId ? (await prisma.character.findUnique({ where: { id: it.holderId }, select: { name: true } }).catch(() => null))?.name ?? null : null;
+          money.push(`The ${it.name.replace(/^the\s+/i, '')}${holder ? ` (${holder} holds it)` : ''} says the amount is still due: whoever holds it is collecting; if the order is yours, you are the one who pays.`);
+        }
+      }
+    }
     const lines = [
       ...doorLines,
       ...presence.lines,
       ...knows,
+      ...money,
       ...ranked.slice(0, 12).map((f) => `${f.subjectKey}: ${f.fact.length > 200 ? `${f.fact.slice(0, 197)}...` : f.fact}`),
     ];
     return { lines, records, hasLight: ranked.length === 0 ? true : hasLightFact(ranked.map((f) => `${f.subjectKey} ${f.fact}`)), noOneInView: presence.noOneInView, absentNames: presence.absentNames };
@@ -1067,7 +1089,7 @@ export async function listenStimulus(
 
   // Fold into the LATEST state: an answer may have been given while this stretch was being worked.
   const folded = foldPerception(getListening(characterId), { prose: content, standing: standing === 'full' ? 'full' : 'new', locationId }, tDone);
-  setListening(characterId, { ...folded, innerState, feltStateBrief, feltAt, recallBlock, desiresBlock });
+  setListening(characterId, { ...folded, innerState, feltStateBrief, feltAt, recallBlock, desiresBlock, impulse });
 
   return {
     status: 'listened',
@@ -1335,6 +1357,7 @@ export async function answerAsk(
     feltStateBrief: state.feltStateBrief || FELT_FALLBACK,
     standingScene: state.standingScene || 'Nothing beyond what is right in front of you.',
     innerState: state.innerState,
+    impulse: state.impulse ?? null,
     heard,
     ask: askArg,
     sinceOwn: ctx.campaignId ? await sinceOwnInWords(ctx.campaignId, ctx.entityDaId, state.lastOwnCycle ?? null).catch(() => null) : null,
