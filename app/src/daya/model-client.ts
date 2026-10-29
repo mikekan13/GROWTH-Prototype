@@ -531,6 +531,8 @@ export async function chat(
       krma: 0,
       sanitized: params.sanitized ?? false,
       rationale: meteredRationale(params.rationale, stopped === true),
+      ms: totalMs,
+      ...(ttftMs !== undefined ? { ttftMs: Math.round(ttftMs) } : {}),
     },
   });
 

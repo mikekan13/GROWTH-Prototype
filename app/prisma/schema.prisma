@@ -1541,6 +1541,8 @@ model DayaModelCall {
   krma       Float       @default(0) // logged only, throttle open
   sanitized  Boolean     @default(false)
   rationale  String?     // audit trail for routing/sanitization decisions
+  ms         Int?        // wall time of the call (speed work 2026-10-29): the beat timeline is read from these
+  ttftMs     Int?        // time to first token when streamed
   createdAt  DateTime    @default(now())
 
   @@index([entityId, createdAt])
