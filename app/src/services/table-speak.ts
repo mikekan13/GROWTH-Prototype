@@ -958,14 +958,17 @@ async function runBeats(
             if (!deduped) { cardRepeat = true; console.log(`[table-speak] ${name}: the whole card was a repeat — not posted`); }
             card = deduped;
           }
-          if (!repeat && !holding && !cardRepeat) await recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
+          // A repeated thought or card is not posted again — but the BEAT is (HW9, 2026-10-29: Violet heard the third knock,
+          // thought the same sentences as before, and the table went dead because nothing was recorded at all). The record
+          // keeps what reached her and her impulse; only the prose she already said is left out.
+          if (!holding) await recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
             characterId: listenerId,
             characterName: name,
             heard: carried.content,
-            thought,
+            thought: repeat ? '' : thought,
             impulse: outcome.listened.impulse,
             canonEventId: truthId,
-            ...(card ? { scene: card.scene, segments: card.segments } : {}),
+            ...(card && !cardRepeat ? { scene: card.scene, segments: card.segments } : {}),
           });
         }
         cardDone();
