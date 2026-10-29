@@ -29,19 +29,19 @@ const ftPoint = z.object({ x: z.number().min(0).max(5000), y: z.number().min(0).
 
 export const placeMapSchema = z.object({
   home: z.string().min(1).max(200).describe('The home / building Location (name or id).'),
-  outlineFt: z.array(ftPoint).min(3).max(64).describe('The home\'s outline in feet, clockwise from its top-left (0,0).'),
+  outlineFt: z.array(ftPoint).min(3).max(64).optional().describe('The home\'s outline in feet, clockwise from its top-left (0,0). OMIT it when the home is already drawn: the drawn outline is kept.'),
   ceilingFt: z.number().min(4).max(500).optional(),
   level: z.number().int().min(-50).max(500).optional(),
   rooms: z.array(z.object({
     name: z.string().min(1).max(200).describe('An existing room inside the home (name or id).'),
-    outlineFt: z.array(ftPoint).min(3).max(64).describe('The room\'s outline in feet, in the HOME\'s frame (same origin).'),
+    outlineFt: z.array(ftPoint).min(3).max(64).describe('The room\'s outline in feet, in the HOME\'s frame (same origin). Rooms not listed keep their drawn outline.'),
     ceilingFt: z.number().min(4).max(500).optional(),
   })).max(30).default([]),
   tokens: z.array(z.object({
     thing: z.string().min(1).max(200).describe('A thing on the floor of a room, or a person (exact name or id).'),
     atFt: ftPoint.describe('Where it stands (its CENTRE), in feet, in the HOME\'s frame. People take a 5-ft square; centre them in it.'),
     sizeFt: z.object({ w: z.number().min(0.2).max(200), d: z.number().min(0.2).max(200) }).optional()
-      .describe('Things: the floor space it really covers, width × depth in feet (a couch 7×3, a bed 5×6.5). Under 5 ft on both sides it shows as a pin.'),
+      .describe('Things: the floor space it really covers, width × depth in feet (a couch 7×3, a bed 5×6.5, a chair 2×2); it is drawn at that size. Under 1.5 ft on both sides it shows as a pin.'),
     outlineFt: z.array(ftPoint).min(3).max(32).optional().describe('Things: an irregular floor shape instead of sizeFt (an L-desk), in feet.'),
     rotation: z.number().optional().describe('Things: 0, 90, 180 or 270 — turns the shape.'),
   })).max(200).default([]),
@@ -52,7 +52,7 @@ export const placeMapSchema = z.object({
     between: z.array(z.string().min(1).max(200)).min(1).max(2).describe('What it joins: room names, or "outside" / "stairwell" / "fire escape".'),
     state: z.enum(['open', 'closed', 'locked']).optional().describe('Doors only: how it stands right now.'),
     name: z.string().max(80).optional(),
-  })).max(40).optional().describe('Doors, windows, archways. REPLACES the home\'s openings when given.'),
+  })).max(40).optional().describe('Doors, windows, archways. OMIT to keep the openings as drawn. When given, the whole list REPLACES them — and only if every one lands on a real wall; a door that matches an existing one by name keeps its state unless you give one.'),
 });
 export type PlaceMapPlan = z.infer<typeof placeMapSchema>;
 
@@ -86,6 +86,13 @@ export async function setDoorState(
   const home = await prisma.location.findUnique({ where: { id: homeId }, select: { name: true } });
   await doorWritten(campaignId, { id: homeId, name: home?.name ?? 'home' }, { id: o.id, name: o.name ?? 'Door', state });
   return o;
+}
+
+/** A redrawn door with no state given keeps the state of the drawn door of the same name; otherwise closed. Pure. */
+export function carriedDoorState(name: string | undefined, existing: Opening[]): DoorState {
+  const key = name?.trim().toLowerCase();
+  const match = key ? existing.find(o => o.kind === 'door' && o.name?.trim().toLowerCase() === key) : undefined;
+  return match?.state ?? 'closed';
 }
 
 /** Feet in the home frame → world units, anchored at `anchor`. Pure. */
@@ -188,6 +195,12 @@ export async function drawPlaceMap(
       });
       const room = roomAt(world, edge?.targetId);
       if (!edge) { report.errors.push(`"${item.name}" is not on a room's floor (inside a container, or unplaced) — place it first`); continue; }
+      // Filed at the home itself (genesis files furniture on the apartment, not its rooms, 2026-10-29): the point
+      // says which room it stands in — re-file it there rather than refuse.
+      if (room && edge.targetId === home.id) {
+        await prisma.entityRelationship.update({ where: { id: edge.id }, data: { targetId: room.id } });
+        edge.targetId = room.id;
+      }
       if (!room || room.id !== edge.targetId) {
         const inRoom = roomPolys.find(r => r.id === edge.targetId)?.name ?? 'another room';
         report.errors.push(`"${item.name}" is in ${inRoom}, but (${t.atFt.x},${t.atFt.y}) ft is ${room ? `in ${room.name}` : 'outside every room'}`);
@@ -226,6 +239,8 @@ export async function drawPlaceMap(
     const roomsFt = roomPolys.map(r => ({ owner: r.name, points: r.points.map(toFt) }));
     const edges = wallEdges([...roomsFt, ...(homeFt ? [{ owner: home.name, points: homeFt }] : [])]);
     const roomNames = new Set(roomPolys.map(r => r.name.toLowerCase()));
+    const existing = parseOpenings(homeData.openings);
+    const errorsBefore = report.errors.length;
     const openings: Opening[] = plan.openings.map((o, i) => {
       const onWall = snapOpeningToWall(o.fromFt, o.toFt, edges);
       const snapped = { ...gridSizedOpening(o.kind, onWall.from, onWall.to, onWall.wall), wall: onWall.wall };
@@ -244,13 +259,19 @@ export async function drawPlaceMap(
         a: ftToWorld(snapped.from, anchor),
         b: ftToWorld(snapped.to, anchor),
         between,
-        ...(o.kind === 'door' ? { state: o.state ?? 'closed' } : {}),
+        ...(o.kind === 'door' ? { state: o.state ?? carriedDoorState(o.name, existing) } : {}),
         ...(o.name ? { name: o.name } : {}),
       };
     });
-    const fresh = parseData((await prisma.location.findUnique({ where: { id: home.id }, select: { data: true } }))?.data ?? null);
-    await updateLocation(home.id, campaignId, actor.userId, actor.role, { data: { ...fresh, openings } });
-    report.openings = openings.length;
+    if (report.errors.length > errorsBefore) {
+      // One wrong wall and the drawn openings stay (2026-10-29: a misplaced plan replaced a locked entry door with a
+      // closed one on another wall).
+      report.errors.push('openings NOT changed: fix the ones above and send the full list again, or omit openings to keep them as drawn');
+    } else {
+      const fresh = parseData((await prisma.location.findUnique({ where: { id: home.id }, select: { data: true } }))?.data ?? null);
+      await updateLocation(home.id, campaignId, actor.userId, actor.role, { data: { ...fresh, openings } });
+      report.openings = openings.length;
+    }
   }
   if (plan.rooms.length > 0 && roomPolys.length === 0) throw new ValidationError(`No room drawn: ${report.errors.join('; ')}`);
   return report;

@@ -491,9 +491,13 @@ export function parseMapShape(raw: unknown): MapShape | null {
   return { points: out };
 }
 
-/** Drawn as its shape when its long side reaches a 5-ft square; else a pin. Pure. */
+/** A thing whose long side reaches this many feet is drawn as its footprint (Mike 2026-10-29: "we should really have
+ *  token sizes appropriate for what they are … a bed takes up more than 5×5 … they shouldn't be round"); smaller
+ *  things (a lamp, a mug, a pen) are pins. Was 5 ft, which made a 4×2 desk a pin. */
+export const SHAPE_MIN_FT = 1.5;
+/** Drawn as its shape when its long side reaches SHAPE_MIN_FT; else a pin. Pure. */
 export function drawsAsShape(shape: MapShape | null): boolean {
   if (!shape) return false;
   const b = footprintBounds(shape.points);
-  return Math.max(b.width, b.height) >= GRID_FT;
+  return Math.max(b.width, b.height) >= SHAPE_MIN_FT;
 }

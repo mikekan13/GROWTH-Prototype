@@ -198,6 +198,7 @@ describe('things take up space (2026-10-17)', () => {
     expect(footprintBounds(couch.points)).toEqual({ x: -3.5, y: -1.5, width: 7, height: 3 });
     expect(drawsAsShape(couch)).toBe(true);
     expect(drawsAsShape(makeMapShape({ sizeFt: { w: 1, d: 1 } }))).toBe(false);
+    expect(drawsAsShape(makeMapShape({ sizeFt: { w: 2, d: 2 } }))).toBe(true); // a desk chair is a square, not a pin (2026-10-29)
     const turned = makeMapShape({ sizeFt: { w: 7, d: 3 }, rotation: 90 })!;
     expect(footprintBounds(turned.points).width).toBe(3);
     expect(drawsAsShape(null)).toBe(false);

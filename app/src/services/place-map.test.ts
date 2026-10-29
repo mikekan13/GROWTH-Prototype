@@ -18,3 +18,13 @@ describe('place map', () => {
     expect(homeAnchor({ canvasX: -50, canvasY: -400 }, 'ACTIVE')).toEqual({ x: -50, y: -400 });
   });
 });
+
+describe('openings are kept unless the whole list lands (2026-10-29)', () => {
+  it('a redrawn door with no state keeps the drawn door\'s state by name; a new door is closed', async () => {
+    const { carriedDoorState } = await import('./place-map');
+    const existing = [{ id: 'op-1', kind: 'door' as const, a: { x: 0, y: 0 }, b: { x: 60, y: 0 }, between: ['Main Room', 'outside'], state: 'locked' as const, name: 'Entry door' }];
+    expect(carriedDoorState('entry door', existing)).toBe('locked');
+    expect(carriedDoorState('Front door', existing)).toBe('closed');
+    expect(carriedDoorState(undefined, existing)).toBe('closed');
+  });
+});

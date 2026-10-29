@@ -18,12 +18,13 @@ export const drawPlaceMapTool: JewlTool = {
   description:
     'Draw a home TO SCALE on the map in ONE call, in FEET, all in the home\'s own frame (origin = its top-left, x right, ' +
     'y down): the home outline, each room\'s outline inside it (rooms must already exist — organize_place first), and ' +
-    'where every floor thing and every person stands. 5-ft squares: a person fills one square (centre them in it); a ' +
+    'where every floor thing and every person stands. ALREADY DRAWN? read_location shows the drawn map in feet; then ' +
+    'OMIT outlineFt, rooms and openings (they are kept exactly) and send only tokens. 5-ft squares: a person fills one square (centre them in it); a ' +
     'thing takes the floor space it really covers — give its CENTRE and its sizeFt (w×d, a couch 7×3, a bed 5×6.5) or ' +
-    'outlineFt, plus rotation; under 5 ft on both sides it shows as a pin. Things inside containers are not drawn. ' +
+    'outlineFt, plus rotation; it is drawn at that size (a chair 2×2, a desk 4×2, a bed 5×6.5); under 1.5 ft on both sides it shows as a pin. Things inside containers are not drawn. ' +
     'OPENINGS: every door (with its state: open/closed/locked), window and archway, as a segment ON a wall line ' +
-    '(fromFt→toFt, a door ~3 ft) and what it joins (rooms, or "outside"/"stairwell"/"fire escape"). Already drawn? ' +
-    'omit outlineFt/rooms and send only what changes. ' +
+    '(fromFt→toFt, a door ~3 ft) and what it joins (rooms, or "outside"/"stairwell"/"fire escape"); the openings list ' +
+    'replaces all of them, so send it only to change them. ' +
     'Use the sizes the description gives (sq ft, dimensions); never contradict them.',
   inputSchema: placeMapSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
