@@ -140,7 +140,8 @@ describe('listenStimulus — reflection while someone else has the floor', () =>
     expect(store.perceived).toEqual([{ stimulus: 'The door bangs open.', source: 'perception', standing: 'once', voice: undefined }]);
     expect(store.ingested).toEqual([{ source: 'perception', content: '[the room] The door bangs open.' }]);
     expect(lane.calls.map((c) => c.kind).sort()).toEqual(['listen', 'soul']);
-    expect(lane.calls.every((c) => !c.stream)).toBe(true);
+    // The listening monologue streams to the table as it is written (speed, 2026-10-29); nothing else in a listen does.
+    expect(lane.calls.filter((c) => c.kind !== 'listen').every((c) => !c.stream)).toBe(true);
     expect(store.memories).toEqual([]);
     expect(getListening('mara')).toMatchObject({
       locationId: 'inn',

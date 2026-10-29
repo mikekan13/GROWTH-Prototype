@@ -24,6 +24,7 @@ import type { GrowthCharacter } from '@/types/growth';
 
 import { resolveDayaEntityId } from './entity';
 import { chat, type DayaChatMessage, type DayaClientOverrides } from './model-client';
+import { broadcastEvent } from '@/lib/campaign-stream';
 import { registerHandler, wake, type DayaTrigger, type HandlerResult } from './events';
 import { ingestStimulus, writeMemoryEntry } from './memory';
 import { intentionLine } from './intentions';
@@ -1014,7 +1015,12 @@ export async function listenStimulus(
       held: heldNow,
       reads: stimulus.reads,
     });
-    const raw = (await chat({ tier: 'L1', subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS }, overrides)).text.trim();
+    // THE GROWING THOUGHT (speed, 2026-10-29): the monologue is streamed to the table as it is written, on the growing-line
+    // channel the spoken reply already uses, wrapped as a thought; the line yields to the recorded beat. A perceived viewer
+    // never gets this channel (lib/campaign-stream), so only the Watcher sees a being think.
+    const grow = ctx.campaignId && !omniscient ? thoughtStreamer(ctx.campaignId, characterId, ctx.name) : null;
+    const raw = (await chat({ tier: 'L1', subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS, ...(grow ? { onToken: grow.onToken } : {}) }, overrides)).text.trim();
+    grow?.done();
     // The last line is the being's own say on breaking in; only the thought is kept as its inner state.
     const split = splitImpulse(raw);
     impulse = split.impulse;
@@ -1067,6 +1073,33 @@ export async function listenStimulus(
     impulse,
     ...(innerUpdated ? { thought: innerState } : {}),
     timings: { perceiveMs: tPerceived - t0, ingestMs: tIngested - tPerceived, recallMs: tRecalled - tIngested, soulMs, spiritMs: tDone - tSpirit, totalMs: tDone - t0, standing },
+  };
+}
+
+/**
+ * Streams a being's monologue to the table as it is written: `start`, then a `partial` every ~150 ms carrying the WHOLE
+ * text so far (the impulse line at its tail cut off), then a `final` of action 'rest' so the growing line steps aside
+ * for the recorded beat. Never throws.
+ */
+function thoughtStreamer(campaignId: string, characterId: string, characterName: string): { onToken: (delta: string) => void; done: () => void } {
+  const utteranceId = `thought-${characterId}-${Date.now()}`;
+  let text = '';
+  let shown = '';
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let started = false;
+  const emit = (e: Record<string, unknown>) => { try { broadcastEvent(campaignId, { kind: 'being_speaking', utteranceId, characterId, ...e } as never); } catch { /* transient */ } };
+  const flush = () => {
+    timer = null;
+    // The impulse line ("impulse: stay") is the being's say on breaking in, not its thought: never shown growing.
+    const visible = text.replace(/\n?\s*\**\s*impulse\s*\**\s*[:—–-]?.*$/i, '').trim();
+    if (!visible || visible === shown) return;
+    if (!started) { started = true; emit({ phase: 'start', characterName }); }
+    shown = visible;
+    emit({ phase: 'partial', text: `((${visible}))`, delta: '' });
+  };
+  return {
+    onToken: (delta) => { text += delta; if (!timer) timer = setTimeout(flush, 150); },
+    done: () => { if (timer) { clearTimeout(timer); timer = null; } if (started) emit({ phase: 'final', action: 'rest', text: '', revoiced: false }); },
   };
 }
 
