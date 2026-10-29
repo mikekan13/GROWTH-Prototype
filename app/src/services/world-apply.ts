@@ -426,6 +426,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
     }
   }
 
+  if (report.applied.length || report.refused.length) console.log(`[world-apply] ${actor.name}: ${report.applied.join('; ') || 'nothing moved'}${report.refused.length ? ` · refused: ${report.refused.join('; ')}` : ''}`);
   if (report.applied.length) {
     try { broadcastEvent(campaignId, { kind: 'character_update', characterId: actor.id, characterName: actor.name, fields: ['world'] }); } catch { /* canvases re-read on their own */ }
   }

@@ -48,7 +48,10 @@ Rules:
    to a person or a thing is move → its name; leaving for another room is
    move → that room. The map walks the actor there: a closed door on the way
    is opened by the walker, a LOCKED one stops the walk at the door. Never
-   invent distances or coordinates.
+   invent distances or coordinates. An act that says "the door" without
+   naming which one is move → "the door", those words exactly: the map
+   knows the door the moment is about (the way out, the one knocked on).
+   Never choose a door for the actor by nearness or by guess.
 1. Facts are law. Never contradict one. If the action touches something with
    no established fact, establish it conservatively (boring, plausible,
    room-appropriate) via factsToWrite.

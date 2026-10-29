@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Point } from '@/lib/canvas-geometry';
 import { pointInPolygon } from '@/lib/canvas-geometry';
-import { nearestWalkable, spotAtPortal, spotBeside, spotInRoom } from './targets';
+import { nearestWalkable, spotAtPortal, spotBeside, spotInRoom, wayOutDoor } from './targets';
 import { roomAt, roomByName } from './level-map';
 import { CELL_UNITS } from './types';
 import { fixture, P } from './test-fixture';
@@ -67,5 +67,18 @@ describe('nearestWalkable', () => {
     expect(p).not.toBeNull();
     expect(dist(p!, P(50, 650))).toBeLessThanOrEqual(CELL_UNITS);
     expect(nearestWalkable(map, P(1000, 1000))).toBeNull();
+  });
+});
+
+describe('wayOutDoor — "the door", unnamed (HW10 2026-10-29)', () => {
+  it('from the Main Room, with the bathroom door nearer, "the door" is the entry door', () => {
+    const map = fixture();
+    const main = roomByName(map, 'Main Room')!;
+    // Standing a step from the bathroom door: nearness would say op-2; the way out says op-1.
+    expect(wayOutDoor(map, main, P(120, 950))?.id).toBe('op-1');
+  });
+  it('from the Bathroom, its one door', () => {
+    const map = fixture();
+    expect(wayOutDoor(map, roomByName(map, 'Bathroom')!, null)?.id).toBe('op-2');
   });
 });

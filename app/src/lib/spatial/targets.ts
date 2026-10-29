@@ -8,7 +8,7 @@ import type { Point } from '@/lib/canvas-geometry';
 import { pointInPolygon } from '@/lib/canvas-geometry';
 import { CELL_UNITS, UNITS_PER_FT } from './types';
 import type { LevelMap, Portal, RoomPoly } from './types';
-import { insideOrOn, polygonCentroid, portalsOfRoom, roomAt } from './level-map';
+import { insideOrOn, polygonCentroid, portalsOfRoom, roomAt, roomByName } from './level-map';
 import { cellCentre, cellIndex, cellXY, gridOf, snapToWalkable } from './nav-grid';
 
 /** The walkable cell centre nearest p within maxCells, or null. */
@@ -92,4 +92,57 @@ export function spotBeside(map: LevelMap, target: Point, from: Point, opts?: { d
     ideal = { x: ideal.x + u.x * CELL_UNITS / 2, y: ideal.y + u.y * CELL_UNITS / 2 };
   }
   return nearestWalkable(map, ideal) ?? ideal;
+}
+
+const lower = (s: string) => s.trim().toLowerCase().replace(/^(the|a|an)\s+/, '');
+
+/**
+ * "The door", unnamed, from a room with several doors (HW10 2026-10-29: Violet, "her back against the wall beside the
+ * door" with Kristopher behind the entry door, was walked to the bathroom door — the nearer one). The door a being means
+ * when it names none is the way OUT: the room's door that leaves the home, else the room's door on the fewest-doors way
+ * to a room that has one, and only when no way out is drawn the nearest. One door: that door. Pure.
+ */
+export function wayOutDoor(map: LevelMap, here: RoomPoly, from: Point | null): Portal | null {
+  const isDoor = (p: Portal) => p.kind === 'door';
+  const mine = portalsOfRoom(map, here).filter(isDoor);
+  if (!mine.length) return null;
+  if (mine.length === 1) return mine[0];
+  const home = map.homes?.find((h) => pointInPolygon(polygonCentroid(here.points), h.points)) ?? null;
+  const inHome = (name: string): boolean => {
+    const r = roomByName(map, name);
+    if (!r) return false;
+    return home ? pointInPolygon(polygonCentroid(r.points), home.points) : true;
+  };
+  const other = (p: Portal, of: string) => p.between.map(lower).find((b) => b !== lower(of)) ?? null;
+  const leavesHome = (p: Portal, of: string) => { const o = other(p, of); return !!o && !inHome(o); };
+  const out = mine.find((p) => leavesHome(p, here.name));
+  if (out) return out;
+  // Rooms with a door out of the home, then the fewest doors from each room to one of them.
+  const doors = map.portals.filter(isDoor);
+  const dist = new Map<string, number>();
+  const queue: string[] = [];
+  for (const r of map.rooms) {
+    const name = lower(r.name);
+    if (inHome(r.name) && portalsOfRoom(map, r).filter(isDoor).some((p) => leavesHome(p, r.name))) { dist.set(name, 0); queue.push(name); }
+  }
+  while (queue.length) {
+    const n = queue.shift()!;
+    for (const p of doors) {
+      if (!p.between.some((b) => lower(b) === n)) continue;
+      const o = other(p, n);
+      if (o && !dist.has(o)) { dist.set(o, (dist.get(n) ?? 0) + 1); queue.push(o); }
+    }
+  }
+  let best: Portal | null = null;
+  let bestD = Number.POSITIVE_INFINITY;
+  for (const p of mine) {
+    const o = other(p, here.name);
+    const d = o ? dist.get(o) ?? Number.POSITIVE_INFINITY : Number.POSITIVE_INFINITY;
+    if (d < bestD) { best = p; bestD = d; }
+  }
+  if (best) return best;
+  if (!from) return null;
+  const mid = (p: Portal) => ({ x: (p.a.x + p.b.x) / 2, y: (p.a.y + p.b.y) / 2 });
+  const d2 = (a: Point, b: Point) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+  return mine.reduce((a, p) => (d2(from, mid(p)) < d2(from, mid(a)) ? p : a));
 }

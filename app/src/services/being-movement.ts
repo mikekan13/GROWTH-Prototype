@@ -20,7 +20,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import type { Point } from '@/lib/canvas-geometry';
-import { findPath, pathSeconds, portalPassability, roomAt, roomByName, portalsOfRoom, spotInRoom, spotAtPortal, spotBeside, nearestWalkable, crossesBlocking, type LevelMap, type Portal, type RoomPoly, type Pace } from '@/lib/spatial';
+import { findPath, pathSeconds, portalPassability, roomAt, roomByName, portalsOfRoom, spotInRoom, spotAtPortal, spotBeside, nearestWalkable, crossesBlocking, wayOutDoor, type LevelMap, type Portal, type RoomPoly, type Pace } from '@/lib/spatial';
 import { loadWorldLevel, beingStanding, thingStanding, stampBeingPoint, roomIdOf, levelOfBeing } from '@/services/spatial-world';
 import { moveCharacterToLocation } from '@/services/character-location';
 import { writeDoorState } from '@/services/door-state';
@@ -85,7 +85,8 @@ export async function resolveMoveRef(campaignId: string, ref: string, actorChara
   if (DOOR_WORD.test(r)) {
     const doors = roomPortals.filter((p) => p.kind === 'door');
     const beyond = doors.find((p) => p.between.some((b) => here && norm(b) !== norm(here.name) && r.includes(norm(b))));
-    const pick = beyond ?? (doors.length === 1 ? doors[0] : null);
+    // Unnamed, with several doors: the way out — never the nearest (HW10 2026-10-29: Violet walked to the bathroom door).
+    const pick = beyond ?? (here ? wayOutDoor(map, here, standing?.point ?? null) : doors.length === 1 ? doors[0] : null);
     if (pick) return { target: { kind: 'portal', portalId: pick.id, homeId: pick.homeId }, label: pick.name };
   }
   const people = await prisma.character.findMany({ where: { campaignId, id: { not: actorCharacterId }, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { id: true, name: true } });
