@@ -12,7 +12,7 @@ vi.mock('@/lib/campaign-stream', () => ({ broadcastEvent: vi.fn() }));
 import { mapFactLines, lockedDoorInTheWay, parseActEffects, passageGraph, routeBetween, passageInWords, whereaboutsLines, type ActorMap } from './world-apply';
 
 const apartment: ActorMap = {
-  roomId: 'main', roomName: 'Main Room', home: { id: 'apt', name: "Violet's Apartment" },
+  roomId: 'main', roomName: 'Main Room', home: { id: 'apt', name: "Violet's Apartment" }, homeRooms: ['Main Room', 'Bathroom', 'Kitchenette'],
   doors: [
     { id: 'op-1', name: 'Entry door', between: ['Main Room', 'Fourth-floor landing'], state: 'locked', homeId: 'apt' },
     { id: 'op-2', name: 'Bathroom door', between: ['Bathroom', 'Main Room'], state: 'closed', homeId: 'apt' },
@@ -33,8 +33,17 @@ describe('the map as facts', () => {
 });
 
 describe('a locked door stops the act before any model is asked (hello world 2026-10-17)', () => {
-  it('"turn the knob and push the door open" against the locked entry door is refused', () => {
-    expect(lockedDoorInTheWay('Violet turns the knob and pushes the entry door open', apartment)?.id).toBe('op-1');
+  // A LOCK IS WORKED FROM THE INSIDE (HW10 2026-10-29): from inside her own apartment the deadbolt is under her hand —
+  // "pushes the entry door open" unlocks it on the way. From the landing (another home, or none) it is locked.
+  const landing: ActorMap = { roomId: 'landing', roomName: 'Fourth-floor landing', home: { id: 'bldg', name: 'The building' }, homeRooms: ['Fourth-floor landing'], doors: apartment.doors };
+  it('"turn the knob and push the door open" from INSIDE is hers: not blocked', () => {
+    expect(lockedDoorInTheWay('Violet turns the knob and pushes the entry door open', apartment)).toBeNull();
+  });
+  it('the same act from the landing is refused — the lock is on her side, not his', () => {
+    expect(lockedDoorInTheWay('Kristopher turns the knob and pushes the entry door open', landing)?.id).toBe('op-1');
+  });
+  it('the home\'s rooms unknown (a hand-built map): the old law, locked is locked', () => {
+    expect(lockedDoorInTheWay('Violet turns the knob and pushes the entry door open', { ...apartment, homeRooms: undefined })?.id).toBe('op-1');
   });
   it('the same act with an unlocking step is let through to the adjudicator', () => {
     expect(lockedDoorInTheWay('Violet turns the deadbolt, then pulls the entry door open', apartment)).toBeNull();
@@ -42,10 +51,13 @@ describe('a locked door stops the act before any model is asked (hello world 202
   it('opening the closed bathroom door is fine', () => {
     expect(lockedDoorInTheWay('she pushes the bathroom door open', apartment)).toBeNull();
   });
-  it('an unnamed door: refused only when every door is locked', () => {
+  it('an unnamed door: refused only when every door is locked against her', () => {
     expect(lockedDoorInTheWay('she opens the door', apartment)).toBeNull();
     const allLocked: ActorMap = { ...apartment, doors: apartment.doors.map((d) => ({ ...d, state: 'locked' as const })) };
-    expect(lockedDoorInTheWay('she opens the door', allLocked)?.id).toBe('op-1');
+    // The entry is hers from inside; the bathroom's lock is not — one door is still open to her, so nothing blocks.
+    expect(lockedDoorInTheWay('she opens the door', allLocked)).toBeNull();
+    // From the landing with only the locked entry: blocked.
+    expect(lockedDoorInTheWay('he opens the door', { ...landing, doors: [apartment.doors[0]] })?.id).toBe('op-1');
   });
   it('an act that is not about a door is never blocked', () => {
     expect(lockedDoorInTheWay('she presses her forehead to the fridge', { ...apartment, doors: apartment.doors.map((d) => ({ ...d, state: 'locked' as const })) })).toBeNull();

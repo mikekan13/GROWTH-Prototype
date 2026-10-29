@@ -324,8 +324,9 @@ Her line: "${args.line}"
 
 A GUESS is a thing stated as so that nothing above supports, or that the above contradicts:
 where an object is, that something happened or was paid or given, what someone said, what
-she has or did. Feelings, wishes, intentions ("I was going to"), refusals, questions back,
-opinions, and anything the above supports are NOT guesses.
+she has or did. Feelings, wishes, intentions ("I was going to"), promises and plans of her own
+("give me a second", "I'll be right there", "hold on"), refusals, questions back, opinions, and
+anything the above supports are NOT guesses.
 Answer with exactly one line: OK — or — GUESS: <the unsupported claim, in a few words>`;
 }
 

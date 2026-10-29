@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Point } from '@/lib/canvas-geometry';
 import { pointInPolygon } from '@/lib/canvas-geometry';
-import { nearestWalkable, spotAtPortal, spotBeside, spotInRoom, wayOutDoor } from './targets';
+import { nearestWalkable, spotAtPortal, spotBeside, spotInRoom, wayOutDoor, lockedFromMySide } from './targets';
 import { roomAt, roomByName } from './level-map';
 import { CELL_UNITS } from './types';
 import { fixture, P } from './test-fixture';
@@ -80,5 +80,19 @@ describe('wayOutDoor — "the door", unnamed (HW10 2026-10-29)', () => {
   it('from the Bathroom, its one door', () => {
     const map = fixture();
     expect(wayOutDoor(map, roomByName(map, 'Bathroom')!, null)?.id).toBe('op-2');
+  });
+});
+
+describe('lockedFromMySide — a lock is worked from the inside (HW10 2026-10-29)', () => {
+  it('the locked entry door is hers from inside the apartment, not his from the landing', () => {
+    const map = fixture({ entry: 'locked' });
+    const entry = map.portals.find((p) => p.id === 'op-1')!;
+    expect(lockedFromMySide(map, entry, P(200, 800))).toBe(true);
+    expect(lockedFromMySide(map, entry, P(-100, 800))).toBe(false);
+  });
+  it('a locked door between two rooms of the home keeps its lock', () => {
+    const map = fixture({ entry: 'locked', bathroom: 'locked' });
+    const bath = map.portals.find((p) => p.id === 'op-2')!;
+    expect(lockedFromMySide(map, bath, P(200, 800))).toBe(false);
   });
 });

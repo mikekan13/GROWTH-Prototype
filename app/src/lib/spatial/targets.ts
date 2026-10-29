@@ -146,3 +146,16 @@ export function wayOutDoor(map: LevelMap, here: RoomPoly, from: Point | null): P
   const d2 = (a: Point, b: Point) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
   return mine.reduce((a, p) => (d2(from, mid(p)) < d2(from, mid(a)) ? p : a));
 }
+
+/**
+ * A LOCK IS WORKED FROM THE INSIDE (HW10 2026-10-29: Violet, inside her own apartment, walked toward her entry door and
+ * the world said "tries the Entry door; it is locked and does not give"). A locked door that LEAVES a home is, to the one
+ * standing inside that home, a closed door: her hand is on the deadbolt. From outside it is locked. A locked door between
+ * two rooms of the same home keeps its lock for both sides (who holds that key is not drawn). Pure.
+ */
+export function lockedFromMySide(map: LevelMap, p: Portal, from: Point): boolean {
+  if (p.kind !== 'door' || p.state !== 'locked') return false;
+  const home = map.homes?.find((h) => h.id === p.homeId) ?? null;
+  if (!home || !pointInPolygon(from, home.points)) return false;
+  return p.between.some((b) => { const r = roomByName(map, b); return !r || !pointInPolygon(polygonCentroid(r.points), home.points); });
+}

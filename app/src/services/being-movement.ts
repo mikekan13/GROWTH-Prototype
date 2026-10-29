@@ -20,7 +20,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import type { Point } from '@/lib/canvas-geometry';
-import { findPath, pathSeconds, portalPassability, roomAt, roomByName, portalsOfRoom, spotInRoom, spotAtPortal, spotBeside, nearestWalkable, crossesBlocking, wayOutDoor, type LevelMap, type Portal, type RoomPoly, type Pace } from '@/lib/spatial';
+import { findPath, pathSeconds, portalPassability, roomAt, roomByName, portalsOfRoom, spotInRoom, spotAtPortal, spotBeside, nearestWalkable, crossesBlocking, wayOutDoor, lockedFromMySide, type LevelMap, type Portal, type RoomPoly, type Pace } from '@/lib/spatial';
 import { loadWorldLevel, beingStanding, thingStanding, stampBeingPoint, roomIdOf, levelOfBeing } from '@/services/spatial-world';
 import { moveCharacterToLocation } from '@/services/character-location';
 import { writeDoorState } from '@/services/door-state';
@@ -165,17 +165,22 @@ export async function moveBeing(
   const fromRoom = standing.room;
   const base = { label: dest.label, from, fromRoom: fromRoom?.name ?? null };
 
+  // A LOCK IS WORKED FROM THE INSIDE (HW10 2026-10-29): a locked door that leaves the home the walker stands in is a closed
+  // door to her — the way is found as if it were, and it is unlocked and opened on the way.
+  const mine = map.portals.filter((p) => lockedFromMySide(map, p, from));
+  const walkMap: LevelMap = mine.length ? { ...map, portals: map.portals.map((p) => (mine.some((m) => m.id === p.id && m.homeId === p.homeId) ? { ...p, state: 'closed' as const } : p)) } : map;
   // Other beings on the level are stepped around when there is room (soft, never a wall).
-  const path = findPath(map, from, dest.point, { avoid: await othersStanding(campaignId, characterId, map) });
+  const path = findPath(walkMap, from, dest.point, { avoid: await othersStanding(campaignId, characterId, map) });
   if (!path) return { ...empty(dest.label, `no way from ${fromRoom?.name ?? 'here'} to ${dest.label}`), ...base };
 
   // Doors the walker passes: a closed one is opened on the way (the one writer tells the facts and the canvases).
   const opened: string[] = [];
   for (const p of path.portals) {
-    const pass = portalPassability(p);
+    const unlocked = mine.some((m) => m.id === p.id && m.homeId === p.homeId);
+    const pass = unlocked ? { opens: true } : portalPassability(p);
     if (pass.opens) {
       const ok = await writeDoorState(campaignId, p.homeId, p.id, 'open').catch(() => false);
-      if (ok) opened.push(p.name);
+      if (ok) opened.push(unlocked ? `${p.name} (unlocked)` : p.name);
     }
   }
 

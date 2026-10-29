@@ -58,6 +58,22 @@ export interface ActorMap {
   roomName: string;
   home: { id: string; name: string };
   doors: MapDoor[];
+  /** Names of the rooms filed under the home (a door whose far side is none of them leaves the home). */
+  homeRooms?: string[];
+}
+
+/**
+ * A LOCK IS WORKED FROM THE INSIDE (HW10 2026-10-29): the actor stands inside the home; a locked door of that home whose
+ * far side is not one of its rooms (the landing, the street) has its deadbolt under the actor's hand — it does not block
+ * her, and "opens the door" unlocks it first. A locked door between two rooms of the home keeps its lock. Pure.
+ */
+export function lockOnActorsSide(map: ActorMap, d: MapDoor): boolean {
+  // The actor's room is filed under the home (that is how the map was built), so the actor is inside it; the door is of
+  // that home; and its far side is not one of the home's rooms. Without the home's rooms listed nothing can be told — locked.
+  if (d.homeId !== map.home.id || !map.homeRooms) return false;
+  const lower = (x: string) => x.trim().toLowerCase();
+  const inside = new Set([...map.homeRooms, map.home.name].map(lower));
+  return d.between.some((b) => !inside.has(lower(b)));
 }
 
 const REL = 'located_at';
@@ -106,7 +122,9 @@ export async function actorMap(characterId: string): Promise<ActorMap | null> {
     }
     break;
   }
-  return { roomId: room.id, roomName: room.name, home, doors };
+  const under = await prisma.entityRelationship.findMany({ where: { targetId: home.id, relationshipType: REL, sourceType: 'LOCATION' }, select: { sourceId: true } }).catch(() => []);
+  const homeRooms = under.length ? (await prisma.location.findMany({ where: { id: { in: under.map((u) => u.sourceId) } }, select: { name: true } })).map((r) => r.name) : [];
+  return { roomId: room.id, roomName: room.name, home, doors, homeRooms };
 }
 
 // ── Who is where (HW4 2026-10-24) ─────────────────────────────────────────────
@@ -231,9 +249,10 @@ export function lockedDoorInTheWay(intent: string, map: ActorMap | null): MapDoo
   if (!OPENS_RE.test(intent) || !DOOR_RE.test(intent)) return null;
   if (UNLOCKS_RE.test(intent)) return null;
   const lower = intent.toLowerCase();
+  const blocks = (d: MapDoor) => d.state === 'locked' && !lockOnActorsSide(map, d);
   const named = map.doors.find((d) => lower.includes(d.name.toLowerCase()) || d.between.some((b) => b.toLowerCase() !== map.roomName.toLowerCase() && lower.includes(b.toLowerCase())));
-  if (named) return named.state === 'locked' ? named : null;
-  return map.doors.every((d) => d.state === 'locked') ? map.doors[0] : null;
+  if (named) return blocks(named) ? named : null;
+  return map.doors.length && map.doors.every(blocks) ? map.doors[0] : null;
 }
 
 function findDoor(map: ActorMap, ref: string): MapDoor | null {
@@ -339,7 +358,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           if (!d) { report.refused.push(`door "${e.door}": no such door touches ${map.roomName}`); break; }
           const homeRef = { name: map.home.name };
           if (d.state === 'locked' && e.state === 'open') {
-            if (!actWorksTheLock(actText)) {
+            if (!actWorksTheLock(actText) && !lockOnActorsSide(map, d)) {
               report.refused.push(`door "${d.name}": locked — it has to be unlocked before it opens`);
               // The model's "open" fact for this door must not stand against the map.
               await syncDoorFact(campaignId, homeRef, d).catch(() => undefined);
