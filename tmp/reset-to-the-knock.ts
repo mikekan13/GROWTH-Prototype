@@ -127,6 +127,13 @@ const dry = process.argv.includes('--dry');
       const walk = await moveBeing(CAMP, VIOLET, { kind: 'point', point: { x: cx, y: cy } }, { cause: 'gm' });
       console.log(walk.ok ? `Violet → the middle of the Main Room (${walk.feet} ft)` : `Violet stays: ${walk.reason}`);
     }
+    // Kristopher starts at the top of the stairs, the far end of the landing from her door (Mike 2026-10-29: "at the
+    // entryway to the fourth floor landing… not at her door"): the square against the door-side wall, 15 ft down.
+    const KRIS_START = { x: -50, y: 950 };
+    const kw = await moveBeing(CAMP, KRIS, { kind: 'point', point: KRIS_START }, { cause: 'gm' });
+    console.log(kw.ok ? `Kristopher → the top of the stairs (${kw.feet} ft)` : `Kristopher stays: ${kw.reason}`);
+    const ks2 = await beingStanding(map, KRIS);
+    if (ks2?.room) await beingPlaced(CAMP, { id: KRIS, name: 'Kristopher' }, ks2.room.id, ks2.point);
   } catch (e) { console.warn('facts-from-the-map skipped:', (e as Error).message); }
   console.log(`reset to the knock: archive ${file}; clock → ${CLOCK_AT_THE_KNOCK}; Violet → Main Room; pizza → Kristopher; entry door locked; last-known wiped (${wiped.count}) and ${looked} beings looked around; ${refacted} placement facts rebuilt from the map`);
   process.exit(0);
