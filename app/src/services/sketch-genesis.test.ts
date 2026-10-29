@@ -114,7 +114,7 @@ describe('sketch genesis — the write set', () => {
     expect(sheet.skills.find((s) => s.name === 'Brewing')?.level).toBe(4);
     expect(sheet.attributes.frequency.level).toBe(40);
     expect(sheet.creation?.seed?.baseFateDie).toBe('d8');
-    expect(sheet.attributes.willpower.augmentPositive).toBe(13);
+    expect(sheet.attributes.willpower.augmentPositive).toBe(31); // Human seed augments re-based ×2.4 on 2026-10-29
     expect(sheet._npc.description).toMatch(/Drowned Lantern/);
 
     // Priced through the crystallization debit at the sheet's own TKV.
@@ -136,13 +136,13 @@ describe('sketch genesis — the write set', () => {
   });
 
   it('over-wallet KV is clamped to the fluid KRMA and the summary says so', async () => {
-    h.fluid = 200; // the proposal prices at 227; the bare Human floor is 188
+    h.fluid = 280; // the proposal prices at 297; the bare Human floor is 258 (seed augments re-based 2026-10-29)
     const { characterId } = await startSketch('c1', GM, { seedText: 'a retired champion' });
     const job = await awaitSketch(characterId);
     expect(job?.status).toBe('DONE');
     const sheet = JSON.parse(h.created[0].data as string) as GrowthCharacter;
     const kv = calculateCharacterTKV(sheet).total;
-    expect(kv).toBeLessThanOrEqual(200);
+    expect(kv).toBeLessThanOrEqual(280);
     expect(sheet.skills).toEqual([]); // skills give way first
     expect(sheet.attributes.clout.level).toBeLessThan(20);
     expect(h.crystallize.mock.calls[0][3]).toMatchObject({ karmicValue: kv });

@@ -342,28 +342,29 @@ export const forgeSpellDataSchema = z.object({
   ...maturityFlagsField,
 });
 
-// Root/Branch attribute schema — starting levels (not augments)
+// Root/Branch attribute schema — starting levels (not augments). Cap 60: since the 2026-10-29 re-base an average
+// human sits around 30 per attribute and a childhood Root alone carries 15–35 of that.
 const attributeLevelsSchema = z.object({
-  clout: z.number().int().min(0).max(20).default(0),
-  celerity: z.number().int().min(0).max(20).default(0),
-  constitution: z.number().int().min(0).max(20).default(0),
-  focus: z.number().int().min(0).max(20).default(0),
-  flow: z.number().int().min(0).max(20).default(0),
-  willpower: z.number().int().min(0).max(20).default(0),
-  wisdom: z.number().int().min(0).max(20).default(0),
-  wit: z.number().int().min(0).max(20).default(0),
+  clout: z.number().int().min(0).max(60).default(0),
+  celerity: z.number().int().min(0).max(60).default(0),
+  constitution: z.number().int().min(0).max(60).default(0),
+  focus: z.number().int().min(0).max(60).default(0),
+  flow: z.number().int().min(0).max(60).default(0),
+  willpower: z.number().int().min(0).max(60).default(0),
+  wisdom: z.number().int().min(0).max(60).default(0),
+  wit: z.number().int().min(0).max(60).default(0),
 });
 
 // Seed augment schema — augments added to attributes
 const attributeAugmentsSchema = z.object({
-  clout: z.number().int().min(0).max(30).default(0),
-  celerity: z.number().int().min(0).max(30).default(0),
-  constitution: z.number().int().min(0).max(30).default(0),
-  focus: z.number().int().min(0).max(30).default(0),
-  flow: z.number().int().min(0).max(30).default(0),
-  willpower: z.number().int().min(0).max(30).default(0),
-  wisdom: z.number().int().min(0).max(30).default(0),
-  wit: z.number().int().min(0).max(30).default(0),
+  clout: z.number().int().min(0).max(60).default(0),
+  celerity: z.number().int().min(0).max(60).default(0),
+  constitution: z.number().int().min(0).max(60).default(0),
+  focus: z.number().int().min(0).max(60).default(0),
+  flow: z.number().int().min(0).max(60).default(0),
+  willpower: z.number().int().min(0).max(60).default(0),
+  wisdom: z.number().int().min(0).max(60).default(0),
+  wit: z.number().int().min(0).max(60).default(0),
 });
 
 const forgeSkillEntrySchema = z.object({
