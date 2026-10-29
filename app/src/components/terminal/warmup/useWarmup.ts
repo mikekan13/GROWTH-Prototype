@@ -21,6 +21,8 @@ export interface WarmupState {
   phase: LaneLike['phase'] | null;
   /** The worker's GPU, when the lane says so (for the plain offline/loading line). */
   gpu: string | null;
+  /** The RunPod balance the lane reported, when it did (for the throttled line). */
+  balance: number | null;
   dismiss: () => void;
 }
 
@@ -36,6 +38,7 @@ export function useWarmup(campaignId: string, session: { id: string; startedAt?:
   const [progress, setProgress] = useState(0);
   const [phase, setPhase] = useState<LaneLike['phase'] | null>(null);
   const [gpu, setGpu] = useState<string | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
   const doneFor = useRef<string | null>(null);
   const laneRef = useRef<LaneLike | null>(null);
   const phaseSince = useRef(Date.now());
@@ -70,6 +73,7 @@ export function useWarmup(campaignId: string, session: { id: string; startedAt?:
           laneRef.current = lane;
           setPhase(lane.phase);
           setGpu(lane.endpoint?.worker?.gpu ?? null);
+          setBalance(typeof lane.endpoint?.balance === 'number' ? lane.endpoint.balance : null);
           if (first) {
             first = false;
             if (!fresh && lane.phase !== 'ready' && lane.phase !== 'disabled') { phaseSince.current = Date.now(); setMode('warming'); }
@@ -109,5 +113,5 @@ export function useWarmup(campaignId: string, session: { id: string; startedAt?:
     return () => clearTimeout(t);
   }, [mode, sessionId]);
 
-  return { mode, progress, phase, gpu, dismiss };
+  return { mode, progress, phase, gpu, balance, dismiss };
 }

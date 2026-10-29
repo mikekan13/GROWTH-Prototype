@@ -18,7 +18,8 @@
 import 'server-only';
 import { l1Status, type L1Status } from './l1-warm';
 
-export type LanePhase = 'ready' | 'host' | 'loading' | 'offline' | 'disabled';
+/** `throttled`: RunPod will not rent a worker — the account balance is spent (2026-10-27..29: two days read as "warming"). */
+export type LanePhase = 'ready' | 'host' | 'loading' | 'offline' | 'disabled' | 'throttled';
 
 export interface LaneReadiness {
   status: L1Status;
@@ -33,6 +34,8 @@ export interface LaneReadiness {
     unhealthy: number;
     queue: number;
     worker?: { id: string; gpu?: string; uptimeSeconds?: number };
+    /** The RunPod account balance in USD, when GraphQL answers. */
+    balance?: number;
   };
   probedAt: string;
 }
@@ -82,6 +85,12 @@ async function endpointView(): Promise<LaneReadiness['endpoint'] | undefined> {
       workers?: Array<{ id: string; lastStatusChange?: string }>;
     };
     const live = (ep.workers ?? []).filter((x) => !/Exited/.test(x.lastStatusChange ?? ''));
+    try {
+      const b = (await (await fetch(`https://api.runpod.io/graphql`, {
+        method: 'POST', headers: H, body: JSON.stringify({ query: '{ myself { clientBalance } }' }), signal: withTimeout(4000),
+      })).json()) as { data?: { myself?: { clientBalance?: number } } };
+      if (typeof b.data?.myself?.clientBalance === 'number') out.balance = b.data.myself.clientBalance;
+    } catch { /* the balance is a courtesy */ }
     // Workers are pods under the hood; GraphQL is the only place their GPU + uptime show.
     for (const x of live) {
       const q = `{ pod(input:{podId:"${x.id}"}) { machine { gpuDisplayName } runtime { uptimeInSeconds } } }`;
@@ -97,12 +106,27 @@ async function endpointView(): Promise<LaneReadiness['endpoint'] | undefined> {
   }
 }
 
+/**
+ * RunPod throttles an endpoint it will not rent for: `workers.throttled` with nothing ready, running or starting.
+ * A spent balance is the known cause (the account read −$0.01 on 29 Oct 2026); a balance at or under zero says so
+ * on its own even before the throttle shows.
+ */
+export function laneThrottled(endpoint: LaneReadiness['endpoint'] | undefined): boolean {
+  if (!endpoint) return false;
+  if (typeof endpoint.balance === 'number' && endpoint.balance <= 0) return true;
+  return endpoint.throttled > 0 && endpoint.ready === 0 && endpoint.running === 0 && endpoint.initializing === 0;
+}
+
 export async function laneReadiness(): Promise<LaneReadiness> {
-  const [status, endpoint] = await Promise.all([probeCached(), endpointView()]);
+  const endpoint = await endpointView();
+  // A throttled endpoint gets no probe: each probe is a job that would wait in the queue for a worker that will
+  // not come (and fire the moment the balance is topped up). 27–29 Oct: 136, 80 and 37 of them, purged by hand.
+  const status: L1Status = laneThrottled(endpoint) ? 'warming' : await probeCached();
   let phase: LanePhase;
   if (status === 'ready') phase = 'ready';
   else if (status === 'disabled') phase = 'disabled';
   else if (status === 'offline') phase = 'offline';
+  else if (laneThrottled(endpoint)) phase = 'throttled';
   else phase = endpoint?.worker?.uptimeSeconds != null || (endpoint?.running ?? 0) > 0 ? 'loading' : 'host';
   return { status, phase, expectedColdStartSeconds: EXPECTED_COLD_START_S, endpoint, probedAt: new Date().toISOString() };
 }

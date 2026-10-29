@@ -22,11 +22,13 @@ interface Props {
   /** 'watcher' or a character id. */
   viewer: string;
   progress: number;
-  offline: boolean;
+  /** 'offline': the lane did not answer. 'throttled': RunPod will not rent a worker (balance spent). */
+  offline: 'offline' | 'throttled' | null;
   gpu?: string | null;
+  balance?: number | null;
 }
 
-export default function WarmupTicker({ campaignId, viewer, progress, offline, gpu }: Props) {
+export default function WarmupTicker({ campaignId, viewer, progress, offline, gpu, balance }: Props) {
   const [tidbits, setTidbits] = useState<string[]>([]);
   const [mode, setMode] = useState<'tidbit' | 'readout'>('tidbit');
   const [idx, setIdx] = useState(0);
@@ -73,7 +75,12 @@ export default function WarmupTicker({ campaignId, viewer, progress, offline, gp
       {/* The two numbers hold the far edges and never leave; only the glitch-out removes the whole ticker. */}
       <span data-ps-left style={{ ...numStyle, textAlign: 'left' }}>{s.left}</span>
       <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
-        {offline ? (
+        {offline === 'throttled' ? (
+          <div data-lane-throttled style={{ fontSize: 13, lineHeight: 1.45 }}>
+            <strong style={{ color: '#f7525f' }}>NO CORE WILL BE RENTED.</strong>{' '}
+            RunPod is out of money{typeof balance === 'number' ? ` (balance $${balance.toFixed(2)})` : ''}; top up and the lane returns on its own.
+          </div>
+        ) : offline ? (
           <div style={{ fontSize: 13, lineHeight: 1.45 }}>
             <strong style={{ color: '#f7525f' }}>THE CORE IS UNREACHABLE.</strong>{' '}
             The lane did not answer{gpu ? ` (last seen on ${gpu})` : ''}.

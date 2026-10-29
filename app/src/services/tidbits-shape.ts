@@ -11,6 +11,8 @@ export type TidbitSource =
   | { kind: 'fact'; text: string }
   /** A line of shared or object history, or canon narration: prose already. */
   | { kind: 'history'; text: string }
+  /** A thing and its story; the story is prefixed with the name when it does not name the thing itself. */
+  | { kind: 'thing'; name: string; text: string }
   /** A being's own memory; `owner` closes it with a trailing dash. */
   | { kind: 'memory'; text: string; owner: string }
   /** A DayaIntention, turned into a teaser. */
@@ -39,8 +41,11 @@ const PLACEHOLDER_RES: RegExp[] = [
   /\bis out in the world\b/i,
   /\s[—–-]\s*(?:npc|player character|character|creature|godhead)\s*,\s*(?:active|draft|dead|submitted|approved|retired)\b/i,
   /^[^.!?]{1,60} holds [^.!?]{1,60}\.?$/i, // "Violet holds The errand bag."
+  /^[^.!?]{1,60} is in [^.!?]{1,60}\.?$/i, // "The story board is in Main Room."
   /^[^.!?]{1,60} is an? (?:settlement|wilderness|dungeon|building|region|location|item)\.?$/i,
   /\b(?:lorem ipsum|placeholder|tbd|todo)\b/i,
+  /^no (?:items|objects|things) (?:are )?placed\b/i, // "No items placed in the bathroom at this time." — a layout note
+  /\bat this time\b/i,
 ];
 
 export function isPlaceholder(text: string): boolean {
@@ -58,6 +63,8 @@ export const FALLBACK_TIDBITS: readonly string[] = [
 ];
 
 export const TIDBIT_COUNT = 12;
+/** A thing's story shorter than this is a catalogue entry, not a line. */
+export const THING_MIN_WORDS = 6;
 export const MAX_CHARS = 160;
 const MIN_NON_MEMORY = 4;
 
@@ -173,6 +180,21 @@ function shapeRaw(source: TidbitSource): string | null {
     }
     case 'economy':
       return isPlaceholder(source.text) ? null : source.text.trim() || null;
+    case 'thing': {
+      // "The one she reaches for first when the radiator hasn't caught up yet." names nothing on its own; a catalogue
+      // line ("Plain grey boxer briefs.") says nothing worth a loading screen. The name leads when the story lacks it.
+      if (isPlaceholder(source.text)) return null;
+      const s = wholeSentences(source.text);
+      if (!s || isPlaceholder(s)) return null;
+      if (s.split(/\s+/).length < THING_MIN_WORDS) return null;
+      const name = source.name.trim().replace(/[.!?]+$/, '');
+      const head = name.split(/\s+/).filter((w) => !/^(?:the|a|an|her|his|their|my|its)$/i.test(w)).pop() ?? name;
+      const named = head.length > 2 && new RegExp(`\\b${head.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i').test(s);
+      if (named) return s;
+      const cap = name.charAt(0).toUpperCase() + name.slice(1);
+      const story = s.charAt(0).toLowerCase() + s.slice(1);
+      return `${cap}: ${story}`;
+    }
     case 'memory': {
       if (isPlaceholder(source.text)) return null;
       const s = wholeSentences(source.text);
@@ -185,8 +207,10 @@ function shapeRaw(source: TidbitSource): string | null {
       const lead = source.cadence && LEAD[source.cadence] ? LEAD[source.cadence] : source.dueCycle != null ? 'Soon' : null;
       if (trigger && lead) return `${lead}, when ${trigger}… — ${source.owner}`;
       if (trigger) return `When ${trigger}… — ${source.owner}`;
+      // The same rule as a memory: a habit read off a being's words must name what it is about ("It's the one I
+      // always reach for" says nothing on its own).
       const s = wholeSentences(source.description);
-      return s && !isPlaceholder(s) ? `${s} — ${source.owner}` : null;
+      return s && !isPlaceholder(s) && memoryOpensCleanly(s) ? `${s} — ${source.owner}` : null;
     }
     case 'familiarity': {
       const k = knowing(source.score);
@@ -215,9 +239,9 @@ function shuffle<T>(xs: T[], random: () => number): T[] {
   return a;
 }
 
-/** Round-robin across shuffled groups, up to `count`. */
-function spread(groups: string[][], random: () => number, count: number): string[] {
-  const gs = groups.map((g) => shuffle([...new Set(g.filter((s) => s && s.trim()))], random)).filter((g) => g.length > 0);
+/** Round-robin across shuffled groups, up to `count`; no one group gives more than `perGroup` lines. */
+function spread(groups: string[][], random: () => number, count: number, perGroup = count): string[] {
+  const gs = groups.map((g) => shuffle([...new Set(g.filter((s) => s && s.trim()))], random).slice(0, perGroup)).filter((g) => g.length > 0);
   const out: string[] = [];
   while (out.length < count && gs.some((g) => g.length > 0)) {
     for (const g of shuffle(gs, random)) {
@@ -229,12 +253,15 @@ function spread(groups: string[][], random: () => number, count: number): string
 }
 
 /**
- * ~12 lines, sampled at random, spread across kinds. At most one line in three is a memory. Fewer than
- * MIN_NON_MEMORY real non-memory lines → the tiny generic fallback tops them up and `fallback` is true.
+ * ~12 lines, sampled at random, spread across kinds. No kind gives more than a quarter of the lines (Mike
+ * 2026-10-29, "very flat": Kristopher's screen was seven pieces of his uniform). At most one line in three is a
+ * memory. Fewer than MIN_NON_MEMORY real non-memory lines → the tiny generic fallback tops them up and
+ * `fallback` is true.
  */
+export const MAX_PER_KIND = Math.ceil(TIDBIT_COUNT / 4);
 export function sampleTidbits(pool: TidbitPool, random: () => number = Math.random, count = TIDBIT_COUNT): { tidbits: string[]; fallback: boolean } {
   const { memories = [], ...rest } = pool;
-  let others = spread(Object.values(rest) as string[][], random, count);
+  let others = spread(Object.values(rest) as string[][], random, count, MAX_PER_KIND);
   let fallback = false;
   if (others.length < MIN_NON_MEMORY) {
     others = [...others, ...shuffle([...FALLBACK_TIDBITS], random).slice(0, MIN_NON_MEMORY - others.length)];

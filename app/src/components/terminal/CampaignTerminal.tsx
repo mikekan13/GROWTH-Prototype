@@ -1276,8 +1276,9 @@ export default function CampaignTerminal({
                 campaignId={campaignId}
                 viewer={viewAs ?? 'watcher'}
                 progress={warm.progress}
-                offline={warm.phase === 'offline'}
+                offline={warm.phase === 'offline' ? 'offline' : warm.phase === 'throttled' ? 'throttled' : null}
                 gpu={warm.gpu}
+                balance={warm.balance}
               />
             ) : undefined}
           />

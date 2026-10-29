@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sampleTidbits, shapeTidbit, wholeSentences, splitSentences, isProse, startsLikeSentence, memoryOpensCleanly, FALLBACK_TIDBITS, TIDBIT_COUNT, type TidbitSource } from './tidbits-shape';
+import { sampleTidbits, shapeTidbit, wholeSentences, splitSentences, isProse, startsLikeSentence, memoryOpensCleanly, FALLBACK_TIDBITS, TIDBIT_COUNT, MAX_PER_KIND, type TidbitSource } from './tidbits-shape';
 
 const seq = (xs: number[]) => { let i = 0; return () => xs[i++ % xs.length]; };
 const fact = (text: string): TidbitSource => ({ kind: 'fact', text });
@@ -12,6 +12,8 @@ describe('shapeTidbit rejects the template dumps and placeholders Mike saw', () 
     fact('Rosemary Marsh — npc, draft.'),
     fact('The desk lamp is out in the world.'),
     fact('Violet holds The errand bag.'),
+    fact('The story board is in Main Room.'),
+    fact('No items placed in the bathroom at this time. The wooden shelf, wire caddy, and pedestal sink are present but empty of placed objects.'),
     fact("Derek is a character in Violet's world — role, relationship to Violet, and current status not yet established. He exists as a named person the story…"),
     { kind: 'history', text: 'Derek exists as a named person the story has not yet used.' },
     { kind: 'memory', text: 'Status not yet established.', owner: 'Violet' },
@@ -142,5 +144,37 @@ describe('fault 3: a memory is its OPENING, and the opening must stand alone', (
   it('takes the opening, never an interior sentence', () => {
     expect(mem('The kettle is the one I trust. The lid rattles at dawn.')).toBe('The kettle is the one I trust. The lid rattles at dawn. — Violet');
     expect(mem("It's late. The kettle is the one I trust and use daily.")).toBeNull();
+  });
+});
+
+describe('"very flat" (Mike 2026-10-29): the live ticker lines', () => {
+  it('an intention read off a being\'s words must name what it is about, like a memory', () => {
+    const v = (description: string, cadence?: string) => shapeTidbit({ kind: 'intention', description, cadence, owner: 'Violet' });
+    expect(v("It's the one I always reach for.", 'always')).toBeNull();
+    expect(v("It's solid, the drawers stick in summer, and the top is the right height for leaving things I mean to put away.")).toBeNull();
+    expect(v('And if I know for certain I will have to decide what that means.')).toBeNull();
+    expect(v('I lock the door every time.', 'always')).toBe('I lock the door every time. \u2014 Violet');
+    expect(v('I order from the same pizza place every day.', 'daily')).toBe('I order from the same pizza place every day. \u2014 Violet');
+  });
+
+  it('a thing\'s story leads with its name when the story does not name it, and a catalogue entry is dropped', () => {
+    const t = (name: string, text: string) => shapeTidbit({ kind: 'thing', name, text });
+    expect(t('The big cardigan', "The one she reaches for first when the radiator hasn't caught up yet.")).toBe("The big cardigan: the one she reaches for first when the radiator hasn't caught up yet.");
+    expect(t('Her key', 'The key to the fourth-floor studio. She carries it on a plain ring with nothing else on it.')).toBe('The key to the fourth-floor studio. She carries it on a plain ring with nothing else on it.');
+    expect(t('Orthodox wooden cross', 'A wooden Orthodox cross on a cord around his neck. He does not take it off.')).toBe('A wooden Orthodox cross on a cord around his neck. He does not take it off.');
+    expect(t('Boxer briefs', 'Plain grey boxer briefs.')).toBeNull();
+    expect(t('The errand bag', '')).toBeNull();
+  });
+
+  it('no kind floods the set: a wardrobe of twelve held things gives at most a quarter of the lines', () => {
+    const r = sampleTidbits({
+      facts: Array.from({ length: 12 }, (_, i) => `Uniform piece number ${i} with its story.`),
+      intentions: ['I work on GRO.WTH every day. \u2014 Kristopher', 'I always stay a few seconds longer at her door than the delivery needs. \u2014 Kristopher'],
+      familiarity: ['You know Violet well.'],
+      memories: ['First time I held a camera for work, I understood something. \u2014 Kristopher'],
+    }, seq([0.1, 0.5, 0.9, 0.3]));
+    expect(r.tidbits.filter((t) => t.startsWith('Uniform')).length).toBeLessThanOrEqual(MAX_PER_KIND);
+    expect(MAX_PER_KIND).toBe(3);
+    expect(r.fallback).toBe(false);
   });
 });

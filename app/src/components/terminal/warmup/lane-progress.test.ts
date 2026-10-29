@@ -6,6 +6,7 @@ describe('laneTarget', () => {
     expect(laneTarget({ phase: 'ready' }, 0)).toBe(1);
     expect(laneTarget({ phase: 'disabled' }, 0)).toBe(1);
     expect(laneTarget({ phase: 'offline' }, 0)).toBeNull();
+    expect(laneTarget({ phase: 'throttled' }, 0)).toBeNull();
   });
 
   it('host eases inside 0..0.30 and keeps moving', () => {

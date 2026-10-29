@@ -53,7 +53,7 @@ async function watcherPool(campaignId: string, TAKE = 60): Promise<TidbitPool> {
   const [facts, locations, items, canon, memories, intentions, wallet] = await Promise.all([
     prisma.worldFact.findMany({ where: { campaignId, supersededById: null }, select: { fact: true }, take: TAKE }),
     prisma.location.findMany({ where: { campaignId, status: { not: 'HIDDEN' } }, select: { data: true }, take: TAKE }),
-    prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { story: true, history: true }, take: TAKE }),
+    prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { name: true, story: true, history: true }, take: TAKE }),
     prisma.canonEvent.findMany({ where: { campaignId }, select: { narration: true }, orderBy: { cycle: 'desc' }, take: TAKE }),
     prisma.dayaMemoryEntry.findMany({
       where: { noticed: true, entity: { character: { campaignId } } },
@@ -73,7 +73,7 @@ async function watcherPool(campaignId: string, TAKE = 60): Promise<TidbitPool> {
     facts: lines([
       ...facts.map((f) => shapeTidbit({ kind: 'fact', text: f.fact })),
       ...locations.map((l) => shapeTidbit({ kind: 'fact', text: proseOf(l.data) })),
-      ...items.map((i) => shapeTidbit({ kind: 'fact', text: i.story ?? '' })),
+      ...items.map((i) => shapeTidbit({ kind: 'thing', name: i.name, text: i.story ?? '' })),
     ]),
     history: lines([
       ...canon.map((e) => shapeTidbit({ kind: 'history', text: e.narration })),
@@ -98,7 +98,7 @@ async function characterPool(campaignId: string, characterId: string, TAKE = 60)
     entity
       ? prisma.dayaIntention.findMany({ where: { entityId: entity.id, status: 'PENDING' }, select: { description: true, trigger: true, cadence: true, dueCycle: true }, take: TAKE })
       : Promise.resolve([] as Array<{ description: string; trigger: string | null; cadence: string | null; dueCycle: number | null }>),
-    prisma.campaignItem.findMany({ where: { campaignId, holderId: characterId, status: 'ACTIVE' }, select: { story: true }, take: TAKE }),
+    prisma.campaignItem.findMany({ where: { campaignId, holderId: characterId, status: 'ACTIVE' }, select: { name: true, story: true }, take: TAKE }),
   ]);
   const fam = entity
     ? await prisma.familiarity.findMany({ where: { campaignId, perceiverId: entity.id, score: { gt: 0.15 } }, select: { subjectId: true, score: true }, take: 200 })
@@ -112,12 +112,14 @@ async function characterPool(campaignId: string, characterId: string, TAKE = 60)
     prisma.campaignItem.findMany({ where: { id: { in: ids }, campaignId }, select: { id: true, name: true } }),
     prisma.location.findMany({ where: { id: { in: ids }, campaignId }, select: { id: true, name: true } }),
   ]);
-  const known = [...chars, ...items, ...locs].filter((x) => x.id !== characterId);
+  // A room's name is a label ("Main Room"); in a sentence it takes its article.
+  const named = locs.map((l) => ({ ...l, name: /^(?:the|a|an)\s/i.test(l.name.trim()) ? l.name.trim() : `the ${l.name.trim()}` }));
+  const known = [...chars, ...items, ...named].filter((x) => x.id !== characterId);
   return {
     memories: lines(memories.map((m) => shapeTidbit({ kind: 'memory', text: m.content, owner }))),
     intentions: lines(intentions.map((i) => shapeTidbit({ kind: 'intention', description: i.description, trigger: i.trigger, cadence: i.cadence, dueCycle: i.dueCycle, owner }))),
     familiarity: lines(known.map((k) => shapeTidbit({ kind: 'familiarity', subject: k.name, score: best.get(k.id) ?? 0, owner, second: true }))),
-    facts: lines(held.map((i) => shapeTidbit({ kind: 'fact', text: i.story ?? '' }))),
+    facts: lines(held.map((i) => shapeTidbit({ kind: 'thing', name: i.name, text: i.story ?? '' }))),
   };
 }
 

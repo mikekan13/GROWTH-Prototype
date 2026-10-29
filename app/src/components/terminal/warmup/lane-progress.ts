@@ -8,11 +8,12 @@
  *   ready    1.00
  *   disabled 1.00          no local core at all: straight to the in-session look
  *   offline  null          unknown — the bar holds where it is, the state is shown plainly
+ *   throttled null         RunPod will not rent a worker (balance spent) — held, and said plainly with the balance
  */
 export interface LaneLike {
-  phase: 'ready' | 'host' | 'loading' | 'offline' | 'disabled';
+  phase: 'ready' | 'host' | 'loading' | 'offline' | 'disabled' | 'throttled';
   expectedColdStartSeconds?: number;
-  endpoint?: { ready?: number; initializing?: number; running?: number; worker?: { uptimeSeconds?: number } };
+  endpoint?: { ready?: number; initializing?: number; running?: number; worker?: { uptimeSeconds?: number }; balance?: number };
 }
 
 export function laneTarget(lane: LaneLike | null, sincePhaseMs: number): number | null {
@@ -22,6 +23,7 @@ export function laneTarget(lane: LaneLike | null, sincePhaseMs: number): number 
     case 'disabled':
       return 1;
     case 'offline':
+    case 'throttled':
       return null;
     case 'host': {
       const eased = 1 - Math.exp(-Math.max(0, sincePhaseMs) / 45_000);
