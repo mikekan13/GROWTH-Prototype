@@ -336,6 +336,9 @@ export function isScriptLine(line: string): boolean {
 }
 
 const QUOTE_CHAR_RE = /["“”]/;
+// WRITTEN, not said (HW10 2026-10-29: 'The caller ID reads "Chess Pizza."' became Violet SAYING "Chess Pizza." and Kristopher
+// answered her through the door): a quote introduced by a verb of writing or display is text on a thing — it stays narration.
+const WRITTEN_BEFORE_QUOTE_RE = /\b(?:reads?|reading|is\s+(?:written|printed|marked|labell?ed|titled|inscribed)|says?\s+on\s+(?:it|the\s+\w+)|displays?|displaying|shows?|showing|flashe?s|flashing|lights?\s+up(?:\s+with)?|spells?\s+out|printed|written|labell?ed|marked|titled|inscribed)\s*[:,]?\s*$/i;
 // A quote said where nobody can hear it: in his head, to himself, silently.
 const SILENT_SAY_RE = /\b(?:in (?:his|her|their) (?:head|mind)|to (?:himself|herself|themselves)|silently|without a sound|inwardly|in silence)\b/i;
 const SAID_VERBS = '(?:says|asks|shouts|whispers|yells|replies|calls out|mutters|growls|snaps)';
@@ -522,6 +525,12 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
       const start = m.index ?? 0;
       const before = line.slice(cursor, start);
       stripped += before;
+      // Text on a screen, a sign, a label: written, not said — it stays in the prose, nobody's mouth.
+      if (WRITTEN_BEFORE_QUOTE_RE.test(before.slice(-80).trimEnd()) || (cursor === 0 && WRITTEN_BEFORE_QUOTE_RE.test(line.slice(0, start).slice(-80).trimEnd()))) {
+        stripped += m[0];
+        cursor = start + m[0].length;
+        continue;
+      }
       const afterAll = line.slice(start + m[0].length);
       const afterTag = afterAll.split(/(?<=[.!?])\s|\n/)[0] ?? '';
       const beforeWindow = (stripped.length > 0 ? stripped : line.slice(0, start)).slice(-240);

@@ -289,7 +289,12 @@ export async function judgeCanonReach(
     }
   }
   // The one holding a named thing perceives what happens to it whole — it is in their pocket (HW9: Violet's own phone).
+  // Only for what happens TO the thing: the world's own narration ("Her phone rings in her pocket", no actor) or the holder's
+  // own act. Another being's act that merely NAMES it ("Kristopher … calls Violet's phone", from the landing) reaches her as
+  // far as her senses carry — through the door, that is nothing; the ring the world answers with is what she hears
+  // (HW10 2026-10-29: she perceived his whole call, app and all, and "saw" the name on the screen before it rang).
   for (const b of beings) {
+    if (event.sourceId && event.sourceId !== b.id) continue;
     const v = holderVerdict(b.id, named.matches, j.verdicts.get(b.id));
     if (v && v !== j.verdicts.get(b.id)) { console.log(`[perception-reach] ${b.name} holds ${named.matches.find((m) => m.holderId === b.id)?.name}: perceives it whole`); j.verdicts.set(b.id, v); }
   }

@@ -1027,8 +1027,11 @@ export async function listenStimulus(
     const sealed = omniscient ? { text: split.thought, usedFallback: false } : await enforceSeal(split.thought, { entityId: ctx.entityDaId, subsystem: 'spirit_listen', fallback: '' });
     // THE VOICE FILTER (HW8 run 6): the table's words, stock images, counting nobody gave it, light with no light fact, and a
     // sentence already thought are dropped before anything downstream (the scene builder, the feed) sees the monologue.
+    // The echo corpus is the prompt with every living part blank — its instructions only (HW10: with the whole prompt, the
+    // being's own earlier thoughts, handed back in "what has been going through your mind", read as echoes and were dropped).
+    const promptStatics = buildSpiritListeningPrompt({ name: '', identityNarrative: '', voiceNotes: '', feltStateBrief: '', standingScene: '', recallBlock: ' (Your most recent thoughts are given so you can continue from them. Never repeat a sentence you have already thought; think the NEXT thing.)', desiresBlock: '', innerSoFar: '', heard: '', sinceOwn: null, sensesNote: sensesNoteFor(stimulus.via, own), facts: [], held: [], reads: '' });
     const voiced = (!sealed.usedFallback && sealed.text && !omniscient)
-      ? filterVoice(sealed.text, { prior: priorVoice, heard: stimulus.content, hasLightFact: ground.hasLight, facts: ground.lines, noOneInView: ground.noOneInView, absentNames: ground.absentNames, heldNames: (heldRows ?? []).map((h) => h.name), prompt })
+      ? filterVoice(sealed.text, { prior: priorVoice, heard: stimulus.content, hasLightFact: ground.hasLight, facts: ground.lines, noOneInView: ground.noOneInView, absentNames: ground.absentNames, heldNames: (heldRows ?? []).map((h) => h.name), prompt: promptStatics })
       : { text: sealed.text, dropped: [] };
     const log = droppedLog(ctx.name, 'monologue', voiced.dropped);
     if (log) console.log(log);
@@ -1041,7 +1044,7 @@ export async function listenStimulus(
         let again = '';
         try {
           const second = (await chat({ tier: 'L1', subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }, { role: 'user', content: specificsHint(bad.c) }], maxTokens: LISTENING_MAX_TOKENS }, overrides)).text.trim();
-          again = filterVoice(splitImpulse(second).thought, { prior: priorVoice, heard: stimulus.content, hasLightFact: ground.hasLight, prompt }).text;
+          again = filterVoice(splitImpulse(second).thought, { prior: priorVoice, heard: stimulus.content, hasLightFact: ground.hasLight, prompt: promptStatics }).text;
         } catch (err) { console.warn('[daya/ensemble] specifics re-voice failed (non-fatal):', err instanceof Error ? err.message : err); }
         const rechecked = again && !splitSentences(again).some((x) => competingSpecific(x, knowledge));
         voiced.text = rechecked ? again : splitSentences(voiced.text).filter((x) => !competingSpecific(x, knowledge)).join(' ');

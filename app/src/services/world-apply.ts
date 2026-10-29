@@ -281,18 +281,32 @@ export interface ApplyReport {
   sounds?: Array<{ text: string; at: string; locationId: string | null }>;
 }
 
-/** The thing or being a sound is said to be at, and the room it is in (a held thing is with its holder). Null when unknown. */
-async function soundSite(campaignId: string, at: string): Promise<{ name: string; locationId: string | null } | null> {
+/**
+ * The thing a sound is said to be at, and the room it is in (a held thing is with its holder). Null when unknown.
+ * A sound "at a person" is refused (HW10 2026-10-29: the adjudicator put the ring "at Kristopher" when the Watcher's line
+ * already said he heard it, and he heard it twice) — a person's senses carry the act; only a THING is a place a sound comes from.
+ * The name is matched loosely (HW10: "Violet's smartphone" is "Her phone" — the model names things as it likes): the thing's
+ * own name, the holder's possessive with the thing's head noun (named-things), then any held thing whose head noun ends the
+ * model's noun or vice versa ("smartphone" ~ "phone"), owner first.
+ */
+async function soundSite(campaignId: string, at: string): Promise<{ kind: 'thing'; name: string; locationId: string | null } | { kind: 'being'; name: string } | null> {
   const key = at.trim().toLowerCase().replace(/^the\s+/, '');
   const beings = await prisma.character.findMany({ where: { campaignId, status: { notIn: ['DEAD', 'RETIRED'] } }, select: { id: true, name: true } });
   const items = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { id: true, name: true, holderId: true, locationId: true } });
-  const { matchNamedThings } = await import('@/sim/senses/named-things');
+  const { matchNamedThings, headNoun } = await import('@/sim/senses/named-things');
   const { roomIdOf } = await import('@/services/spatial-world');
   const being = beings.find((b) => b.name.toLowerCase() === key || b.name.toLowerCase().split(/\s+/)[0] === key);
-  if (being) return { name: being.name, locationId: await roomIdOf(being.id) };
-  const thing = items.find((i) => i.name.toLowerCase() === key || i.name.toLowerCase().replace(/^(?:the|her|his)\s+/, '') === key) ?? matchNamedThings(at, items, beings)[0];
+  if (being) return { kind: 'being', name: being.name };
+  let thing: (typeof items)[number] | undefined = items.find((i) => i.name.toLowerCase() === key || i.name.toLowerCase().replace(/^(?:the|her|his)\s+/, '') === key) ?? matchNamedThings(at, items, beings)[0];
+  if (!thing) {
+    // "Violet's smartphone", "her cell": the owner named, then the noun loosely against what they hold.
+    const noun = headNoun(at);
+    const owner = beings.find((b) => new RegExp(`\\b${b.name.split(/\\s+/)[0]}(?:'s|s)\\b`, 'i').test(at));
+    const loose = (i: { name: string }) => { const n = headNoun(i.name); return n.length >= 3 && noun.length >= 3 && (noun.endsWith(n) || n.endsWith(noun)); };
+    thing = (owner ? items.filter((i) => i.holderId === owner.id) : []).find(loose) ?? (owner ? undefined : items.find(loose));
+  }
   if (!thing) return null;
-  return { name: thing.name, locationId: thing.holderId ? await roomIdOf(thing.holderId) : thing.locationId };
+  return { kind: 'thing', name: thing.name, locationId: thing.holderId ? await roomIdOf(thing.holderId) : thing.locationId };
 }
 
 /**
@@ -314,6 +328,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           // Where it sounds: the named thing (held → with its holder) or the named being; the text is what the table narrates.
           const where = await soundSite(campaignId, e.at);
           if (!where) { report.refused.push(`sound at "${e.at}": nothing by that name here`); break; }
+          if (where.kind === 'being') { report.refused.push(`sound at ${where.name}: a person's senses carry the act; a sound comes from a thing`); break; }
           (report.sounds ??= []).push({ text: e.text, at: where.name, locationId: where.locationId });
           report.applied.push(`sound at ${where.name}: ${e.text}`);
           break;

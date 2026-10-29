@@ -432,3 +432,20 @@ describe('a stated thought is kept out of the public stretch (HW8 run 7 #4, #9)'
     expect(p.quotes.map((q) => q.text)).toEqual(['Are you ok?']);
   });
 });
+
+describe('written text in quotes is not speech (HW10 2026-10-29)', () => {
+  const two = [{ id: 'v', name: 'Violet', sex: 'female' }, { id: 'k', name: 'Kristopher', sex: 'male' }];
+  it('the caller ID reads "Chess Pizza." — nobody said it', () => {
+    const p = parseTableProse('The phone rings in Violet\'s hand. The caller ID reads "Chess Pizza." Kristopher can hear her phone ring through the door.', two);
+    expect(p.quotes).toEqual([]);
+    expect(p.narration ?? '').toContain('The caller ID reads "Chess Pizza."');
+  });
+  it('a sign, a label, a screen', () => {
+    expect(parseTableProse('The sign over the door reads "Closed."', two).quotes).toEqual([]);
+    expect(parseTableProse('The screen lights up with "Mom".', two).quotes).toEqual([]);
+  });
+  it('a spoken quote beside a name is still speech', () => {
+    const p = parseTableProse('Violet says, "Chess Pizza?"', two);
+    expect(p.quotes.map((q) => [q.speakerLabel, q.text])).toEqual([['Violet', 'Chess Pizza?']]);
+  });
+});
