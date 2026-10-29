@@ -67,6 +67,8 @@ export interface ReachEvent {
   hidden?: boolean;
   /** Free text for the world-sim: places/materials between, weather, light. */
   setting?: string | null;
+  /** The things the line names, with where each one is (held by whom, in which room) — the sound of a ringing phone is at the phone. */
+  things?: Array<{ name: string; holderName?: string | null; locationName?: string | null }>;
 }
 
 export interface ReachBeing {
@@ -241,6 +243,7 @@ export function buildReachPrompt(event: ReachEvent, beings: ReachBeing[]): { sys
   const user = [
     `EVENT (${kind}${kind === 'speech' ? `, ${volume} volume` : ''}${hidden ? ', concealed' : ''}): ${JSON.stringify(event.text.slice(0, 600))}`,
     `From: ${event.sourceName ?? 'no one in particular'}. At: ${event.locationName ?? (event.locationId ? 'a placed location' : 'the scene')}.`,
+    ...(event.things?.length ? [`Things named, and where each one is (what happens TO a thing sounds and shows there): ${event.things.map((t) => `${t.name} — ${t.holderName ? `held by ${t.holderName}` : 'on the floor'}${t.locationName ? ` in ${t.locationName}` : ''}`).join('; ')}.`] : []),
     ...(event.setting ? [`Setting: ${event.setting.slice(0, 300)}`] : []),
     'BEINGS:',
     ...lines,

@@ -26,6 +26,34 @@ import { actorMap, mapFactLines } from '@/services/world-apply';
 import { loadWorldLevel, beingStanding, levelOfBeing } from '@/services/spatial-world';
 import { lineOfSight } from '@/lib/spatial';
 import { decodePerceivedVia, encodePerceivedVia, mergePerceivedVia } from '@/daya/perceived-via';
+import { matchNamedThings, holderVerdict, type ThingMatch } from '@/sim/senses/named-things';
+
+/**
+ * The things the line names, each with where it is: held by a being (then at that being's room) or on a room's
+ * floor. The event is told about them; a narration about a thing with no acting being happens AT the thing.
+ * Never throws.
+ */
+async function namedThingsIn(campaignId: string, text: string, beings: ReachBeing[]): Promise<{ matches: ThingMatch[]; things: NonNullable<ReachEvent['things']>; at: { locationId: string; locationName: string | null } | null }> {
+  try {
+    const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { id: true, name: true, holderId: true, locationId: true } });
+    const matches = matchNamedThings(text, rows, beings.map((b) => ({ id: b.id, name: b.name })));
+    if (!matches.length) return { matches, things: [], at: null };
+    const locIds = [...new Set(matches.map((m) => m.locationId).filter((x): x is string => !!x))];
+    const locs = locIds.length ? await prisma.location.findMany({ where: { id: { in: locIds } }, select: { id: true, name: true } }) : [];
+    const things = matches.map((m) => {
+      const holder = m.holderId ? beings.find((b) => b.id === m.holderId) : undefined;
+      const locationName = holder ? holder.locationName ?? null : locs.find((l) => l.id === m.locationId)?.name ?? null;
+      return { name: m.name, holderName: holder?.name ?? null, locationName };
+    });
+    const first = matches[0];
+    const holder = first.holderId ? beings.find((b) => b.id === first.holderId) : undefined;
+    const at = holder?.locationId ? { locationId: holder.locationId, locationName: holder.locationName ?? null } : first.locationId ? { locationId: first.locationId, locationName: locs.find((l) => l.id === first.locationId)?.name ?? null } : null;
+    return { matches, things, at };
+  } catch (err) {
+    console.warn('[perception-reach] named things unread', err instanceof Error ? err.message : err);
+    return { matches: [], things: [], at: null };
+  }
+}
 
 export { perceptionReachOn };
 
@@ -214,9 +242,15 @@ export async function judgeCanonReach(
 ): Promise<ReachJudgement & { beings: ReachBeing[] }> {
   let beings: ReachBeing[] = [];
   let walls: WallDoor[] = [];
+  let named: Awaited<ReturnType<typeof namedThingsIn>> = { matches: [], things: [], at: null };
   try {
     beings = opts.beings ?? await loadReachBeings(campaignId, characterIds, { focusById: opts.focusById });
     if (opts.atScene) beings = beings.map((b) => ({ ...b, locationId: event.locationId ?? null, locationName: event.locationName ?? b.locationName ?? null }));
+    // The things the line names (HW9): the judge hears where they are, and a narration with no acting being
+    // happens at the thing (her phone rings in HER room, not where the last beat was).
+    named = await namedThingsIn(campaignId, event.text, beings);
+    if (named.things.length) event = { ...event, things: named.things };
+    if (!opts.atScene && !event.locationId && !event.sourceId && named.at) event = { ...event, locationId: named.at.locationId, locationName: named.at.locationName };
     if (!opts.atScene) event = placeAtSource(event, beings);
     // What stands between the rooms: the judge is told the doors, and held to them below.
     if (!opts.atScene) {
@@ -253,6 +287,11 @@ export async function judgeCanonReach(
       const held = throughWalls(event, b, v, walls, sight.get(b.id));
       if (held !== v) { console.log(`[perception-reach] ${b.name}: a wall is a wall — ${v.via.join('+')} → ${held.reaches ? held.via.join('+') : 'nothing'}`); j.verdicts.set(b.id, held); }
     }
+  }
+  // The one holding a named thing perceives what happens to it whole — it is in their pocket (HW9: Violet's own phone).
+  for (const b of beings) {
+    const v = holderVerdict(b.id, named.matches, j.verdicts.get(b.id));
+    if (v && v !== j.verdicts.get(b.id)) { console.log(`[perception-reach] ${b.name} holds ${named.matches.find((m) => m.holderId === b.id)?.name}: perceives it whole`); j.verdicts.set(b.id, v); }
   }
   return { ...j, beings };
 }

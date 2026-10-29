@@ -101,9 +101,15 @@ export function audibleOnly(content: string, via: string[] | undefined): string 
 
 const UNPLACEABLE_SOUND = 'A sound from beyond the room, too faint to make out.';
 const FRAGMENT_RE = new RegExp(`(?<=(?:^|\\b(?:he|she|they|it|someone|somebody|and|then|but|who)|[A-Z][\\w'’-]*)\\s+(?:(?:then|also|just|again|slowly|quietly|loudly|softly|suddenly|gently|finally)\\s+)?)${SOUND_VERB_RE.source}[^,.;!?]*`, 'g');
+/** "Violets cell phone begins to ring." — a thing that sounds, with a noun-phrase subject the subject rule does not catch (HW9). */
+const THING_SOUND_RE = /^(?:[A-Z][\w'’]*s?\s+)?(?:[a-z-]+\s+){0,3}?([a-z-]+)\s+(?:(?:begins?|starts?|began|started)\s+to\s+)?(ring(?:s|ing)?|rang|buzz(?:es|ed|ing)?|chim(?:es|ed|ing)|beep(?:s|ed|ing)?|vibrat(?:es|ed|ing))\b/i;
+const thirdPerson = (v: string) => /^(?:ring|buzz|chime|beep|vibrate)$/i.test(v) ? (v.toLowerCase() === 'buzz' ? 'buzzes' : `${v.toLowerCase()}s`) : v.toLowerCase();
+
 /** The sounding predicates of a sentence, each as a sentence of its own with an unknown subject ("Someone knocks three times on the door."). Pure. */
 export function soundingFragments(sentence: string): string[] {
   const out: string[] = [];
+  const thing = sentence.trim().match(THING_SOUND_RE);
+  if (thing) out.push(`Someone's ${thing[1].toLowerCase()} ${thirdPerson(thing[2])}.`);
   for (const m of sentence.matchAll(FRAGMENT_RE)) {
     const frag = m[0].trim().replace(/\s+(?:as|while|and|but|with|before|after)\s+(?:he|she|they|it|a|an|the|his|her|their|its|my)\b.*$/i, '');
     if (!frag) continue;

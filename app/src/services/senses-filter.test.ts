@@ -62,3 +62,12 @@ describe('a silent "says" is not sound (HW8 run 5, 2026-10-26)', () => {
     expect(out).not.toContain('prayer');
   });
 });
+
+describe('a thing that rings (HW9, 2026-10-29)', () => {
+  it("'Violets cell phone begins to ring.' is a sound a listener through the door can place on a phone", async () => {
+    const { audibleOnly, soundingFragments } = await import('./senses-filter');
+    expect(soundingFragments('Violets cell phone begins to ring.')).toContain("Someone's phone rings.");
+    expect(audibleOnly('Violets cell phone begins to ring.', ['hearing'])).toBe("Someone's phone rings.");
+    expect(audibleOnly('His work phone buzzes in his pocket.', ['hearing'])).toContain("Someone's phone buzzes.");
+  });
+});
