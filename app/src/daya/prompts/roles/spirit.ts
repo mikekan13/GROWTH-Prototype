@@ -100,7 +100,7 @@ export interface SpiritListeningArgs {
 export const QUOTED_WORDS_NOTE = "Quoted words are the speaker's own; a name inside them is whoever the speaker is addressing, not the speaker.";
 
 /** The in-world words for the voice: never the table's (beat, stimulus, instruction, scene). */
-export const IN_WORLD_NOTE = 'Think and speak only in the words of your own life — what just happened, what you notice, what you do now. Never count knocks, seconds or minutes you were not given a number for. Say nothing about light or dark unless the facts above say how the room is lit. Do not reach for stock images that could fit any scene — say what is specific to this one. A person you remember, or are told to think of, is NOT in front of you unless the facts above say they are in sight.';
+export const IN_WORLD_NOTE = 'Think and speak only in the words of your own life — what just happened, what you notice, what you do now. Put no number on anything you were not given a number for. Say nothing about light or dark unless the facts above say how the room is lit. Do not reach for stock images that could fit any scene — say what is specific to this one. A person you remember, or are told to think of, is NOT in front of you unless the facts above say they are in sight.';
 
 export const LISTENING_MAX_TOKENS = 140;
 

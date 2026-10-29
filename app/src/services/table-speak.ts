@@ -935,8 +935,12 @@ async function runBeats(
           const name = listeners.find((l) => l.id === listenerId)?.name ?? listenerId;
           const said = outcome.listened.thought;
           // THE REPLAY: no sentence the being already thought, verbatim, in its last three records.
-          const thought = said?.trim() ? withoutRepeats(said, await recentThoughtsOf(campaignId, listenerId)) : said;
+          const priorThoughts = await recentThoughtsOf(campaignId, listenerId);
+          const thought = said?.trim() ? withoutRepeats(said, priorThoughts) : said;
           const repeat = !!said?.trim() && !thought;
+          // The card's repeat window is taken NOW, before this beat's thought is recorded (HW10 2026-10-29: the thought went on
+          // the record first, so every card built from it read as a repeat of itself and no card was attached all run).
+          const priorCards = repeat ? [] : await recentCardTextsOf(campaignId, listenerId);
           if (repeat) console.log(`[table-speak] ${name}: the whole thought was a repeat — dropped`);
           // HELD REACTIONS: the Watcher's character still listened (memory formed), but his reaction to another being's line waits for his next beat.
           const holding = !repeat && !!thought && !!truth.gmActorId && listenerId === truth.gmActorId && truthId !== truth.primary;
@@ -967,7 +971,7 @@ async function runBeats(
               // this one (the standing beat repeated one verbatim); a card with nothing left is not posted.
               if (card && standingHere) card = { ...card, scene: null };
               if (card) {
-                const previous = [...await recentThoughtsOf(campaignId, listenerId), ...await recentCardTextsOf(campaignId, listenerId)];
+                const previous = [...priorThoughts, ...priorCards];
                 const deduped = cardWithoutRepeats(card, previous);
                 if (!deduped) console.log(`[table-speak] ${name}: the whole card was a repeat — not attached`);
                 card = deduped;
@@ -1039,7 +1043,8 @@ async function runBeats(
       const content = [clock ? `It is ${clock}.` : null, room ? `You are in the ${nameHead(room.name)}.` : null, 'Nothing from beyond the room has reached you just now.'].filter(Boolean).join(' ');
       console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: ${content}`);
       standingIds.add(listenerId);
-      hear(listenerId, { source: 'perception', content }, { verdict: { beingId: listenerId, reaches: true, via: ['sight'], noticed: true, salience: 0.3 }, source: 'stub' }, undefined, truthId);
+      // All her senses, none of them given anything (HW10 2026-10-29: via ['sight'] alone told her "this reached you by SIGHT only" of a beat in which nothing reached her).
+      hear(listenerId, { source: 'perception', content }, { verdict: { beingId: listenerId, reaches: true, via: ['sight', 'hearing'], noticed: true, salience: 0.3 }, source: 'stub' }, undefined, truthId);
     } catch (err) { console.warn('[standing-beat] failed (non-fatal):', err instanceof Error ? err.message : err); }
   };
   const gatedHear = (utterances: TableUtterance[], ids: string[], askFor?: TableAsk, truthId: string | null = truth.primary, preset: Map<string, ReachVerdict> = new Map(), withOwnWords = false, judgeWith?: TableUtterance[]) => {

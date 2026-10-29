@@ -35,6 +35,8 @@ export interface VoiceFilterContext {
   heldNames?: string[];
   /** 'vocab' = only the table's words (a being's DOING: "knocks three times" is not a count). Default 'all'. */
   rules?: 'all' | 'vocab';
+  /** The prompt the voice answered (HW10 2026-10-29: the small model copied the prompt's own notes into Violet's thought). A sentence of five words or more that appears in it is an echo, not a thought. */
+  prompt?: string;
 }
 
 export interface DroppedSentence { sentence: string; why: string }
@@ -144,10 +146,12 @@ export function filterVoice(text: string, ctx: VoiceFilterContext = {}): { text:
   const seenBefore = new Set(recent.flatMap((p) => splitSentences(p).map(norm)).filter(Boolean));
   const usedNow = new Set<string>();
   const kept: string[] = [];
+  const promptNorm = ctx.prompt ? norm(ctx.prompt) : '';
   for (const sentence of splitSentences(text)) {
     const drop = (why: string) => { dropped.push({ sentence, why }); };
     const vocab = TABLE_VOCAB.find(([re]) => re.test(sentence));
     if (vocab) { drop(`table vocabulary: ${vocab[1]}`); continue; }
+    if (promptNorm && echoesPrompt(sentence, promptNorm)) { drop('echoes the prompt'); continue; }
     if (ctx.rules === 'vocab') { kept.push(sentence); continue; }
     if (seenBefore.has(norm(sentence))) { drop('repeat of a recent thought'); continue; }
     const image = stockImageOf(sentence);
@@ -167,6 +171,17 @@ export function filterVoice(text: string, ctx: VoiceFilterContext = {}): { text:
     kept.push(sentence);
   }
   return { text: kept.join(' ').trim(), dropped };
+}
+
+/** A sentence of five words or more that is found, word for word, in the prompt it answered. Pure. */
+export function echoesPrompt(sentence: string, promptNorm: string): boolean {
+  const n = norm(sentence);
+  if (n.split(' ').length < 5) return false;
+  if (promptNorm.includes(n)) return true;
+  // A clause of it: the model often runs two prompt sentences together or trims one — any 8-word run from the prompt is an echo.
+  const words = n.split(' ');
+  for (let i = 0; i + 8 <= words.length; i++) if (promptNorm.includes(words.slice(i, i + 8).join(' '))) return true;
+  return false;
 }
 
 /** The log line for what a pass dropped, or null when nothing went. */

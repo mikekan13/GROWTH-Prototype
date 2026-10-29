@@ -81,6 +81,43 @@ const dry = process.argv.includes('--dry');
     for (const o of data.openings ?? []) { if (o.name === 'Entry door') o.state = 'locked'; if (o.name === 'Bathroom door') o.state = 'closed'; }
     await p.location.update({ where: { id: 'cmv5x69xp004y1448l1sqlkjc' }, data: { data: JSON.stringify(data) } });
   }
-  console.log(`reset to the knock: archive ${file}; clock → ${CLOCK_AT_THE_KNOCK}; Violet → Main Room; pizza → Kristopher; entry door locked`);
+  // Fog of war (2026-10-28): what each being last knew is wiped with the world, then each one looks around
+  // from where it stands so the first map a Trailblazer loads is what their character can see at the knock.
+  // (Needs the server-only shim: run with `npx tsx --tsconfig ../tmp/tsconfig.recall.json`.)
+  const wiped = await p.lastKnown.deleteMany({ where: { campaignId: CAMP } });
+  let looked = 0;
+  try {
+    const { loadWorldLevel, beingStanding } = await import('../app/src/services/spatial-world');
+    const { lookAround } = await import('../app/src/services/spatial-perception');
+    const { map } = await loadWorldLevel(CAMP);
+    const beings = await p.character.findMany({ where: { campaignId: CAMP, status: { notIn: ['DEAD', 'RETIRED'] } }, select: { id: true } });
+    for (const b of beings) { const s = await beingStanding(map, b.id); if (s) { await lookAround(CAMP, b.id, map, s.point); looked++; } }
+  } catch (e) { console.warn('look-around skipped (run with --tsconfig ../tmp/tsconfig.recall.json):', (e as Error).message); }
+  // Facts follow the map (2026-10-29): the placement facts of every drawn thing and Kristopher's position fact were
+  // written at the knock's own cycle, so the wipe above takes them with the run. The map is the truth — rebuild them from it.
+  let refacted = 0;
+  try {
+    const { thingPlaced, beingPlaced, cornersOf, roomContext } = await import('../app/src/services/thing-facts');
+    const { parseFootprint, footprintBounds, fractionToWorld, parseMapShape } = await import('../app/src/lib/canvas-geometry');
+    const { loadWorldLevel, beingStanding } = await import('../app/src/services/spatial-world');
+    const parse = (raw: string | null): any => { try { const d = raw ? JSON.parse(raw) : {}; return d && typeof d === 'object' ? d : {}; } catch { return {}; } };
+    const edges = await p.entityRelationship.findMany({ where: { campaignId: CAMP, relationshipType: 'located_at', sourceType: 'CAMPAIGN_ITEM', targetType: 'LOCATION' } });
+    for (const e of edges) {
+      const pos = parse(e.data).position;
+      if (!pos || typeof pos.x !== 'number') continue;
+      const room = await p.location.findUnique({ where: { id: e.targetId }, select: { data: true } });
+      const fp = room ? parseFootprint(parse(room.data).footprint) : null;
+      const ctx = fp ? await roomContext(CAMP, e.targetId) : null;
+      const item = await p.campaignItem.findUnique({ where: { id: e.sourceId }, select: { id: true, name: true, data: true, status: true } });
+      if (!fp || !ctx || !item || item.status !== 'ACTIVE') continue;
+      const world = fractionToWorld(pos, footprintBounds(fp.points));
+      await thingPlaced(CAMP, { id: item.id, name: item.name }, ctx.room, ctx.portals, { at: world, corners: cornersOf(world, parseMapShape(parse(item.data).mapShape)) }, ctx.others);
+      refacted++;
+    }
+    const { map } = await loadWorldLevel(CAMP);
+    const ks = await beingStanding(map, KRIS);
+    if (ks?.room) { await beingPlaced(CAMP, { id: KRIS, name: 'Kristopher' }, ks.room.id, ks.point); refacted++; }
+  } catch (e) { console.warn('facts-from-the-map skipped:', (e as Error).message); }
+  console.log(`reset to the knock: archive ${file}; clock → ${CLOCK_AT_THE_KNOCK}; Violet → Main Room; pizza → Kristopher; entry door locked; last-known wiped (${wiped.count}) and ${looked} beings looked around; ${refacted} placement facts rebuilt from the map`);
   process.exit(0);
 })().catch((e) => { console.error('FAIL', e.message); process.exit(1); });

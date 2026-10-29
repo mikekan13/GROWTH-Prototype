@@ -115,3 +115,16 @@ describe('held things are stated as held (HW8 run 7 #8)', () => {
     expect(lines.join(' ')).toMatch(/Held, not set down anywhere: Five-dollar bill with her number - with you.*never on a shelf/);
   });
 });
+
+describe('the echo guard (HW10 2026-10-29)', () => {
+  const prompt = `What just reached you:\nNothing from beyond the room has reached you just now.\nQuoted words are the speaker's own; a name inside them is whoever the speaker is addressing, not the speaker.\n\nNobody is waiting on you; things are still unfolding. Think and speak only in the words of your own life — what just happened, what you notice, what you do now. Take it in.`;
+  it('drops the sentences copied from the prompt and keeps her own', () => {
+    const r = filterVoice("It is past seven, and the October air has stopped moving. Quoted words are the speaker's own; a name inside them is whoever the speaker is addressing, not the speaker. Nobody is waiting on you; things are still unfolding. The bill is a sharp point in my palm.", { prompt });
+    expect(r.text).toBe('It is past seven, and the October air has stopped moving. The bill is a sharp point in my palm.');
+    expect(r.dropped.map((d) => d.why)).toEqual(['echoes the prompt', 'echoes the prompt']);
+  });
+  it('a short phrase that happens to be in the prompt is not an echo', () => {
+    const r = filterVoice('Nothing has reached me. Take it in.', { prompt });
+    expect(r.text).toBe('Nothing has reached me. Take it in.');
+  });
+});
