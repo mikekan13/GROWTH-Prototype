@@ -382,14 +382,9 @@ export default function CampaignTerminal({
     if (!streamEvents || streamEvents.length === 0) return;
     // Viewing as a character: the Watcher's stream carries the truth — the view re-reads on the memory push instead.
     if (viewAsRef.current) return;
-    setEvents(prev => {
-      const existingIds = new Set(prev.map(e => e.id));
-      const newEvents = streamEvents.filter(e => !existingIds.has(e.id));
-      if (newEvents.length === 0) return prev;
-      const merged = [...prev, ...newEvents];
-      merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-      return merged;
-    });
+    // A row pushed again under its own id REPLACES the one on screen (speed, 2026-10-29): the seed line becomes the
+    // built page, a being's thought grows its card, in place.
+    setEvents(prev => mergeEvents(prev, streamEvents));
   }, [streamEventsTick, streamEvents]);
 
   // Fallback poll every 30s (in case SSE reconnects and misses events)

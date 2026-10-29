@@ -56,13 +56,14 @@ import {
   declareCanon,
   recordDialogueCanon,
   recordUnattributedDialogueCanon,
+  rewriteDeclarationFeed,
 } from '@/services/canon';
 import { parseTableProse, splitSentences, closeUnclosedQuote, type ProseQuote, type ProseRosterEntry, type ProseThought } from '@/services/table-prose';
 import { ensureKeepalive } from '@/daya/l1-keepalive';
 import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, type ReconTicket } from '@/services/reconciliation';
 import { advanceClockForLine } from '@/services/table-clock';
 import type { ListenImpulse } from '@/daya/prompts/roles/spirit';
-import { recordBeingThought } from '@/services/being-thought';
+import { recordBeingThought, attachBeingCard } from '@/services/being-thought';
 import { actorMap, whereOthersStand } from '@/services/world-apply';
 import { actInThirdPerson, worldChangeSentences } from '@/daya/act-card';
 import { didNotHear } from '@/daya/did-not-hear';
@@ -945,33 +946,36 @@ async function runBeats(
             heldReactions.set(listenerId, held.slice(-HELD_CAP));
             console.log(`[held-reaction] ${name}: held (${Math.min(held.length, HELD_CAP)})`);
           }
-          let card = !repeat && !holding && sceneBuilderOn() && thought && !own
-            ? await buildBeingCard(campaignId, { id: listenerId, name }, carried.content, thought, await sceneFacts(campaignId, [listenerId])).catch(() => null)
-            : null;
-          // THE REPLAY, on the card (HW8 run 6): a sentence the being's last three thoughts or cards already carried is dropped from
-          // this one (the standing beat repeated one verbatim); a card with nothing left is not posted.
-          if (card && standingIds.delete(listenerId)) card = { ...card, scene: null };
-          let cardRepeat = false;
-          if (card) {
-            const previous = [...await recentThoughtsOf(campaignId, listenerId), ...await recentCardTextsOf(campaignId, listenerId)];
-            const deduped = cardWithoutRepeats(card, previous);
-            if (!deduped) { cardRepeat = true; console.log(`[table-speak] ${name}: the whole card was a repeat — not posted`); }
-            card = deduped;
-          }
           // A repeated thought or card is not posted again — but the BEAT is (HW9, 2026-10-29: Violet heard the third knock,
           // thought the same sentences as before, and the table went dead because nothing was recorded at all). The record
           // keeps what reached her and her impulse; only the prose she already said is left out.
-          if (!holding) await recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
+          // THE CARD FOLLOWS THE THOUGHT (speed, 2026-10-29): the beat is posted NOW, the built card lands on it after.
+          const rowId = holding ? null : await recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
             characterId: listenerId,
             characterName: name,
             heard: carried.content,
             thought: repeat ? '' : thought,
             impulse: outcome.listened.impulse,
             canonEventId: truthId,
-            ...(card && !cardRepeat ? { scene: card.scene, segments: card.segments } : {}),
           });
-        }
-        cardDone();
+          const standingHere = standingIds.delete(listenerId);
+          cardDone();
+          if (!repeat && !holding && sceneBuilderOn() && thought && !own && rowId) {
+            void buildBeingCard(campaignId, { id: listenerId, name }, carried.content, thought, await sceneFacts(campaignId, [listenerId])).catch(() => null).then(async (built) => {
+              let card = built;
+              // THE REPLAY, on the card (HW8 run 6): a sentence the being's last three thoughts or cards already carried is dropped from
+              // this one (the standing beat repeated one verbatim); a card with nothing left is not posted.
+              if (card && standingHere) card = { ...card, scene: null };
+              if (card) {
+                const previous = [...await recentThoughtsOf(campaignId, listenerId), ...await recentCardTextsOf(campaignId, listenerId)];
+                const deduped = cardWithoutRepeats(card, previous);
+                if (!deduped) console.log(`[table-speak] ${name}: the whole card was a repeat — not attached`);
+                card = deduped;
+              }
+              if (card) await attachBeingCard(campaignId, rowId, { scene: card.scene, segments: card.segments });
+            });
+          }
+        } else cardDone();
         // null = an answer took this stretch over; that answer stores it and points it at the truth.
         if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId, truthId);
         if (reached && outcome.listened?.memoryEntryId) {
@@ -1348,26 +1352,51 @@ async function speakProseSplit(
   let feedParts: { narration: string | null; speech: typeof parsed.quotes; actions: typeof parsed.actions; thoughts: typeof parsed.thoughts; built?: boolean; seedNarration?: string | null; monologues?: Array<{ actorId: string; text: string }> } = { narration: narrated ? parsed.narration : null, speech: parsed.quotes, actions: parsed.actions, thoughts: parsed.thoughts };
   let preListened: Map<string, Promise<TableListenOutcome>> | undefined;
   let blended: Set<string> | undefined;
+  // THE PAGE FOLLOWS THE SEED (speed, 2026-10-29): the voiced beings start listening to their own beat NOW, the seed is
+  // declared and posted at once, every listener is handed the seed at once (runBeats below) — and the scene builder works
+  // beside all of that; when its page comes back the declaration row is rewritten in place. Before this, every other being
+  // waited for the voiced being's whole listen and the cloud build (15 s of a 36 s beat) before it was handed anything.
+  let voicedHere: string[] = [];
+  let pageAfter: ((ids: { canonEventId: string; gameEventId: string | null }) => void) | null = null;
   if (sceneBuilderOn() && narration !== null && (narrated || hasActions)) {
-    const voicedHere = voicedIn(parsed).filter((id) => listeners.some((l) => l.id === id));
+    voicedHere = voicedIn(parsed).filter((id) => listeners.some((l) => l.id === id));
     preListened = preListenVoiced(actor, plan, parsed, actorsById, voicedHere, await readingsFor(voicedHere, parsed.full));
-    const monologues = await monologuesWithin(preListened, PRELISTEN_WAIT_MS, campaignId);
-    const seed: SeedParts = { full: parsed.full, narration: narrated ? parsed.narration : null, actions: parsed.actions ?? [], thoughts: parsed.thoughts ?? [], quotes: parsed.quotes };
-    const focus = [...new Set([soleActor(parsed), ...voicedHere].filter((x): x is string => !!x))];
-    const built = await buildScene(campaignId, seed, monologues, await sceneFacts(campaignId, focus.length ? focus : listeners.map((l) => l.id)));
-    if (built.source === 'cloud') {
-      feedParts = {
-        narration: built.scene,
-        speech: parsed.quotes,
-        actions: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'action').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence }))),
-        thoughts: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'thought').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence, ...(s.narrated ? { narrated: s.narrated } : {}) }))),
-        built: true,
-        seedNarration: narrated ? parsed.narration : null,
-        monologues: [...monologues].map(([actorId, text]) => ({ actorId, text })),
-      };
-      blended = new Set(monologues.keys());
-    }
+    // The voiced beings' beats go into the page's cards (or, if the page fails, are posted from their listen below).
+    blended = new Set(voicedHere);
+    const pre = preListened;
+    pageAfter = (ids) => {
+      void (async () => {
+        const monologues = await monologuesWithin(pre, PRELISTEN_WAIT_MS, campaignId);
+        const seed: SeedParts = { full: parsed.full, narration: narrated ? parsed.narration : null, actions: parsed.actions ?? [], thoughts: parsed.thoughts ?? [], quotes: parsed.quotes };
+        const focus = [...new Set([soleActor(parsed), ...voicedHere].filter((x): x is string => !!x))];
+        const built = await buildScene(campaignId, seed, monologues, await sceneFacts(campaignId, focus.length ? focus : listeners.map((l) => l.id)));
+        if (built.source === 'cloud') {
+          await rewriteDeclarationFeed(campaignId, ids, {
+            via: 'typed', raw: rawMessage,
+            narration: built.scene,
+            speech: parsed.quotes,
+            actions: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'action').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence }))),
+            thoughts: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'thought').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence, ...(s.narrated ? { narrated: s.narrated } : {}) }))),
+            built: true,
+            seedNarration: narrated ? parsed.narration : null,
+            monologues: [...monologues].map(([actorId, text]) => ({ actorId, text })),
+          });
+          // A voiced being whose monologue missed the page still gets its beat on the record.
+          for (const id of voicedHere) if (!monologues.has(id)) await postVoicedBeat(id);
+        } else {
+          for (const id of voicedHere) await postVoicedBeat(id);
+        }
+      })().catch((err) => console.warn('[table-speak] the page did not follow the seed (the seed stands):', err instanceof Error ? err.message : err));
+    };
   }
+  const postVoicedBeat = async (id: string) => {
+    try {
+      const o = await preListened?.get(id);
+      if (!o || o.status !== 'ok' || !o.listened || o.listened.status !== 'listened') return;
+      const name = listeners.find((l) => l.id === id)?.name ?? id;
+      await recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, { characterId: id, characterName: name, heard: parsed.full, thought: o.listened.thought, impulse: o.listened.impulse, canonEventId });
+    } catch (err) { console.warn('[table-speak] voiced beat not posted (non-fatal):', err instanceof Error ? err.message : err); }
+  };
   if (narration !== null && (narrated || hasActions || parsed.quotes.length !== 1)) {
     const declared = await declareCanon(campaignId, actor, {
       narration, kind: 'narration', actorId: soleActor(parsed), locationId: input.locationId ?? null, witnessIds: [],
@@ -1375,6 +1404,9 @@ async function speakProseSplit(
     });
     canonEventId = declared.event.id;
     narratedActs(campaignId, parsed.actions, actor);
+    if (pageAfter) pageAfter({ canonEventId: declared.event.id, gameEventId: declared.gameEventId ?? null });
+  } else if (pageAfter) {
+    for (const id of voicedHere) void postVoicedBeat(id);
   }
   for (const q of parsed.quotes) {
     try {

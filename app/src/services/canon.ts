@@ -271,7 +271,7 @@ export function declarationPayload(eventType: string, description: string, opts:
   };
 }
 
-async function postCanonGameEvent(campaignId: string, actor: { userId: string; username?: string }, eventType: string, description: string, beatId?: string | null, extra: { cycle?: number; feed?: DeclarationFeed } = {}) {
+async function postCanonGameEvent(campaignId: string, actor: { userId: string; username?: string }, eventType: string, description: string, beatId?: string | null, extra: { cycle?: number; feed?: DeclarationFeed } = {}): Promise<string> {
   const payload: TerminalPayload = declarationPayload(eventType, description, { beatId, ...extra });
   const event = await createCampaignEvent({ campaignId, type: 'game_event', actor: 'gm', actorUserId: actor.userId, actorName: actor.username ?? 'Watcher', payload });
   const terminalEvent: TerminalEvent = {
@@ -281,6 +281,39 @@ async function postCanonGameEvent(campaignId: string, actor: { userId: string; u
     sessionId: event.sessionId || undefined, payload,
   };
   broadcastEvent(campaignId, { kind: 'terminal_event', event: terminalEvent });
+  return event.id;
+}
+
+/**
+ * THE PAGE FOLLOWS THE SEED (speed, 2026-10-29): the declaration is posted the moment it is written, as the seed; when the
+ * scene builder comes back the same row is rewritten with the built page (canon detail.split and the feed row's payload) and
+ * re-broadcast under the SAME id — every open terminal replaces the line in place.
+ */
+export async function rewriteDeclarationFeed(campaignId: string, ids: { canonEventId: string; gameEventId: string | null }, feed: DeclarationFeed): Promise<void> {
+  try {
+    const row = await prisma.canonEvent.findUnique({ where: { id: ids.canonEventId }, select: { detail: true } });
+    if (row) {
+      let detail: Record<string, unknown> = {};
+      try { detail = JSON.parse(row.detail ?? '{}') as Record<string, unknown>; } catch { /* fresh */ }
+      detail.split = { narration: feed.narration ?? null, speech: feed.speech ?? [], actions: (feed.actions ?? []).map((a) => ({ actorId: a.actorId, actorLabel: a.actorLabel, text: a.text, ...(a.sentence ? { sentence: a.sentence } : {}) })), ...(feed.thoughts?.length ? { thoughts: feed.thoughts.map((t) => ({ actorId: t.actorId, actorLabel: t.actorLabel, text: t.text, ...(t.sentence ? { sentence: t.sentence } : {}), ...(t.narrated ? { narrated: t.narrated } : {}) })) } : {}), ...(feed.built ? { built: true, seedNarration: feed.seedNarration ?? null } : {}) };
+      await prisma.canonEvent.update({ where: { id: ids.canonEventId }, data: { detail: JSON.stringify(detail) } });
+    }
+    if (!ids.gameEventId) return;
+    const ev = await prisma.campaignEvent.findUnique({ where: { id: ids.gameEventId } });
+    if (!ev) return;
+    let prev: Record<string, unknown> = {};
+    try { prev = JSON.parse(ev.payload ?? '{}') as Record<string, unknown>; } catch { /* fresh */ }
+    const description = typeof prev.description === 'string' ? prev.description : '';
+    const payload: TerminalPayload = { ...declarationPayload('declaration', description, { beatId: typeof prev.beatId === 'string' ? prev.beatId : null, cycle: typeof prev.cycle === 'number' ? prev.cycle : undefined, feed }), ...(typeof prev.raw === 'string' ? { raw: prev.raw } : {}) } as TerminalPayload;
+    await prisma.campaignEvent.update({ where: { id: ev.id }, data: { payload: JSON.stringify(payload) } });
+    const terminalEvent: TerminalEvent = {
+      id: `ev-${ev.id}`, type: 'game_event',
+      timestamp: ev.createdAt instanceof Date ? ev.createdAt.toISOString() : String(ev.createdAt),
+      campaignId, actor: 'gm', actorUserId: ev.actorUserId ?? '', actorName: ev.actorName ?? 'Watcher',
+      sessionId: ev.sessionId || undefined, payload,
+    };
+    broadcastEvent(campaignId, { kind: 'terminal_event', event: terminalEvent });
+  } catch (err) { console.warn('[canon] the page could not follow the seed (the seed stands):', err instanceof Error ? err.message : err); }
 }
 
 /**
@@ -327,7 +360,8 @@ export async function declareCanon(
     sourceType: 'gm', goalIds, domains,
   });
   if (goalIds.length) recordVineEntriesSafe({ campaignId, canonEventId: event.id, cycle, narration: input.narration, goalIds });
-  try { await postCanonGameEvent(campaignId, actor, 'declaration', input.narration, input.beatId, { cycle, feed: input.feed }); } catch (err) { console.warn('[canon] declaration event failed', err); }
+  let gameEventId: string | null = null;
+  try { gameEventId = await postCanonGameEvent(campaignId, actor, 'declaration', input.narration, input.beatId, { cycle, feed: input.feed }); } catch (err) { console.warn('[canon] declaration event failed', err); }
 
   // Everyone present perceives it — engine-authored, no confabulation.
   // witnessIds undefined = every ACTIVE being in the campaign; an explicit
@@ -383,7 +417,7 @@ export async function declareCanon(
   if (reach) await recordNoticedExposures(campaignId, cycle, exposures);
   // Introductions teach names: what each witness CAUGHT of any quoted introduction ("This is Ruth").
   if (reach && noticedRows.length) await learnIntroductions(campaignId, groupRows(noticedRows), cycle, { canonEventId: event.id });
-  return { event, witnesses: witnesses.length, memoryIds };
+  return { gameEventId, event, witnesses: witnesses.length, memoryIds };
 }
 
 /** Table dialogue is truth too: what an NPC said, recorded once. */

@@ -9,8 +9,11 @@
  * with `types=being_thought`, or the handoff scripts).
  */
 import 'server-only';
+import { prisma } from '@/lib/db';
 import { createCampaignEvent } from '@/services/campaign-event';
+import { broadcastEvent } from '@/lib/campaign-stream';
 import type { ListenImpulse } from '@/daya/prompts/roles/spirit';
+import type { TerminalEvent } from '@/types/terminal';
 
 export interface BeingThoughtRecord {
   characterId: string;
@@ -25,10 +28,50 @@ export interface BeingThoughtRecord {
   segments?: Array<{ kind: 'action' | 'thought' | 'speech'; text: string; narrated?: string }>;
 }
 
-/** Never throws: a record that fails to write is logged, the table does not notice. */
-export async function recordBeingThought(campaignId: string, by: { userId: string; username: string }, r: BeingThoughtRecord): Promise<void> {
+const segs = (segments: BeingThoughtRecord['segments']) => segments?.length ? segments.map((s) => ({ kind: s.kind, text: s.text.slice(0, 1500), ...(s.narrated ? { narrated: s.narrated.slice(0, 1500) } : {}) })) : undefined;
+
+/** Every open terminal gets the row at once (speed, 2026-10-29: before this the beat waited for the next fetch). */
+function pushRow(campaignId: string, ev: { id: string; createdAt: Date | string; sessionId?: string | null; actorUserId?: string | null; actorName?: string | null; characterId?: string | null; characterName?: string | null }, payload: Record<string, unknown>): void {
+  const terminalEvent: TerminalEvent = {
+    id: `ev-${ev.id}`, type: 'being_thought',
+    timestamp: ev.createdAt instanceof Date ? ev.createdAt.toISOString() : String(ev.createdAt),
+    campaignId, actor: 'system', actorUserId: ev.actorUserId ?? '', actorName: ev.actorName ?? 'Being',
+    characterId: ev.characterId ?? undefined, characterName: ev.characterName ?? undefined,
+    sessionId: ev.sessionId || undefined, payload: payload as unknown as TerminalEvent['payload'],
+  };
+  broadcastEvent(campaignId, { kind: 'terminal_event', event: terminalEvent });
+}
+
+/**
+ * THE CARD FOLLOWS THE THOUGHT (speed, 2026-10-29): the beat is recorded and pushed the moment the being has thought;
+ * the built card lands on the same row later and the row is pushed again under the same id.
+ */
+export async function attachBeingCard(campaignId: string, eventId: string, card: { scene: string | null; segments: BeingThoughtRecord['segments'] }): Promise<void> {
   try {
-    await createCampaignEvent({
+    const ev = await prisma.campaignEvent.findUnique({ where: { id: eventId } });
+    if (!ev) return;
+    let payload: Record<string, unknown> = {};
+    try { payload = JSON.parse(ev.payload ?? '{}') as Record<string, unknown>; } catch { /* fresh */ }
+    payload = { ...payload, ...(card.scene ? { scene: card.scene.slice(0, 1200) } : {}), ...(segs(card.segments) ? { segments: segs(card.segments) } : {}) };
+    await prisma.campaignEvent.update({ where: { id: eventId }, data: { payload: JSON.stringify(payload) } });
+    pushRow(campaignId, ev, payload);
+  } catch (err) { console.warn('[being-thought] card not attached (the thought stands):', err instanceof Error ? err.message : err); }
+}
+
+/** Never throws: a record that fails to write is logged, the table does not notice. Returns the row's id for the card to follow. */
+export async function recordBeingThought(campaignId: string, by: { userId: string; username: string }, r: BeingThoughtRecord): Promise<string | null> {
+  try {
+    const payload = {
+        kind: 'being_thought' as const,
+        heard: r.heard.slice(0, 2000),
+        thought: (r.thought ?? '').slice(0, 4000),
+        impulse: r.impulse,
+        canonEventId: r.canonEventId,
+        ...(r.cycle !== undefined ? { cycle: r.cycle } : {}),
+        ...(r.scene ? { scene: r.scene.slice(0, 1200) } : {}),
+        ...(segs(r.segments) ? { segments: segs(r.segments) } : {}),
+    };
+    const ev = await createCampaignEvent({
       campaignId,
       type: 'being_thought',
       actor: 'system',
@@ -36,18 +79,12 @@ export async function recordBeingThought(campaignId: string, by: { userId: strin
       actorName: by.username,
       characterId: r.characterId,
       characterName: r.characterName,
-      payload: {
-        kind: 'being_thought',
-        heard: r.heard.slice(0, 2000),
-        thought: (r.thought ?? '').slice(0, 4000),
-        impulse: r.impulse,
-        canonEventId: r.canonEventId,
-        ...(r.cycle !== undefined ? { cycle: r.cycle } : {}),
-        ...(r.scene ? { scene: r.scene.slice(0, 1200) } : {}),
-        ...(r.segments?.length ? { segments: r.segments.map((s) => ({ kind: s.kind, text: s.text.slice(0, 1500), ...(s.narrated ? { narrated: s.narrated.slice(0, 1500) } : {}) })) } : {}),
-      },
+      payload,
     });
+    pushRow(campaignId, ev, payload);
+    return ev.id;
   } catch (err) {
     console.warn('[being-thought] record failed (non-fatal):', err instanceof Error ? err.message : err);
+    return null;
   }
 }
