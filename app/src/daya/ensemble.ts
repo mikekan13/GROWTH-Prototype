@@ -876,6 +876,8 @@ export interface TableStimulus {
   own?: boolean;
   /** What is written on a thing this stretch has the being read, exactly (HW8 run 6): put to it as the text in its hand, not mirrored. */
   reads?: string;
+  /** ORDINARY COMPETENCE (2026-10-30): a routine step is due — handed to the listen as a fact about the being itself (services/routine-run). */
+  routine?: { step: string; because: string[] };
 }
 
 export interface ListenTimings {
@@ -902,6 +904,10 @@ export interface ListenResult {
   impulse: ListenImpulse;
   /** This stretch's monologue as kept (sealed), for the Watcher's audit record; absent when the call failed or the seal held it. */
   thought?: string;
+  /** INACTION IS A CLAIM (2026-10-30): what the being said holds it when its impulse was stay — read by the player and the facts. */
+  stayReason?: string | null;
+  /** The survival-rung memory that rose this stretch (arousal ≥ 0.7, valence ≤ −0.3), strongest first — what a routine step would have to be done against. */
+  resistance?: { content: string; arousal: number } | null;
 }
 
 const FELT_FALLBACK = 'Right now, in your body and mood: steady, holding your own.';
@@ -1008,6 +1014,12 @@ export async function listenStimulus(
   let innerState = prior?.innerState ?? '';
   let innerUpdated = false;
   let impulse: ListenImpulse = 'stay';
+  let stayReason: string | null = null;
+  // What rose against doing: the strongest survival-rung memory this stretch surfaced (the dice decide a routine step against it).
+  const resistance = (recallResult.surfaced ?? [])
+    .filter((s) => s.rung === 'survival' && typeof s.arousal === 'number' && s.arousal >= 0.7 && (s.valence ?? 0) <= -0.3 && !!s.content)
+    .sort((a, b) => (b.arousal ?? 0) - (a.arousal ?? 0))
+    .map((s) => ({ content: s.content!, arousal: s.arousal! }))[0] ?? null;
   // THE VOICE'S GROUND (HW8 run 6): what the beat touches in the world (the door, the keys, the receipt — a voice that was never
   // given them invents a glass door and a key in hand), what it holds and what each thing is, and what it has already thought
   // (the filter's memory). All best-effort: a lookup that fails leaves the section empty.
@@ -1036,6 +1048,7 @@ export async function listenStimulus(
       facts: ground.lines.slice(0, 10),
       held: heldNow,
       reads: stimulus.reads,
+      routine: stimulus.routine ?? null,
     });
     // THE GROWING THOUGHT (speed, 2026-10-29): the monologue is streamed to the table as it is written, on the growing-line
     // channel the spoken reply already uses, wrapped as a thought; the line yields to the recorded beat. A perceived viewer
@@ -1046,6 +1059,7 @@ export async function listenStimulus(
     // The last line is the being's own say on breaking in; only the thought is kept as its inner state.
     const split = splitImpulse(raw);
     impulse = split.impulse;
+    stayReason = split.impulse === 'stay' ? split.reason : null;
     const sealed = omniscient ? { text: split.thought, usedFallback: false } : await enforceSeal(split.thought, { entityId: ctx.entityDaId, subsystem: 'spirit_listen', fallback: '' });
     // THE VOICE FILTER (HW8 run 6): the table's words, stock images, counting nobody gave it, light with no light fact, and a
     // sentence already thought are dropped before anything downstream (the scene builder, the feed) sees the monologue.
@@ -1096,6 +1110,8 @@ export async function listenStimulus(
     memoryEntryId: ingest.memoryEntryId,
     innerUpdated,
     impulse,
+    stayReason,
+    resistance,
     ...(innerUpdated ? { thought: innerState } : {}),
     timings: { perceiveMs: tPerceived - t0, ingestMs: tIngested - tPerceived, recallMs: tRecalled - tIngested, soulMs, spiritMs: tDone - tSpirit, totalMs: tDone - t0, standing },
   };

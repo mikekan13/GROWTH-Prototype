@@ -78,6 +78,10 @@ export interface SurfacedMemory {
   score: number;
   /** Which rung of the ladder surfaced it: survival > goals > domain > chain > words. */
   rung?: Rung;
+  /** The row's charge and words (2026-10-30): what rose against a routine step is read from here. */
+  arousal?: number;
+  valence?: number;
+  content?: string;
 }
 
 export interface RecallResult {
@@ -596,7 +600,7 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
 
   return {
     prose,
-    surfaced: surfacedList.map((c) => ({ memoryId: c.memory.id, score: c.score, rung: rungOf.get(c.memory.id)?.rung })),
+    surfaced: surfacedList.map((c) => ({ memoryId: c.memory.id, score: c.score, rung: rungOf.get(c.memory.id)?.rung, arousal: c.memory.arousal, valence: c.memory.valence, content: c.memory.content })),
     failedFeel,
     deferred,
     ...(due.length ? { intentions: due.map((d) => d.description) } : {}),

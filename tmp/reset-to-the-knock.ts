@@ -85,6 +85,9 @@ const dry = process.argv.includes('--dry');
   // from where it stands so the first map a Trailblazer loads is what their character can see at the knock.
   // (Needs the server-only shim: run with `npx tsx --tsconfig ../tmp/tsconfig.recall.json`.)
   const wiped = await p.lastKnown.deleteMany({ where: { campaignId: CAMP } });
+  // Ordinary competence (2026-10-30): every routine back to READY at its first end — the pizza has not come yet.
+  const routinesReset = await p.dayaRoutine.updateMany({ where: { entity: { character: { campaignId: CAMP } } }, data: { status: 'READY', cursor: 0, steps: 0, startedCycle: null } }).catch(() => ({ count: 0 }));
+  console.log(`routines re-armed: ${routinesReset.count}`);
   let looked = 0;
   try {
     const { loadWorldLevel, beingStanding } = await import('../app/src/services/spatial-world');

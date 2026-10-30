@@ -15,7 +15,8 @@ import type { GrowthAttribute, GrowthAttributes, GrowthCharacter, GrowthSkill } 
 import type { ActionPools, AttrKey, FateDie, Governor, Participant, ParticipantSkill, Pillar, SpeedGauges } from './types';
 import { ATTR_KEYS } from './types';
 
-export const ACTION_DIVISOR = 25;
+/** Ruled 75 by Mike 2026-10-29 (was 25): a ~30-average human has three actions a round, one per pillar. */
+export const ACTION_DIVISOR = 75;
 
 export const FATE_DIE_MAX: Record<FateDie, number> = { d4: 4, d6: 6, d8: 8, d12: 12, d20: 20 };
 

@@ -20,6 +20,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import type { Point } from '@/lib/canvas-geometry';
+import { walkFtPerSFromCelerity } from '@/lib/spatial/pathfinding';
 import { findPath, pathSeconds, portalPassability, roomAt, roomByName, portalsOfRoom, spotInRoom, spotAtPortal, spotBeside, nearestWalkable, crossesBlocking, wayOutDoor, lockedFromMySide, type LevelMap, type Portal, type RoomPoly, type Pace } from '@/lib/spatial';
 import { loadWorldLevel, beingStanding, thingStanding, stampBeingPoint, roomIdOf, levelOfBeing } from '@/services/spatial-world';
 import { moveCharacterToLocation } from '@/services/character-location';
@@ -154,8 +155,11 @@ export async function moveBeing(
   opts: { cause: 'sim' | 'gm' | 'jewl'; pace?: Pace; world?: { map: LevelMap } },
 ): Promise<MoveReport> {
   const { map } = opts.world ?? await loadWorldLevel(campaignId, await levelOfBeing(characterId));
-  const actor = await prisma.character.findUnique({ where: { id: characterId }, select: { id: true, name: true, campaignId: true, campaign: { select: { gmUserId: true } } } });
+  const actor = await prisma.character.findUnique({ where: { id: characterId }, select: { id: true, name: true, campaignId: true, data: true, campaign: { select: { gmUserId: true } } } });
   const empty = (label: string, reason: string): MoveReport => ({ ok: false, reason, label, from: { x: 0, y: 0 }, to: { x: 0, y: 0 }, feet: 0, seconds: 0, fromRoom: null, toRoom: null, opened: [], path: [] });
+  // The sheet is the dial (2026-10-30): the walk's pace reads Celerity off the sheet when it is there.
+  let walkFtPerS: number | undefined;
+  try { const sheet = actor?.data ? (JSON.parse(actor.data) as { attributes?: { celerity?: { level?: number } } }) : null; walkFtPerS = walkFtPerSFromCelerity(sheet?.attributes?.celerity?.level); } catch { walkFtPerS = undefined; }
   if (!actor || actor.campaignId !== campaignId) return empty('?', 'not in this campaign');
   const standing = await beingStanding(map, characterId);
   if (!standing) return empty('?', `${actor.name} stands nowhere on the map`);
@@ -187,7 +191,7 @@ export async function moveBeing(
   const end = path.points[path.points.length - 1] ?? from;
   const moved = path.points.length > 1 && (Math.abs(end.x - from.x) > 0.5 || Math.abs(end.y - from.y) > 0.5);
   const toRoom = walkedRoom(map, end) ?? fromRoom;
-  const seconds = moved ? pathSeconds(path.feet, opts.pace ?? 'walk') : 0;
+  const seconds = moved ? pathSeconds(path.feet, opts.pace ?? 'walk', walkFtPerS) : 0;
 
   if (moved) {
     const filedId = await roomIdOf(characterId);

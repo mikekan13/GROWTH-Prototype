@@ -238,7 +238,20 @@ export function findPath(map: LevelMap, from: Point, to: Point, opts?: { ignoreP
 export const PACE_FT_PER_S: Record<Pace, number> = { creep: 1.5, walk: 4, hurry: 6, run: 12 };
 
 /** Whole seconds (rounded up, at least 1 when there is any distance) to cover `feet` at a pace. */
-export function pathSeconds(feet: number, pace: Pace = 'walk'): number {
+export function pathSeconds(feet: number, pace: Pace = 'walk', walkFtPerS?: number): number {
   if (!(feet > 0)) return 0;
-  return Math.max(1, Math.ceil(feet / PACE_FT_PER_S[pace]));
+  // THE SHEET IS THE DIAL (2026-10-30): a being's walk comes from its Celerity when the caller has it (being-movement);
+  // the other paces scale from it. Without it, the stand-in table.
+  const rate = walkFtPerS && walkFtPerS > 0 ? walkFtPerS * (PACE_FT_PER_S[pace] / PACE_FT_PER_S.walk) : PACE_FT_PER_S[pace];
+  return Math.max(1, Math.ceil(feet / rate));
+}
+
+/**
+ * Walking speed from the sheet: one action's movement is Celerity/5 squares of 5 ft in a 6 s round (Repository
+ * Combat_Grid_System, confirmed 2026-10-28), so an unhurried walk ≈ Celerity ft per 6 s = Celerity/6 ft/s. Bounded so a
+ * low sheet still crosses a room and a high one does not teleport. Pure.
+ */
+export function walkFtPerSFromCelerity(celerity: number | null | undefined): number | undefined {
+  if (typeof celerity !== 'number' || !(celerity > 0)) return undefined;
+  return Math.max(1.5, Math.min(12, celerity / 6));
 }

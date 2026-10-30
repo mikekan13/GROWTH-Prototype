@@ -1302,6 +1302,38 @@ model DayaEntity {
   modelCalls         DayaModelCall[]
   familiarities      Familiarity[]
   intentions         DayaIntention[]
+  routines           DayaRoutine[]
+}
+
+// ORDINARY COMPETENCE (Claude, ruled by Michael 2026-10-30): procedural memory.
+// A routine is what a being's hands know to do without deliberating — the
+// pizza every day: go, unlock, open, take, pay, tip, shut, lock. The ENDS are
+// derived once from the being's own words (its cadence and trigger intentions,
+// what it holds, who it knows) in the world's own op vocabulary; the MEANS are
+// planned every beat from the live map by daya/routines.ts (a step toward the
+// first unmet end), never stored. The step runs through world-apply like any
+// act; the character colours it; the player (daya/player.ts) may hold or break
+// it with a reason the facts can check.
+model DayaRoutine {
+  id              String     @id @default(cuid())
+  entity          DayaEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  entityId        String
+  name            String     // in the being's own register: "the pizza comes"
+  triggers        String     @default("[]") // JSON string[] — cue words that call it up ("knock", "delivery")
+  cadence         String?    // daily | nightly | weekly | always
+  ends            String     @default("[]") // JSON RoutineEnd[] — see src/daya/routines.ts
+  sourceIntentionIds String  @default("[]") // JSON string[] — the DayaIntention rows it was read from
+  status          String     @default("READY") // READY | RUNNING | DONE | RETIRED
+  /** How many leading ends this instance has reached (never goes back: a thing handed over is not fetched back). */
+  cursor          Int        @default(0)
+  /** Steps run in this instance; a run past ROUTINE_STEP_CAP lapses. */
+  steps           Int        @default(0)
+  startedCycle    Float?
+  lastDoneCycle   Float?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([entityId, status])
 }
 
 // What a being means to do (Mike 2026-10-25): under the GRO.vines (overall

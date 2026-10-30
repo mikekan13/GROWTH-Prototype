@@ -20,7 +20,7 @@ describe('participantFromCharacter', () => {
   it('derives pools by canon, gauges from max pools, attrs with currents, control by entityType', () => {
     const pc = participantFromCharacter({ id: 'v', name: 'V', entityType: 'PLAYER_CHARACTER', sheet, side: 'party', held: { id: 'it1', name: 'buckler', baseResist: 4, condition: 3 } });
     // Body 75/25 = 3; Spirit (20+30)/25 = 2 (Frequency excluded); Soul (26+20+4)/25 = 2
-    expect(pc.pools).toEqual({ body: 3, spirit: 2, soul: 2 });
+    expect(pc.pools).toEqual({ body: 1, spirit: 1, soul: 1 }); // divisor 75 since 2026-10-29: 75 body, 50 spirit, 50 soul → one each
     expect(pc.gauges).toEqual({ celerity: 30, frequency: 26, wisdom: 20 });
     expect(pc.attrs.celerity).toEqual({ current: 12, max: 30 });
     expect(pc.attrs.frequency).toEqual({ current: 19, max: 26 });

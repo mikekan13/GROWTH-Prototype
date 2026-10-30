@@ -26,6 +26,8 @@ export interface BeingThoughtRecord {
   /** Built up (scene-builder 2026-10-25): the being's side of the scene, and its monologue as a card. */
   scene?: string | null;
   segments?: Array<{ kind: 'action' | 'thought' | 'speech'; text: string; narrated?: string }>;
+  /** ORDINARY COMPETENCE (2026-10-30): the player behind the character's decision on a routine step, for the Watcher's eyes. */
+  player?: { decision: 'follow' | 'hold' | 'break'; reason: string; step: string; routine: string; roll?: { rollId: string; success: boolean | null; total?: number; dr: number; via: 'ai' | 'popup' } };
 }
 
 const segs = (segments: BeingThoughtRecord['segments']) => segments?.length ? segments.map((s) => ({ kind: s.kind, text: s.text.slice(0, 1500), ...(s.narrated ? { narrated: s.narrated.slice(0, 1500) } : {}) })) : undefined;
@@ -70,6 +72,7 @@ export async function recordBeingThought(campaignId: string, by: { userId: strin
         ...(r.cycle !== undefined ? { cycle: r.cycle } : {}),
         ...(r.scene ? { scene: r.scene.slice(0, 1200) } : {}),
         ...(segs(r.segments) ? { segments: segs(r.segments) } : {}),
+        ...(r.player ? { player: { ...r.player, reason: r.player.reason.slice(0, 300) } } : {}),
     };
     const ev = await createCampaignEvent({
       campaignId,

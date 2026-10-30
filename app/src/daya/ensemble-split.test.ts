@@ -91,7 +91,7 @@ function fakeLane(script: { answers?: string[][]; listen?: string; soul?: string
   const fetchImpl: DayaFetch = async (_url, init) => {
     const body = JSON.parse(init.body) as { messages: Array<{ content: string }>; stream?: boolean; stop?: string[] };
     const prompt = body.messages.map((m) => m.content).join('\n');
-    const kind: LaneCall['kind'] = prompt.includes('You check one spoken line') ? 'check' : prompt.includes('Answer now') ? 'answer' : prompt.includes('Nobody is waiting on you') ? 'listen' : prompt.includes('Output ONLY JSON') ? 'body' : 'soul';
+    const kind: LaneCall['kind'] = prompt.includes('You check one spoken line') ? 'check' : prompt.includes('Answer now') ? 'answer' : prompt.includes('What rises in memory') ? 'listen' : prompt.includes('Output ONLY JSON') ? 'body' : 'soul';
     calls.push({ kind, stream: body.stream === true, stop: body.stop, hinted: body.messages.length > 1, prompt });
     const json = (text: string) => ({ ok: true, status: 200, text: async () => '', json: async () => ({ choices: [{ message: { content: text } }], usage: { prompt_tokens: 800, completion_tokens: 20 } }) });
     if (kind === 'answer') {

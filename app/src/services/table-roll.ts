@@ -62,9 +62,13 @@ export interface StartedRoll {
 export async function startTableRoll(
   campaignId: string,
   gm: { id: string; username: string },
-  input: { characterId: string; text: string; cycle?: number; forceKind?: ActiveCheck['kind'] },
+  input: {
+    characterId: string; text: string; cycle?: number; forceKind?: ActiveCheck['kind'];
+    /** A FEAR CHECK (ordinary competence, 2026-10-30): a memory rose against a routine step; the governor and DR come from the engine, not the words. */
+    fear?: { governor: string; dr: number };
+  },
 ): Promise<StartedRoll | null> {
-  const check = detectActiveCheck(input.text) ?? (input.forceKind ? { kind: input.forceKind, perceptual: input.forceKind !== 'attempt', match: input.forceKind } : null);
+  const check = input.fear ? { kind: 'attempt' as const, perceptual: false, match: 'fear' } : detectActiveCheck(input.text) ?? (input.forceKind ? { kind: input.forceKind, perceptual: input.forceKind !== 'attempt', match: input.forceKind } : null);
   if (!check) return null;
 
   const key = `${campaignId}:${input.characterId}:${input.text.trim().toLowerCase()}`;
@@ -80,8 +84,8 @@ export async function startTableRoll(
   if (!campaign || !ch || ch.campaignId !== campaignId) return null;
   const sheet = parseSheet(ch.data);
   const skills = Array.isArray(sheet?.skills) ? sheet!.skills : [];
-  const skill = namedSkill(input.text, skills);
-  const governor = skill ? (skill.governors?.[0] ?? 'willpower') : governorFor(input.text, check);
+  const skill = input.fear ? null : namedSkill(input.text, skills);
+  const governor = input.fear ? input.fear.governor : skill ? (skill.governors?.[0] ?? 'willpower') : governorFor(input.text, check);
 
   const played = ch.entityType === 'PLAYER_CHARACTER' && !!ch.userId && ch.userId !== campaign.gmUserId;
   const ownerRole: RollPurpose['ownerRole'] = played ? 'trailblazer' : 'watcher';
@@ -89,7 +93,7 @@ export async function startTableRoll(
   const settings = await getCampaignAISettings(campaignId);
   const aiDecides = !played && settings.rollEffort !== 'manual';
   const timeoutSec = played ? Math.max(10, settings.rollTimeoutSec ?? DEFAULT_ROLL_TIMEOUT_SEC) : WATCHER_ROLL_TIMEOUT_SEC;
-  const dr = INSPECT_TUNING.defaultDr; // the sim's SUGGESTION — canon has no obstacle ladder [NEEDS MIKE]
+  const dr = input.fear?.dr ?? INSPECT_TUNING.defaultDr; // the sim's SUGGESTION — canon has no obstacle ladder [NEEDS MIKE]
 
   const rollId = crypto.randomUUID();
   const purpose: RollPurpose = {
@@ -109,6 +113,17 @@ export async function startTableRoll(
     return { rollId, checkId: started.checkId, ownerRole, via: 'ai' };
   }
   return { rollId, checkId: started.checkId, ownerRole, via: 'popup' };
+}
+
+/** The outcome of a roll already carded (by rollId), for the engine that asked for it. Null when no card yet. */
+export async function rollOutcome(campaignId: string, rollId: string): Promise<{ success: boolean; total: number; dr: number } | null> {
+  const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'roll', payload: { contains: rollId } }, orderBy: { createdAt: 'desc' }, take: 1, select: { payload: true } });
+  if (!rows.length) return null;
+  try {
+    const p = JSON.parse(rows[0].payload ?? '{}') as Partial<RollPayload>;
+    if (p.rollId !== rollId || typeof p.success !== 'boolean') return null;
+    return { success: p.success, total: p.total ?? 0, dr: p.dr ?? 0 };
+  } catch { return null; }
 }
 
 /** The AI chooses the Effort for a stored check and resolves it (setting 'ai', or a popup nobody answered in time). */

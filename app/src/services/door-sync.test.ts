@@ -61,13 +61,12 @@ describe('compound door acts', () => {
     expect(doorState()).toBe('open');
     expect(liveFacts().map((f) => f.fact)).toEqual([doorFactText('Entry door', 'open')]);
   });
-  it('a bare "opens the door" on a locked door is refused, and the contradicting open fact is pulled back to locked', async () => {
+  it('a bare "opens the door" on her OWN locked door, from inside, unlocks and opens it (a lock is worked from the inside — HW10 2026-10-29; the 10-17 refusal law is gone)', async () => {
     const r = await applyActEffects('c1', 'vi', [{ op: 'door', door: 'Entry door', state: 'open' }], 'She opens the door.');
-    expect(r.applied).toEqual([]);
-    expect(r.refused[0]).toMatch(/locked/);
-    expect(doorState()).toBe('locked');
-    expect(liveFacts().map((f) => f.fact)).toEqual([doorFactText('Entry door', 'locked')]);
-    expect(h.broadcast).not.toHaveBeenCalled();
+    expect(r.applied).toEqual(['door "Entry door" unlocked, then opened']);
+    expect(r.refused).toEqual([]);
+    expect(doorState()).toBe('open');
+    expect(liveFacts().map((f) => f.fact)).toEqual([doorFactText('Entry door', 'open')]);
   });
   it('"shuts and bolts it": open → locked in one act is applied', async () => {
     h.loc.data = JSON.stringify({ openings: [opening('open')] });

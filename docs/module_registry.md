@@ -2,6 +2,19 @@
 
 Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all components inventoried)
 
+
+## Ordinary competence — routines, the player, rolls at resistance (2026-10-30)
+
+- `src/daya/routines.ts` (pure) — `RoutineEnd` (hold / gave / door / at), `RoutineWorld`, `nextStep(ends, world, cursor)` (a backward planner over world-apply's preconditions), `advanceCursor`, `routineDone`, `triggerInCue` (stemmed trigger words), `parseRoutineDrafts` + `normalizeEndOrder` (door-open → hold → gave → at → door shut/locked), `endsInWordsFrom`, `ROUTINE_STEP_CAP` 12, `ROUTINE_LAPSE_CYCLES` 2 h. Tests `routines.test.ts`.
+- `src/services/routine-world.ts` — `routineWorldFor(campaignId, actorId)`: the world as the planner sees it, read fresh each beat (doors with lock-side and way-out and distance in feet, things held or lying in the room, people with reach here / through-open / beyond-door / far / none).
+- `src/services/routine-derive.ts` — `deriveRoutines(characterId)`: ONE judgment-lane call from the being's own cadence/trigger intentions + their memories + its things (with descriptions) + the people (with what they carry that names it) + the money/order facts → `DayaRoutine` rows (replaces all non-RUNNING). `scripts/derive-routines.ts <name…> [--show]`.
+- `src/services/routine-run.ts` — `routineStepFor(campaignId, characterId, cue)` (due routine → step; marks RUNNING; re-arms by cadence; lapses; lazily kicks derivation when a being with intentions has none), `runRoutineStep` (player → fear check → `applyActEffects` → cursor/steps/DONE), `fearDr` (`FEAR_DR` provisional).
+- `src/daya/player.ts` + `src/daya/prompts/roles/player.ts` — the player behind the character: `sheetReadout` (raw numbers + canon conditions at zero), `buildPlayerPrompt`, `readPlayerDecision` (follow | hold | break; unreadable = follow), `playerDecides` (L1, subsystem `player`, 90 tokens).
+- `src/services/table-speak.ts` — `routineTurn` inside `runBeats`: the step handed to `listenToTable` as `stimulus.routine`; after the listen the turn; act card carries `player` (`being-thought.ts` `BeingThoughtRecord.player`).
+- `src/services/table-roll.ts` — `startTableRoll(…, { fear: { governor, dr } })`, `rollOutcome(campaignId, rollId)`.
+- `src/daya/prompts/roles/spirit.ts` — `SpiritListeningArgs.routine`, `splitImpulse` → `{ thought, impulse, reason }`, `LISTENING_MAX_TOKENS` 180, the anti-table line removed. `src/daya/ensemble.ts` — `TableStimulus.routine`, `ListenResult.stayReason` / `resistance`; `recall.ts` `SurfacedMemory` carries arousal/valence/content.
+- `src/lib/spatial/pathfinding.ts` — `pathSeconds(feet, pace, walkFtPerS?)`, `walkFtPerSFromCelerity`; `being-movement.moveBeing` reads Celerity. `world-apply.ts` — give across one open way (`withinReachThroughOpenWay`); `actorMap` homeRooms best-effort.
+
 ## Services (Business Logic)
 
 | Module | File | Purpose | Dependencies |

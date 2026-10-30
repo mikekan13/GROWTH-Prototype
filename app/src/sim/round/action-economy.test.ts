@@ -15,13 +15,14 @@ function attrs(o: Partial<Record<keyof GrowthAttributes, number>>): GrowthAttrib
 }
 
 describe('action pools', () => {
-  it('canon: 75 body = 3, Frequency excluded from Spirit, min 1', () => {
-    const pools = actionPools({ attributes: attrs({ clout: 25, celerity: 25, constitution: 25, flow: 10, focus: 10, frequency: 500, willpower: 4, wisdom: 4, wit: 4 }) });
+  // Divisor 75 since Mike's ruling of 2026-10-29 (was 25): a ~30-average human has one action a pillar.
+  it('canon: 225 body = 3, Frequency excluded from Spirit, min 1', () => {
+    const pools = actionPools({ attributes: attrs({ clout: 75, celerity: 75, constitution: 75, flow: 30, focus: 30, frequency: 500, willpower: 4, wisdom: 4, wit: 4 }) });
     expect(pools).toEqual({ body: 3, spirit: 1, soul: 1 });
   });
-  it("Mike's example: 1b2s1s vs 2b2s1s", () => {
-    const a = actionPools({ attributes: attrs({ clout: 8, celerity: 8, constitution: 8, flow: 25, focus: 25, willpower: 5, wisdom: 5, wit: 5 }) });
-    const b = actionPools({ attributes: attrs({ clout: 20, celerity: 20, constitution: 10, flow: 25, focus: 25, willpower: 5, wisdom: 5, wit: 5 }) });
+  it("Mike's example (scaled to /75): 1b2s1s vs 2b2s1s", () => {
+    const a = actionPools({ attributes: attrs({ clout: 24, celerity: 24, constitution: 24, flow: 75, focus: 75, willpower: 5, wisdom: 5, wit: 5 }) });
+    const b = actionPools({ attributes: attrs({ clout: 60, celerity: 60, constitution: 30, flow: 75, focus: 75, willpower: 5, wisdom: 5, wit: 5 }) });
     expect(a).toEqual({ body: 1, spirit: 2, soul: 1 });
     expect(b).toEqual({ body: 2, spirit: 2, soul: 1 });
   });

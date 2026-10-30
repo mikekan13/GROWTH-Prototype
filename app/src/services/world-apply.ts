@@ -122,8 +122,12 @@ export async function actorMap(characterId: string): Promise<ActorMap | null> {
     }
     break;
   }
-  const under = await prisma.entityRelationship.findMany({ where: { targetId: home.id, relationshipType: REL, sourceType: 'LOCATION' }, select: { sourceId: true } }).catch(() => []);
-  const homeRooms = under.length ? (await prisma.location.findMany({ where: { id: { in: under.map((u) => u.sourceId) } }, select: { name: true } })).map((r) => r.name) : [];
+  // Best effort (a test's partial prisma, or a bad read, must not take the map down): no rooms listed = nothing can be told about the lock's side.
+  let homeRooms: string[] = [];
+  try {
+    const under = await prisma.entityRelationship.findMany({ where: { targetId: home.id, relationshipType: REL, sourceType: 'LOCATION' }, select: { sourceId: true } });
+    homeRooms = under.length ? (await prisma.location.findMany({ where: { id: { in: under.map((u) => u.sourceId) } }, select: { name: true } })).map((r) => r.name) : [];
+  } catch { homeRooms = []; }
   return { roomId: room.id, roomName: room.name, home, doors, homeRooms };
 }
 
@@ -281,6 +285,17 @@ async function itemChanged(campaignId: string, itemId: string): Promise<void> {
   } catch { /* canvases re-read on their own */ }
 }
 
+/** The other room is joined to the actor's by exactly one passage and it is open (an open door, an archway): a hand reaches across it. */
+async function withinReachThroughOpenWay(campaignId: string, map: ActorMap, otherRoomId: string): Promise<boolean> {
+  try {
+    const locs = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { id: true, name: true, data: true } });
+    const other = locs.find((l) => l.id === otherRoomId);
+    if (!other) return false;
+    const route = routeBetween(passageGraph(locs.flatMap((l) => parseOpenings(parseData(l.data).openings))), map.roomName, other.name);
+    return !!route && route.length === 1 && (route[0].kind !== 'door' || route[0].state === 'open');
+  } catch { return false; }
+}
+
 /** The act's own words say the lock/bolt/latch was worked (so an open on a locked door is unlock-then-open). Pure. */
 const LOCK_WORKED_RE = /\b(?:unlock\w*|unbolt\w*|dead-?bolt\w*|bolt\w*|latch\w*|keys?|(?:turn|flip|slid|slide|draw|drew|drawn|retract|throw|threw|click|snap)\w*\s+(?:back\s+)?(?:the\s+)?(?:lock|bolt|deadbolt|latch))\b/i;
 export function actWorksTheLock(actText: string | undefined): boolean {
@@ -401,8 +416,9 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           const to = people.find((p) => p.id === e.to) ?? people.find((p) => p.name.toLowerCase() === e.to.trim().toLowerCase()) ?? people.find((p) => e.to.toLowerCase().includes(p.name.toLowerCase()));
           if (!to) { report.refused.push(`give "${item.name}": no one called "${e.to}" here`); break; }
           const toRel = await prisma.entityRelationship.findFirst({ where: { sourceId: to.id, relationshipType: REL }, select: { targetId: true } });
-          // A hand-over needs both in one room (HW4 2026-10-24: a five held out through a locked door).
-          if (map && toRel && toRel.targetId !== map.roomId) { report.refused.push(`give "${item.name}": ${to.name} is not in ${map.roomName}`); break; }
+          // A hand-over needs both in one room (HW4 2026-10-24: a five held out through a locked door) — or within reach through
+          // ONE open way between the rooms (2026-10-30: the pizza and the cash change hands across the open doorway, her inside, him on the landing).
+          if (map && toRel && toRel.targetId !== map.roomId && !(await withinReachThroughOpenWay(campaignId, map, toRel.targetId))) { report.refused.push(`give "${item.name}": ${to.name} is not within reach from ${map.roomName}`); break; }
           await prisma.campaignItem.update({ where: { id: item.id }, data: { holderId: to.id, ...(toRel ? { locationId: toRel.targetId } : {}) } });
           report.applied.push(`"${item.name}" handed to ${to.name}`);
           await itemChanged(campaignId, item.id);

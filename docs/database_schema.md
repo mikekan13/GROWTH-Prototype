@@ -655,3 +655,8 @@ Where a viewing character LAST KNEW a being, a thing or a door to be. Written by
 | seenAt | DateTime | |
 
 Unique `(viewerId, subjectId)`; index `(campaignId, viewerId)`. Rows are never deleted by play; a world reset should clear them (`tmp/fog-clear.ts`).
+
+## DayaRoutine — procedural memory (Claude, ruled by Michael 2026-10-30; migrations `20261030120000_daya_routines`, `20261030130000_daya_routine_cursor`)
+
+One row per routine of a being: `name` (the being's register), `triggers` (JSON string[] of cue words), `cadence` (daily | nightly | weekly | always | null), `ends` (JSON `RoutineEnd[]` — `{kind:'hold',item}` / `{kind:'gave',item,to}` / `{kind:'door',door,state}` / `{kind:'at',place}`), `sourceIntentionIds`, `status` (READY | RUNNING | DONE | RETIRED), `cursor` (ends reached, never goes back), `steps` (this instance), `startedCycle`, `lastDoneCycle`. The means are never stored — planned per beat from the live map (`src/daya/routines.ts`). Derived by `services/routine-derive.ts`; run by `services/routine-run.ts`.
+

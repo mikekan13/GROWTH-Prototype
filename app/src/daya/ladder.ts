@@ -115,6 +115,9 @@ export function wordsStrength(cue: string, content: string): number {
 export function climb(m: LadderMemory, ctx: LadderContext): LadderResult {
   const cueDomains = ctx.cueDomains ?? classifyDomains(ctx.cue).all;
   const words = wordsStrength(ctx.cue, m.content);
+  // Survival is cue-blind BY RULING (Mike 2026-10-25: "survival should be most important… she should be able to hold both
+  // memories at once" — the budget spreads a slot per rung). A 2026-10-30 attempt to gate it on the cue was reverted: with
+  // ordinary competence the routine step is handed to the being as a fact outside recall, so dread no longer crowds it out.
   const rungs: Array<[Rung, number]> = [
     ['survival', survivalStrength(m, ctx.situation)],
     ['intention', ctx.intentionMemoryIds?.has(m.id) ? 1 : 0],

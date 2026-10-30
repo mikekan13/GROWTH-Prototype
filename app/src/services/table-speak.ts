@@ -63,7 +63,7 @@ import { ensureKeepalive } from '@/daya/l1-keepalive';
 import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, type ReconTicket } from '@/services/reconciliation';
 import { advanceClockForLine } from '@/services/table-clock';
 import type { ListenImpulse } from '@/daya/prompts/roles/spirit';
-import { recordBeingThought, attachBeingCard } from '@/services/being-thought';
+import { recordBeingThought, attachBeingCard, type BeingThoughtRecord } from '@/services/being-thought';
 import { actorMap, whereOthersStand } from '@/services/world-apply';
 import { actInThirdPerson, worldChangeSentences } from '@/daya/act-card';
 import { didNotHear } from '@/daya/did-not-hear';
@@ -73,6 +73,9 @@ import { recentVoiceOf, recentCardTextsOf } from '@/daya/voice-history';
 import { markAddressedByName } from '@/daya/name-addressed';
 import { splitHeld, readHeldIn } from '@/daya/facts-for-actor';
 import { cueCoverage } from '@/daya/ladder';
+import { routineStepFor, runRoutineStep, type DueRoutine } from '@/services/routine-run';
+import { resolveDayaEntityId } from '@/daya/entity';
+import type { FactLine } from '@/daya/claim-vs-fact';
 
 export interface TableActor {
   userId: string;
@@ -378,12 +381,14 @@ async function postActCard(
   by: { userId: string; username: string },
   being: { id: string; name: string; sex?: string | null },
   content: string,
+  extra: { player?: BeingThoughtRecord['player'] } = {},
 ): Promise<string | null> {
   const text = actInThirdPerson(being.name, being.sex, content);
   if (!text) return null;
   await recordBeingThought(campaignId, by, {
     characterId: being.id, characterName: being.name, heard: '', thought: text, impulse: 'act', canonEventId: null,
     segments: [{ kind: 'action', text }],
+    ...(extra.player ? { player: extra.player } : {}),
   });
   return text;
 }
@@ -920,8 +925,16 @@ async function runBeats(
     if (pre) truth.preListened!.delete(listenerId);
     let cardDone: () => void = () => {};
     cardPosted.set(listenerId, new Promise<void>((r) => { cardDone = r; }));
-    void (pre ?? (unnamed ? unnamed.then((c) => listenToTable(listenerId, actor.role, { ...carried, content: hearerName ? markAddressedByName(c, hearerName) : c })) : listenToTable(listenerId, actor.role, carried)))
-      .then(async (outcome) => {
+    // ORDINARY COMPETENCE (2026-10-30): before the being listens, is a routine of its called up by what reached it, or
+    // already running? Its next step is planned from the live world and handed to the listen as a fact about itself.
+    // Never for the being the Watcher voiced (his voicing is the override) and never on its own act.
+    const routineDue: Promise<DueRoutine | null> = pre || own || voiced.has(listenerId)
+      ? Promise.resolve(null)
+      : routineStepFor(campaignId, listenerId, carried.content, { sex: truth.actors?.[listenerId]?.sex ?? null }).catch(() => null);
+    const withRoutine = (s: PlannedStimulus, r: DueRoutine | null): PlannedStimulus & { routine?: { step: string; because: string[] } } => (r ? { ...s, routine: { step: r.step.step, because: r.step.because } } : s);
+    void routineDue
+      .then((routine) => (pre ?? (unnamed ? unnamed.then((c) => listenToTable(listenerId, actor.role, withRoutine({ ...carried, content: hearerName ? markAddressedByName(c, hearerName) : c }, routine))) : listenToTable(listenerId, actor.role, withRoutine(carried, routine)))).then((outcome) => ({ outcome, routine })))
+      .then(async ({ outcome, routine }) => {
         if (outcome.status !== 'ok') {
           console.warn(`[table-speak] ${listenerId} could not listen: ${outcome.status}${outcome.detail ? ` (${outcome.detail})` : ''}`);
           reportTiming({ kind: 'listen', characterId: listenerId, outcome: outcome.status });
@@ -987,11 +1000,21 @@ async function runBeats(
           // Introductions teach names (this stretch's row, once it points at the truth and carries its senses).
           await learnIntroductions(campaignId, [{ characterId: listenerId, memoryIds: [outcome.listened.memoryEntryId] }], undefined, { canonEventId: truthId });
         }
+        // ORDINARY COMPETENCE (2026-10-30): a routine step due this beat is the being's turn — the player behind it decides
+        // (follow / hold / break), the dice decide what rose against it, the step runs through world-apply. 'break' falls
+        // through to the being's own answer below.
+        if (routine && outcome.listened?.status === 'listened' && !granted.has(listenerId) && !voiced.has(listenerId)) {
+          const ran = await routineTurn(listenerId, routine, outcome.listened, carried.content, askFor);
+          if (ran !== 'broke') return;
+        }
         // THE BEING'S OWN SAY (Mike 2026-10-24: "the entities themselves should have a say if they
         // want to answer"): a listen that ends in "speak" or "act" earns the turn the ask did not give.
         const impulse = outcome.listened?.impulse;
         if (askFor && (impulse === 'speak' || impulse === 'act') && !granted.has(listenerId) && !voiced.has(listenerId)) {
           await answer(listenerId, askFor);
+        } else if (routine && !askFor && impulse === 'act' && !granted.has(listenerId) && !voiced.has(listenerId)) {
+          // The player broke from the routine to DO something else: the world's beat is its turn.
+          await answer(listenerId, { kind: 'turn' });
         }
       })
       .catch((err) => console.error('[table-speak] listening failed (non-fatal):', err))
@@ -1157,6 +1180,68 @@ async function runBeats(
   const answered = new Map<string, ListenerResponse>();
   // Who asked each being (the speaker of the line it answers), for the reply's way back.
   const askSource = new Map<string, string | null>();
+
+  /**
+   * A routine step as the being's turn (ordinary competence, 2026-10-30). Returns what the player did with it; 'broke'
+   * hands the turn back to the ordinary answer path. The act goes on the record as an act card, the world's changes as a
+   * scene sentence, the act reaches the room by the judge, the clock is charged, intentions settle — as an answered act does.
+   */
+  const routineTurn = async (listenerId: string, routine: DueRoutine, listened: NonNullable<TableListenOutcome['listened']>, heard: string, askFor?: TableAsk): Promise<'followed' | 'held' | 'broke'> => {
+    const listener = listeners.find((l) => l.id === listenerId);
+    if (!listener) return 'held';
+    try {
+      const [entityDaId, row, factRows] = await Promise.all([
+        resolveDayaEntityId(listenerId),
+        prisma.character.findUnique({ where: { id: listenerId }, select: { data: true } }),
+        prisma.worldFact.findMany({ where: { campaignId, supersededById: null }, select: { subjectKey: true, fact: true }, take: 300 }).catch((): Array<{ subjectKey: string; fact: string }> => []),
+      ]);
+      let sheet: Parameters<typeof runRoutineStep>[0]['being']['sheet'] = null;
+      try { sheet = row?.data ? JSON.parse(row.data) : null; } catch { sheet = null; }
+      const facts: FactLine[] = factRows.map((f) => ({ subjectKey: f.subjectKey, fact: f.fact }));
+      const sex = truth.actors?.[listenerId]?.sex ?? null;
+      const result = await runRoutineStep({
+        campaignId, by: { userId: actor.userId, username: actor.username },
+        being: { id: listenerId, name: listener.name, sex, entityDaId, sheet },
+        routine,
+        listen: { thought: listened.thought ?? '', impulse: listened.impulse, stayReason: listened.stayReason ?? null, resistance: listened.resistance ?? null },
+        heard, facts,
+      });
+      if (result.status === 'broke') { console.log(`[routine] ${listener.name}: breaks from "${routine.name}" — ${result.reason}`); return 'broke'; }
+      granted.add(listenerId);
+      if (result.status === 'held') {
+        console.log(`[routine] ${listener.name}: holds "${routine.name}" at "${routine.step.step}" — ${result.reason}${result.roll ? ` (roll ${result.roll.success === null ? 'pending' : result.roll.success ? 'made' : 'failed'} vs DR ${result.roll.dr})` : ''}`);
+        // The Watcher reads why (a being_thought row; the thought card stands above it): her hands held, and the reason.
+        await awaitCard(cardPosted.get(listenerId));
+        await recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
+          characterId: listenerId, characterName: listener.name, heard: '', thought: '', impulse: 'stay', canonEventId: null,
+          player: { decision: 'hold', reason: result.reason, step: routine.step.step, routine: routine.name, ...(result.roll ? { roll: result.roll } : {}) },
+        });
+        answered.set(listenerId, { characterId: listenerId, characterName: listener.name, status: 'ok', actionKind: 'rest', detail: `held: ${result.reason}` });
+        return 'held';
+      }
+      // FOLLOWED. The act line, the clock, the card, the world's change, the room, the intentions.
+      const act = result.act;
+      console.log(`[routine] ${listener.name}: ${act}${result.applied.length ? ` → ${result.applied.join('; ')}` : ''}${result.refused.length ? ` · refused: ${result.refused.join('; ')}` : ''}${result.done ? ' · routine done' : ''}`);
+      if (result.effect.op !== 'wait') await advanceClockForLine(campaignId, 'being-act', act);
+      await awaitCard(cardPosted.get(listenerId));
+      await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listener.id, name: listener.name, sex }, act, { player: { decision: 'follow', reason: result.player.reason, step: routine.step.step, routine: routine.name, ...(result.roll ? { roll: result.roll } : {}) } });
+      if (result.refused.length && !result.applied.length) await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listener.id, name: listener.name, sex }, `cannot: ${result.refused[0]}`);
+      if (result.applied.length) await postWorldChange(campaignId, actor, result.applied);
+      answered.set(listenerId, { characterId: listenerId, characterName: listener.name, status: 'ok', actionKind: 'act', detail: act });
+      settleByAct(campaignId, listener.id, act);
+      // The act reaches the room (as an answered act does): the judge decides what crosses the door.
+      const others = listeners.map((l) => l.id).filter((id) => id !== listener.id);
+      if (others.length && result.effect.op !== 'wait') {
+        const text = actInThirdPerson(listener.name, sex, act) || `${listener.name} ${act}.`;
+        const u: TableUtterance = { text, kind: 'narration', to: null, speaker: null, expectsReply: false, ambiguous: false, rule: 'being-act' };
+        gatedHear([u], others, undefined, null);
+      }
+      return 'followed';
+    } catch (err) {
+      console.error('[routine] the step could not be run (non-fatal):', err);
+      return 'held';
+    }
+  };
   const answer = async (listenerId: string, ask: TableAsk) => {
     const listener = listeners.find((l) => l.id === listenerId);
     if (!listener || granted.has(listenerId)) return;

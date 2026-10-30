@@ -91,6 +91,8 @@ export interface SpiritListeningArgs {
   held?: string[];
   /** What is written on a thing this stretch has the being read, exactly as written (HW8 run 6). */
   reads?: string;
+  /** ORDINARY COMPETENCE (2026-10-30): a routine of the being's days is called up — the step its hands know next, as a fact about itself. */
+  routine?: { step: string; because?: string[] } | null;
 }
 
 /**
@@ -102,7 +104,8 @@ export const QUOTED_WORDS_NOTE = "Quoted words are the speaker's own; a name ins
 /** The in-world words for the voice: never the table's (beat, stimulus, instruction, scene). */
 export const IN_WORLD_NOTE = 'Think and speak only in the words of your own life — what just happened, what you notice, what you do now. Put no number on anything you were not given a number for. Say nothing about light or dark unless the facts above say how the room is lit. Do not reach for stock images that could fit any scene — say what is specific to this one. A person you remember, or are told to think of, is NOT in front of you unless the facts above say they are in sight.';
 
-export const LISTENING_MAX_TOKENS = 140;
+/** Room for the thought AND the impulse line (2026-10-30: at 140 a long thought lost its last line, which was the impulse, which read as stay). */
+export const LISTENING_MAX_TOKENS = 180;
 
 /**
  * What a stretch's senses allow the being to think about it (HW5 2026-10-25: Violet, behind
@@ -132,10 +135,15 @@ export type ListenImpulse = 'speak' | 'act' | 'stay';
  * they want to answer"). Split it off; the thought alone is what is kept.
  * No marker → 'stay' (today's behaviour). Pure.
  */
-export function splitImpulse(raw: string): { thought: string; impulse: ListenImpulse } {
-  const m = raw.match(/\n?\s*\**\s*impulse\s*\**\s*[:—–-]\s*\**\s*(speak|act|stay)\b\W*$/i);
-  if (!m) return { thought: raw.trim(), impulse: 'stay' };
-  return { thought: raw.slice(0, m.index).trim(), impulse: m[1].toLowerCase() as ListenImpulse };
+export function splitImpulse(raw: string): { thought: string; impulse: ListenImpulse; reason: string | null } {
+  // The LAST impulse marker, wherever it fell (2026-10-30: only an end-anchored match was read, so a trailing word or a
+  // reason after "stay" lost the whole line to 'stay'); a reason after the impulse is the being's own say on what holds it.
+  const re = /\n?\s*\**\s*impulse\s*\**\s*[:—–-]\s*\**\s*(speak|act|stay)\b\**\s*(?:[—–:-]|because|,)?\s*([^\n]*(?:\n[^\n]*)*)$/gi;
+  let m: RegExpExecArray | null = null;
+  for (let x = re.exec(raw); x; x = re.exec(raw)) { m = x; if (re.lastIndex === x.index) break; }
+  if (!m || m.index === undefined) return { thought: raw.trim(), impulse: 'stay', reason: null };
+  const reason = (m[2] ?? '').replace(/^\s*(?:\(|because\b)\s*/i, '').replace(/[)\s.]+$/, '').trim();
+  return { thought: raw.slice(0, m.index).trim(), impulse: m[1].toLowerCase() as ListenImpulse, reason: reason.length >= 3 ? reason.slice(0, 160) : null };
 }
 
 export function buildSpiritListeningPrompt(args: SpiritListeningArgs): string {
@@ -164,8 +172,8 @@ ${args.innerSoFar || 'Nothing yet — you have only just started paying attentio
 ${args.held?.length ? `What you have on you:\n${args.held.join('\n')}\n\n` : ''}${args.facts?.length ? `What the world holds true about this (check it before you imagine anything — a thing not here or in your memory is not known to you):\n${args.facts.join('\n')}\n\n` : ''}What just reached you:
 ${args.heard}
 ${QUOTED_WORDS_NOTE}
-${args.reads ? `\nWhat you read, exactly as it is written — the text in your hand; read it as it is, do not guess at it or remember it differently:\n${args.reads}\n` : ''}${args.sensesNote ? `\n${args.sensesNote}\n` : ''}${args.sinceOwn ? `\nTime, as you feel it: it has been ${args.sinceOwn} since you last said or did anything.\n` : ''}
-Nobody is waiting on you; things are still unfolding. ${IN_WORLD_NOTE} Take it in. Write
+${args.reads ? `\nWhat you read, exactly as it is written — the text in your hand; read it as it is, do not guess at it or remember it differently:\n${args.reads}\n` : ''}${args.sensesNote ? `\n${args.sensesNote}\n` : ''}${args.sinceOwn ? `\nTime, as you feel it: it has been ${args.sinceOwn} since you last said or did anything.\n` : ''}${args.routine ? `\nWhat your hands know to do next — the routine of your days, not a thought; the body knows the way: you ${args.routine.step}.${args.routine.because?.length ? ` (${args.routine.because.join('; ')}.)` : ''} It runs on its own unless you hold it, and holding needs a reason you could point to.\n` : ''}
+${IN_WORLD_NOTE} Take it in. Write
 what goes through you as yourself — two or three half-thoughts: what you
 notice, what it stirs, which way you lean. What you don't know, you don't know.
 Do not speak aloud and do not act. Thoughts only, under sixty words. You are
@@ -175,7 +183,7 @@ Then, on its own last line, your impulse — whether you would break in now,
 as yourself, given who you are and how long you have let this sit:
 Impulse: speak   (you would say something now)
 Impulse: act     (you would do something now)
-Impulse: stay    (you let it sit)`;
+Impulse: stay — <what holds you, in a few words>   (you let it sit; say why)`;
 }
 
 /** What turned the moment to the being: the table waiting on it, or someone speaking to it. */
