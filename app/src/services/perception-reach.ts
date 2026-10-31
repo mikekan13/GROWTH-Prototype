@@ -25,6 +25,7 @@ import { laneReadiness } from '@/daya/l1-endpoint';
 import { actorMap, mapFactLines } from '@/services/world-apply';
 import { loadWorldLevel, beingStanding, levelOfBeing } from '@/services/spatial-world';
 import { lineOfSight } from '@/lib/spatial';
+import { UNITS_PER_FT } from '@/lib/spatial/types';
 import { decodePerceivedVia, encodePerceivedVia, mergePerceivedVia } from '@/daya/perceived-via';
 import { matchNamedThings, holderVerdict, type ThingMatch } from '@/sim/senses/named-things';
 
@@ -207,8 +208,9 @@ export function throughWalls(event: ReachEvent, b: ReachBeing, v: ReachVerdict, 
  * the walls, the doors as they stand, archways and windows letting it through. Only beings whose points are
  * known get a verdict; the rest fall back to the room-name rule. Never throws.
  */
-async function sightLines(campaignId: string, sourceId: string | null | undefined, beingIds: string[]): Promise<Map<string, boolean>> {
-  const out = new Map<string, boolean>();
+/** The map's own answer per being: a clear ray from the event's source, and how far it is in feet. Never throws. */
+async function sightGeometry(campaignId: string, sourceId: string | null | undefined, beingIds: string[]): Promise<Map<string, { los: boolean; feet: number }>> {
+  const out = new Map<string, { los: boolean; feet: number }>();
   if (!sourceId) return out;
   try {
     const { map } = await loadWorldLevel(campaignId, await levelOfBeing(sourceId));
@@ -219,10 +221,36 @@ async function sightLines(campaignId: string, sourceId: string | null | undefine
       if (id === sourceId) continue;
       const s = await beingStanding(map, id);
       if (!s) continue;
-      out.set(id, lineOfSight(map, src.point, s.point));
+      const feet = Math.hypot(s.point.x - src.point.x, s.point.y - src.point.y) / UNITS_PER_FT;
+      out.set(id, { los: lineOfSight(map, src.point, s.point), feet });
     }
   } catch (err) { console.warn('[perception-reach] line of sight unread (room rule applies)', err instanceof Error ? err.message : err); }
   return out;
+}
+
+/** Within this many feet, with a clear ray, a being is face to face with the event: it reaches by sight and by ear. */
+export const FACE_TO_FACE_FT = Number(process.env.PERCEPTION_FACE_TO_FACE_FT ?? 15);
+/** Within this many feet with a clear ray it is in plain sight. */
+export const PLAIN_SIGHT_FT = Number(process.env.PERCEPTION_PLAIN_SIGHT_FT ?? 60);
+
+/**
+ * THE MAP OVERRULES THE JUDGE WHEN THE MAP IS SURE (HW12 2026-10-31: Violet stood in her open doorway with Kristopher
+ * handing her the box and the judge ruled her NOT REACHED on five of seven lines — once even for his hand brushing hers).
+ * A clear ray on the real map within a few feet is not a judgement call: she sees it, and close enough, hears it. The
+ * judge keeps its say on everything the map cannot settle (noticing, clarity, what is far or behind a wall). Pure.
+ */
+export function faceToFace(v: ReachVerdict, geometry: { los: boolean; feet: number } | undefined, senses: ReachBeing['senses'] | undefined): ReachVerdict {
+  if (!geometry?.los) return v;
+  if (v.reaches && v.via.includes('self')) return v;
+  const blind = senses ? (senses.effectiveness.sight ?? 1) <= 0 : false;
+  const deaf = senses ? (senses.effectiveness.hearing ?? 1) <= 0 : false;
+  const via: string[] = [];
+  if (!blind && geometry.feet <= PLAIN_SIGHT_FT) via.push('sight');
+  if (!deaf && geometry.feet <= FACE_TO_FACE_FT) via.push('hearing');
+  if (!via.length) return v;
+  const merged = Array.from(new Set([...(v.reaches ? v.via : []), ...via]));
+  if (v.reaches && v.noticed && merged.length === v.via.length) return v;
+  return { ...v, beingId: v.beingId, reaches: true, via: merged, noticed: true, salience: Math.max(v.salience ?? 0, geometry.feet <= FACE_TO_FACE_FT ? 0.8 : 0.6) };
 }
 
 /** The doors around the event's source, as the adjudicator reads them (services/world-apply). Never throws. */
@@ -280,12 +308,16 @@ export async function judgeCanonReach(
   }
   if (j.source === 'fallback') console.warn(`[perception-reach] world-sim fell back to the stub after ${j.ms}ms: ${j.error}`);
   if (walls.length || event.locationId) {
-    const sight = opts.atScene ? new Map<string, boolean>() : await sightLines(campaignId, event.sourceId, beings.map((b) => b.id));
+    const geometry = opts.atScene ? new Map<string, { los: boolean; feet: number }>() : await sightGeometry(campaignId, event.sourceId, beings.map((b) => b.id));
     for (const b of beings) {
       const v = j.verdicts.get(b.id);
       if (!v) continue;
-      const held = throughWalls(event, b, v, walls, sight.get(b.id));
+      const g = geometry.get(b.id);
+      const held = throughWalls(event, b, v, walls, g?.los);
       if (held !== v) { console.log(`[perception-reach] ${b.name}: a wall is a wall — ${v.via.join('+')} → ${held.reaches ? held.via.join('+') : 'nothing'}`); j.verdicts.set(b.id, held); }
+      // The map is sure: a clear ray within a few feet reaches, whatever the judge said (HW12).
+      const near = faceToFace(held, g, b.senses);
+      if (near !== held) { console.log(`[perception-reach] ${b.name}: the map says REACHED — clear line, ${Math.round(g!.feet)} ft (${held.reaches ? held.via.join('+') : 'the judge said nothing'} → ${near.via.join('+')})`); j.verdicts.set(b.id, near); }
     }
   }
   // The one holding a named thing perceives what happens to it whole — it is in their pocket (HW9: Violet's own phone).

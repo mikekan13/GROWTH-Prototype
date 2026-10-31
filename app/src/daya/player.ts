@@ -22,6 +22,8 @@ export interface PlayerArgs {
   resistance: PlayerPromptArgs['resistance'];
   heard: string;
   sinceOwn?: string | null;
+  /** Someone is speaking to the character this very beat (HW12: she shut the door on him mid-sentence). */
+  addressed?: boolean;
 }
 
 export async function playerDecides(args: PlayerArgs, overrides: DayaClientOverrides = {}): Promise<PlayerDecision & { ms: number; raw?: string }> {
@@ -30,11 +32,14 @@ export async function playerDecides(args: PlayerArgs, overrides: DayaClientOverr
   const prompt = buildPlayerPrompt({
     name: args.name, sheetLines: readout.lines, conditions: readout.conditions, fateDie: readout.fateDie,
     routine: args.routine, thought: args.thought, impulse: args.impulse, stayReason: args.stayReason, resistance: args.resistance, heard: args.heard, sinceOwn: args.sinceOwn,
+    addressed: args.addressed ?? false,
   });
   try {
+    // No stop on a newline (HW12 2026-10-31: the model opened with "{\n" and the answer was cut to "{" — read as FOLLOW by
+    // default, the reason lost). The reader takes the first decision it finds wherever the line breaks fell.
     const r = await chat({
       tier: 'L1', subsystem: 'player', contentClass: 'fiction', entityId: args.entityDaId, ...(args.campaignId ? { campaignId: args.campaignId } : {}),
-      messages: [{ role: 'system', content: prompt }], maxTokens: PLAYER_MAX_TOKENS, stop: ['\n'],
+      messages: [{ role: 'system', content: prompt }], maxTokens: PLAYER_MAX_TOKENS,
     }, overrides);
     const d = readPlayerDecision(r.text);
     return { ...d, ms: Date.now() - t0, raw: r.text.trim().slice(0, 200) };

@@ -140,6 +140,8 @@ function resolveFateDie(character: Partial<GrowthCharacter> | null): FateDie {
  * check when the model calls for one, and returns the outcome + experience
  * event for a caller (WP3 event bus / WP4 memory ingest) to persist.
  */
+import { statesHandOver, HAND_OVER_NUDGE } from './hand-over';
+
 export async function resolveIntent(
   input: ResolveIntentInput,
   overrides: DayaClientOverrides = {},
@@ -244,7 +246,29 @@ export async function resolveIntent(
     overrides,
   );
 
-  const parsed = parseAdjudicatorResponse(modelResult.text);
+  let parsed = parseAdjudicatorResponse(modelResult.text);
+
+  // A NARRATED HAND-OVER WITH NO EFFECT IS A MISS (HW12 2026-10-31): one more ask, with the miss named. The model still
+  // maps the words to the carried thing; the engine only knows the sentence said something changed hands.
+  if (input.narrated && !parsed.effects?.length && statesHandOver(intent)) {
+    console.log(`[daya/adjudicator] narrated hand-over came back with no effects — asking once more: "${intent.slice(0, 80)}"`);
+    try {
+      const again = await chat(
+        {
+          tier: 'C', subsystem: 'adjudicator', contentClass: 'fiction', entityId: entityDaId,
+          messages: [
+            { role: 'system', content: buildAdjudicatorPrompt() },
+            { role: 'user', content: `${userMessage}\n\n${HAND_OVER_NUDGE}` },
+          ],
+        },
+        overrides,
+      );
+      const reparsed = parseAdjudicatorResponse(again.text);
+      if (reparsed.effects?.length) parsed = { ...parsed, effects: reparsed.effects };
+    } catch (err) {
+      console.warn('[daya/adjudicator] the second ask failed (the first answer stands):', err instanceof Error ? err.message : err);
+    }
+  }
 
   const factsSuperseded: WorldFactRecord[] = [];
   const factsWritten: WorldFactRecord[] = [];

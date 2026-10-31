@@ -54,6 +54,8 @@ export interface PlayerPromptArgs {
   /** What just reached the character (the Watcher's line, through its senses). */
   heard: string;
   sinceOwn?: string | null;
+  /** Someone is speaking to the character this beat. */
+  addressed?: boolean;
 }
 
 export function buildPlayerPrompt(a: PlayerPromptArgs): string {
@@ -74,7 +76,7 @@ ${a.sinceOwn ? `It has been ${a.sinceOwn} since ${a.name} last said or did anyth
 Where ${a.name} leaned: ${a.impulse}${a.stayReason ? ` — "${a.stayReason}"` : ''}.
 ${a.resistance ? `What rose against it: "${a.resistance.content.slice(0, 220)}" (charge ${a.resistance.arousal.toFixed(2)} of 1).` : 'Nothing rose against it.'}
 
-The routine runs by default: a person does what their hands know without deciding it. You HOLD it only for a reason you could point to at the table — a fact of the room, a memory that stands in the way, a pool that cannot afford it. You BREAK it when ${a.name} would do something else INSTEAD, now, that moves the scene (speak through the door, go to the window) — not to do nothing. Nobody at a table waits a whole beat on a character doing nothing for no reason.
+The routine runs by default: a person does what their hands know without deciding it. You HOLD it only for a reason you could point to at the table — a fact of the room, a memory that stands in the way, a pool that cannot afford it${a.addressed ? `, or someone speaking to ${a.name} right now while the step would end the exchange (shutting a door, walking off): that is worth one beat of holding unless ${a.name} means to end it` : ''}. You BREAK it when ${a.name} would do something else INSTEAD, now, that moves the scene (speak through the door, go to the window) — not to do nothing. Nobody at a table waits a whole beat on a character doing nothing for no reason.
 
 Answer with one line of JSON and nothing else:
 {"decision":"follow"|"hold"|"break","reason":"<a few words, in plain terms the table can check>"}`;

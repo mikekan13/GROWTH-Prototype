@@ -3,6 +3,10 @@
 Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all components inventoried)
 
 
+## HW12 fix pass (2026-10-31)
+
+- `src/services/perception-reach.ts` — `sightGeometry` (clear ray + feet per being), `faceToFace` (the map overrules the judge: ≤ 15 ft sight + hearing, ≤ 60 ft sight; `FACE_TO_FACE_FT`, `PLAIN_SIGHT_FT`). `src/daya/hand-over.ts` — `statesHandOver`, `HAND_OVER_NUDGE`; `adjudicator.resolveIntent` asks once more when a narrated hand-over names no effects. `table-speak.ts` — routine step beside a granted answer; a repeated wait is not carded; `STANDING_BEAT_TAIL`; a standing-beat repeat writes no row. `world-apply.ts` — a zero-foot walk is not an act. `daya/player.ts` — no newline stop; `addressed` → the player prompt.
+
 ## The session owns the text pod (2026-10-30)
 
 - `src/daya/text-pod.ts` — `podIdFromUrl` / `textPodId` (a `*.proxy.runpod.net` lane is a pod), `podView`, `resumeTextPod`, `stopTextPod` (debounced, never throw), `podPhase` (stopped → host, placed → loading, answering → ready), `POD_COLD_START_S` 270. `l1-keepalive.ts` resumes the pod while a session is hot and `stopKeepalive(campaignId, reason)` stops it once no campaign keeps the lane; `l1-endpoint.laneReadiness` reports the pod's state for the warm-up screen; `table-speak.hearSpoken` re-arms the loop on every GM line. Tests `text-pod.test.ts`.

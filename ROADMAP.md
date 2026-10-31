@@ -1,6 +1,6 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-10-30
+Last updated: 2026-10-31
 
 > 2026-10-24 (hello world 2 → fixes): HW2 ran on the split loop (TABLE_SPLIT_LOOP=on). Violet listened to every
 > line and never answered: the ask reader needed a name, and the clock never moved (cycle 0.0022 all session).
@@ -921,6 +921,13 @@ With `TABLE_SPLIT_LOOP=on`, a live GameSession and the campaign's GM speaking, e
 
 ## 2026-10-26 — Hello world 8 run 6 → JEWL injections revamp, run-6 base fixes, the novel view + glitch load, first mechanics layer
 Run 6 (7 lines, $0.28): the base held (scene block, cards, hearing, standing beat, her card gets his words); JEWL stopped the table on a false gap and the phone had no reply path. Mike's rulings (memory: `hw8-run6-findings-2026-10-26`, `ruling-in-session-terminal-reads-like-a-novel-2026-10-26`, `ruling-session-start-glitch-loading-screen-2026-10-26`, `ruling-rolls-are-cards-and-popups-2026-10-26`). Built by four Sonnet agents, see `docs/module_registry.md` sections dated 2026-10-26: (1) JEWL's read sees item text, memories, familiarity; a stop cites what it checked; the Watcher answers in the force-open popup (desktop + phone); (2) twelve engine fixes (claim vs fact, voice filter, GM thoughts kept, judged once, …); (3) out-of-session novel view, session-start glitch load with the Pattern Stability bar and per-viewer tidbits; (4) rolls as popup + card and canonical inputs behind passive perception. NEXT: HW8 run 7 from the phone; then the mechanics talk on the [NEEDS MIKE] list (DR ladder for obstacles, sense-skill governors, order outside encounters).
+
+## 2026-10-31 — HW12 PLAYED: VIOLET OPENED THE DOOR AND FINISHED THE DELIVERY (session 1 KEPT) + fix pass
+
+First live run of ORDINARY COMPETENCE, from the phone. From the knock: `[player] follow` → she walked to the Entry door → turned the lock and opened it (two beats, no nudge, no roll) → waited hands ready → took the box → handed the cash → the five with her number → shut and locked; `"Pizza delivery" is done`. Michael: "That's a wrap.... 5 dollar exchange complete. We are keeping this one." Session 1 is the first kept record. The pod started with the session and stopped itself on the end (the 10-30 lifecycle, verified live).
+What broke around her (all logged in `tmp/hw12-log.md`, fixed the same night): the reach judge ruled her NOT REACHED at her own open door on five of seven lines (now the map's clear ray within 15 ft overrules it); a line that asked her something stopped her hands (the routine now runs beside the answer); the Watcher's split hand-over line came back with no give (a narrated hand-over with no effects is asked once more); a wait carded twice, an empty card, a no-op walk carded three times, the player's answer cut at "{" (no newline stop), and the player now hears that someone is speaking to her before a step that ends the exchange. The record was edited by hand (archived first) and Violet's memory backfilled with the missed lines.
+OPEN: a Watcher's "tries to" line rolled Willpower for Kristopher and failed (by the 10-26 ruling; Michael to rule whether a voiced attempt rolls); a line with no actor read as 'self' by both beings; routines arm from the cue only, never from the being's situation; the landing has no stairs exit on the map; her first-beat thought voiced a memory with no cue.
+NEXT (Michael): session prep with JEWL and work on JEWL; then a LONGER session to tune DAYA; then the loose-ends list (`docs/LOOSE-ENDS-2026-10-30.md`).
 
 ## 2026-10-30 (later) — THE SESSION OWNS THE TEXT POD (Michael: "set up the pod so it just starts when we hit start from now. If I need it on not during a session I'll ask")
 

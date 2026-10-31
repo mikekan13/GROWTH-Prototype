@@ -123,6 +123,8 @@ export interface RoutineRunInput {
   listen: { thought: string; impulse: 'speak' | 'act' | 'stay'; stayReason?: string | null; resistance: { content: string; arousal: number } | null };
   heard: string;
   sinceOwn?: string | null;
+  /** Someone is speaking to the being this beat (the player weighs it before a step that ends the exchange). */
+  addressed?: boolean;
   /** The world's facts this beat, for checking a hold's reason. */
   facts: FactLine[];
 }
@@ -146,7 +148,7 @@ export async function runRoutineStep(input: RoutineRunInput): Promise<RoutineRun
     entityDaId: being.entityDaId, campaignId, name: being.name, sheet: being.sheet,
     routine: { name: routine.name, step: routine.step.step, because: routine.step.because, ends: routine.endsInWords },
     thought: input.listen.thought, impulse: input.listen.impulse, stayReason: input.listen.stayReason, resistance: input.listen.resistance,
-    heard: input.heard, sinceOwn: input.sinceOwn,
+    heard: input.heard, sinceOwn: input.sinceOwn, addressed: input.addressed ?? false,
   });
   console.log(`[player] ${being.name}: ${player.decision}${player.reason ? ` — ${player.reason}` : ''} (${player.ms} ms)${player.raw ? ` raw="${player.raw}"` : ''}`);
   const note = { reason: player.reason, ms: player.ms };

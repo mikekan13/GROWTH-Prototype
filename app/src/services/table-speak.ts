@@ -258,6 +258,9 @@ export async function recentThoughtsOf(campaignId: string, characterId: string, 
   return recentVoiceOf(campaignId, characterId, n);
 }
 
+/** The standing beat's last sentence: a beat in which nothing from beyond the room reached the being. */
+export const STANDING_BEAT_TAIL = 'Nothing from beyond the room has reached you just now.';
+
 /** How long a being's line waits for its own thought card to be on the page first — the cloud build alone is allowed 30 s (HW8 run 6: 8 s let "It's open." go up 7 s before her card). */
 export const CARD_WAIT_MS = 45_000;
 /** Wait for a card (bounded, non-fatal): the line that follows goes up after it. */
@@ -967,7 +970,11 @@ async function runBeats(
           // thought the same sentences as before, and the table went dead because nothing was recorded at all). The record
           // keeps what reached her and her impulse; only the prose she already said is left out.
           // THE CARD FOLLOWS THE THOUGHT (speed, 2026-10-29): the beat is posted NOW, the built card lands on it after.
-          const rowId = holding ? null : await recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
+          // A standing beat (nothing reached her) whose whole thought was a repeat has nothing to show: no row (HW12 2026-10-31:
+          // an EMPTY card on the record). A real line that reached her still posts the beat, thought or not (the HW9 rule).
+          const standingRepeat = repeat && carried.source === 'perception' && carried.content.endsWith(STANDING_BEAT_TAIL);
+          if (standingRepeat) console.log(`[table-speak] ${name}: standing beat, repeated thought — no row`);
+          const rowId = holding || standingRepeat ? null : await recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
             characterId: listenerId,
             characterName: name,
             heard: carried.content,
@@ -1003,9 +1010,13 @@ async function runBeats(
         // ORDINARY COMPETENCE (2026-10-30): a routine step due this beat is the being's turn — the player behind it decides
         // (follow / hold / break), the dice decide what rose against it, the step runs through world-apply. 'break' falls
         // through to the being's own answer below.
-        if (routine && outcome.listened?.status === 'listened' && !granted.has(listenerId) && !voiced.has(listenerId)) {
+        // HANDS AND MOUTH ARE DIFFERENT (HW12 2026-10-31: three beats of Kristopher talking to her and her hands stopped —
+        // every line that asked her something skipped the step). A being already granted an answer still runs its step;
+        // only the fall-through to its OWN say below is what the grant already covers.
+        if (routine && outcome.listened?.status === 'listened' && !voiced.has(listenerId)) {
+          const wasGranted = granted.has(listenerId);
           const ran = await routineTurn(listenerId, routine, outcome.listened, carried.content, askFor);
-          if (ran !== 'broke') return;
+          if (ran !== 'broke' || wasGranted) return;
         }
         // THE BEING'S OWN SAY (Mike 2026-10-24: "the entities themselves should have a say if they
         // want to answer"): a listen that ends in "speak" or "act" earns the turn the ask did not give.
@@ -1063,7 +1074,7 @@ async function runBeats(
       const clock = (await clockLine(campaignId))?.replace(/^\[clock\]\s*/, '') ?? null;
       const where = await prisma.entityRelationship.findFirst({ where: { sourceId: listenerId, relationshipType: 'located_at' }, select: { targetId: true } });
       const room = where ? await prisma.location.findUnique({ where: { id: where.targetId }, select: { name: true } }) : null;
-      const content = [clock ? `It is ${clock}.` : null, room ? `You are in the ${nameHead(room.name)}.` : null, 'Nothing from beyond the room has reached you just now.'].filter(Boolean).join(' ');
+      const content = [clock ? `It is ${clock}.` : null, room ? `You are in the ${nameHead(room.name)}.` : null, STANDING_BEAT_TAIL].filter(Boolean).join(' ');
       console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: ${content}`);
       standingIds.add(listenerId);
       // All her senses, none of them given anything (HW10 2026-10-29: via ['sight'] alone told her "this reached you by SIGHT only" of a beat in which nothing reached her).
@@ -1204,7 +1215,7 @@ async function runBeats(
         being: { id: listenerId, name: listener.name, sex, entityDaId, sheet },
         routine,
         listen: { thought: listened.thought ?? '', impulse: listened.impulse, stayReason: listened.stayReason ?? null, resistance: listened.resistance ?? null },
-        heard, facts,
+        heard, facts, addressed: !!askFor,
       });
       if (result.status === 'broke') { console.log(`[routine] ${listener.name}: breaks from "${routine.name}" — ${result.reason}`); return 'broke'; }
       granted.add(listenerId);
@@ -1224,7 +1235,11 @@ async function runBeats(
       console.log(`[routine] ${listener.name}: ${act}${result.applied.length ? ` → ${result.applied.join('; ')}` : ''}${result.refused.length ? ` · refused: ${result.refused.join('; ')}` : ''}${result.done ? ' · routine done' : ''}`);
       if (result.effect.op !== 'wait') await advanceClockForLine(campaignId, 'being-act', act);
       await awaitCard(cardPosted.get(listenerId));
-      await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listener.id, name: listener.name, sex }, act, { player: { decision: 'follow', reason: result.player.reason, step: routine.step.step, routine: routine.name, ...(result.roll ? { roll: result.roll } : {}) } });
+      // A WAIT is said once (HW12 2026-10-31: "waits, hands ready, for the Pizza" carded twice in a row): the same wait
+      // sentence in her last records is not posted again — the player's decision still goes to the console.
+      const waitRepeat = result.effect.op === 'wait' && (await recentThoughtsOf(campaignId, listener.id, 4)).some((t) => t.includes(act.trim()));
+      if (waitRepeat) console.log(`[routine] ${listener.name}: still waiting (not carded again)`);
+      else await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listener.id, name: listener.name, sex }, act, { player: { decision: 'follow', reason: result.player.reason, step: routine.step.step, routine: routine.name, ...(result.roll ? { roll: result.roll } : {}) } });
       if (result.refused.length && !result.applied.length) await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listener.id, name: listener.name, sex }, `cannot: ${result.refused[0]}`);
       if (result.applied.length) await postWorldChange(campaignId, actor, result.applied);
       answered.set(listenerId, { characterId: listenerId, characterName: listener.name, status: 'ok', actionKind: 'act', detail: act });

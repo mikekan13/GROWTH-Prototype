@@ -450,7 +450,9 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             break;
           }
           const walk = await moveBeing(campaignId, actor.id, resolved.target, { cause: 'sim' });
-          if (walk.ok) report.applied.push(describeMove(actor.name, walk));
+          // A walk of no feet that opened nothing is no act (HW12 2026-10-31: "Kristopher is already at Entry door" narrated three times).
+          if (walk.ok && walk.feet <= 0 && !walk.opened.length) console.log(`[world-apply] ${actor.name}: already at ${resolved.label} — nothing to apply`);
+          else if (walk.ok) report.applied.push(describeMove(actor.name, walk));
           else report.refused.push(`move to ${resolved.label}: ${walk.reason ?? 'no way'}`);
           map = await actorMap(actorCharacterId);
           break;
