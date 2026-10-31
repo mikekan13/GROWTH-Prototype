@@ -17,6 +17,7 @@
  */
 import 'server-only';
 import { l1Status, type L1Status } from './l1-warm';
+import { textPodId, podView, podPhase, POD_COLD_START_S } from './text-pod';
 
 /** `throttled`: RunPod will not rent a worker — the account balance is spent (2026-10-27..29: two days read as "warming"). */
 export type LanePhase = 'ready' | 'host' | 'loading' | 'offline' | 'disabled' | 'throttled';
@@ -118,6 +119,19 @@ export function laneThrottled(endpoint: LaneReadiness['endpoint'] | undefined): 
 }
 
 export async function laneReadiness(): Promise<LaneReadiness> {
+  // A dedicated pod lane (2026-10-30): its own state says where the boot is; nothing here resumes it — the session
+  // does (`l1-keepalive` → `text-pod`), so a stopped pod outside a session stays stopped.
+  const podId = textPodId();
+  if (podId) {
+    const [view, status] = await Promise.all([podView(podId), probeCached()]);
+    const phase = podPhase(view, status);
+    const endpoint: LaneReadiness['endpoint'] = {
+      ready: phase === 'ready' ? 1 : 0, initializing: phase === 'loading' ? 1 : 0, running: view?.desiredStatus === 'RUNNING' ? 1 : 0,
+      throttled: 0, unhealthy: 0, queue: 0,
+      worker: view ? { id: podId, gpu: view.gpu ?? undefined, uptimeSeconds: view.uptimeSeconds ?? undefined } : undefined,
+    };
+    return { status, phase, expectedColdStartSeconds: POD_COLD_START_S, endpoint, probedAt: new Date().toISOString() };
+  }
   const endpoint = await endpointView();
   // A throttled endpoint gets no probe: each probe is a job that would wait in the queue for a worker that will
   // not come (and fire the moment the balance is topped up). 27–29 Oct: 136, 80 and 37 of them, purged by hand.

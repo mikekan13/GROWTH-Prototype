@@ -3,6 +3,10 @@
 Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all components inventoried)
 
 
+## The session owns the text pod (2026-10-30)
+
+- `src/daya/text-pod.ts` — `podIdFromUrl` / `textPodId` (a `*.proxy.runpod.net` lane is a pod), `podView`, `resumeTextPod`, `stopTextPod` (debounced, never throw), `podPhase` (stopped → host, placed → loading, answering → ready), `POD_COLD_START_S` 270. `l1-keepalive.ts` resumes the pod while a session is hot and `stopKeepalive(campaignId, reason)` stops it once no campaign keeps the lane; `l1-endpoint.laneReadiness` reports the pod's state for the warm-up screen; `table-speak.hearSpoken` re-arms the loop on every GM line. Tests `text-pod.test.ts`.
+
 ## Ordinary competence — routines, the player, rolls at resistance (2026-10-30)
 
 - `src/daya/routines.ts` (pure) — `RoutineEnd` (hold / gave / door / at), `RoutineWorld`, `nextStep(ends, world, cursor)` (a backward planner over world-apply's preconditions), `advanceCursor`, `routineDone`, `triggerInCue` (stemmed trigger words), `parseRoutineDrafts` + `normalizeEndOrder` (door-open → hold → gave → at → door shut/locked), `endsInWordsFrom`, `ROUTINE_STEP_CAP` 12, `ROUTINE_LAPSE_CYCLES` 2 h. Tests `routines.test.ts`.

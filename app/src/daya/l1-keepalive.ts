@@ -18,6 +18,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { warmL1 } from './l1-warm';
+import { resumeTextPod, stopTextPod, textPodId } from './text-pod';
 
 export const KEEPALIVE_INTERVAL_MS = Number(process.env.DAYA_L1_KEEPALIVE_MS ?? 60_000);
 
@@ -49,7 +50,7 @@ async function tick(campaignId: string) {
   if (!entry) return;
   try {
     if (!(await hasActiveSession(campaignId))) {
-      stopKeepalive(campaignId);
+      stopKeepalive(campaignId, 'session over');
       console.log(`[l1-keepalive] session over for ${campaignId} — lane released`);
       return;
     }
@@ -58,16 +59,19 @@ async function tick(campaignId: string) {
     // budget is spent, or when the table has been quiet for KEEPALIVE_IDLE_MS.
     const { gpuStatus } = await import('@/services/gpu-budget');
     if (!(await gpuStatus()).allowed) {
-      stopKeepalive(campaignId);
+      stopKeepalive(campaignId, 'GPU budget reached');
       console.warn(`[l1-keepalive] GPU budget reached — lane released for ${campaignId}`);
       return;
     }
     const quietFor = await quietMs(campaignId);
     if (quietFor > KEEPALIVE_IDLE_MS) {
-      stopKeepalive(campaignId);
+      stopKeepalive(campaignId, `table quiet ${Math.round(quietFor / 60000)} min`);
       console.log(`[l1-keepalive] table quiet ${Math.round(quietFor / 60000)} min — lane released for ${campaignId}`);
       return;
     }
+    // A pod lane (2026-10-30): the session keeps the pod up — resume it if it is not running (one cheap read a minute
+    // when it is). The probe below then reports where the boot is.
+    if (textPodId()) await resumeTextPod(`session hot at ${campaignId}`);
     const status = await warmL1();
     entry.probes++;
     if (entry.probes % 10 === 1 || status !== 'ready') console.log(`[l1-keepalive] ${campaignId} probe #${entry.probes}: ${status}`);
@@ -87,11 +91,17 @@ export function startKeepalive(campaignId: string): void {
   void tick(campaignId);
 }
 
-export function stopKeepalive(campaignId: string): void {
+/**
+ * Release the lane for a campaign. On a pod lane, once no campaign is keeping it warm, the pod is STOPPED (2026-10-30:
+ * the session owns the pod; a release for any reason — session over, idle, budget — is a stop).
+ */
+export function stopKeepalive(campaignId: string, reason = 'released'): void {
   const entry = registry.get(campaignId);
-  if (!entry) return;
-  clearInterval(entry.timer);
-  registry.delete(campaignId);
+  if (entry) {
+    clearInterval(entry.timer);
+    registry.delete(campaignId);
+  }
+  if (registry.size === 0 && textPodId()) void stopTextPod(`${reason} (${campaignId})`);
 }
 
 /** After a server restart the timers are gone but the session may still be open — re-arm if so. */

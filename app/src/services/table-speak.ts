@@ -1720,6 +1720,9 @@ export async function hearSpoken(
   if (!actor.runsCampaign || !isWatcherOrAbove(actor.role)) return { fed: false, why: 'not_the_gm', ...NOT_FED };
   const live = await prisma.gameSession.findFirst({ where: { campaignId, endedAt: null }, select: { id: true } });
   if (!live) return { fed: false, why: 'no_session', ...NOT_FED };
+  // A line at the table re-arms the keep-warm loop (idle release / dev-server restart): on a pod lane this is what
+  // resumes a stopped pod (2026-10-30).
+  void ensureKeepalive(campaignId).catch(() => {});
 
   let table = spokenTables.get(campaignId);
   if (!table) { table = { talk: { focusIds: [], checkPending: false }, pending: null, lastAt: 0, beatId: crypto.randomUUID(), queue: Promise.resolve() }; spokenTables.set(campaignId, table); }
