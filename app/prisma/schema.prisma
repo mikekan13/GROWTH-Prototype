@@ -1353,6 +1353,9 @@ model DayaIntention {
   cadence        String?    // daily | nightly | weekly | always — a routine
   goalId         String?    // the GRO.vine it serves (Goal.id), when its words touch one
   status         String     @default("PENDING") // PENDING | DONE | LAPSED
+  // Whose word it is (stretch 2026-10-31): self = the being's own words; player = the Trailblazer's stated intention for a span;
+  // gm = the Watcher's override — it HAPPENS as written when due (narrated), no roll.
+  authority      String     @default("self") // self | player | gm
   sourceMemoryId String?    // the DayaMemoryEntry whose words it came from
   narrativeCycle Float      // when it was formed
   createdAt      DateTime   @default(now())

@@ -3,6 +3,8 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({ prisma: {} }));
 vi.mock('@/daya/timeskip', () => ({ runTimeSkip: vi.fn() }));
+vi.mock('@/services/stretch-live', () => ({ liveStretch: vi.fn(), STRETCH_MIN_SECONDS: 3600 }));
+vi.mock('@/services/time', () => ({ ensureDefaultTimescale: vi.fn() }));
 vi.mock('@/daya/events', () => ({ isDayaEnabled: () => false }));
 vi.mock('@/services/campaign-event', () => ({ createCampaignEvent: vi.fn() }));
 vi.mock('@/lib/campaign-stream', () => ({ broadcastEvent: vi.fn() }));

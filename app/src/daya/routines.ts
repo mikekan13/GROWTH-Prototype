@@ -63,9 +63,22 @@ export interface RoutineWorld {
     touchesMyRoom: boolean;
     /** From the actor to the door, in feet; null when unplaced. */
     distanceFt: number | null;
+    /**
+     * The door belongs to the home the actor stands in (false = another's door seen from outside: the landing side of
+     * her Entry door). Absent = unknown, read as the actor's own. One KNOCKS at another's shut door (stretch 2026-10-31).
+     */
+    ofMyHome?: boolean;
   }>;
-  things: Array<{ id: string; name: string; holderId: string | null; holderName: string | null; roomId: string | null; distanceFt: number | null }>;
-  people: Array<{ id: string; name: string; roomId: string | null; roomName: string | null; reach: Reach; doorBetween?: string }>;
+  things: Array<{
+    id: string; name: string; holderId: string | null; holderName: string | null; roomId: string | null; distanceFt: number | null;
+    /** The room the thing lies in when nobody holds it (the planner goes where the thing is). */
+    roomName?: string | null;
+  }>;
+  people: Array<{
+    id: string; name: string; roomId: string | null; roomName: string | null; reach: Reach; doorBetween?: string;
+    /** The home their room is filed under — where to go when they are nowhere near (an actor off the map comes to the home's door). */
+    homeName?: string | null;
+  }>;
 }
 
 export interface RoutineStep {
@@ -90,6 +103,16 @@ const norm = (s: string) => s.trim().toLowerCase().replace(/^(the|a|an|her|his|t
 const head = (s: string) => { const w = norm(s).replace(/\s*\(.*$/, '').split(/\s+/); return w[w.length - 1] ?? ''; };
 /** "the X" without doubling an article the name already carries ("The charcoal coat" → "the charcoal coat"). */
 const the = (name: string) => (/^(the|a|an|her|his|their|my)\s/i.test(name.trim()) ? name.trim().charAt(0).toLowerCase() + name.trim().slice(1) : `the ${name.trim()}`);
+/** A place by name: rooms take "the" ("the Main Room", "the landing"); a proper name or a possessive stands alone ("Chess Pizza", "Kristopher's hotel room"). */
+const ROOMISH = /(room|kitchen|kitchenette|bathroom|bedroom|landing|hall|hallway|stairs|stairwell|stair|street|lobby|office|shop|store|yard|garden|cellar|attic|porch|corridor|closet|studio|apartment|flat|house)$/i;
+const placeThe = (name: string): string => {
+  const n = name.trim();
+  if (/^(the|a|an|her|his|their|my)\s/i.test(n)) return n.charAt(0).toLowerCase() + n.slice(1);
+  if (/['’]s/.test(n)) return n;
+  const words = n.split(/\s+/);
+  const proper = words.length > 1 && words.every((w) => /^[A-Z]/.test(w)) && !ROOMISH.test(n);
+  return proper ? n : `the ${n}`;
+};
 
 export function pickByName<T extends { name: string }>(ref: string, rows: T[]): T | null {
   const r = norm(ref);
@@ -152,6 +175,12 @@ function toDoor(d: RoutineWorld['doors'][number], world: RoutineWorld, because: 
   if (d.distanceFt === null || d.distanceFt > REACH_FT) {
     return { effect: { op: 'move', to: d.name }, act: `goes to ${the(d.name)}`, step: `go to ${the(d.name)}`, because: [...because, `to work ${the(d.name)} ${s} must be at it`] };
   }
+  // ANOTHER'S DOOR IS KNOCKED AT, NOT OPENED (stretch 2026-10-31; HW12 needed the Watcher to narrate the knock): a shut
+  // door of a home that is not the actor's is worked from the inside by whoever lives there. The knock is a sound at the
+  // door — what reaches the one inside and calls up their own routine.
+  if (d.state !== 'open' && d.ofMyHome === false && !d.mine) {
+    return { effect: { op: 'sound', at: d.name, text: `a knock at ${the(d.name)}` }, act: `knocks at ${the(d.name)}`, step: `knock at ${the(d.name)}`, because: [...because, `${the(d.name)} is not ${s === 'they' ? 'theirs' : s === 'she' ? 'hers' : 'his'} to open`] };
+  }
   return { effect: { op: 'door', door: d.name, state: 'open' }, act: d.state === 'locked' ? `turns the lock and opens ${the(d.name)}` : `opens ${the(d.name)}`, step: d.state === 'locked' ? `turn the lock and open ${the(d.name)}` : `open ${the(d.name)}`, because };
 }
 
@@ -163,6 +192,11 @@ function toPerson(p: RoutineWorld['people'][number], world: RoutineWorld, becaus
     return toDoor(d, world, [...because, `${p.name} is beyond ${the(d.name)}: it must be open`]);
   }
   if (p.reach === 'far') return { effect: { op: 'move', to: p.name }, act: `goes to ${p.name}`, step: `go to ${p.name}`, because: [...because, `${p.name} is not within reach`] };
+  // Nowhere near, and the actor stands off the map (elsewhere): the way to them is to their home — the world lands the
+  // actor at its door (services/world-apply: arriving from elsewhere).
+  if (p.reach === 'none' && !world.actor.roomId && p.homeName) {
+    return { effect: { op: 'move', to: p.homeName }, act: `goes to ${p.homeName}`, step: `go to ${p.homeName}`, because: [...because, `${p.name} is at ${p.homeName}`] };
+  }
   return null;
 }
 
@@ -178,6 +212,8 @@ function stepToward(end: RoutineEnd, world: RoutineWorld): Chain | null {
           if (t.distanceFt !== null && t.distanceFt > REACH_FT) return { effect: { op: 'move', to: t.name }, act: `goes to ${the(t.name)}`, step: `go to ${the(t.name)}`, because };
           return { effect: { op: 'take', item: t.name }, act: `takes ${the(t.name)}`, step: `take ${the(t.name)}`, because };
         }
+        // It lies somewhere else: go where it is (the pizza waits at the pizza place).
+        if (t.roomId && t.roomName) return { effect: { op: 'move', to: t.roomName }, act: `goes to ${placeThe(t.roomName)}`, step: `go to ${placeThe(t.roomName)}`, because: [...because, `${the(t.name)} is at ${placeThe(t.roomName)}`] };
         return null;
       }
       const p = world.people.find((x) => x.id === t.holderId);
@@ -197,6 +233,7 @@ function stepToward(end: RoutineEnd, world: RoutineWorld): Chain | null {
           if (t.distanceFt !== null && t.distanceFt > REACH_FT) return { effect: { op: 'move', to: t.name }, act: `goes to ${the(t.name)}`, step: `go to ${the(t.name)}`, because };
           return { effect: { op: 'take', item: t.name }, act: `takes ${the(t.name)}`, step: `take ${the(t.name)}`, because };
         }
+        if (!t.holderId && t.roomId && t.roomName) return { effect: { op: 'move', to: t.roomName }, act: `goes to ${placeThe(t.roomName)}`, step: `go to ${placeThe(t.roomName)}`, because: [...because, `${the(t.name)} is at ${placeThe(t.roomName)}`] };
         return null;
       }
       if (!p) return null;
@@ -213,7 +250,7 @@ function stepToward(end: RoutineEnd, world: RoutineWorld): Chain | null {
       return { effect: { op: 'door', door: d.name, state: 'locked' }, act: d.state === 'open' ? `shuts and locks ${the(d.name)}` : `locks ${the(d.name)}`, step: d.state === 'open' ? `shut and lock ${the(d.name)}` : `lock ${the(d.name)}`, because };
     }
     case 'at': {
-      return { effect: { op: 'move', to: end.place }, act: `goes to the ${norm(end.place)}`, step: `go to the ${norm(end.place)}`, because: [`${s} ${means} to be at the ${norm(end.place)}`] };
+      return { effect: { op: 'move', to: end.place }, act: `goes to ${placeThe(end.place)}`, step: `go to ${placeThe(end.place)}`, because: [`${s} ${means} to be at ${placeThe(end.place)}`] };
     }
   }
 }

@@ -16,7 +16,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { parseFootprint, parseTokenPosition, footprintBounds, fractionToWorld, type Point } from '@/lib/canvas-geometry';
-import { buildLevelMap, roomAt, nearestWalkable, spotInRoom, insideOrOn, type LevelMap, type RoomPoly } from '@/lib/spatial';
+import { buildLevelMap, roomAt, nearestWalkable, spotInRoom, insideOrOn, type LevelMap, type RoomPoly, type Portal } from '@/lib/spatial';
 import { broadcastEvent } from '@/lib/campaign-stream';
 
 const REL = 'located_at';
@@ -206,4 +206,28 @@ export async function stampBeingPoint(characterId: string, p: Point): Promise<nu
   const d = parseData(c.data);
   await prisma.character.update({ where: { id: characterId }, data: { data: JSON.stringify({ ...d, canvasX: Math.round(p.x * 100) / 100, canvasY: Math.round(p.y * 100) / 100, canvasPlacedAt: placedAt }) } });
   return placedAt;
+}
+
+/**
+ * Take a being off the map (stretch 2026-10-31: it went ELSEWHERE — a place
+ * that exists as facts, not as a drawn room). Its stored point is dropped so
+ * `beingStanding` answers null until it comes back onto a drawn level; the
+ * canvases are told to re-read.
+ */
+export async function clearBeingPoint(characterId: string): Promise<void> {
+  const c = await prisma.character.findUnique({ where: { id: characterId }, select: { data: true } });
+  if (!c) throw new Error('Character not found');
+  const d = parseData(c.data);
+  delete d.canvasX; delete d.canvasY;
+  d.canvasPlacedAt = Date.now();
+  await prisma.character.update({ where: { id: characterId }, data: { data: JSON.stringify(d) } });
+}
+
+/**
+ * The ways on and off a level: openings whose far side names no drawn room on it ("stairs down", "outside", "the street").
+ * A being arriving from elsewhere appears at one of these; one leaving walks to one. Pure over the map.
+ */
+export function exitPortals(map: LevelMap): Portal[] {
+  const rooms = new Set([...map.rooms, ...(map.homes ?? [])].map((r) => r.name.trim().toLowerCase()));
+  return map.portals.filter((p) => p.kind !== 'window' && p.between.some((b) => !rooms.has(b.trim().toLowerCase())));
 }

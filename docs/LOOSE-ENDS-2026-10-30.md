@@ -21,7 +21,7 @@ Status key: **M** = design decision owed by Michael · **O** = open · **U** = b
 14. Wisdom recall budget (2 at Wisdom 14) calibration. 10-25, **M**.
 15. PTSD memory encoded at arousal 0.12 so it never climbs to survival (ingest-tagging). 10-25, O.
 16. Goals-rung stoplist (`goalsTouched` counts "from"/"that"). 10-25, **M**.
-17. Time jumps: DORMANT beings and beings with no active goal live nothing; top goal only. 10-24, O.
+17. Time jumps: DORMANT beings and beings with no active goal live nothing; top goal only. 10-24, **S** 10-31 — `services/stretch-live` lives the span for every crystallized character (routines in their hour, intentions, the account of the day, sleep); see ROADMAP 2026-10-31 (later).
 18. Per-action durations and base durations (speech 6 s, action 1 min, rests). first-test-plan C1, 10-17, **M**.
 19. Perceived elapsed time as a stimulus. STATE 10-23, O.
 20. The answerer's monologue should carry the ask's words. 10-23, O.
@@ -274,3 +274,14 @@ Status key: **M** = design decision owed by Michael · **O** = open · **U** = b
 8. Content-gen 1–5: thorn framing, vehicles, fated-age term, Earth seeds, library state (08-04).
 9. JEWL economics and the F3 spec questions (08-07).
 10. Species maturation (08-19), lien sizing (08-19), triggered effects → blossoms (08-24).
+
+
+## Added 2026-10-31 — living a stretch (see `docs/TIME-STRETCH-DESIGN-2026-10-31.md`)
+230. JEWL's prep for the two-day jump, with his own tools: Kristopher's hotel room and Chess Pizza as undrawn Locations from the facts; his rig placed in the hotel; fresh pizzas stocked at the pizza place (the only pizza is in Violet's hands; the walker reports the lack and will not send him to take it back); re-derive his routine so "the customer" is Violet. **M**/JEWL.
+231. The canvas's reading of a being ELSEWHERE (filed in an undrawn Location, point cleared): token greyed at last known per the fog ruling, "elsewhere: …" on the tooltip. U.
+232. The stretch's bounded exchange (cap 4) and the account-of-the-day path unverified live. U.
+233. `stretch-live.hears` is room adjacency (the door's two sides / the sound's room), not the reach judge; a sound through a wall or from the street is not heard. O.
+234. A Watcher-voiced (DORMANT) entity lives a stretch like an ACTIVE one (Michael 10-31: every crystallized entity); at the table it stays GM-voiced. The first stretch will show whether its listens read well. U.
+235. Characters not yet crystallized (DRAFT, e.g. Rosemary Marsh) are posted "not yet crystallized" and live nothing. O (rule when one matters).
+236. Body across a stretch (hunger, fatigue) still deferred per the 10-24 addendum; night is a sleep window with a dream tick. **M**.
+237. The intention deriver's time words: `quarterInWords` reads evening/night/morning/afternoon markers; "after work", "at six" and clock times are not read. O.

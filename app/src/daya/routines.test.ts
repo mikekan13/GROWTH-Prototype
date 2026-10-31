@@ -165,3 +165,60 @@ describe('the sheet is the dial: a walk reads Celerity', () => {
     expect(pathSeconds(12, 'run', 4)).toBe(1);
   });
 });
+
+// ── Living a stretch (2026-10-31): the planner without a Watcher ─────────────
+describe("another's shut door is knocked at, never opened; one's own is worked", () => {
+  const landing = (over: Partial<{ doorState: 'open' | 'closed' | 'locked'; doorFt: number; violetReach: RoutineWorld['people'][number]['reach'] }> = {}): RoutineWorld => ({
+    actor: { id: KRIS, name: 'Kristopher', sex: 'male', roomId: 'landing', roomName: 'Fourth-floor landing' },
+    doors: [{ id: 'entry', name: 'Entry door', state: over.doorState ?? 'locked', between: ['Main Room', 'Fourth-floor landing'], mine: false, wayOut: false, touchesMyRoom: true, distanceFt: over.doorFt ?? 2, ofMyHome: false }],
+    things: [{ id: 'pizza', name: 'Pizza (Hawaiian + black olives)', holderId: KRIS, holderName: 'Kristopher', roomId: null, distanceFt: 0 }],
+    people: [{ id: VIOLET, name: 'Violet', roomId: 'main', roomName: 'Main Room', reach: over.violetReach ?? ((over.doorState ?? 'locked') === 'open' ? 'through-open' : 'beyond-door'), doorBetween: 'Entry door', homeName: "Violet's Apartment" }],
+  });
+  const DELIVERY: RoutineEnd[] = [{ kind: 'gave', item: 'pizza', to: 'the customer' }];
+  it('at her locked door with the box: he knocks (a sound at the door), he does not try her lock', () => {
+    const s = nextStep(DELIVERY, landing())!;
+    expect(s.effect).toEqual({ op: 'sound', at: 'Entry door', text: 'a knock at the Entry door' });
+    expect(s.act).toBe('knocks at the Entry door');
+    expect(s.because.join(' ')).toMatch(/not his to open/);
+  });
+  it('far from her door: he goes to it first', () => {
+    expect(nextStep(DELIVERY, landing({ doorFt: 14 }))!.effect).toEqual({ op: 'move', to: 'Entry door' });
+  });
+  it('once she opens it, the box changes hands through the open way', () => {
+    expect(nextStep(DELIVERY, landing({ doorState: 'open' }))!.effect).toEqual({ op: 'give', item: 'Pizza (Hawaiian + black olives)', to: 'Violet' });
+  });
+  it("Violet's own locked way out is still hers to open (ofMyHome absent or true)", () => {
+    const s = nextStep(PIZZA_ENDS, world({ doorFt: 2 }))!;
+    expect(s.effect).toEqual({ op: 'door', door: 'Entry door', state: 'open' });
+  });
+});
+
+describe('the planner goes where the thing is, and comes in from elsewhere', () => {
+  it('the pizza lies at the pizza place: go there, then take it', () => {
+    const w: RoutineWorld = {
+      actor: { id: KRIS, name: 'Kristopher', sex: 'male', roomId: 'hotel', roomName: "Kristopher's hotel room" },
+      doors: [],
+      things: [{ id: 'pz', name: 'Pizza (Hawaiian + black olives)', holderId: null, holderName: null, roomId: 'chess', roomName: 'Chess Pizza', distanceFt: null }],
+      people: [],
+    };
+    const s = nextStep([{ kind: 'hold', item: 'the pizza' }], w)!;
+    expect(s.effect).toEqual({ op: 'move', to: 'Chess Pizza' });
+    expect(s.act).toBe('goes to Chess Pizza');
+    const there = nextStep([{ kind: 'hold', item: 'the pizza' }], { ...w, actor: { ...w.actor, roomId: 'chess', roomName: 'Chess Pizza' }, things: [{ ...w.things[0], distanceFt: 2 }] })!;
+    expect(there.effect).toEqual({ op: 'take', item: 'Pizza (Hawaiian + black olives)' });
+  });
+  it('off the map with the box for a customer at home: go to her home (the world lands him at its door)', () => {
+    const w: RoutineWorld = {
+      actor: { id: KRIS, name: 'Kristopher', sex: 'male', roomId: null, roomName: null },
+      doors: [],
+      things: [{ id: 'pz', name: 'Pizza (Hawaiian + black olives)', holderId: KRIS, holderName: 'Kristopher', roomId: null, distanceFt: 0 }],
+      people: [{ id: VIOLET, name: 'Violet', roomId: 'main', roomName: 'Main Room', reach: 'none', homeName: "Violet's Apartment — Fourth-Floor Walkup Studio" }],
+    };
+    const s = nextStep([{ kind: 'gave', item: 'pizza', to: 'the customer' }], w);
+    // "the customer" names a role: with nobody in reach the role has no one — the end is skipped (the deriver should name her).
+    expect(s).toBeNull();
+    const named = nextStep([{ kind: 'gave', item: 'pizza', to: 'Violet' }], w)!;
+    expect(named.effect).toEqual({ op: 'move', to: "Violet's Apartment — Fourth-Floor Walkup Studio" });
+    expect(named.because.join(' ')).toMatch(/Violet is at/);
+  });
+});

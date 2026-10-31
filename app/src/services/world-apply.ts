@@ -31,8 +31,8 @@ import { moveCharacterToLocation } from '@/services/character-location';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { syncDoorFact } from '@/services/door-facts';
 import { writeDoorState } from '@/services/door-state';
-import { resolveMoveRef, moveBeing, describeMove } from '@/services/being-movement';
-import { loadWorldLevel, levelOfLocation, thingStanding } from '@/services/spatial-world';
+import { resolveMoveRef, moveBeing, describeMove, leaveMap, arriveOnMap, locationPointOn, type MoveTarget } from '@/services/being-movement';
+import { loadWorldLevel, levelOfLocation, thingStanding, beingStanding, clearBeingPoint } from '@/services/spatial-world';
 import { perceiveMapChange } from '@/services/spatial-perception';
 
 export type ActEffect =
@@ -311,8 +311,9 @@ async function findItemByName(campaignId: string, ref: string, where: Record<str
 export interface ApplyReport {
   applied: string[];
   refused: string[];
-  /** Sounds the act caused elsewhere, each placed: the table narrates them so whoever is there perceives them (HW9). */
-  sounds?: Array<{ text: string; at: string; locationId: string | null }>;
+  /** Sounds the act caused elsewhere, each placed: the table narrates them so whoever is there perceives them (HW9).
+   *  A sound at a DOOR (a knock, stretch 2026-10-31) names the rooms on both sides in `rooms`. */
+  sounds?: Array<{ text: string; at: string; locationId: string | null; rooms?: string[] }>;
 }
 
 /**
@@ -323,8 +324,22 @@ export interface ApplyReport {
  * own name, the holder's possessive with the thing's head noun (named-things), then any held thing whose head noun ends the
  * model's noun or vice versa ("smartphone" ~ "phone"), owner first.
  */
-async function soundSite(campaignId: string, at: string): Promise<{ kind: 'thing'; name: string; locationId: string | null } | { kind: 'being'; name: string } | null> {
+async function soundSite(campaignId: string, at: string): Promise<{ kind: 'thing'; name: string; locationId: string | null } | { kind: 'being'; name: string } | { kind: 'door'; name: string; locationId: string | null; rooms: string[] } | null> {
   const key = at.trim().toLowerCase().replace(/^the\s+/, '');
+  // A door of any home on the map (a knock sounds at the door and is heard on both sides of it).
+  if (/\b(door|doorway|gate)\b/.test(key)) {
+    const locs = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { id: true, name: true, data: true } });
+    for (const loc of locs) {
+      for (const o of parseOpenings(parseData(loc.data).openings)) {
+        if (o.kind !== 'door') continue;
+        const name = (o.name ?? '').toLowerCase();
+        if (name && (name === key || key.includes(name) || name.includes(key))) {
+          const inside = await prisma.location.findFirst({ where: { campaignId, name: { in: o.between } }, select: { id: true } }).catch(() => null);
+          return { kind: 'door', name: o.name ?? `door between ${o.between.join(' and ')}`, locationId: inside?.id ?? loc.id, rooms: o.between };
+        }
+      }
+    }
+  }
   const beings = await prisma.character.findMany({ where: { campaignId, status: { notIn: ['DEAD', 'RETIRED'] } }, select: { id: true, name: true } });
   const items = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { id: true, name: true, holderId: true, locationId: true } });
   const { matchNamedThings, headNoun } = await import('@/sim/senses/named-things');
@@ -363,7 +378,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           const where = await soundSite(campaignId, e.at);
           if (!where) { report.refused.push(`sound at "${e.at}": nothing by that name here`); break; }
           if (where.kind === 'being') { report.refused.push(`sound at ${where.name}: a person's senses carry the act; a sound comes from a thing`); break; }
-          (report.sounds ??= []).push({ text: e.text, at: where.name, locationId: where.locationId });
+          (report.sounds ??= []).push({ text: e.text, at: where.name, locationId: where.locationId, ...(where.kind === 'door' ? { rooms: where.rooms } : {}) });
           report.applied.push(`sound at ${where.name}: ${e.text}`);
           break;
         }
@@ -435,25 +450,67 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
         case 'move': {
           // The being WALKS (2026-10-27): the target is a room, a door, a person or a thing; the way is
           // found on the real map, closed doors open on the way, a locked one stops the walk at the door.
+          const gmId = actor.campaign?.gmUserId ?? '';
           const resolved = await resolveMoveRef(campaignId, e.to, actor.id);
           if (!resolved) {
-            // No map to walk on (a campaign with no footprints yet): fall back to filing the being in the room.
             const locs = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { id: true, name: true } });
             const to = locs.find((l) => l.id === e.to) ?? locs.find((l) => l.name.toLowerCase() === e.to.trim().toLowerCase()) ?? locs.find((l) => e.to.toLowerCase().includes(l.name.toLowerCase()));
             if (!to) { report.refused.push(`move: nothing called "${e.to}" on the map`); break; }
             if (map && to.id === map.roomId) { report.applied.push(`already in ${to.name}`); break; }
+            const toLevel = await levelOfLocation(to.id);
+            if (toLevel === null) {
+              // ELSEWHERE (stretch 2026-10-31): a place that exists as facts, not as a drawn room. Walk to the nearest way off
+              // the map, then be filed there; the token leaves the level.
+              const left = await leaveMap(campaignId, actor.id);
+              if (!left.ok) { report.refused.push(`move to ${to.name}: ${left.reason}`); break; }
+              await moveCharacterToLocation(gmId, 'WATCHER', { characterId: actor.id, locationId: to.id, snapCanvas: false, broadcast: true });
+              await clearBeingPoint(actor.id);
+              report.applied.push(`${actor.name} leaves${left.via ? ` by the ${left.via}` : ''} for ${to.name}`);
+              map = await actorMap(actorCharacterId);
+              break;
+            }
+            // Drawn, but no room of this level answers to the name (a home shell, another story). Coming from elsewhere: arrive at
+            // the way onto the level nearest it. On the map already: a home is reached at its own door from outside.
+            const { map: lvl } = await loadWorldLevel(campaignId, toLevel);
+            const here = await beingStanding(lvl, actor.id).catch(() => null);
+            if (!here) {
+              const arrived = await arriveOnMap(campaignId, actor.id, locationPointOn(lvl, to.id), { level: toLevel });
+              if (!arrived.ok) { report.refused.push(`move to ${to.name}: ${arrived.reason}`); break; }
+              report.applied.push(`${actor.name} arrives by the ${arrived.via} at ${arrived.room}`);
+              map = await actorMap(actorCharacterId);
+            }
+            const under = await prisma.entityRelationship.findMany({ where: { targetId: to.id, relationshipType: REL, sourceType: 'LOCATION' }, select: { sourceId: true } });
+            const underNames = under.length ? (await prisma.location.findMany({ where: { id: { in: under.map((r) => r.sourceId) } }, select: { name: true } })).map((r) => r.name.toLowerCase()) : [];
+            const homeRooms = new Set([...underNames, to.name.toLowerCase()]);
+            const door = lvl.portals.find((p) => p.homeId === to.id && p.kind === 'door' && p.between.some((b) => !homeRooms.has(b.toLowerCase())));
+            if (door) {
+              const walk = await moveBeing(campaignId, actor.id, { kind: 'portal', portalId: door.id, homeId: door.homeId }, { cause: 'sim' });
+              if (walk.ok && (walk.feet > 0 || walk.opened.length)) report.applied.push(describeMove(actor.name, walk));
+              else if (!walk.ok) report.refused.push(`move to ${to.name}: ${walk.reason ?? 'no way'}`);
+              map = await actorMap(actorCharacterId);
+              break;
+            }
+            // No door of its own on this level: file the being there (the pre-map fallback).
             const between = map?.doors.find((d) => d.between.some((b) => b.toLowerCase() === to.name.toLowerCase()));
             if (between && between.state === 'locked') { report.refused.push(`move to ${to.name}: the ${between.name} is locked`); break; }
-            await moveCharacterToLocation(actor.campaign?.gmUserId ?? '', 'WATCHER', { characterId: actor.id, locationId: to.id, snapCanvas: true });
+            await moveCharacterToLocation(gmId, 'WATCHER', { characterId: actor.id, locationId: to.id, snapCanvas: true });
             report.applied.push(`${actor.name} → ${to.name}`);
             map = await actorMap(actorCharacterId);
             break;
           }
-          const walk = await moveBeing(campaignId, actor.id, resolved.target, { cause: 'sim' });
+          let walk = await moveBeing(campaignId, actor.id, resolved.target, { cause: 'sim' });
+          if (!walk.ok && /stands nowhere on the map/.test(walk.reason ?? '')) {
+            // Coming from elsewhere: appear at the way onto the level nearest the target, then walk the rest.
+            const arrived = await arriveOnMap(campaignId, actor.id, await targetPoint(campaignId, resolved.target));
+            if (arrived.ok) {
+              report.applied.push(`${actor.name} arrives by the ${arrived.via} at ${arrived.room}`);
+              walk = await moveBeing(campaignId, actor.id, resolved.target, { cause: 'sim' });
+            } else report.refused.push(`move to ${resolved.label}: ${arrived.reason}`);
+          }
           // A walk of no feet that opened nothing is no act (HW12 2026-10-31: "Kristopher is already at Entry door" narrated three times).
           if (walk.ok && walk.feet <= 0 && !walk.opened.length) console.log(`[world-apply] ${actor.name}: already at ${resolved.label} — nothing to apply`);
           else if (walk.ok) report.applied.push(describeMove(actor.name, walk));
-          else report.refused.push(`move to ${resolved.label}: ${walk.reason ?? 'no way'}`);
+          else if (!/stands nowhere on the map/.test(walk.reason ?? '')) report.refused.push(`move to ${resolved.label}: ${walk.reason ?? 'no way'}`);
           map = await actorMap(actorCharacterId);
           break;
         }
@@ -468,6 +525,20 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
     try { broadcastEvent(campaignId, { kind: 'character_update', characterId: actor.id, characterName: actor.name, fields: ['world'] }); } catch { /* canvases re-read on their own */ }
   }
   return report;
+}
+
+/** Where a move target sits on its level, for "the nearest way onto the map"; null when unknown. */
+async function targetPoint(campaignId: string, target: MoveTarget): Promise<{ x: number; y: number } | null> {
+  try {
+    const { map } = await loadWorldLevel(campaignId, null);
+    switch (target.kind) {
+      case 'point': return target.point;
+      case 'room': return locationPointOn(map, target.roomId);
+      case 'portal': { const p = map.portals.find((x) => x.id === target.portalId && x.homeId === target.homeId); return p ? { x: (p.a.x + p.b.x) / 2, y: (p.a.y + p.b.y) / 2 } : null; }
+      case 'being': return (await beingStanding(map, target.characterId))?.point ?? null;
+      case 'thing': return (await thingStanding(map, target.itemId))?.point ?? null;
+    }
+  } catch { return null; }
 }
 
 /** Defensive read of the adjudicator's `effects` list. Pure. */

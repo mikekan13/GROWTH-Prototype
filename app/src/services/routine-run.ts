@@ -14,7 +14,7 @@
  */
 import 'server-only';
 import { prisma } from '@/lib/db';
-import type { ActEffect } from '@/services/world-apply';
+import type { ActEffect, ApplyReport } from '@/services/world-apply';
 import { applyActEffects } from '@/services/world-apply';
 import { routineWorldFor } from '@/services/routine-world';
 import { nextStep, routineDone, advanceCursor, triggerInCue, endsInWordsFrom, parseEnds, ROUTINE_LAPSE_CYCLES, ROUTINE_STEP_CAP, type RoutineEnd, type RoutineStep, type RoutineWorld } from '@/daya/routines';
@@ -32,8 +32,8 @@ export interface DueRoutine {
   cursor: number;
   step: RoutineStep;
   world: RoutineWorld;
-  /** Why it is due: the trigger word in the cue, or the routine was already running. */
-  why: 'trigger' | 'running';
+  /** Why it is due: the trigger word in the cue, the routine was already running, or its hour came (a lived stretch). */
+  why: 'trigger' | 'running' | 'clock';
   /** For the listening prompt and the player. */
   endsInWords: string[];
 }
@@ -58,44 +58,102 @@ export async function routineStepFor(campaignId: string, characterId: string, cu
       void maybeDerive(characterId, entity.id);
       return null;
     }
-    // Re-arm by cadence; lapse a run that went on too long.
-    for (const r of rows) {
-      if (r.status === 'DONE' && r.cadence && r.lastDoneCycle !== null && now - r.lastDoneCycle >= (RE_ARM_AFTER[r.cadence] ?? 0)) {
-        await prisma.dayaRoutine.update({ where: { id: r.id }, data: { status: 'READY', cursor: 0, steps: 0 } });
-        r.status = 'READY'; r.cursor = 0; r.steps = 0;
-      }
-      if (r.status === 'RUNNING' && ((r.startedCycle !== null && now - r.startedCycle > ROUTINE_LAPSE_CYCLES) || r.steps >= ROUTINE_STEP_CAP)) {
-        await prisma.dayaRoutine.update({ where: { id: r.id }, data: { status: r.cadence ? 'READY' : 'RETIRED', cursor: 0, steps: 0 } });
-        r.status = r.cadence ? 'READY' : 'RETIRED';
-        console.log(`[routine] ${r.name}: lapsed unfinished (${r.steps} steps)`);
-      }
-    }
+    await rearmAndLapse(rows, now);
     const running = rows.find((r) => r.status === 'RUNNING');
     const triggered = running ? null : rows.map((r) => ({ r, t: triggerInCue(parseList(r.triggers), cue) })).find((x) => x.r.status === 'READY' && x.t);
     const chosen = running ?? triggered?.r ?? null;
     if (!chosen) return null;
-    const ends = parseEnds(safeJson(chosen.ends));
-    if (!ends.length) return null;
-    const world = await routineWorldFor(campaignId, characterId, { sex: opts.sex });
-    if (!world) return null;
-    const cursor = advanceCursor(ends, world, chosen.status === 'RUNNING' ? chosen.cursor : 0);
-    if (cursor !== chosen.cursor) await prisma.dayaRoutine.update({ where: { id: chosen.id }, data: { cursor } }).catch(() => undefined);
-    if (routineDone(ends, world, cursor)) {
-      await prisma.dayaRoutine.update({ where: { id: chosen.id }, data: { status: 'DONE', lastDoneCycle: now, cursor: 0, steps: 0 } });
-      console.log(`[routine] ${world.actor.name}: "${chosen.name}" is done`);
-      return null;
-    }
-    const step = nextStep(ends, world, cursor);
-    if (!step) return null;
-    if (chosen.status !== 'RUNNING') {
-      await prisma.dayaRoutine.update({ where: { id: chosen.id }, data: { status: 'RUNNING', startedCycle: now, cursor, steps: 0 } });
-      console.log(`[routine] ${world.actor.name}: "${chosen.name}" called up by "${triggered?.t}"`);
-    }
-    return { id: chosen.id, name: chosen.name, ends, cursor, step, world, why: running ? 'running' : 'trigger', endsInWords: endsInWordsFrom(ends, world, cursor) };
+    return planRoutine(campaignId, characterId, chosen, now, running ? { why: 'running' } : { why: 'trigger', calledUpBy: triggered?.t ?? cue }, opts);
   } catch (err) {
     console.warn('[routine] step lookup failed (non-fatal):', err instanceof Error ? err.message : err);
     return null;
   }
+}
+
+type RoutineRow = { id: string; name: string; status: string; cadence: string | null; cursor: number; steps: number; startedCycle: number | null; lastDoneCycle: number | null; ends: string; triggers: string };
+
+/** Re-arm DONE routines by cadence; set down a run that went on too long. Mutates the rows to match. */
+async function rearmAndLapse(rows: RoutineRow[], now: number): Promise<void> {
+  for (const r of rows) {
+    if (r.status === 'DONE' && r.cadence && r.lastDoneCycle !== null && now - r.lastDoneCycle >= (RE_ARM_AFTER[r.cadence] ?? 0)) {
+      await prisma.dayaRoutine.update({ where: { id: r.id }, data: { status: 'READY', cursor: 0, steps: 0 } });
+      r.status = 'READY'; r.cursor = 0; r.steps = 0;
+    }
+    if (r.status === 'RUNNING' && ((r.startedCycle !== null && now - r.startedCycle > ROUTINE_LAPSE_CYCLES) || r.steps >= ROUTINE_STEP_CAP)) {
+      await prisma.dayaRoutine.update({ where: { id: r.id }, data: { status: r.cadence ? 'READY' : 'RETIRED', cursor: 0, steps: 0 } });
+      r.status = r.cadence ? 'READY' : 'RETIRED';
+      console.log(`[routine] ${r.name}: lapsed unfinished (${r.steps} steps)`);
+    }
+  }
+}
+
+/**
+ * Plan the next step of ONE routine against the live world: advance its cursor past met ends, mark it DONE when every end
+ * from the cursor is met (re-armed by its cadence later), mark it RUNNING when it is just being called up. Null = nothing
+ * to do (done, or no step from here). Shared by the trigger path above and the stretch (the clock calls a routine up).
+ */
+export async function planRoutine(
+  campaignId: string,
+  characterId: string,
+  chosen: RoutineRow,
+  now: number,
+  called: { why: 'running' } | { why: 'trigger'; calledUpBy: string } | { why: 'clock' },
+  opts: { sex?: string | null } = {},
+): Promise<DueRoutine | null> {
+  const ends = parseEnds(safeJson(chosen.ends));
+  if (!ends.length) return null;
+  const world = await routineWorldFor(campaignId, characterId, { sex: opts.sex });
+  if (!world) return null;
+  const cursor = advanceCursor(ends, world, chosen.status === 'RUNNING' ? chosen.cursor : 0);
+  if (cursor !== chosen.cursor) await prisma.dayaRoutine.update({ where: { id: chosen.id }, data: { cursor } }).catch(() => undefined);
+  if (routineDone(ends, world, cursor)) {
+    await prisma.dayaRoutine.update({ where: { id: chosen.id }, data: { status: 'DONE', lastDoneCycle: now, cursor: 0, steps: 0 } });
+    console.log(`[routine] ${world.actor.name}: "${chosen.name}" is done`);
+    return null;
+  }
+  const step = nextStep(ends, world, cursor);
+  if (!step) return null;
+  if (chosen.status !== 'RUNNING') {
+    await prisma.dayaRoutine.update({ where: { id: chosen.id }, data: { status: 'RUNNING', startedCycle: now, cursor, steps: 0 } });
+    console.log(`[routine] ${world.actor.name}: "${chosen.name}" called up by ${called.why === 'trigger' ? `"${called.calledUpBy}"` : called.why === 'clock' ? 'the hour' : 'itself'}`);
+  }
+  return { id: chosen.id, name: chosen.name, ends, cursor, step, world, why: called.why === 'running' ? 'running' : called.why, endsInWords: endsInWordsFrom(ends, world, cursor) };
+}
+
+/**
+ * The CLOCK calls a routine up (stretch 2026-10-31: its usual hour has come inside a lived span). Returns the first step,
+ * or null when the routine is already met or cannot be begun from here.
+ */
+export async function callUpRoutine(campaignId: string, characterId: string, routineId: string, opts: { sex?: string | null } = {}): Promise<DueRoutine | null> {
+  try {
+    const row = await prisma.dayaRoutine.findUnique({ where: { id: routineId } });
+    if (!row || (row.status !== 'READY' && row.status !== 'DONE' && row.status !== 'RUNNING')) return null;
+    const camp = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } });
+    const now = camp?.currentCycle ?? 0;
+    if (row.status === 'DONE') { await prisma.dayaRoutine.update({ where: { id: row.id }, data: { status: 'READY', cursor: 0, steps: 0 } }); row.status = 'READY'; row.cursor = 0; row.steps = 0; }
+    return planRoutine(campaignId, characterId, row, now, row.status === 'RUNNING' ? { why: 'running' } : { why: 'clock' }, opts);
+  } catch (err) {
+    console.warn('[routine] call-up failed (non-fatal):', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/** Re-plan a routine the being is in the middle of (after a step, the world has changed). Null = done or stuck. */
+export async function replanRoutine(campaignId: string, characterId: string, routineId: string, opts: { sex?: string | null } = {}): Promise<DueRoutine | null> {
+  try {
+    const row = await prisma.dayaRoutine.findUnique({ where: { id: routineId } });
+    if (!row || row.status !== 'RUNNING') return null;
+    const camp = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } });
+    return planRoutine(campaignId, characterId, row, camp?.currentCycle ?? 0, { why: 'running' }, opts);
+  } catch { return null; }
+}
+
+/** Set a running routine down unfinished (nobody came to the door): READY again when it has a cadence, else RETIRED. */
+export async function setDownRoutine(routineId: string, why: string): Promise<void> {
+  const row = await prisma.dayaRoutine.findUnique({ where: { id: routineId }, select: { name: true, cadence: true, status: true } }).catch(() => null);
+  if (!row || row.status !== 'RUNNING') return;
+  await prisma.dayaRoutine.update({ where: { id: routineId }, data: { status: row.cadence ? 'READY' : 'RETIRED', cursor: 0, steps: 0 } }).catch(() => undefined);
+  console.log(`[routine] ${row.name}: set down — ${why}`);
 }
 
 async function maybeDerive(characterId: string, entityId: string): Promise<void> {
@@ -130,7 +188,7 @@ export interface RoutineRunInput {
 }
 
 export type RoutineRunResult =
-  | { status: 'followed'; act: string; effect: RoutineStep['effect']; applied: string[]; refused: string[]; roll?: RollNote; player: { reason: string; ms: number }; done: boolean }
+  | { status: 'followed'; act: string; effect: RoutineStep['effect']; applied: string[]; refused: string[]; sounds?: ApplyReport['sounds']; roll?: RollNote; player: { reason: string; ms: number }; done: boolean }
   | { status: 'held'; reason: string; checked: 'stands' | 'refuted'; roll?: RollNote; player: { reason: string; ms: number } }
   | { status: 'broke'; reason: string; player: { reason: string; ms: number } };
 
@@ -187,9 +245,10 @@ export async function runRoutineStep(input: RoutineRunInput): Promise<RoutineRun
   const effect = routine.step.effect;
   let applied: string[] = [];
   let refused: string[] = [];
+  let sounds: ApplyReport['sounds'];
   if (effect.op !== 'wait') {
     const report = await applyActEffects(campaignId, being.id, [effect as ActEffect], routine.step.act);
-    applied = report.applied; refused = report.refused;
+    applied = report.applied; refused = report.refused; sounds = report.sounds;
   }
   let done = false;
   try {
@@ -204,7 +263,7 @@ export async function runRoutineStep(input: RoutineRunInput): Promise<RoutineRun
       await prisma.dayaRoutine.update({ where: { id: routine.id }, data: { cursor, steps: { increment: 1 } } });
     }
   } catch { /* checked next beat */ }
-  return { status: 'followed', act: routine.step.act, effect, applied, refused, roll, player: note, done };
+  return { status: 'followed', act: routine.step.act, effect, applied, refused, ...(sounds?.length ? { sounds } : {}), roll, player: note, done };
 }
 
 async function gmOf(campaignId: string, by: { userId: string; username: string }): Promise<{ id: string; username: string }> {

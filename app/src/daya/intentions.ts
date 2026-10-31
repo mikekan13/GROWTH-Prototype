@@ -45,6 +45,8 @@ export interface IntentionDraft {
   cadence: Cadence | null;
 }
 
+export type IntentionAuthority = 'self' | 'player' | 'gm';
+
 export interface DueIntention {
   id: string;
   description: string;
@@ -52,6 +54,8 @@ export interface DueIntention {
   sourceMemoryId: string | null;
   goalId: string | null;
   why: 'trigger' | 'time';
+  /** Whose word it is: the being's own, the Trailblazer's stated plan, or the Watcher's override (stretch 2026-10-31). */
+  authority: IntentionAuthority;
 }
 
 // ── Grammar of a prospective sentence (first person, future-leaning) ─────────
@@ -197,13 +201,17 @@ export async function dueIntentionsFor(entityId: string, cue: string, nowCycle: 
     for (const r of rows) {
       if (staleIds.has(r.id)) continue;
       const why = dueReason({ trigger: r.trigger, dueCycle: r.dueCycle, dueUntil: r.dueUntil }, cue, nowCycle);
-      if (why) due.push({ id: r.id, description: r.description, trigger: r.trigger, sourceMemoryId: r.sourceMemoryId, goalId: r.goalId, why });
+      if (why) due.push({ id: r.id, description: r.description, trigger: r.trigger, sourceMemoryId: r.sourceMemoryId, goalId: r.goalId, why, authority: authorityOf(r.authority) });
     }
     return due;
   } catch (err) {
     console.warn('[daya/intentions] due intentions lookup failed (non-fatal):', err);
     return [];
   }
+}
+
+function authorityOf(raw: string | null | undefined): IntentionAuthority {
+  return raw === 'player' || raw === 'gm' ? raw : 'self';
 }
 
 /** The being did it (or let it go). */
@@ -227,6 +235,8 @@ export interface SetIntentionInput {
   dueUntil?: number | null;
   cadence?: Cadence | null;
   goalId?: string | null;
+  /** Default 'self'. 'player' = the Trailblazer's stated plan for a span; 'gm' = the Watcher's override (it happens as written). */
+  authority?: IntentionAuthority;
 }
 
 /** Set an intention outright, in the being's own words. Returns the row id (an identical pending one is reused). */
@@ -240,6 +250,7 @@ export async function setIntention(characterId: string, input: SetIntentionInput
       entityId: entity.id, description,
       trigger: input.trigger ?? triggerOf(description), dueCycle: input.dueCycle ?? null, dueUntil: input.dueUntil ?? null,
       cadence: input.cadence ?? cadenceOf(description), goalId: input.goalId ?? null, narrativeCycle: atCycle,
+      authority: input.authority ?? 'self',
     },
   });
   return row.id;

@@ -22,7 +22,7 @@ import { broadcastEvent } from '@/lib/campaign-stream';
 import type { Point } from '@/lib/canvas-geometry';
 import { walkFtPerSFromCelerity } from '@/lib/spatial/pathfinding';
 import { findPath, pathSeconds, portalPassability, roomAt, roomByName, portalsOfRoom, spotInRoom, spotAtPortal, spotBeside, nearestWalkable, crossesBlocking, wayOutDoor, lockedFromMySide, type LevelMap, type Portal, type RoomPoly, type Pace } from '@/lib/spatial';
-import { loadWorldLevel, beingStanding, thingStanding, stampBeingPoint, roomIdOf, levelOfBeing } from '@/services/spatial-world';
+import { loadWorldLevel, beingStanding, thingStanding, stampBeingPoint, roomIdOf, levelOfBeing, exitPortals } from '@/services/spatial-world';
 import { moveCharacterToLocation } from '@/services/character-location';
 import { writeDoorState } from '@/services/door-state';
 import { perceiveMapChange } from '@/services/spatial-perception';
@@ -250,4 +250,80 @@ export function describeMove(name: string, r: MoveReport): string {
   const where = r.toRoom && r.toRoom !== r.fromRoom ? ` into ${r.toRoom}` : '';
   const head = r.feet > 0 ? `${name} walks ${r.feet} ft${where} to ${r.label}` : `${name} is already at ${r.label}`;
   return `${head}${bits.length ? ', ' + bits.join(', ') : ''}.`;
+}
+
+// ── Elsewhere (stretch 2026-10-31) ───────────────────────────────────────────
+// A being's life is not all on the drawn map: the hotel, the pizza place, the
+// street exist as facts and as undrawn Locations. Leaving the map is a walk to
+// the nearest way off it (an opening whose far side is no drawn room: "stairs
+// down", "outside"); coming back is appearing at the way onto it nearest where
+// one is headed. Both are plain moves; nothing teleports into a room.
+
+/** The exit portal nearest a point on the level; null when the level has no way off it drawn. */
+function nearestExit(map: LevelMap, from: Point | null): Portal | null {
+  const exits = exitPortals(map);
+  if (!exits.length) return null;
+  if (!from) return exits[0];
+  const d = (p: Portal) => Math.hypot((p.a.x + p.b.x) / 2 - from.x, (p.a.y + p.b.y) / 2 - from.y);
+  return exits.slice().sort((a, b) => d(a) - d(b))[0];
+}
+
+/** The drawn room an exit portal opens onto. */
+function roomOfExit(map: LevelMap, p: Portal): RoomPoly | null {
+  for (const b of p.between) { const r = roomByName(map, b); if (r) return r; }
+  return roomAt(map, { x: (p.a.x + p.b.x) / 2, y: (p.a.y + p.b.y) / 2 });
+}
+
+export interface LeaveReport { ok: boolean; via?: string; feet: number; reason?: string }
+
+/**
+ * Walk to the nearest way off the level (the being is then filed elsewhere by the caller). A being already off the map
+ * leaves nothing; a level with no way off it drawn refuses, so JEWL can see what the map lacks.
+ */
+export async function leaveMap(campaignId: string, characterId: string): Promise<LeaveReport> {
+  const { map } = await loadWorldLevel(campaignId, await levelOfBeing(characterId));
+  const standing = await beingStanding(map, characterId);
+  if (!standing) return { ok: true, feet: 0 };
+  const exit = nearestExit(map, standing.point);
+  if (!exit) return { ok: false, feet: 0, reason: 'no way off the map is drawn (an opening to "outside" or "stairs down")' };
+  const walk = await moveBeing(campaignId, characterId, { kind: 'portal', portalId: exit.id, homeId: exit.homeId }, { cause: 'sim', world: { map } });
+  if (!walk.ok) return { ok: false, feet: 0, reason: walk.reason, via: exit.name };
+  return { ok: true, via: exit.name, feet: walk.feet };
+}
+
+export interface ArriveReport { ok: boolean; via?: string; room?: string; reason?: string }
+
+/**
+ * Appear on the level at the way onto it nearest `toward` (a point, when known), filed in the room that way opens onto, the
+ * token placed at the opening. The walk to the real target follows as an ordinary move.
+ */
+export async function arriveOnMap(campaignId: string, characterId: string, toward: Point | null, opts: { cause?: 'sim' | 'gm' | 'jewl'; level?: number | null } = {}): Promise<ArriveReport> {
+  const { map } = await loadWorldLevel(campaignId, opts.level ?? null);
+  const actor = await prisma.character.findUnique({ where: { id: characterId }, select: { id: true, name: true, campaignId: true, campaign: { select: { gmUserId: true } } } });
+  if (!actor || actor.campaignId !== campaignId) return { ok: false, reason: 'not in this campaign' };
+  const exit = nearestExit(map, toward);
+  if (!exit) return { ok: false, reason: 'no way onto the map is drawn (an opening to "outside" or "stairs down")' };
+  const room = roomOfExit(map, exit);
+  if (!room) return { ok: false, reason: `the ${exit.name} opens onto no drawn room` };
+  const at = spotAtPortal(map, exit, roomCentreOf(room));
+  await moveCharacterToLocation(actor.campaign?.gmUserId ?? '', 'WATCHER', { characterId, locationId: room.id, broadcast: false });
+  const placedAt = await stampBeingPoint(characterId, at);
+  try {
+    const seen = await perceiveMapChange(campaignId, { kind: 'being', entityId: characterId, at, roomId: room.id }, { map });
+    const { beingPlaced } = await import('@/services/thing-facts');
+    await beingPlaced(campaignId, { id: characterId, name: actor.name }, room.id, at);
+    broadcastEvent(campaignId, { kind: 'token_moved', entityId: characterId, entityType: 'character', x: at.x, y: at.y, placedAt, roomId: room.id, roomName: room.name, cause: opts.cause ?? 'sim', ...seen });
+  } catch { /* the canvases will re-read */ }
+  return { ok: true, via: exit.name, room: room.name };
+}
+
+function roomCentreOf(room: RoomPoly): Point {
+  const n = room.points.length || 1;
+  return { x: room.points.reduce((s, p) => s + p.x, 0) / n, y: room.points.reduce((s, p) => s + p.y, 0) / n };
+}
+
+/** Where a drawn Location sits on the level, for "nearest way in": the centre of its footprint, or null when it is not drawn there. */
+export function locationPointOn(map: LevelMap, locationId: string): Point | null {
+  const r = map.rooms.find((x) => x.id === locationId) ?? map.homes?.find((x) => x.id === locationId) ?? null;
+  return r ? roomCentreOf(r) : null;
 }
