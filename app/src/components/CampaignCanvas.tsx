@@ -101,6 +101,14 @@ function applyLayoutEpochGate(campaignId: string, serverEpoch: number | undefine
   let seen = 0;
   try { seen = Number(localStorage.getItem(key) ?? '0') || 0; } catch { return false; }
   if (serverEpoch <= seen) return false;
+  // LOOP GUARD (2026-11-01: a phone whose localStorage did not keep the epoch reloaded on every load and never reached
+  // the canvas): a tab reloads for a given epoch ONCE — the marker lives in sessionStorage, which survives the reload
+  // in the same tab; if that fails too, do not reload at all.
+  const onceKey = `${key}-reloaded`;
+  try {
+    if (sessionStorage.getItem(onceKey) === String(serverEpoch)) return false;
+    sessionStorage.setItem(onceKey, String(serverEpoch));
+  } catch { return false; }
   try {
     const prefix = `canvas-${campaignId}-`;
     for (const k of Object.keys(localStorage)) if (k.startsWith(prefix) && k !== key) localStorage.removeItem(k);
