@@ -28,6 +28,7 @@ Respond with STRICT JSON only — no prose outside the JSON object — in exactl
              | { "op": "take", "item": <thing in the room> }
              | { "op": "give", "item": <thing in hand>, "to": <person present> }
              | { "op": "put", "item": <thing in hand>, "into": <room or container> }
+             | { "op": "pay", "to": <person present>, "amount": <number>, "currency": <code, optional> }
              | { "op": "move", "to": <room, door, person or thing the actor goes to> } ]
 }
 
@@ -38,6 +39,10 @@ Rules:
    unlock it. The entity has ONLY what its Entity section lists — never
    invent a jacket, a pocket, a bag, a key. "effects" lists every physical
    change the outcome makes to doors, hands and rooms; [] when none.
+   MONEY changing hands is {"op":"pay"} with the AMOUNT the actor means to
+   pay (what is due, or what the words say) — never a "give" of "the cash":
+   the engine picks the bills out of what the actor carries and says what was
+   handed. Change is the receiver's own pay, the other way.
    WHO IS WHERE is authoritative too: only the people listed HERE share
    the actor's room. Someone beyond a closed or locked door cannot be seen,
    touched or handed anything; a locked door is not passed. An act that

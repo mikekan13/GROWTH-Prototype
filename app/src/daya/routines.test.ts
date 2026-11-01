@@ -222,3 +222,40 @@ describe('the planner goes where the thing is, and comes in from elsewhere', () 
     expect(named.because.join(' ')).toMatch(/Violet is at/);
   });
 });
+
+describe("PAYING IS AN AMOUNT (Michael 2026-11-01): the 'paid' end", () => {
+  const KRIS_HERE: RoutineWorld['people'] = [{ id: KRIS, name: 'Kristopher', roomId: null, roomName: 'Landing', reach: 'through-open', doorBetween: 'Entry door' }];
+  const w = (over: Partial<RoutineWorld> & { cash?: number }): RoutineWorld => {
+    const base = world({ doorState: 'open' });
+    return { ...base, actor: { ...base.actor, ...(over.cash != null ? { cash: [{ code: 'USD', onHand: over.cash }] } : {}) }, people: KRIS_HERE, payments: over.payments ?? [], now: over.now ?? 10 };
+  };
+  const PAID: RoutineEnd = { kind: 'paid', to: 'Kristopher', amount: 22.97, currency: 'USD' };
+  it('with money in hand and the driver in reach: a pay op for the amount, never a give of the cash', () => {
+    const step = nextStep([PAID], w({ cash: 45 }), 0)!;
+    expect(step.effect).toEqual({ op: 'pay', to: 'Kristopher', amount: 22.97, currency: 'USD' });
+    expect(step.act).toBe('pays Kristopher 22.97 USD');
+  });
+  it('without enough money: waits for money, names what she has', () => {
+    const step = nextStep([PAID], w({ cash: 20 }), 0)!;
+    expect(step.effect).toEqual({ op: 'wait', for: '22.97 USD to pay Kristopher — 20 USD in hand' });
+    const none = nextStep([PAID], w({}), 0)!;
+    expect(none.effect.op).toBe('wait');
+  });
+  it('met by a payment to that person of at least the amount, within the day; stale payments do not count', () => {
+    expect(endMet(PAID, w({ cash: 45, payments: [{ to: KRIS, amount: 25, code: 'USD', cycle: 9.999 }], now: 10 }))).toBe(true);
+    expect(endMet(PAID, w({ cash: 45, payments: [{ to: KRIS, amount: 20, code: 'USD', cycle: 9.999 }], now: 10 }))).toBe(false);
+    expect(endMet(PAID, w({ cash: 45, payments: [{ to: KRIS, amount: 25, code: 'USD', cycle: 9.99 }], now: 10 }))).toBe(false);
+  });
+  it('parses, orders after what is received and before what is handed over, and reads in words', () => {
+    const ends = normalizeEndOrder([
+      { kind: 'gave', item: 'Five-dollar bill with her number', to: 'Kristopher' },
+      { kind: 'door', door: 'Entry door', state: 'locked' },
+      { kind: 'paid', to: 'Kristopher', amount: 22.97, currency: 'USD' },
+      { kind: 'hold', item: 'Pizza (Hawaiian + black olives)' },
+    ]);
+    expect(ends.map((e) => e.kind)).toEqual(['hold', 'paid', 'gave', 'door']);
+    expect(endsInWords([PAID])).toEqual(['pay Kristopher 22.97 USD']);
+    const drafts = parseRoutineDrafts({ routines: [{ name: 'Pizza', triggers: ['knock'], cadence: 'daily', ends: [{ kind: 'paid', to: 'the driver', amount: '22.97', currency: 'usd' }], sourceIntentionIds: [] }] });
+    expect(drafts[0].ends).toEqual([{ kind: 'paid', to: 'the driver', amount: 22.97, currency: 'USD' }]);
+  });
+});

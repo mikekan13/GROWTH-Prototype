@@ -20,7 +20,7 @@ import { establishFact, supersede } from '@/daya/world-ledger';
 const REL = 'located_at';
 const MAX_DEPTH = 12;
 
-export type Place = { kind: 'location'; id: string; name: string } | { kind: 'item'; id: string; name: string; locationId: string | null };
+export type Place = { kind: 'location'; id: string; name: string } | { kind: 'item'; id: string; name: string; locationId: string | null; holderId?: string | null };
 
 /** A Location or a container item of this campaign, by id or exact name (case-insensitive). */
 export async function resolvePlace(campaignId: string, ref: string): Promise<Place | null> {
@@ -29,11 +29,11 @@ export async function resolvePlace(campaignId: string, ref: string): Promise<Pla
   const locs = await prisma.location.findMany({ where: { campaignId }, select: { id: true, name: true } });
   const loc = locs.find(l => l.id === r) ?? locs.find(l => l.name.toLowerCase() === r.toLowerCase());
   if (loc) return { kind: 'location', id: loc.id, name: loc.name };
-  const items = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', OR: [{ id: r }, { name: r }] }, select: { id: true, name: true, locationId: true } });
+  const items = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', OR: [{ id: r }, { name: r }] }, select: { id: true, name: true, locationId: true, holderId: true } });
   const it = items.find(i => i.id === r) ?? items.find(i => i.name.toLowerCase() === r.toLowerCase()) ?? null;
-  if (it) return { kind: 'item', id: it.id, name: it.name, locationId: it.locationId };
-  const loose = await prisma.campaignItem.findFirst({ where: { campaignId, status: 'ACTIVE', name: { equals: r } }, select: { id: true, name: true, locationId: true } });
-  return loose ? { kind: 'item', id: loose.id, name: loose.name, locationId: loose.locationId } : null;
+  if (it) return { kind: 'item', id: it.id, name: it.name, locationId: it.locationId, holderId: it.holderId };
+  const loose = await prisma.campaignItem.findFirst({ where: { campaignId, status: 'ACTIVE', name: { equals: r } }, select: { id: true, name: true, locationId: true, holderId: true } });
+  return loose ? { kind: 'item', id: loose.id, name: loose.name, locationId: loose.locationId, holderId: loose.holderId } : null;
 }
 
 /** The parent (located_at target) of an entity, if any. */
@@ -116,7 +116,8 @@ export async function placeItem(campaignId: string, opts: { item: string; into: 
         relationshipType: REL, strength: 5,
       },
     }),
-    prisma.campaignItem.update({ where: { id: item.id }, data: { locationId, holderId: null } }),
+    // A thing inside a CARRIED container is carried (Michael 2026-11-01, object permanence: the cash in her wallet is in her hand).
+    prisma.campaignItem.update({ where: { id: item.id }, data: { locationId, holderId: into.kind === 'item' ? into.holderId ?? null : null } }),
   ]);
   const path = await placePath(item.id);
   return { itemId: item.id, name: item.name, into, path, locationId, ...(warnings.length ? { warnings } : {}) };

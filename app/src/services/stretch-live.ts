@@ -27,6 +27,8 @@
  */
 import 'server-only';
 import { prisma } from '@/lib/db';
+import { ValidationError } from '@/lib/errors';
+import { broadcastEvent } from '@/lib/campaign-stream';
 import { isDayaEnabled } from '@/daya/events';
 import { listenAtTable, answerAsk, type ListenResult } from '@/daya/ensemble';
 import { resolveIntent } from '@/daya/adjudicator';
@@ -48,7 +50,6 @@ import { advanceClockBySim, flushSimClock, ensureDefaultTimescale } from '@/serv
 import { spanInWords, hourInWords } from '@/services/table-clock';
 import { cycleToLocalDate, secondsToCycles, type CalendarSpec } from '@/types/time';
 import { createCampaignEvent } from '@/services/campaign-event';
-import { broadcastEvent } from '@/lib/campaign-stream';
 import type { TerminalEvent, TerminalPayload } from '@/types/terminal';
 
 // ── Shape ────────────────────────────────────────────────────────────────────
@@ -105,8 +106,10 @@ const inFlight: Map<string, Promise<unknown>> =
 export function stretchInProgress(campaignId: string): boolean { return inFlight.has(campaignId); }
 
 export async function liveStretch(campaignId: string, actor: StretchActor, input: StretchInput): Promise<StretchReport> {
-  const prev = inFlight.get(campaignId) ?? Promise.resolve();
-  const run = prev.catch(() => undefined).then(() => liveStretchNow(campaignId, actor, input));
+  // REFUSED, NOT QUEUED (2026-11-01 first run: the Watcher resent his line while the first two days were being lived; the
+  // second call queued behind the first and started living two MORE days the moment it finished). One stretch at a time.
+  if (inFlight.has(campaignId)) throw new ValidationError('A stretch is already being lived for this campaign — wait for it to finish before moving the clock again.');
+  const run = liveStretchNow(campaignId, actor, input);
   inFlight.set(campaignId, run);
   try { return await run; } finally { if (inFlight.get(campaignId) === run) inFlight.delete(campaignId); }
 }
@@ -175,8 +178,11 @@ async function liveStretchNow(campaignId: string, actor: StretchActor, input: St
     const b = beings.find((x) => x.id === d.character || x.name.toLowerCase() === d.character.trim().toLowerCase() || x.name.toLowerCase().startsWith(d.character.trim().toLowerCase()));
     if (!b) { report.refused.push(`directive for "${d.character}": no crystallized character by that name`); continue; }
     try {
-      await setIntention(b.id, { description: d.text.trim(), dueCycle: start, dueUntil: end, authority: d.authority }, start);
-      console.log(`[stretch] ${b.name}: ${d.authority} directive — "${d.text.trim().slice(0, 100)}"`);
+      // WHEN (2026-11-01): an 'end' directive is the state the span closes on — due in the last awake window only.
+      const lastAwake = [...windows].reverse().find((w) => !w.sleep) ?? windows[windows.length - 1];
+      const due = d.when === 'end' ? { dueCycle: lastAwake.start, dueUntil: end } : { dueCycle: start, dueUntil: end };
+      await setIntention(b.id, { description: d.text.trim(), ...due, authority: d.authority }, start);
+      console.log(`[stretch] ${b.name}: ${d.authority} directive${d.when === 'end' ? ' (at the end)' : ''} — "${d.text.trim().slice(0, 100)}"`);
     } catch (err) { report.refused.push(`directive for ${b.name}: ${msg(err)}`); }
   }
 
@@ -192,6 +198,8 @@ async function liveStretchNow(campaignId: string, actor: StretchActor, input: St
     const hour = hourInWords(local.hour ?? 12);
     const label = windowLabel(w, totalDays);
     console.log(`[stretch] ── ${label} (${local.formatted}) ──`);
+    // WHAT JEWL IS AT (2026-11-01: nine silent minutes and the Watcher resent his line): the live working tick names the window.
+    try { broadcastEvent(campaignId, { kind: 'jewl_working', phase: 'tool', tool: 'advance_clock', label: `living ${span} — ${label} (${i + 1}/${windows.length})` }); } catch { /* best-effort */ }
     for (const b of beings) { b.listen = null; b.waits.clear(); b.stepsThisWindow = 0; b.spokeWith.clear(); }
 
     if (w.sleep) {

@@ -25,6 +25,7 @@ const directiveSchema = z.object({
   character: z.string().min(1).max(120).describe('The character, by name or id.'),
   authority: z.enum(['player', 'gm']).describe("'player' = the Trailblazer's own stated intention for the span (the character pursues it; the world adjudicates). 'gm' = the Watcher's override: it HAPPENS as written, no roll."),
   text: z.string().min(3).max(600).describe('First person for a player ("I spend the days at the shelter"); plain statement for a gm override ("Kristopher does not come by on the second day").'),
+  when: z.enum(['during', 'end']).optional().describe("'during' (default): it holds across the span — what the character does over the days. 'end': the STATE the span closes on, where the next scene opens (\"sits in his car outside the hotel, phone in hand, just off work\") — lived in the last window only, never on day one."),
 });
 
 const inputSchema = z.object({
@@ -67,7 +68,11 @@ export const advanceClockTool: JewlTool = {
     'Watcher said of the span as `narration`, and Trailblazer intentions / Watcher overrides as `directives`. ' +
     'Returns what each being did day by day and what the world refused (places not on the map) — read it and report ' +
     'it to the Watcher. Do NOT call this for in-round combat actions unless the GM explicitly advances rounds. Call it ' +
-    'ONCE per span; never split a span into pieces.',
+    'ONCE per span; never split a span into pieces. BEFORE a span of an hour or more, PREPARE THE WORLD: every crystallized ' +
+    'character needs the places their days happen in (home, workplace, vehicle — create_location, undrawn is fine) and the things ' +
+    "their routines need stocked where they come from (stock_goods); then ask the table what each Trailblazer's character does over " +
+    "the span (directives, authority player) and take the Watcher's overrides (authority gm). WHERE/HOW the span CLOSES is " +
+    '`when: "end"`, never a day-one act. A stretch already being lived refuses the call: wait, do not retry.',
   inputSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const parsed = inputSchema.parse(input);
@@ -91,7 +96,7 @@ export const advanceClockTool: JewlTool = {
       seconds,
       narration: parsed.narration ?? parsed.note,
       source: 'jewl',
-      directives: parsed.directives?.map((d) => ({ character: d.character, authority: d.authority, text: d.text })),
+      directives: parsed.directives?.map((d) => ({ character: d.character, authority: d.authority, text: d.text, ...(d.when ? { when: d.when } : {}) })),
     });
     return {
       output: {

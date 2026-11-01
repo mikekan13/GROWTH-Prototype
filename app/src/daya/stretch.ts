@@ -219,7 +219,9 @@ export function endsNeedingAnothersHands(
     const t = pick(e.item, things);
     if (!t) continue;
     const lying = things.some((x) => x.name === t.name && !x.holderId && x.roomId);
-    if (t.holderId && t.holderId !== actorId && !lying) out.push({ item: t.name, holder: t.holderName ?? 'someone' });
+    const holder = t.holderName ?? 'someone';
+    // Once per thing (2026-11-01: "Kristopher/Kristopher/Kristopher" — two ends named the same five).
+    if (t.holderId && t.holderId !== actorId && !lying && !out.some((o) => o.item === t.name && o.holder === holder)) out.push({ item: t.name, holder });
   }
   return out;
 }
@@ -227,14 +229,15 @@ export function endsNeedingAnothersHands(
 // ── The account: when in the day a being gives its own account ───────────────
 
 /**
- * The window in which a being gives its account of the day: the first awake window of that day with nothing of its
- * own due, else the last awake window. Pure. `dueByWindow` is indexed like `windows`.
+ * The window in which a being gives its account of the day: the LAST awake window of that day — after the day's doings,
+ * never before them (2026-11-01 first run: the account fired in the morning, the being had nothing to tell and invented
+ * a phone call that spent the session's opening). `dueByWindow` is kept for the caller's bookkeeping. Pure.
  */
 export function accountWindowIndex(windows: StretchWindow[], dayIndex: number, dueByWindow: number[]): number | null {
+  void dueByWindow;
   const awake = windows.map((w, i) => ({ w, i })).filter(({ w }) => w.dayIndex === dayIndex && !w.sleep);
   if (!awake.length) return null;
-  const free = awake.find(({ i }) => (dueByWindow[i] ?? 0) === 0);
-  return (free ?? awake[awake.length - 1]).i;
+  return awake[awake.length - 1].i;
 }
 
 // ── Directives: what a Trailblazer says their character does; what the GM overrides ──
@@ -244,6 +247,12 @@ export type DirectiveAuthority = 'player' | 'gm';
 export interface StretchDirective {
   /** The character, by id or name (the runtime resolves it). */
   character: string;
+  /**
+   * WHEN it holds (2026-11-01 first run: the Watcher's end state — "sits in his car outside the hotel, phone in hand" —
+   * was lived on the first evening). 'during' (default): across the span. 'end': the state the span closes on — due in
+   * the last awake window only, so the next scene opens on it.
+   */
+  when?: 'during' | 'end';
   /** 'player' = the Trailblazer's stated intention for the span (the being pursues it, the world adjudicates);
    *  'gm' = the Watcher's override: it HAPPENS as written (narrated), no roll. */
   authority: DirectiveAuthority;

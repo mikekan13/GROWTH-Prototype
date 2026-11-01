@@ -16,7 +16,9 @@ export const stockGoodsTool: JewlTool = {
     '(decimal: an onion 0.02, a couch 2): a new everyday archetype under 1 KV is made on the spot (give its value); a new ' +
     'thing worth 1 KV or more goes through the Forge first. CAPACITY: give volumeCuFt (and capacityCuFt / capacityLbs for ' +
     'new holders) — a holder refuses what will not fit. A holder’s ordinary contents can be a KIT instead (stock_kit). Garments: ONE item per piece — nothing comes in pairs (two socks = two goods). ' +
-    'Consumables carry qty. Real pounds. Be exhaustive and specific to HER: what a real person in her life, means and ' +
+    'Consumables carry qty. WHAT A THING IS MADE OF goes in `parts` (object permanence): money is ALWAYS a thing whose parts are bills/coins ' +
+    'with faceValue in the campaign currency (a wad of cash: two twenty-dollar bills and a five) — never a consumable with qty or a prose state; a bundle of ' +
+    'arrows is 20 arrow parts; a prayer rope is its knotted cord and its beads (bound). Real pounds. Be exhaustive and specific to HER: what a real person in her life, means and ' +
     'season actually has, down to the half-used spices and the rubber bands.',
   inputSchema: stockGoodsSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {

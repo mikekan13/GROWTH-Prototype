@@ -124,12 +124,12 @@ describe('what the clock calls up in a window', () => {
   });
 });
 
-describe('the account of the day falls in the first free awake window, else the last', () => {
+describe('the account of the day falls in the LAST awake window — after the day, never before it', () => {
   const ws = windowsFor(NOW, NOW + 2 * D);
-  it('day 2 with the pizza due in the evening: the morning is free', () => {
+  it('day 2 with the pizza due in the evening: still the evening (the account tells of the pizza)', () => {
     const due = ws.map((w) => (w.kind === 'evening' && w.dayIndex === 1 ? 1 : 0));
     const i = accountWindowIndex(ws, 1, due)!;
-    expect(ws[i].kind).toBe('morning');
+    expect(ws[i].kind).toBe('evening');
   });
   it('a day with something due in every awake window: the last one', () => {
     const due = ws.map((w) => (w.dayIndex === 1 && !w.sleep ? 1 : 0));
@@ -162,7 +162,8 @@ describe("the hour may not send a being to take a thing from another's hands", (
     const { pickByName } = await import('./routines');
     const things = [{ name: 'Pizza (Hawaiian + black olives)', holderId: 'v', holderName: 'Violet', roomId: null }, { name: 'Chess Pizza receipt', holderId: 'k', holderName: 'Kristopher', roomId: null }];
     const ends = [{ kind: 'hold', item: 'Pizza (Hawaiian + black olives)' }, { kind: 'hold', item: 'Chess Pizza receipt' }, { kind: 'gave', item: 'Pizza (Hawaiian + black olives)', to: 'the customer' }];
-    expect(endsNeedingAnothersHands(ends, things, 'k', pickByName)).toEqual([{ item: 'Pizza (Hawaiian + black olives)', holder: 'Violet' }, { item: 'Pizza (Hawaiian + black olives)', holder: 'Violet' }]);
+    // Once per thing, however many ends name it (2026-11-01).
+    expect(endsNeedingAnothersHands(ends, things, 'k', pickByName)).toEqual([{ item: 'Pizza (Hawaiian + black olives)', holder: 'Violet' }]);
   });
   it('a fresh one lying at the pizza place: nothing is lacking', async () => {
     const { endsNeedingAnothersHands } = await import('./stretch');

@@ -35,6 +35,8 @@ export type RoutineEnd =
   | { kind: 'hold'; item: string }
   /** The thing is in that person's hands (handed over by the being). */
   | { kind: 'gave'; item: string; to: string }
+  /** That person has been paid that much (Michael 2026-11-01): the bills come out of what the being carries. `currency` is a code. */
+  | { kind: 'paid'; to: string; amount: number; currency?: string }
   /** A door stands in that state ("the way out" = the door that leaves the home). */
   | { kind: 'door'; door: string; state: DoorState }
   /** The being stands in that room, or beside that thing. */
@@ -53,7 +55,15 @@ export interface RoutineDraft {
 export type Reach = 'here' | 'through-open' | 'beyond-door' | 'far' | 'none';
 
 export interface RoutineWorld {
-  actor: { id: string; name: string; sex?: string | null; roomId: string | null; roomName: string | null };
+  actor: {
+    id: string; name: string; sex?: string | null; roomId: string | null; roomName: string | null;
+    /** Money in the actor's hands, per currency code (from the parts of what they carry). */
+    cash?: Array<{ code: string; onHand: number }>;
+  };
+  /** Payments the actor has made lately (what was handed, to whom, when) — a 'paid' end is met by one of these. */
+  payments?: Array<{ to: string; amount: number; code?: string; cycle: number | null }>;
+  /** The clock now, in cycles, when known (payments older than a day do not count). */
+  now?: number | null;
   doors: Array<{
     id: string; name: string; state: DoorState; between: string[];
     /** Locked, but the deadbolt is under the actor's hand (leaves the home the actor stands in). */
@@ -144,6 +154,12 @@ export function endMet(end: RoutineEnd, world: RoutineWorld): boolean {
   switch (end.kind) {
     case 'hold': { const t = pickByName(end.item, world.things); return !!t && t.holderId === world.actor.id; }
     case 'gave': { const t = pickByName(end.item, world.things); const p = pickPerson(end.to, world); return !!t && !!p && t.holderId === p.id; }
+    case 'paid': {
+      const p = pickPerson(end.to, world);
+      if (!p) return false;
+      return (world.payments ?? []).some((pay) => pay.to === p.id && pay.amount + 0.005 >= end.amount && (!end.currency || !pay.code || pay.code.toUpperCase() === end.currency.toUpperCase())
+        && (world.now == null || pay.cycle == null || world.now - pay.cycle <= PAYMENT_FRESH_CYCLES));
+    }
     case 'door': { const d = pickDoor(end.door, world); return !!d && d.state === end.state; }
     case 'at': {
       if (world.actor.roomName && norm(world.actor.roomName) === norm(end.place)) return true;
@@ -158,6 +174,7 @@ export function endPossible(end: RoutineEnd, world: RoutineWorld): boolean {
   switch (end.kind) {
     case 'hold': return !!pickByName(end.item, world.things);
     case 'gave': return !!pickByName(end.item, world.things);
+    case 'paid': return true;
     case 'door': return !!pickDoor(end.door, world);
     case 'at': return true;
   }
@@ -240,6 +257,19 @@ function stepToward(end: RoutineEnd, world: RoutineWorld): Chain | null {
       if (p.reach === 'here' || p.reach === 'through-open') return { effect: { op: 'give', item: t.name, to: p.name }, act: `hands ${the(t.name)} to ${p.name}`, step: `hand ${the(t.name)} to ${p.name}`, because };
       return toPerson(p, world, because);
     }
+    case 'paid': {
+      const p = pickPerson(end.to, world);
+      if (!p) return null;
+      const money = `${end.amount} ${end.currency ?? ''}`.trim();
+      const because = [`${s} ${means} to pay ${p.name} ${money}`];
+      const purse = (world.actor.cash ?? []).find((c) => !end.currency || c.code.toUpperCase() === end.currency.toUpperCase()) ?? (end.currency ? null : world.actor.cash?.[0] ?? null);
+      if (!purse || purse.onHand + 0.005 < end.amount) {
+        const has = purse ? `${purse.onHand} ${purse.code}` : 'no money';
+        return { effect: { op: 'wait', for: `${money} to pay ${p.name} — ${has} in hand` }, act: `has ${has} in hand, not the ${money} for ${p.name}`, step: `pay ${p.name} ${money} when there is money for it`, because: [...because, `${s} ${/^f/i.test(world.actor.sex ?? '') ? 'has' : /^m/i.test(world.actor.sex ?? '') ? 'has' : 'have'} ${has}`] };
+      }
+      if (p.reach === 'here' || p.reach === 'through-open') return { effect: { op: 'pay', to: p.name, amount: end.amount, ...(end.currency ? { currency: end.currency } : {}) }, act: `pays ${p.name} ${money}`, step: `pay ${p.name} ${money}`, because };
+      return toPerson(p, world, because);
+    }
     case 'door': {
       const d = pickDoor(end.door, world);
       if (!d) return null;
@@ -299,6 +329,9 @@ export function triggerInCue(triggers: string[], cue: string): string | null {
   return null;
 }
 
+/** A payment counts toward a 'paid' end for this long (a day): the same routine tomorrow pays again. */
+export const PAYMENT_FRESH_CYCLES = 1 / 365.25;
+
 /** The hours a routine instance is given before it is set down unfinished (the pizza never came). */
 export const ROUTINE_LAPSE_CYCLES = 1 / 365.25 / 24 * 2; // two hours
 
@@ -314,6 +347,13 @@ export function parseEnds(raw: unknown): RoutineEnd[] {
     switch (r.kind) {
       case 'hold': { const item = s(r.item); if (item) out.push({ kind: 'hold', item }); break; }
       case 'gave': { const item = s(r.item); const to = s(r.to); if (item && to) out.push({ kind: 'gave', item, to }); break; }
+      case 'paid': {
+        const to = s(r.to);
+        const amount = typeof r.amount === 'number' ? r.amount : Number(String(r.amount ?? '').replace(/[^0-9.]/g, ''));
+        const currency = s(r.currency)?.toUpperCase();
+        if (to && Number.isFinite(amount) && amount > 0) out.push({ kind: 'paid', to, amount: Math.round(amount * 100) / 100, ...(currency ? { currency } : {}) });
+        break;
+      }
       case 'door': { const door = s(r.door) ?? 'the way out'; const state = s(r.state)?.toLowerCase(); if (state === 'open' || state === 'closed' || state === 'locked') out.push({ kind: 'door', door, state }); break; }
       case 'at': { const place = s(r.place); if (place) out.push({ kind: 'at', place }); break; }
       default: break;
@@ -345,7 +385,7 @@ export function parseRoutineDrafts(raw: unknown): RoutineDraft[] {
  * over; where to be; a door shut or locked last. Stable within each group, so the deriver's "pay, then tip" holds. Pure.
  */
 export function normalizeEndOrder(ends: RoutineEnd[]): RoutineEnd[] {
-  const rank = (e: RoutineEnd): number => (e.kind === 'door' ? (e.state === 'open' ? 0 : 4) : e.kind === 'hold' ? 1 : e.kind === 'gave' ? 2 : 3);
+  const rank = (e: RoutineEnd): number => (e.kind === 'door' ? (e.state === 'open' ? 0 : 5) : e.kind === 'hold' ? 1 : e.kind === 'paid' ? 2 : e.kind === 'gave' ? 3 : 4);
   return ends.map((e, i) => ({ e, i })).sort((a, b) => rank(a.e) - rank(b.e) || a.i - b.i).map((x) => x.e);
 }
 
@@ -357,6 +397,7 @@ export function endsInWords(ends: RoutineEnd[], world?: RoutineWorld): string[] 
     switch (e.kind) {
       case 'hold': return `${tick}have the ${norm(e.item)}`;
       case 'gave': return `${tick}hand the ${norm(e.item)} to ${e.to}`;
+      case 'paid': return `${tick}pay ${e.to} ${e.amount}${e.currency ? ` ${e.currency}` : ''}`;
       case 'door': return `${tick}the ${norm(e.door)} ${e.state}`;
       case 'at': return `${tick}be at the ${norm(e.place)}`;
     }

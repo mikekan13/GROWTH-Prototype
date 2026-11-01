@@ -16,6 +16,7 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import { routedChatText } from '@/ai/network/chat';
 import { parseRoutineDrafts, type RoutineDraft } from '@/daya/routines';
+import { isComposed, partsOf, partsInWords } from '@/lib/parts';
 import { actorMap } from '@/services/world-apply';
 
 const MAX_TOKENS = 1200;
@@ -37,6 +38,7 @@ ORDER is the hands' order: what is received comes before what is paid; paying co
 TRIGGERS are what the person hears or sees at the MOMENT the routine runs — for a delivery, the knock at the door and the box, never the ordering; for locking up, coming in or going out. Plain sensory words ("knock", "delivery", "pizza box"), never abstractions, never words that would fire on ordinary talk ("home", "inside", "time").
   {"kind":"hold","item":"<thing>"}            the person has the thing in hand (took it, or was handed it)
   {"kind":"gave","item":"<thing>","to":"<person>"}   the thing is in that person's hands
+  {"kind":"paid","to":"<person>","amount":<number>,"currency":"<code>"}   that person has been paid that much — MONEY IS NEVER a "gave" of "the cash": write the amount (the total a receipt or the words name); the hands pick the bills
   {"kind":"door","door":"<door or 'the way out'>","state":"open"|"closed"|"locked"}
   {"kind":"at","place":"<room or thing>"}
 Use the names from the lists for things and people exactly. Use "the way out" for the door that leaves the home unless a door is named. The person an end names is the one the WORDS name; when the words name a role and no name ("the customer", "the driver", "the caller"), write the role — never pick a name from the list the words do not point to. Do NOT write the walking, the unlocking or the opening as ends unless the words are about the door itself — the body does those on the way. A sentence meant for one night (a trigger, a "tonight") belongs INSIDE the routine it rides on, as an end at the right place (a tip is handed over when paying). Routines that are only a habit of attention with no hands ("I always notice…") are not routines: skip them. Fold a routine the words describe twice into one.
@@ -76,7 +78,8 @@ export async function deriveRoutines(characterId: string): Promise<RoutineDraft[
     let d: Record<string, unknown> = {};
     try { d = i.data ? JSON.parse(i.data) : {}; } catch { d = {}; }
     const line = [d.description, d.state, d.look].find((x) => typeof x === 'string' && x.trim()) as string | undefined;
-    return line ? `${i.name} — ${line.replace(/\s+/g, ' ').slice(0, 160)}` : i.name;
+    const made = isComposed(d as Parameters<typeof isComposed>[0]) ? ` (${partsInWords(partsOf(i.name, d as Parameters<typeof partsOf>[1]))})` : '';
+    return line ? `${i.name}${made} — ${line.replace(/\s+/g, ' ').slice(0, 160)}` : `${i.name}${made}`;
   };
   const held = ch.campaignId ? await prisma.campaignItem.findMany({ where: { campaignId: ch.campaignId, status: 'ACTIVE', holderId: characterId }, select: { name: true, data: true } }) : [];
   const owned = await prisma.entityRelationship.findMany({ where: { sourceId: characterId, relationshipType: 'owns' }, select: { targetId: true } }).catch(() => []);

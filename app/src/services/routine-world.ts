@@ -137,7 +137,15 @@ export async function routineWorldFor(campaignId: string, actorId: string, opts:
       return { id: w.id, name: w.name, roomId: rid, roomName: w.roomName, homeName: homeOf(rid), ...reachOf(w.route) };
     });
 
-    return { actor: { id: actor.id, name: actor.name, sex, roomId, roomName }, doors, things, people };
+    // Money in hand and payments made lately (Michael 2026-11-01): from the parts of what the actor carries, and the
+    // 'paid' entries on the rows' histories — so a routine's "pay the driver" end knows what is there and when it was met.
+    const { tenderOnHand, recentPayments } = await import('./parts');
+    const cash = (await tenderOnHand(campaignId, actorId)).map((c) => ({ code: c.code, onHand: c.amount }));
+    const now = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }).catch(() => null))?.currentCycle ?? null;
+    const payments = (await recentPayments(campaignId, { from: actorId, ...(now != null ? { sinceCycle: now - 1 / 365.25 } : {}) }))
+      .map((p) => ({ to: p.to, amount: p.handed || p.amount, code: p.code || undefined, cycle: p.cycle }));
+
+    return { actor: { id: actor.id, name: actor.name, sex, roomId, roomName, ...(cash.length ? { cash } : {}) }, doors, things, people, payments, now };
   } catch (err) {
     console.warn('[routine-world] unreadable (non-fatal):', err instanceof Error ? err.message : err);
     return null;

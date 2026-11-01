@@ -274,8 +274,9 @@ Campaign-level item entity. Represents weapons, armor, artifacts, prima materia,
 - `campaignId`: String — which campaign
 - `name`: String — item name
 - `type`: String — `weapon` | `armor` | `accessory` | `consumable` | `tool` | `artifact` | `prima_materia` | `misc`
-- `data`: JSON — `GrowthWorldItem` (see `types/item.ts`)
-- `holderId`: String (optional) — characterId of current holder
+- `data`: JSON — `GrowthWorldItem` (see `types/item.ts`). 2026-11-01 OBJECT PERMANENCE: `parts: ItemPart[]` = what the thing is MADE OF by kind and count (`{name, count, bound?, each?: {tender?, weightLbs?, value?, primaryMaterial?, parts?}}`, recursively down to raw materials); `tender: {currencyId, code, faceValue}` = the thing's face as money, apart from its KV. Money is a thing whose parts are bills/coins (never `quantity`). `quantity` is legacy — read as parts of itself.
+- `history`: JSON `[{kind, at, text, ...}]` — the object's ledger. Kinds: `origin`, `split`, `emptied`, `paid` (`{from, to, amount, handed, currencyId, code, cycle?}` — on the payer's rows and the new row in the receiver's hands; `services/parts.recentPayments` reads them back).
+- `holderId`: String (optional) — characterId of current holder. A thing placed INSIDE a carried container carries its holder (2026-11-01).
 - `locationId`: String (optional) — locationId where item resides
 - `status`: String — `ACTIVE` | `DESTROYED` | `CONSUMED` | `LOST`
 - `createdBy`: String — userId of creator (GM)

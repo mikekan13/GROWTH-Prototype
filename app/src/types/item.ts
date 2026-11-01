@@ -28,8 +28,52 @@ export interface ItemAbility {
   grantsSenses?: SenseGrantSpec[];
 }
 
+/**
+ * LEGAL TENDER (Michael 2026-11-01): what a thing is worth as MONEY — its face in a campaign Currency — apart from its
+ * KV (a dollar's KV is paper and ink; it works because people believe in it). A bill, a coin, a token.
+ */
+export interface Tender {
+  currencyId: string;
+  /** Denormalized for display ("USD"). */
+  code: string;
+  faceValue: number;
+}
+
+/**
+ * ONE KIND OF PART OF A THING (Michael 2026-11-01, object permanence): "almost any item is what I'm describing, we just
+ * need to keep track of things better. Kristopher's prayer rope should be composed of what makes it: a rope braided into
+ * a certain amount of beads with additional plastic beads (3 blue ones). Eventually you get to the raw materials." A wad
+ * of cash is made of bills; a bundle of arrows of arrows; a stack of wood of logs. `each` is what is true of every part
+ * of this kind — down to its own parts and materials. `bound` parts are made INTO the thing (the beads braided in) and
+ * come off only by unmaking it; loose parts (the bills in a wad) come out whenever a hand takes one.
+ */
+export interface ItemPart {
+  name: string;
+  count: number;
+  /** Made into the whole (braided, sewn, nailed): not taken out without unmaking. Default: loose. */
+  bound?: boolean;
+  each?: {
+    tender?: Tender;
+    weightLbs?: number;
+    /** KV of one. */
+    value?: number;
+    description?: string;
+    primaryMaterial?: string;
+    /** Its own parts, down to raw materials. */
+    parts?: ItemPart[];
+  };
+}
+
 export interface GrowthWorldItem {
   description: string;
+  /** This one thing is money: its face (a twenty-dollar bill). See Tender. */
+  tender?: Tender;
+  /**
+   * What the thing is MADE OF (lib/parts), by kind and count: the bills in a wad, the arrows in a bundle, the cord and the
+   * beads of a prayer rope — recursively, down to raw materials. Loose parts can be taken out (a split makes a new item
+   * for what left); bound parts come off only by unmaking the thing.
+   */
+  parts?: ItemPart[];
   /** Senses this item / body part grants its holder or body (types/growth SenseGrantSpec), scaled by its condition. */
   grantsSenses?: SenseGrantSpec[];
 

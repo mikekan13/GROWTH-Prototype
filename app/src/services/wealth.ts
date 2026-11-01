@@ -104,6 +104,8 @@ export async function setIncome(campaignId: string, actor: { id: string; role: s
 
 export interface WealthView {
   holdings: Array<GrowthWealthHolding & { line: string; krma: number }>;
+  /** Money in hand — the bills among the parts of what she carries (services/parts), never on the ledger twice. */
+  onHand: Array<{ code: string; amount: number; line: string }>;
   income: Array<{ currencyId: string; code: string; amountPerYear: number; source: string; line: string }>;
   totalKrma: number;
 }
@@ -123,5 +125,7 @@ export async function readWealth(characterId: string, actor: { id: string; role:
     const cur = byId.get(l.currencyId);
     return { ...l, line: `${cur ? formatUnits(l.amountPerYear, cur) : `${l.amountPerYear} ${l.code}`}/yr — ${l.source}` };
   });
-  return { holdings, income, totalKrma: holdings.reduce((a, h) => a + h.krma, 0) };
+  const { tenderOnHand } = await import('./parts');
+  const onHand = c.campaignId ? (await tenderOnHand(c.campaignId, characterId)).map(t => ({ code: t.code, amount: t.amount, line: `${formatUnits(t.amount, t)} in hand — ${t.items.map(i => `${i.name}: ${i.words}`).join('; ')}` })) : [];
+  return { holdings, onHand, income, totalKrma: holdings.reduce((a, h) => a + h.krma, 0) };
 }

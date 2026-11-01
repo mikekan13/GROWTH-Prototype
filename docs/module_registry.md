@@ -3,6 +3,17 @@
 Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all components inventoried)
 
 
+## Parts — what a thing is made of (object permanence, 2026-11-01)
+
+- `src/lib/parts.ts` — PURE. `partsOf(name, data)` (the `parts` list; a lone `tender` thing; a legacy `quantity`; else one of itself), `isComposed`, `looseParts` (not `bound`), `partCount`, `tenderTotal(ms, currencyId?)`, `tenderCurrencies`, `partsInWords` ("a twenty and a five ($25)", "20 arrows"), `pickTender(ms, amount, currencyId?)` (bounded knapsack: least over, fewest pieces; loose tender only), `takeParts` (throws on a bound part unless `unmake`), `addParts`, `dataForParts` (many → `parts`, one piece → `tender`; weight/KV summed; stale quantity/state dropped), `nameForParts`, `billOf`.
+- `src/services/parts.ts` — the rows: `splitOff(campaignId, itemId, picks, dest)` (new row for what left; source keeps the rest or is CONSUMED), `payFromHand(campaignId, from, to, amount, {currency?, because, cycle?})` (picks across every money row the payer carries → ONE new row in the receiver's hands; `history[]` gets `{kind:'paid', from, to, amount, handed, currencyId, code, cycle}` on both sides), `tenderOnHand(campaignId, characterId)`, `recentPayments(campaignId, {from?, to?, sinceCycle?})`, `moneyFormatter`.
+- `src/services/world-apply.ts` — `{op:'pay', to, amount, currency?}`: reach-checked like `give`, then `payFromHand`; refused with what the actor has when short.
+- `src/daya/routines.ts` — `RoutineEnd {kind:'paid', to, amount, currency?}`; `RoutineWorld.actor.cash[]`, `payments[]`, `now`; `PAYMENT_FRESH_CYCLES` (a day); order hold → paid → gave → at → door shut.
+- `src/services/routine-world.ts` — cash in hand (`tenderOnHand`) and the day's payments (`recentPayments`) ride into the world. `src/services/routine-derive.ts` — the `paid` end in the vocabulary; composed things described with their parts.
+- `src/daya/prompts/roles/adjudicator.ts` — `pay` in the effects schema + rule 0 (money is an amount, never a give of "the cash"); `src/daya/hand-over.ts` — `statesPayment`, `PAYMENT_NUDGE`; `src/daya/facts-for-actor.ts` — `splitHeld` names a composed thing's parts in "Carrying".
+- `src/services/life-goods.ts` / `src/ai/copilot/tools/stock-goods.ts` — a good may carry `parts[{name, count, faceValue?, weightLbs?, bound?, primaryMaterial?}]` + `currency`; money parts get `tender` from the campaign Currency.
+- `src/services/placement.ts` — `Place.holderId`; `placeItem` into a CARRIED container keeps the container's holder. `src/services/wealth.ts` — `WealthView.onHand`. `src/components/canvas/folder-tooltips.ts` — one line (Cash: $25 / Pieces: 20), the breakdown one hover in. `src/daya/ensemble.ts` — a receipt that reads PAID is settled.
+
 ## Living a stretch — time walks, every crystallized character lives it (2026-10-31)
 
 - `src/daya/stretch.ts` — PURE. Quarters of the local day (night 0–.25, morning, afternoon, evening — the intention grammar's own fractions); `grainFor(seconds)` (quarters ≤ 4 d, days ≤ 31 d, weeks beyond); `windowsFor(start, end, grain)` tiles the span; `usualQuarterOf(routine)` READS a cadence routine's hour from its source sentences (`quarterInWords`) or the quarter of its last run — null = the clock never fires it; `routinesDueIn(window, routines)` (+ `fireCycleIn`); `accountWindowIndex`; `endsNeedingAnothersHands` (an hour-called routine may not take from another's hands); `actsInProse` / `pastTense` / `dayParagraph` build the record from the acts with no model; `StretchDirective` (player | gm). Tests: `stretch.test.ts` (22).
@@ -13,6 +24,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 - `src/services/routine-run.ts` — `planRoutine` (shared), `callUpRoutine` (the hour), `replanRoutine`, `setDownRoutine`; `DueRoutine.why` adds `'clock'`; a followed step returns `sounds`.
 - `src/services/being-movement.ts` — ELSEWHERE: `leaveMap` (walk to the nearest exit opening), `arriveOnMap` (appear at the way on nearest the target, filed in the room it opens onto), `locationPointOn`. `spatial-world.ts`: `clearBeingPoint`, `exitPortals` (openings whose far side is no drawn room). `world-apply.ts` move: an undrawn Location = leave + file + clear; a drawn home from outside = its own door; an actor nowhere on the map arrives first; `soundSite` accepts a DOOR (`rooms` on both sides).
 - Schema: `DayaIntention.authority` self | player | gm (migration `20261031070000_daya_intention_authority`).
+- 2026-11-01 (first run fixes): `accountWindowIndex` = the LAST awake window of the day; `StretchDirective.when` `'during' | 'end'` (an end state is due in the last awake window only; `advance_clock` exposes it); `liveStretch` REFUSES a second stretch while one is in flight (was queued); a `jewl_working` tick per window ("living about 2 days — the evening, day 1 of 3 (1/9)"); `endsNeedingAnothersHands` once per thing.
 
 ## HW12 fix pass (2026-10-31)
 

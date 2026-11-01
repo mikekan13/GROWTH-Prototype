@@ -21,3 +21,18 @@ export function statesHandOver(text: string): boolean {
 /** The line added to a narrated ask when the first answer named no effects for a hand-over. */
 export const HAND_OVER_NUDGE =
   'The sentence states that something changed hands. Name that as an effect — {"op":"give","item":<the carried thing it means, by its listed name>,"to":<the person it goes to, by name>} — unless the thing is not carried by the actor, in which case say why in "outcome" and leave "effects": [].';
+
+// ── Money (Michael 2026-11-01): a payment is an AMOUNT, never a give of "the cash" ──────────────────────────────────
+const PAYS = /\b(pays?|paid|paying|tips?|tipped|settles? up|hands? (?:over )?(?:the )?(?:money|cash|change|bills?|a (?:twenty|ten|five|fifty|hundred)|\$\s?\d))/i;
+const AMOUNT = /\$\s?\d+(?:\.\d{1,2})?|\b\d+(?:\.\d{1,2})?\s*(?:dollars?|bucks|euros?|pounds?)\b|\b(?:twenty|ten|five|fifty|hundred)(?:-dollar)?\b/i;
+
+/** True when the sentence states money passing to someone (a pay/tip verb with a receiver or an amount). */
+export function statesPayment(text: string): boolean {
+  const t = text.trim();
+  if (!PAYS.test(t)) return false;
+  return RECEIVER.test(t) || AMOUNT.test(t);
+}
+
+/** The line added when a narrated payment came back with no effects. */
+export const PAYMENT_NUDGE =
+  'The sentence states that MONEY changed hands. Name that as an effect — {"op":"pay","to":<the person paid, by name>,"amount":<the number the words or the receipt name>} — never a "give" of "the cash": the engine picks the bills out of what the actor carries. If the actor carries no money, say so in "outcome" and leave "effects": [].';

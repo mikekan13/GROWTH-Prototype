@@ -40,6 +40,8 @@ export type ActEffect =
   | { op: 'take'; item: string }
   | { op: 'give'; item: string; to: string }
   | { op: 'put'; item: string; into: string }
+  /** Money changes hands (Michael 2026-11-01): the AMOUNT; the engine picks the bills from what the actor carries (services/parts). */
+  | { op: 'pay'; to: string; amount: number; currency?: string }
   | { op: 'move'; to: string }
   /** A sound the act causes somewhere other than the actor: a called phone rings where IT is, a thrown thing lands. */
   | { op: 'sound'; at: string; text: string };
@@ -447,6 +449,22 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           await itemChanged(campaignId, item.id);
           break;
         }
+        case 'pay': {
+          // MONEY IS PARTS OF A THING (Michael 2026-11-01): the bills come out of what the actor carries — fewest pieces, least
+          // over — and land as ONE new thing in the receiver's hands, the payment on its history. Never a give of "the cash".
+          const people = await prisma.character.findMany({ where: { campaignId, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { id: true, name: true } });
+          const to = people.find((p) => p.id === e.to) ?? people.find((p) => p.name.toLowerCase() === e.to.trim().toLowerCase()) ?? people.find((p) => e.to.toLowerCase().includes(p.name.toLowerCase()));
+          if (!to) { report.refused.push(`pay "${e.to}": no one by that name here`); break; }
+          const toRel = await prisma.entityRelationship.findFirst({ where: { sourceId: to.id, relationshipType: REL }, select: { targetId: true } });
+          if (map && toRel && toRel.targetId !== map.roomId && !(await withinReachThroughOpenWay(campaignId, map, toRel.targetId))) { report.refused.push(`pay ${to.name}: not within reach from ${map.roomName}`); break; }
+          const { payFromHand } = await import('./parts');
+          const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? null;
+          const r = await payFromHand(campaignId, { id: actor.id, name: actor.name }, { id: to.id, name: to.name, locationId: toRel?.targetId ?? null }, e.amount, { currency: e.currency, because: actText?.trim() || `paid ${to.name}`, cycle });
+          if (!r.ok) { report.refused.push(`pay ${to.name} ${e.amount}${e.currency ? ` ${e.currency}` : ''}: ${r.reason}`); break; }
+          report.applied.push(`${actor.name} hands ${r.words} to ${to.name}${r.over > 0.004 ? ` — ${r.overWords} over the ${e.amount}` : ''}`);
+          for (const id of [r.itemId, ...r.sourceIds]) await itemChanged(campaignId, id);
+          break;
+        }
         case 'move': {
           // The being WALKS (2026-10-27): the target is a room, a door, a person or a thing; the way is
           // found on the real map, closed doors open on the way, a locked one stops the walk at the door.
@@ -554,6 +572,13 @@ export function parseActEffects(raw: unknown): ActEffect[] {
       case 'take': { const item = s(r.item); if (item) out.push({ op: 'take', item }); break; }
       case 'give': { const item = s(r.item); const to = s(r.to); if (item && to) out.push({ op: 'give', item, to }); break; }
       case 'put': { const item = s(r.item); const into = s(r.into); if (item && into) out.push({ op: 'put', item, into }); break; }
+      case 'pay': {
+        const to = s(r.to);
+        const amount = typeof r.amount === 'number' ? r.amount : Number(String(r.amount ?? '').replace(/[^0-9.]/g, ''));
+        const currency = s(r.currency) ?? undefined;
+        if (to && Number.isFinite(amount) && amount > 0) out.push({ op: 'pay', to, amount: Math.round(amount * 100) / 100, ...(currency ? { currency } : {}) });
+        break;
+      }
       case 'move': { const to = s(r.to); if (to) out.push({ op: 'move', to }); break; }
       case 'sound': { const at = s(r.at); const text = s(r.text); if (at && text) out.push({ op: 'sound', at, text: text.slice(0, 240) }); break; }
       default: break;

@@ -428,6 +428,8 @@ async function beatFacts(ctx: EntityContext, cue: string, heldNames: string[] = 
         try { d = it.data ? JSON.parse(it.data) : {}; } catch { d = {}; }
         const text = [d.description, d.text, d.state].filter((x) => typeof x === 'string').join(' ');
         if (!DUE_RE.test(text)) continue;
+        // Settled (2026-11-01): a receipt that says PAID no longer says anything is due, whatever else it says ("cash on delivery").
+        if (/paid/i.test(text) && !/(?:not paid|unpaid)/i.test(text)) continue;
         if (it.holderId === ctx.characterId) money.push(`The ${it.name.replace(/^the\s+/i, '')} in your hand says the amount is still due: YOU are the one collecting it — the money comes to you, you pay nothing here.`);
         else {
           const holder = it.holderId ? (await prisma.character.findUnique({ where: { id: it.holderId }, select: { name: true } }).catch(() => null))?.name ?? null : null;

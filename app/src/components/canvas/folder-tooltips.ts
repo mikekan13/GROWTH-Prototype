@@ -6,6 +6,8 @@
  * Rows with value 0 are INFO rows (no number shown). A row's `source` is the
  * inception layer: hover/tap it and a second tooltip opens with the detail.
  */
+import { isComposed, partsOf, partCount, tenderCurrencies, tenderTotal } from '@/lib/parts';
+import type { ItemPart, Tender } from '@/types/item';
 import type { CanvasFolder } from '@/types/canvas';
 import type { GrowthCharacter, GrowthAttribute } from '@/types/growth';
 import type { GrowthWorldItem } from '@/types/item';
@@ -249,6 +251,19 @@ export function itemTokenTooltip(it: TooltipItem): TooltipModel {
   const typeLabel = titleCase(it.type || 'misc');
   m.push(info(`Type: ${typeLabel}${d.rarity != null ? ` · ${getRarityLabel(d.rarity)}` : ''}${d.quality != null ? ` · Q${d.quality}` : ''}`));
   if (d.condition != null) m.push(info(`Condition: ${getConditionLabel(d.condition)}`));
+  // WHAT IT IS MADE OF (Michael 2026-11-01) — one short line for the player (the money, or how many pieces); the breakdown
+  // is one hover in. "The user doesn't need to see all this in great detail… the mechanics, the things that have big pull."
+  const dd = d as { parts?: ItemPart[]; tender?: Tender; quantity?: number };
+  if (isComposed(dd) || dd.tender) {
+    const parts = partsOf(it.name, dd);
+    const cash = [...tenderCurrencies(parts)].map(([id, code]) => money(tenderTotal(parts, id), code));
+    const n = partCount(parts);
+    const head = cash.length ? `Cash: ${cash.join(', ')}` : `Pieces: ${n}`;
+    m.push(info(head, {
+      name: it.name, type: cash.length ? 'money' : 'parts',
+      description: parts.map(p => `• ${p.count} × ${p.name}${p.each?.tender ? ` (${money(p.each.tender.faceValue, p.each.tender.code)} each)` : ''}${p.bound ? ' · bound' : ''}`).join('\n'),
+    }));
+  }
   const material = d.primaryMaterial || d.material;
   const props = d.properties ?? d.weaponProperties ?? d.materialModifiers ?? [];
   if (material || props.length > 0) {
@@ -309,6 +324,12 @@ export function itemTokenTooltip(it: TooltipItem): TooltipModel {
     hideTotal: d.value == null,
   };
 }
+
+const money = (amount: number, code: string): string => {
+  const n = Math.round(amount * 100) / 100;
+  const sym: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥' };
+  return sym[code.toUpperCase()] ? `${sym[code.toUpperCase()]}${n}` : `${n} ${code}`;
+};
 
 /** The dETAILS strip: the full description a hover away, GM notes one layer in. */
 export function detailsTooltip(li: LocationInfo): TooltipModel {

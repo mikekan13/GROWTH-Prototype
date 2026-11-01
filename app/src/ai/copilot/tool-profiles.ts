@@ -31,6 +31,7 @@ export const TABLE_CHAT_TOOLS: readonly string[] = [
   'forget',
   'read_actors_state',
   'advance_clock',
+  'compose_item',
   'apply_attribute_damage',
   'apply_condition',
   'set_attribute_current',

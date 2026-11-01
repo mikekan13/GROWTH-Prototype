@@ -1,0 +1,53 @@
+{
+  "reason": "duplicate advance_clock queued by a resend 2026-11-01T00:47Z; killed after window 1; these rows were its only writes",
+  "memories": [
+    {
+      "id": "cmvx4cd56009ag848ddfjx2k8",
+      "entityId": "cmv57ezn2000lds4859pxeux4",
+      "narrativeCycle": 0.007730377980720446,
+      "realTime": "2026-11-01T00:55:41.706Z",
+      "source": "perception",
+      "content": "The dashboard clock reads ten, and the engine’s idle is a low, heavy thing that vibrates up through the seat. Two days have bled into this single evening, leaving the silence in the car thick and still. I reach for the phone, the weight of it sudden and cold in my hand.",
+      "valence": -0.45,
+      "arousal": 0.38,
+      "salience": 0.7642400000000001,
+      "entityRefs": "[]",
+      "classification": "{\"contentCategory\":\"perception\",\"sensitivity\":\"sensitive\",\"icOoc\":\"IC\",\"rationaleTag\":\"strong-feeling\",\"mirror\":{\"fidelityLevel\":4,\"distortions\":[\"moodTilt:pessimistic\",\"denial:+0.65→dampened\",\"catastrophize:+0.25→amplified\",\"scene:kept=2/2\"],\"locationId\":\"cmvahhpg00001ss48yarg3fbg\",\"truthLines\":1,\"truthChars\":232,\"observer\":{\"mood\":{\"morale\":-0.13005137433935618,\"stress\":1,\"grief\":0.6796699244294784},\"attunement\":0.8},\"standing\":\"new\"},\"labileUntilNextDream\":true}",
+      "clusterId": null,
+      "parentMemoryId": null,
+      "truthRef": null,
+      "pillar": null,
+      "domain": null,
+      "domains": "[]",
+      "chain": "{\"truthRefs\":[],\"entities\":[],\"items\":[],\"locationId\":null,\"goalIds\":[],\"antecedentId\":\"cmvx4blx3008eg848ryjcebez\"}",
+      "noticed": true,
+      "perceivedVia": "[]",
+      "visibleForm": null,
+      "firstVisibleForm": null
+    },
+    {
+      "id": "cmvx4cqwi009lg848ryl74mdp",
+      "entityId": "cmvccodq2001tyc486jp89cwk",
+      "narrativeCycle": 0.007730377980720446,
+      "realTime": "2026-11-01T00:55:59.538Z",
+      "source": "adjudication",
+      "content": "The phone is warm against your palm, the parking lot quiet around you. The Chess Pizza smell clings to your collar. You press call.",
+      "valence": 0.1,
+      "arousal": 0.55,
+      "salience": 0.427,
+      "entityRefs": "[]",
+      "classification": "{\"contentCategory\":\"perception\",\"sensitivity\":\"safe\",\"icOoc\":\"IC\",\"rationaleTag\":\"routine\"}",
+      "clusterId": null,
+      "parentMemoryId": null,
+      "truthRef": null,
+      "pillar": null,
+      "domain": null,
+      "domains": "[]",
+      "chain": "{\"truthRefs\":[],\"entities\":[],\"items\":[],\"locationId\":null,\"goalIds\":[],\"antecedentId\":\"cmvx4bxd3008wg84852a9bkol\"}",
+      "noticed": true,
+      "perceivedVia": "[]",
+      "visibleForm": null,
+      "firstVisibleForm": null
+    }
+  ]
+}

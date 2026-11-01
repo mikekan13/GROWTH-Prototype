@@ -23,6 +23,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { NotFoundError } from '@/lib/errors';
 import { createCampaignItem } from './campaign-item';
+import { findCurrency, listCurrencies } from './currency';
 import { DEED_RELATIONSHIP } from './genesis-possessions';
 import { itemKvOf, kvMirror, roundKv, WARDROBE_KIT_RE } from '@/lib/item-kv';
 
@@ -44,6 +45,15 @@ export const goodSchema = z.object({
   state: z.string().max(160).optional().describe('Present-tense state ("half full", "expires Thursday", "folded").'),
   story: z.string().max(300).optional().describe('One line, only when it has one. Most goods do not.'),
   worn: z.boolean().optional().describe('She has it on right now (sets it as carried + equipped later at dress time).'),
+  parts: z.array(z.object({
+    name: z.string().min(1).max(80).describe('One kind of part, singular: "twenty-dollar bill", "arrow", "split log", "blue plastic bead".'),
+    count: z.number().int().min(1).max(10000),
+    faceValue: z.number().min(0).optional().describe('MONEY ONLY: the face of ONE in `currency` (20 for a twenty).'),
+    weightLbs: z.number().min(0).optional().describe('Pounds for ONE part.'),
+    bound: z.boolean().optional().describe('Made INTO the thing (braided, sewn, nailed) — comes off only by unmaking it. Default loose: a hand can take one out.'),
+    primaryMaterial: z.string().max(60).optional(),
+  })).max(24).optional().describe('WHAT IT IS MADE OF, by kind and count (object permanence). A wad of cash: [{name:"twenty-dollar bill",count:2,faceValue:20},{name:"five-dollar bill",count:1,faceValue:5}]. A bundle of arrows: [{name:"arrow",count:20}]. A prayer rope: a knotted cord (bound) and three blue beads (bound). MONEY IS ALWAYS a thing whose parts are bills/coins with faceValue — never a consumable with qty, never a "state" that lists the bills in prose.'),
+  currency: z.string().max(12).optional().describe("Currency code for faceValue (default: the campaign's only active currency)."),
 });
 export type Good = z.infer<typeof goodSchema>;
 
@@ -192,11 +202,27 @@ export async function placeGoods(campaignId: string, actor: { id: string; role: 
         for (const w of fit.warnings) if (warnings.length < 20 && !warnings.includes(w)) warnings.push(w);
       }
       const locationId = place.kind === 'location' ? place.id : (place.locationId ?? await enclosingLocationId(place.id));
+      // WHAT IT IS MADE OF (Michael 2026-11-01): parts by kind and count; money parts carry their face in a campaign currency.
+      let parts: Array<Record<string, unknown>> | null = null;
+      if (g.parts?.length) {
+        const needsCurrency = g.parts.some((pt) => pt.faceValue != null);
+        const cur = needsCurrency ? (g.currency ? await findCurrency(campaignId, g.currency) : (await listCurrencies(campaignId))[0] ?? null) : null;
+        if (needsCurrency && !cur) { res.failed.push({ archetype: g.archetype, reason: `no currency${g.currency ? ` "${g.currency}"` : ''} for the faces of ${name} — establish one first` }); continue; }
+        parts = g.parts.map((pt) => ({
+          name: pt.name.trim(), count: pt.count, ...(pt.bound ? { bound: true } : {}),
+          each: {
+            ...(pt.faceValue != null && cur ? { tender: { currencyId: cur.id, code: cur.code, faceValue: pt.faceValue } } : {}),
+            ...(pt.weightLbs != null ? { weightLbs: pt.weightLbs } : {}),
+            ...(pt.primaryMaterial ? { primaryMaterial: pt.primaryMaterial } : {}),
+          },
+        }));
+      }
       const item = await createCampaignItem(campaignId, actor.id, actor.role, {
         name,
         type: (g.itemType ?? (arch.data.itemType as typeof ITEM_TYPES[number]) ?? 'misc'),
         data: {
-          ...arch.data, condition: g.condition ?? 3, ...(g.qty ? { quantity: g.qty } : {}), ...(g.state ? { state: g.state } : {}),
+          ...arch.data, condition: g.condition ?? 3, ...(g.qty && !parts ? { quantity: g.qty } : {}), ...(g.state ? { state: g.state } : {}),
+          ...(parts ? { parts } : {}),
           weightLbs: g.weightLbs, ...(volumeCuFt != null ? { volumeCuFt } : {}), ...(opts.extraData ?? {}),
         },
         holderId: g.worn ? opts.ownerId : null,
