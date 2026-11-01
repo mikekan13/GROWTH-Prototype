@@ -76,6 +76,23 @@ describe('stockGoods', () => {
   });
 });
 
+describe('instance description (2026-11-01)', () => {
+  const stock = async (story?: string) => {
+    db.forgeItem.findFirst.mockResolvedValue({ id: 'a1', name: 'Car', data: JSON.stringify({ description: "The world's default car." }), status: 'published' });
+    await stockGoods('c1', { id: 'jewl', role: 'GODHEAD' }, {
+      characterId: 'v',
+      goods: [{ archetype: 'Car', localName: "Kristopher's car", into: 'Kitchenette', weightLbs: 150, primaryMaterial: 'Steel', ...(story ? { story } : {}) }],
+    });
+    return createItem.mock.calls[0][3].data.description;
+  };
+  it('pulled with a story: the instance description is the story, not the catalogue blurb', async () => {
+    expect(await stock('Rust-streaked, bought the week he moved.')).toBe('Rust-streaked, bought the week he moved.');
+  });
+  it('pulled without a story: the archetype description is kept', async () => {
+    expect(await stock()).toBe("The world's default car.");
+  });
+});
+
 describe('lifeCoverage', () => {
   it('names every gap; a stocked home reads clean', () => {
     const line = coverageLine(lifeCoverage(['Cotton T-Shirt', 'Toothbrush', 'Dry Spaghetti']));

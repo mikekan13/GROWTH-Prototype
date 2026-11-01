@@ -183,6 +183,8 @@ export async function grantPossession(
     condition: 3,
     tags: [],
     ...forgeData,
+    // The instance's description is its OWN text (the story); the catalogue blurb stays on the archetype.
+    ...(p.story?.trim() ? { description: p.story.trim() } : {}),
     ...(weightLbs != null ? { weightLbs } : {}),
     ...(equippedTo ? { equippedTo, equipped: true } : {}),
     ...(p.look ? { look: p.look } : {}),

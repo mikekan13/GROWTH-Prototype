@@ -52,6 +52,15 @@ describe('catalog first: pull stock + paint the instance', () => {
     expect(db.entityRelationship.create).not.toHaveBeenCalled(); // carried = held, not a deed
   });
 
+  it('the painted instance describes itself with the story; the catalogue blurb stays on the archetype', async () => {
+    db.forgeItem.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'stock1' });
+    pull.mockResolvedValue({ id: 'copy1' });
+    db.forgeItem.findUnique.mockResolvedValue(KNIFE);
+    await grantPossession('c1', ACTOR, { characterId: 'v', item: 'Silver Butter Knife', tier: 'carried', story: 'Her grandmother\'s, from the drawer.' });
+    expect(createItem.mock.calls[0][3].data.description).toBe('Her grandmother\'s, from the drawer.');
+    expect(KNIFE.data).toContain('A silver butter knife.');
+  });
+
   it('a thing no archetype fits goes to the Forge as an archetype — never invented here', async () => {
     db.forgeItem.findFirst.mockResolvedValue(null);
     const r = await grantPossession('c1', ACTOR, { characterId: 'v', item: 'Rosemary\'s Lamp', tier: 'owned', story: 's' });

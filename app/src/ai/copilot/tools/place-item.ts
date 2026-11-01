@@ -137,7 +137,10 @@ export const placeItemTool: JewlTool = {
       weightLevel: parsed.weightLevel ?? 1,
       tags: parsed.tags ?? [],
       ...forgeData,
-      ...(parsed.description ? { description: parsed.description } : {}),
+      // Explicit description wins; else the story is the instance's own text (never the archetype blurb).
+      ...(parsed.description
+        ? { description: parsed.description }
+        : parsed.story?.trim() ? { description: parsed.story.trim() } : {}),
     };
 
     // Service owns the GM/ADMIN gate.

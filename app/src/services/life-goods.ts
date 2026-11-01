@@ -253,7 +253,7 @@ export async function placeGoods(campaignId: string, actor: { id: string; role: 
         name,
         type: (g.itemType ?? (arch.data.itemType as typeof ITEM_TYPES[number]) ?? 'misc'),
         data: {
-          ...arch.data, condition: g.condition ?? 3, ...(g.qty && !parts ? { quantity: g.qty } : {}), ...(g.state ? { state: g.state } : {}),
+          ...arch.data, ...(g.story?.trim() ? { description: g.story.trim() } : {}), condition: g.condition ?? 3, ...(g.qty && !parts ? { quantity: g.qty } : {}), ...(g.state ? { state: g.state } : {}),
           ...(parts ? { parts } : {}),
           weightLbs: g.weightLbs, ...(volumeCuFt != null ? { volumeCuFt } : {}), ...(opts.extraData ?? {}),
         },
