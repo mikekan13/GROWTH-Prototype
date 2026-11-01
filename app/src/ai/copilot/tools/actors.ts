@@ -13,6 +13,7 @@
  * CampaignEvent attributed to the NPC. Same gates as npc_speak.
  */
 
+import { isComposed, partsOf, partsInWords } from '@/lib/parts';
 import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
@@ -46,6 +47,10 @@ interface ActorSnapshot {
   frequency: { current: number; max: number } | null;
   conditions: string[];
   aiActionMode: boolean | null;
+  /** The place by name (2026-11-01: an id told JEWL nothing). */
+  locationName?: string | null;
+  /** What the actor holds, by local name — composed things with their parts in words ("Till cash (three twenties…)"). */
+  holds?: string[];
 }
 
 export const readActorsStateTool: JewlTool = {
@@ -106,6 +111,19 @@ export const readActorsStateTool: JewlTool = {
     const locationByCharacter = new Map(
       locationEdges.map(e => [e.sourceId, e.targetId]),
     );
+    // WHAT THEY HOLD AND WHERE THAT IS (2026-11-01: JEWL reported "hands empty" with no read that lists hands).
+    const locRows = await prisma.location.findMany({ where: { id: { in: [...new Set(locationEdges.map(e => e.targetId))] } }, select: { id: true, name: true } });
+    const locName = new Map(locRows.map(l => [l.id, l.name]));
+    const heldRows = await prisma.campaignItem.findMany({ where: { campaignId: ctx.campaignId, status: 'ACTIVE', holderId: { in: characters.map(c => c.id) } }, select: { holderId: true, name: true, data: true } });
+    const holdsByCharacter = new Map<string, string[]>();
+    for (const r of heldRows) {
+      let d: Record<string, unknown> = {};
+      try { d = r.data ? JSON.parse(r.data) : {}; } catch { d = {}; }
+      const words = isComposed(d as Parameters<typeof isComposed>[0]) || (d as { tender?: unknown }).tender ? ` (${partsInWords(partsOf(r.name, d as Parameters<typeof partsOf>[1]))})` : '';
+      const list = holdsByCharacter.get(r.holderId!) ?? [];
+      list.push(`${r.name}${words}`);
+      holdsByCharacter.set(r.holderId!, list);
+    }
 
     const snapshots: ActorSnapshot[] = [];
     const skipped: Array<{ characterId: string; reason: string }> = [];
@@ -121,10 +139,15 @@ export const readActorsStateTool: JewlTool = {
         skipped.push({ characterId: id, reason: 'wrong campaign' });
         continue;
       }
-      snapshots.push(buildActorSnapshot(char, {
-        locationId: locationByCharacter.get(id) ?? null,
-        aiActionMode: aiModeByCharacter.has(id) ? aiModeByCharacter.get(id)! : null,
-      }));
+      const locId = locationByCharacter.get(id) ?? null;
+      snapshots.push({
+        ...buildActorSnapshot(char, {
+          locationId: locId,
+          aiActionMode: aiModeByCharacter.has(id) ? aiModeByCharacter.get(id)! : null,
+        }),
+        locationName: locId ? locName.get(locId) ?? null : null,
+        holds: holdsByCharacter.get(id) ?? [],
+      });
     }
 
     return {
