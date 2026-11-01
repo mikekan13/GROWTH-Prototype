@@ -24,6 +24,7 @@ import { prisma } from '@/lib/db';
 import { NotFoundError } from '@/lib/errors';
 import { createCampaignItem } from './campaign-item';
 import { findCurrency, listCurrencies } from './currency';
+import { partsOf, recipeAllows, partsFromRecipe } from '@/lib/parts';
 import { DEED_RELATIONSHIP } from './genesis-possessions';
 import { itemKvOf, kvMirror, roundKv, WARDROBE_KIT_RE } from '@/lib/item-kv';
 
@@ -78,7 +79,7 @@ export const MUNDANE_KV_CEILING = 1;
 
 type Arch = { id: string; data: Record<string, unknown>; karmicValue: bigint | null };
 
-async function findOrMakeArchetype(campaignId: string, g: Good, actorId: string): Promise<Arch | { error: string }> {
+async function findOrMakeArchetype(campaignId: string, g: Good, actorId: string, recipe: Record<string, unknown>[] | null = null): Promise<Arch | { error: string }> {
   const name = g.archetype.trim();
   const local = await prisma.forgeItem.findFirst({ where: { campaignId, type: 'item', name, status: { not: 'superseded' } }, select: { id: true, data: true, status: true, karmicValue: true } });
   if (local) {
@@ -113,6 +114,8 @@ async function findOrMakeArchetype(campaignId: string, g: Good, actorId: string)
     condition: 3,
     value,
     tags: ['mundane'],
+    // THE RECIPE IS THE ARCHETYPE'S (Michael 2026-11-01): what the kind of thing is made of, written when it is made.
+    ...(recipe?.length ? { parts: recipe } : {}),
   };
   const row = await prisma.forgeItem.create({
     data: { campaignId, type: 'item', name, data: JSON.stringify(data), status: 'published', createdBy: actorId, authorUserId: actorId, karmicValue: kvMirror(value), royaltyRate: 0 },
@@ -184,9 +187,32 @@ export async function placeGoods(campaignId: string, actor: { id: string; role: 
     try {
       const place = await resolvePlace(campaignId, g.into);
       if (!place) { res.failed.push({ archetype: g.archetype, reason: `no room or container "${g.into}"` }); continue; }
+      // WHAT IT IS MADE OF (Michael 2026-11-01): parts by kind and count; money parts carry their face in a campaign currency.
+      let parts: Array<Record<string, unknown>> | null = null;
+      if (g.parts?.length) {
+        const needsCurrency = g.parts.some((pt) => pt.faceValue != null);
+        const cur = needsCurrency ? (g.currency ? await findCurrency(campaignId, g.currency) : (await listCurrencies(campaignId))[0] ?? null) : null;
+        if (needsCurrency && !cur) { res.failed.push({ archetype: g.archetype, reason: `no currency${g.currency ? ` "${g.currency}"` : ''} for the faces of ${g.localName?.trim() || g.archetype} — establish one first` }); continue; }
+        parts = g.parts.map((pt) => ({
+          name: pt.name.trim(), count: pt.count, ...(pt.bound ? { bound: true } : {}),
+          each: {
+            ...(pt.faceValue != null && cur ? { tender: { currencyId: cur.id, code: cur.code, faceValue: pt.faceValue } } : {}),
+            ...(pt.weightLbs != null ? { weightLbs: pt.weightLbs } : {}),
+            ...(pt.primaryMaterial ? { primaryMaterial: pt.primaryMaterial } : {}),
+          },
+        }));
+      }
       const before = await prisma.forgeItem.count({ where: { campaignId, type: 'item' } });
-      const arch = await findOrMakeArchetype(campaignId, g, actor.id);
+      // The recipe on a NEW archetype: the good's kinds, loose kinds at count 1 (a wad holds any number of the bills it names).
+      const recipe = parts ? parts.map((pt) => ({ ...pt, count: pt.bound ? pt.count : 1 })) : null;
+      const arch = await findOrMakeArchetype(campaignId, g, actor.id, recipe);
       if ('error' in arch) { res.failed.push({ archetype: g.archetype, reason: arch.error }); continue; }
+      // THE RECIPE LAW: an existing archetype's recipe binds the instance.
+      if (parts && Array.isArray(arch.data.parts)) {
+        const verdict = recipeAllows(partsOf(g.archetype, arch.data as Parameters<typeof partsOf>[1]), partsOf(g.archetype, { parts } as unknown as Parameters<typeof partsOf>[1]));
+        if (!verdict.ok) { res.failed.push({ archetype: g.archetype, reason: verdict.reason }); continue; }
+        parts = partsFromRecipe(partsOf(g.archetype, arch.data as Parameters<typeof partsOf>[1]), partsOf(g.archetype, { parts } as unknown as Parameters<typeof partsOf>[1])) as unknown as Array<Record<string, unknown>>;
+      }
       if ((await prisma.forgeItem.count({ where: { campaignId, type: 'item' } })) > before) res.archetypesCreated++;
       const name = g.localName?.trim() || g.archetype.trim();
       const kv = goodKv(g, arch);
@@ -202,21 +228,6 @@ export async function placeGoods(campaignId: string, actor: { id: string; role: 
         for (const w of fit.warnings) if (warnings.length < 20 && !warnings.includes(w)) warnings.push(w);
       }
       const locationId = place.kind === 'location' ? place.id : (place.locationId ?? await enclosingLocationId(place.id));
-      // WHAT IT IS MADE OF (Michael 2026-11-01): parts by kind and count; money parts carry their face in a campaign currency.
-      let parts: Array<Record<string, unknown>> | null = null;
-      if (g.parts?.length) {
-        const needsCurrency = g.parts.some((pt) => pt.faceValue != null);
-        const cur = needsCurrency ? (g.currency ? await findCurrency(campaignId, g.currency) : (await listCurrencies(campaignId))[0] ?? null) : null;
-        if (needsCurrency && !cur) { res.failed.push({ archetype: g.archetype, reason: `no currency${g.currency ? ` "${g.currency}"` : ''} for the faces of ${name} — establish one first` }); continue; }
-        parts = g.parts.map((pt) => ({
-          name: pt.name.trim(), count: pt.count, ...(pt.bound ? { bound: true } : {}),
-          each: {
-            ...(pt.faceValue != null && cur ? { tender: { currencyId: cur.id, code: cur.code, faceValue: pt.faceValue } } : {}),
-            ...(pt.weightLbs != null ? { weightLbs: pt.weightLbs } : {}),
-            ...(pt.primaryMaterial ? { primaryMaterial: pt.primaryMaterial } : {}),
-          },
-        }));
-      }
       const item = await createCampaignItem(campaignId, actor.id, actor.role, {
         name,
         type: (g.itemType ?? (arch.data.itemType as typeof ITEM_TYPES[number]) ?? 'misc'),

@@ -32,7 +32,8 @@ export const composeItemTool: JewlTool = {
   description:
     'Tell an existing thing what it is MADE OF (object permanence): parts by kind and count. Money is its bills with faceValue ' +
     '(two twenty-dollar bills and a five) — never a quantity or a prose state; a bundle of arrows is 20 arrow parts; a prayer rope is ' +
-    'a knotted cord and its beads, `bound`. Only what the Watcher said. The player sees one short line; the parts are a hover away.',
+    "a knotted cord and its beads, `bound`. Only what the Watcher said. THE RECIPE IS THE ARCHETYPE'S: an instance may differ " +
+    'only in the count of loose parts and in paint; a change that would move its KV is another thing — forge it. The player sees one short line.',
   inputSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const p = inputSchema.parse(input);

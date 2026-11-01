@@ -11,6 +11,7 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import {
   partsOf, pickTender, takeParts, addParts, dataForParts, nameForParts, partsInWords, tenderTotal, tenderCurrencies,
+  recipeAllows, partsFromRecipe, derivedValue,
   type Parts, type MoneyFormatter,
 } from '@/lib/parts';
 import { formatUnits } from './currency';
@@ -208,9 +209,12 @@ export async function recentPayments(campaignId: string, q: { from?: string; to?
 export interface PartSpec { name: string; count: number; faceValue?: number; weightLbs?: number; value?: number; bound?: boolean; primaryMaterial?: string; description?: string }
 
 /**
- * Set (replace) what an existing thing is made of. Money parts take their face in the campaign currency (`currency` code,
- * or the only active one). A single part of count 1 with a face makes the thing itself tender. The row's own weight is
- * left as it is unless every part carries one. Returns the row's new parts in words.
+ * Set what an existing thing is made of — under THE RECIPE LAW (Michael 2026-11-01): the recipe is the archetype's (the
+ * Forge's); an instance may differ only in the count of loose parts and in paint. With an archetype that has a recipe,
+ * the parts must stay inside it or the call is refused ("another thing — forge it"). An archetype under 1 KV with no recipe
+ * yet takes this composition AS its recipe (the way stock_goods mints mundane archetypes on the spot); a forged archetype
+ * (1 KV or more) takes its recipe in the Forge, not here. A thing with no archetype (legacy rows) keeps its own parts.
+ * Money parts take their face in the campaign currency. KV derives from the parts when every part carries one.
  */
 export async function setParts(campaignId: string, itemRef: string, specs: PartSpec[], opts: { currency?: string; because?: string } = {}): Promise<{ id: string; name: string; words: string }> {
   const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', OR: [{ id: itemRef.trim() }, { name: itemRef.trim() }] } });
@@ -235,17 +239,37 @@ export async function setParts(campaignId: string, itemRef: string, specs: PartS
   }));
   if (!parts.length) throw new Error('no parts given');
   const data = parseData(row.data);
+  // THE RECIPE LAW: the archetype's recipe binds the instance.
+  let recipeNote = '';
+  const arch = row.sourceForgeItemId ? await prisma.forgeItem.findUnique({ where: { id: row.sourceForgeItemId }, select: { id: true, name: true, data: true, status: true } }).catch(() => null) : null;
+  let finalParts: Parts = parts;
+  if (arch) {
+    const archData = parseData(arch.data);
+    const recipe = Array.isArray(archData.parts) ? partsOf(arch.name, archData as Parameters<typeof partsOf>[1]) : null;
+    if (recipe) {
+      const verdict = recipeAllows(recipe, parts);
+      if (!verdict.ok) throw new Error(`"${row.name}" is a ${arch.name}: ${verdict.reason}`);
+      finalParts = partsFromRecipe(recipe, parts);
+    } else {
+      const archValue = typeof archData.value === 'number' ? archData.value : 0;
+      if (archValue >= 1) throw new Error(`"${arch.name}" is a forged thing (${archValue} KV) — its recipe is written in the Forge (propose_forge_blueprint), not on one instance`);
+      await prisma.forgeItem.update({ where: { id: arch.id }, data: { data: JSON.stringify({ ...archData, parts }) } });
+      recipeNote = ` — recipe written on the archetype "${arch.name}"`;
+    }
+  }
+  const dv = derivedValue(finalParts);
   const { quantity: _q, tender: _t, parts: _p, ...rest } = data as Record<string, unknown> & { quantity?: unknown; tender?: unknown; parts?: unknown };
   void _q; void _t; void _p;
   const next: Record<string, unknown> = { ...rest };
-  if (parts.length === 1 && parts[0].count === 1 && parts[0].each?.tender) next.tender = parts[0].each.tender;
-  else next.parts = parts;
-  const weights = parts.map((m) => (m.each?.weightLbs != null ? m.each.weightLbs * m.count : null));
+  if (finalParts.length === 1 && finalParts[0].count === 1 && finalParts[0].each?.tender) next.tender = finalParts[0].each.tender;
+  else next.parts = finalParts;
+  if (dv != null) next.value = dv;
+  const weights = finalParts.map((m) => (m.each?.weightLbs != null ? m.each.weightLbs * m.count : null));
   if (weights.every((w) => w != null)) next.weightLbs = Math.round((weights as number[]).reduce((a, w) => a + w, 0) * 10000) / 10000;
   const history = parseHistory(row.history);
   const fmt = await moneyFormatter(campaignId);
-  const words = partsInWords(parts, fmt);
-  history.push({ kind: 'composed', at: new Date().toISOString(), text: `made of ${words}${opts.because ? ` — ${opts.because}` : ''}` });
+  const words = partsInWords(finalParts, fmt);
+  history.push({ kind: 'composed', at: new Date().toISOString(), text: `made of ${words}${opts.because ? ` — ${opts.because}` : ''}${recipeNote}` });
   await prisma.campaignItem.update({ where: { id: row.id }, data: { data: JSON.stringify(next), history: JSON.stringify(history) } });
   return { id: row.id, name: row.name, words };
 }

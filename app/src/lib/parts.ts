@@ -232,3 +232,44 @@ export function nameForParts(ms: Parts): string {
 export function billOf(name: string, count: number, tender: Tender, each: Omit<NonNullable<ItemPart['each']>, 'tender'> = {}): ItemPart {
   return { name, count, each: { tender, ...each } };
 }
+
+// ── The recipe law (Michael 2026-11-01): an instance never strays from its archetype's KV ──────────────────────────
+// "An item can't stray from its KRMA value with these instantiated versions. Once they do they become something else" —
+// a new archetype through the Forge now, a truly unique item (one campaign at a time) once the game is live. So the
+// RECIPE (kinds, per-unit properties, bound or loose) is the archetype's; an instance may differ only in the COUNT of
+// loose parts (the bills in this wad) and in paint (these beads are blue). KV derives from the parts when they carry one.
+
+/** Does this instance's parts list stay inside the archetype's recipe? Pure. */
+export function recipeAllows(recipe: Parts, parts: Parts): { ok: true } | { ok: false; reason: string } {
+  const byName = new Map(recipe.map((r) => [r.name.toLowerCase(), r]));
+  for (const p of parts) {
+    const r = byName.get(p.name.toLowerCase());
+    if (!r) return { ok: false, reason: `"${p.name}" is not a part of this kind of thing — a thing made of other parts is another thing (forge it)` };
+    if (r.bound && p.count !== r.count) return { ok: false, reason: `${r.count} ${r.name} are made into it; ${p.count} would make it another thing (forge it)` };
+    const rt = r.each?.tender, pt = p.each?.tender;
+    if ((rt || pt) && JSON.stringify(rt ?? null) !== JSON.stringify(pt ?? null)) return { ok: false, reason: `"${p.name}" is not the money the recipe names` };
+  }
+  for (const r of recipe) if (r.bound && !parts.some((p) => p.name.toLowerCase() === r.name.toLowerCase())) return { ok: false, reason: `${r.name} is made into it and cannot be left out (forge it without)` };
+  return { ok: true };
+}
+
+/** The KV of a composed thing when every part carries one: Σ value × count; null when any part has none. Pure. */
+export function derivedValue(parts: Parts): number | null {
+  let sum = 0;
+  for (const p of parts) {
+    if (p.each?.value == null) return null;
+    sum += p.each.value * p.count;
+  }
+  return Math.round(sum * 10000) / 10000;
+}
+
+/** The instance's parts with the recipe's per-unit truths (each) laid under them — paint on top, mechanics from the archetype. */
+export function partsFromRecipe(recipe: Parts, parts: Parts): Parts {
+  const byName = new Map(recipe.map((r) => [r.name.toLowerCase(), r]));
+  return parts.map((p) => {
+    const r = byName.get(p.name.toLowerCase());
+    if (!r) return p;
+    const each = { ...(r.each ?? {}), ...(p.each?.description ? { description: p.each.description } : {}) };
+    return { name: r.name, count: p.count, ...(r.bound ? { bound: true } : {}), ...(Object.keys(each).length ? { each } : {}) };
+  });
+}

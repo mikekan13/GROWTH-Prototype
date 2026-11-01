@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { partsOf, isComposed, partCount, tenderTotal, partsInWords, pickTender, takeParts, addParts, dataForParts, nameForParts, billOf } from './parts';
+import { recipeAllows, derivedValue, partsFromRecipe, partsOf, isComposed, partCount, tenderTotal, partsInWords, pickTender, takeParts, addParts, dataForParts, nameForParts, billOf } from './parts';
 
 const USD = { currencyId: 'usd', code: 'USD' };
 const twenty = billOf('twenty-dollar bill', 2, { ...USD, faceValue: 20 }, { weightLbs: 0.002 });
@@ -100,5 +100,31 @@ describe('splitting and joining', () => {
     expect(nameForParts([{ ...five, count: 1 }])).toBe('five-dollar bill');
     expect(nameForParts([{ ...twenty, count: 1 }, five])).toBe('A twenty and a five');
     expect(nameForParts([{ name: 'arrow', count: 3 }])).toBe('Three arrows');
+  });
+});
+
+describe("the recipe law: an instance never strays from its archetype's KV", () => {
+  const ropeRecipe = [{ name: 'wool cord, knotted 100 times', count: 1, bound: true, each: { value: 0.08, primaryMaterial: 'Wool' } }, { name: 'blue plastic bead', count: 3, bound: true, each: { value: 0.005, primaryMaterial: 'Polymer' } }];
+  const wadRecipe = [twenty, five, one].map((b) => ({ ...b, count: 1, each: { ...b.each, value: 0 } }));
+  it('paint on a bound part is fine; another count or another part is another thing', () => {
+    expect(recipeAllows(ropeRecipe, [{ ...ropeRecipe[0] }, { ...ropeRecipe[1], each: { description: 'sky blue' } }])).toEqual({ ok: true });
+    expect(recipeAllows(ropeRecipe, [{ ...ropeRecipe[0] }, { ...ropeRecipe[1], count: 4 }]).ok).toBe(false);
+    expect(recipeAllows(ropeRecipe, [...ropeRecipe, { name: 'gold bead', count: 1 }]).ok).toBe(false);
+    expect(recipeAllows(ropeRecipe, [ropeRecipe[0]]).ok).toBe(false);
+  });
+  it('counts of loose parts move freely: a wad is a wad with any bills the recipe names', () => {
+    expect(recipeAllows(wadRecipe, [{ ...twenty, count: 2 }, { ...five, count: 1 }])).toEqual({ ok: true });
+    expect(recipeAllows(wadRecipe, [{ name: 'fifty-dollar bill', count: 1, each: { tender: { ...USD, faceValue: 50 } } }]).ok).toBe(false);
+  });
+  it('KV derives from the parts when they carry one', () => {
+    expect(derivedValue(ropeRecipe)).toBe(0.095);
+    expect(derivedValue([{ name: 'arrow', count: 20, each: { value: 0.01 } }])).toBe(0.2);
+    expect(derivedValue([{ name: 'arrow', count: 20 }])).toBeNull();
+  });
+  it('the recipe lays its truths under the instance; paint stays on top', () => {
+    const inst = partsFromRecipe(ropeRecipe, [{ name: 'Wool cord, knotted 100 times', count: 1 }, { name: 'blue plastic bead', count: 3, each: { description: 'sky blue' } }]);
+    expect(inst[0]).toEqual({ ...ropeRecipe[0] });
+    expect(inst[1].each).toEqual({ value: 0.005, primaryMaterial: 'Polymer', description: 'sky blue' });
+    expect(inst[1].bound).toBe(true);
   });
 });
