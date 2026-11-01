@@ -3035,11 +3035,51 @@ export default function RelationsCanvas({
     let swallowMenuUntil = 0; // after a completed hold, a late touch contextmenu must not open a menu either
     const isBackgroundTarget = (t: Element) => t === svg || t.tagName === 'svg' || (t.tagName === 'rect' && t.hasAttribute('data-bg'));
     const isControl = (t: Element) => !!t.closest('button, input, textarea, select, a, [role="button"], [data-no-hold]');
+    // DIRECT DRAG (2026-11-01): a touch that STARTS inside a [data-drag-grip]
+    // (a card's header / a token) skips the hold. The tracker steps aside — it
+    // does not stopPropagation — so the card's own pointer drag starts at once
+    // (same offsets, same final onPositionChange commit as a mouse drag), the
+    // canvas does not pan for this finger, and touchmove is preventDefault'ed.
+    let grip: { id: number; x: number; y: number; wrapper: HTMLElement | null } | null = null;
+    const endGrip = (cancel: boolean) => {
+      const g = grip;
+      if (!g) return;
+      grip = null;
+      swallowMenuUntil = Date.now() + 700;
+      const w = g.wrapper;
+      if (w) {
+        w.removeAttribute('data-gripping');
+        w.style.removeProperty('user-select');
+        w.style.removeProperty('-webkit-user-select');
+        w.style.removeProperty('-webkit-touch-callout');
+      }
+      if (cancel) {
+        // The browser stole the gesture (or a 2nd finger landed): release the card's
+        // own drag AT ITS START POINT so no half position is committed.
+        try {
+          document.dispatchEvent(new PointerEvent('pointerup', { pointerId: g.id, pointerType: 'touch', clientX: g.x, clientY: g.y, bubbles: true }));
+        } catch { /* PointerEvent unavailable */ }
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (grip || hold) e.preventDefault(); // keep the browser from scrolling/zooming/selecting mid-gesture
+    };
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
       if (!e.isTrusted) return; // our own replayed pointerdown — let React have it
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       const t = e.target as Element;
+      if (pointers.size === 1 && !carriedRef.current && svg.contains(t) && !isBackgroundTarget(t) && !isControl(t) && t.closest('[data-drag-grip]')) {
+        const wrapper = t.closest('[data-card-wrapper]') as HTMLElement | null;
+        grip = { id: e.pointerId, x: e.clientX, y: e.clientY, wrapper };
+        if (wrapper) {
+          wrapper.setAttribute('data-gripping', '1');
+          wrapper.style.setProperty('user-select', 'none');
+          wrapper.style.setProperty('-webkit-user-select', 'none');
+          wrapper.style.setProperty('-webkit-touch-callout', 'none');
+        }
+        return;
+      }
       // While carrying, a tap on ANYTHING that is not a control drops here (2026-11-01:
       // tapping a room or another card used to do nothing, so the drop "didn't work").
       const carryDropTarget = pointers.size === 1 && !!carriedRef.current && svg.contains(t) && (isBackgroundTarget(t) || !isControl(t));
@@ -3071,6 +3111,7 @@ export default function RelationsCanvas({
         hold = { id: e.pointerId, x: e.clientX, y: e.clientY, target, timer, done: false };
       }
       if (pointers.size === 2) {
+        if (grip) endGrip(true);
         if (hold) { clearTimeout(hold.timer); hold = null; }
         const rect = svg.getBoundingClientRect();
         const { mx, my, dist } = midAndDist();
@@ -3121,6 +3162,7 @@ export default function RelationsCanvas({
     const onUp = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
       pointers.delete(e.pointerId);
+      if (grip && grip.id === e.pointerId) endGrip(e.type === 'pointercancel');
       if (hold && hold.id === e.pointerId) {
         clearTimeout(hold.timer);
         if (hold.done) { swallowClickUntil = Date.now() + 700; swallowMenuUntil = Date.now() + 700; } // the hold was a pick-up, not a tap
@@ -3169,7 +3211,7 @@ export default function RelationsCanvas({
       const t = e.target as Element | null;
       if (!t || !svg.contains(t)) return;
       if (isBackgroundTarget(t)) return; // empty canvas: long-press = JEWL here
-      const touchHold = (hold && hold.target === t) || (hold && t.contains(hold.target)) || pointers.size > 0
+      const touchHold = !!grip || (hold && hold.target === t) || (hold && t.contains(hold.target)) || pointers.size > 0
         || Date.now() < swallowMenuUntil;
       if (touchHold) { e.preventDefault(); e.stopImmediatePropagation(); }
     };
@@ -3178,6 +3220,7 @@ export default function RelationsCanvas({
     document.addEventListener('pointerup', onUp, true);
     document.addEventListener('pointercancel', onUp, true);
     window.addEventListener('contextmenu', onContextMenu, true);
+    document.addEventListener('touchmove', onTouchMove, { passive: false, capture: true });
     document.addEventListener('mousedown', onCompatMouse, true);
     document.addEventListener('mouseup', onCompatMouse, true);
     document.addEventListener('click', onClickCapture, true);
@@ -3190,6 +3233,8 @@ export default function RelationsCanvas({
       document.removeEventListener('pointerup', onUp, true);
       document.removeEventListener('pointercancel', onUp, true);
       window.removeEventListener('contextmenu', onContextMenu, true);
+      document.removeEventListener('touchmove', onTouchMove, true);
+      endGrip(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- BASE_WIDTH/clampZoom are stable per container size
   }, [BASE_WIDTH]);

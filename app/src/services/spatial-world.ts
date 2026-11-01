@@ -154,7 +154,8 @@ export async function beingStanding(map: LevelMap, characterId: string): Promise
 function containsRoom(map: LevelMap, outer: RoomPoly, inner: RoomPoly): boolean {
   if (outer.id === inner.id) return true;
   const c = polygonCentroid(inner.points);
-  return outer.area > inner.area && roomAt({ ...map, rooms: [outer] }, c)?.id === outer.id;
+  // An identical outline (an open lot and its one zone, 2026-11-01) counts as containing.
+  return outer.area >= inner.area - 1e-6 && roomAt({ ...map, rooms: [outer] }, c)?.id === outer.id;
 }
 
 /** Where a thing lies: on its holder when held; else its point in its room; else its room's centre. */

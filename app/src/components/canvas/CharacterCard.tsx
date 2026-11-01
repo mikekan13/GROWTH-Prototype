@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { DragGripGlyph } from './DragGripGlyph';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { CtxMenuPanel, CtxMenuStreamLabel } from '@/components/ui/ContextMenu';
 
@@ -1047,7 +1048,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           {/* Main Content */}
           <div className="flex-1 flex flex-col" style={{ height: '220px' }}>
             {/* Name */}
-            <div className="flex items-center gap-2 mb-1" style={{ height: '24px' }}>
+            <div className="flex items-center gap-2 mb-1" style={{ height: '24px' }} data-drag-grip>
+              <DragGripGlyph />
               <div className="font-bold truncate" style={{ fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif', fontSize: '14px', color: 'var(--krma-gold)' }}>
                 {node.name}
               </div>
@@ -1200,7 +1202,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         onContextMenu={handleContextMenu}
       >
         {/* ── Top Header Bar ── */}
-        <div className="relative pr-1 flex items-stretch gap-0.5" style={{ height: '29px' }}>
+        <div className="relative pr-1 flex items-stretch gap-0.5" style={{ height: '29px' }} data-drag-grip>
           {/* Teal + purple band — extends the vertical buffer-stripe pattern
               (14px teal on top, 15px purple on bottom) horizontally across
               the header. Runs from the left edge to where the attributes
@@ -1208,7 +1210,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               pass through uninterrupted, forming a menu-options bar. */}
           <div className="absolute top-0 left-0" style={{ width: 'calc(100% - 444px)', height: '14px', backgroundColor: 'var(--terminal-prime)', zIndex: 0 }} />
           <div className="absolute bottom-0 left-0" style={{ width: 'calc(100% - 444px)', height: '15px', backgroundColor: 'var(--pillar-spirit)', zIndex: 0 }} />
-          <div style={{ width: '128px' }} />
+          <div style={{ width: '128px', position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center' }}><DragGripGlyph /></div>
 
           {/* Character Name */}
           <div className="px-3 flex justify-center overflow-visible relative" style={{

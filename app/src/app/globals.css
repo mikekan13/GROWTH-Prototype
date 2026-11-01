@@ -342,3 +342,31 @@ body {
   scrollbar-color: rgba(45, 184, 160, 0.3) transparent;
 }
 
+/* Touch drag grip (2026-11-01): a card header marked data-drag-grip drags
+   directly under a finger (no long-press). The six-dot glyph shows on touch only. */
+.drag-grip-glyph { display: none; }
+@media (pointer: coarse) {
+  .drag-grip-glyph {
+    display: inline-grid;
+    grid-template-columns: repeat(3, 5px);
+    grid-auto-rows: 5px;
+    gap: 4px;
+    padding: 6px 8px;
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+  .drag-grip-glyph > i {
+    display: block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.55);
+  }
+  [data-drag-grip] { touch-action: none; }
+}
+[data-card-wrapper][data-gripping] {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+

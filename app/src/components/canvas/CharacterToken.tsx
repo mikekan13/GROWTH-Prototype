@@ -45,8 +45,8 @@ export default function CharacterToken({ id, name, portrait, status, data, x, y,
     const svg = (e.target as Element).closest('foreignObject')?.closest('svg') as SVGSVGElement | null;
     if (!svg || !onPositionChange || !onDragOffsetChange) {
       // No map to move on — a press is just a tap.
-      const up = () => { document.removeEventListener('mouseup', up); onOpen(id); };
-      document.addEventListener('mouseup', up);
+      const up = () => { document.removeEventListener('pointerup', up); onOpen(id); };
+      document.addEventListener('pointerup', up);
       return;
     }
     setIsDragging(true);
@@ -62,16 +62,16 @@ export default function CharacterToken({ id, name, portrait, status, data, x, y,
       onDragOffsetChange(id, cur.x - start.x, cur.y - start.y);
     };
     const onUp = (ue: MouseEvent) => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
       const end = toSvg(ue.clientX, ue.clientY);
       onDragOffsetChange(id, 0, 0);
       if (movedRef.current) onPositionChange(id, from.x + end.x - start.x, from.y + end.y - start.y);
       else onOpen(id);
       setIsDragging(false);
     };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   };
 
   const d = CHARACTER_TOKEN_DIAMETER;
@@ -82,7 +82,8 @@ export default function CharacterToken({ id, name, portrait, status, data, x, y,
       data-character-token={id}
       data-character-id={id}
       data-drop-zone="character"
-      onMouseDown={handleMouseDown}
+      data-drag-grip
+      onPointerDown={handleMouseDown}
       onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onOpen(id); }}
       style={{ width: d, height: d + CHARACTER_TOKEN_LABEL, position: 'relative', cursor: dragging ? 'grabbing' : 'pointer', userSelect: 'none' }}
     >

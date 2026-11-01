@@ -219,8 +219,8 @@ export default function ItemToken({ node, isDraggingNode = false, onDelete, onPo
       onDragOffsetChange(node.id, current.x - startSVGCoords.x, current.y - startSVGCoords.y);
     };
     const handleMouseUp = (upEvent: MouseEvent) => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('pointermove', handleMouseMove);
+      document.removeEventListener('pointerup', handleMouseUp);
       if (!dragStartPosRef.current) return;
       const final = screenToSVG(upEvent.clientX, upEvent.clientY);
       onDragOffsetChange(node.id, 0, 0);
@@ -236,8 +236,8 @@ export default function ItemToken({ node, isDraggingNode = false, onDelete, onPo
       setIsDragging(false);
       dragStartPosRef.current = null;
     };
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointermove', handleMouseMove);
+    document.addEventListener('pointerup', handleMouseUp);
   };
 
   const closeContents = useCallback(() => setContentsAnchor(null), []);
@@ -288,7 +288,8 @@ export default function ItemToken({ node, isDraggingNode = false, onDelete, onPo
   return (
     <div
       data-item-token={node.id}
-      onMouseDown={handleMouseDown}
+      data-drag-grip
+      onPointerDown={handleMouseDown}
       onContextMenu={handleContextMenu}
       style={{ width: box.w, height: box.h, position: 'relative', cursor: dragging ? 'grabbing' : 'grab', userSelect: 'none' }}
     >

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { DragGripGlyph } from './DragGripGlyph';
 import type { GrowthLocation, LocationType } from '@/types/location';
 import { LOCATION_TYPE_ICONS, LOCATION_TYPE_COLORS } from '@/types/location';
 
@@ -182,8 +183,8 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
     };
 
     const handleMouseUp = (upEvent: MouseEvent) => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('pointermove', handleMouseMove);
+      document.removeEventListener('pointerup', handleMouseUp);
       if (!dragStartPosRef.current) return;
       const final = screenToSVG(upEvent.clientX, upEvent.clientY);
       onDragOffsetChange(node.id, 0, 0);
@@ -192,8 +193,8 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
       dragStartPosRef.current = null;
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointermove', handleMouseMove);
+    document.addEventListener('pointerup', handleMouseUp);
   };
 
   // ── Context Menu Portal ───────────────────────────────────────────────────
@@ -247,11 +248,11 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
               ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
               : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
           }}
-          onMouseDown={handleMouseDown}
+          onPointerDown={handleMouseDown}
           onContextMenu={handleContextMenu}
         >
           {/* Header bar with type accent */}
-          <div style={{
+          <div data-drag-grip style={{
             borderBottom: `2px solid ${typeColor}`,
             padding: '8px 12px',
             display: 'flex',
@@ -259,6 +260,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
             justifyContent: 'space-between',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <DragGripGlyph />
               <span style={{ fontSize: 16 }}>{typeIcon}</span>
               <span style={{
                 fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif',
@@ -345,7 +347,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
         {/* Expand button — bottom-right corner */}
         <button
           onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }}
-          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           style={{
             position: 'absolute',
             bottom: '-16px',
@@ -385,11 +387,11 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
             ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
             : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
         }}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handleMouseDown}
         onContextMenu={handleContextMenu}
       >
         {/* Header */}
-        <div style={{
+        <div data-drag-grip style={{
           borderBottom: `2px solid ${typeColor}`,
           padding: '10px 14px',
           display: 'flex',
@@ -397,6 +399,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
           justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <DragGripGlyph />
             <span style={{ fontSize: 20 }}>{typeIcon}</span>
             <div>
               <div style={{
@@ -661,7 +664,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
                   <button
                     key={c.id}
                     onClick={(e) => { e.stopPropagation(); focusEntity(c.childId); }}
-                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
                     style={{
                       display: 'flex',
                       alignItems: 'center',

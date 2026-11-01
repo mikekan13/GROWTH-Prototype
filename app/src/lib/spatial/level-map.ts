@@ -128,8 +128,10 @@ export function buildLevelMap(input: LevelMapInput): LevelMap {
     return { l, fp: parseFootprint(data.footprint), openings: parseOpenings(data.openings) };
   });
   const onLevel = parsed.filter(p => p.fp && p.fp.level === level) as Array<typeof parsed[number] & { fp: NonNullable<typeof parsed[number]['fp']> }>;
+  // A shell holds a STRICTLY smaller footprint. Two identical outlines (an open lot and its one zone, 2026-11-01) are not
+  // shells of each other — both are the room, so a point in the lot stands somewhere.
   const isShell = (p: typeof onLevel[number]) =>
-    onLevel.some(q => q !== p && q.fp.points.every(pt => insideOrOn(pt, p.fp.points)));
+    onLevel.some(q => q !== p && polygonArea(q.fp.points) < polygonArea(p.fp.points) - 1e-6 && q.fp.points.every(pt => insideOrOn(pt, p.fp.points)));
 
   const rooms: RoomPoly[] = [];
   const homes: RoomPoly[] = [];
