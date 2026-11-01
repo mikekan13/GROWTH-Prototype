@@ -3026,9 +3026,11 @@ export default function RelationsCanvas({
     // never sees the pointerdown. Move within the hold time → the canvas pans.
     // Hold still → the original pointerdown is replayed to the target and the
     // card's own drag takes over, fed by the real pointermoves that follow.
-    const HOLD_MS = 280, SLOP_PX = 10;
+    // SLOP 16 (was 10, 2026-11-01): a thumb's natural jitter on a big sheet card
+    // cancelled the hold and panned the canvas instead of picking the card up.
+    const HOLD_MS = 280, SLOP_PX = 16;
     let hold: { id: number; x: number; y: number; target: Element; timer: ReturnType<typeof setTimeout>; done: boolean } | null = null;
-    let bgTap: { id: number; x: number; y: number } | null = null; // a tap on empty canvas while carrying = drop here
+    let bgTap: { id: number; x: number; y: number; onCard?: boolean } | null = null; // a tap on empty canvas while carrying = drop here
     let swallowClickUntil = 0; // after a completed hold, the finger lifting must not also count as a tap/click
     let swallowMenuUntil = 0; // after a completed hold, a late touch contextmenu must not open a menu either
     const isBackgroundTarget = (t: Element) => t === svg || t.tagName === 'svg' || (t.tagName === 'rect' && t.hasAttribute('data-bg'));
@@ -3038,10 +3040,14 @@ export default function RelationsCanvas({
       if (!e.isTrusted) return; // our own replayed pointerdown — let React have it
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       const t = e.target as Element;
-      if (pointers.size === 1 && carriedRef.current && svg.contains(t) && isBackgroundTarget(t)) {
-        bgTap = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      // While carrying, a tap on ANYTHING that is not a control drops here (2026-11-01:
+      // tapping a room or another card used to do nothing, so the drop "didn't work").
+      const carryDropTarget = pointers.size === 1 && !!carriedRef.current && svg.contains(t) && (isBackgroundTarget(t) || !isControl(t));
+      if (carryDropTarget) {
+        bgTap = { id: e.pointerId, x: e.clientX, y: e.clientY, onCard: !isBackgroundTarget(t) };
+        if (!isBackgroundTarget(t)) e.stopPropagation(); // a drop tap must not also select/open what is under it
       }
-      if (pointers.size === 1 && svg.contains(t) && !isBackgroundTarget(t) && !isControl(t)) {
+      if (pointers.size === 1 && !carriedRef.current && svg.contains(t) && !isBackgroundTarget(t) && !isControl(t)) {
         e.stopPropagation();
         const target = t;
         const timer = setTimeout(() => {
@@ -3082,7 +3088,16 @@ export default function RelationsCanvas({
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== 'touch' || !pointers.has(e.pointerId)) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (bgTap && bgTap.id === e.pointerId && Math.hypot(e.clientX - bgTap.x, e.clientY - bgTap.y) > SLOP_PX) bgTap = null; // it became a pan
+      if (bgTap && bgTap.id === e.pointerId && Math.hypot(e.clientX - bgTap.x, e.clientY - bgTap.y) > SLOP_PX) {
+        // It became a pan. On empty canvas React's own handler pans; on a card/room
+        // (whose pointerdown we stopped while carrying) start the pan here.
+        if (bgTap.onCard) {
+          const cam = cameraRef.current;
+          setPanStart({ x: bgTap.x, y: bgTap.y, viewBoxX: cam.x, viewBoxY: cam.y });
+          setIsPanning(true); setIsDragging(true);
+        }
+        bgTap = null;
+      }
       if (hold && hold.id === e.pointerId && !hold.done) {
         if (Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > SLOP_PX) {
           // Moved before the hold completed: this finger is panning the canvas.
@@ -3114,6 +3129,7 @@ export default function RelationsCanvas({
       if (bgTap && bgTap.id === e.pointerId) {
         const p = clientToSvgRef.current(e.clientX, e.clientY);
         bgTap = null;
+        swallowClickUntil = Date.now() + 700; // the lifting finger's click must not open what is under the drop
         dropCarriedRef.current(p.x, p.y);
       }
       if (pointers.size < 2 && pinchRef.current) {
@@ -3729,7 +3745,7 @@ export default function RelationsCanvas({
           style={{ overflow: "visible", pointerEvents: "none" }}
         >
           <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
-          <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto" }}>
+          <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", touchAction: "none" }}>
           <CharacterCard
             node={charNode}
             campaignId={campaignId}
@@ -4654,7 +4670,7 @@ export default function RelationsCanvas({
                 style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
-                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", width: D }}>
+                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", touchAction: "none", width: D }}>
                   <CharacterToken
                     id={node.id}
                     name={node.name}
@@ -4733,7 +4749,7 @@ export default function RelationsCanvas({
                 style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
-                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
+                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", touchAction: "none", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
                   <LocationCard
                     node={{
                       id: node.id,
@@ -4833,7 +4849,7 @@ export default function RelationsCanvas({
                 style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
-                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto" }}>
+                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", touchAction: "none" }}>
                   <ItemToken
                     node={{
                       id: node.id,
