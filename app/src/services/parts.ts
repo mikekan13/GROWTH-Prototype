@@ -12,9 +12,9 @@ import { prisma } from '@/lib/db';
 import {
   partsOf, pickTender, takeParts, addParts, dataForParts, nameForParts, partsInWords, tenderTotal, tenderCurrencies,
   recipeAllows, partsFromRecipe, derivedValue,
-  type Parts, type MoneyFormatter,
+  type Parts, type MoneyFormatter, type Denominations,
 } from '@/lib/parts';
-import { formatUnits } from './currency';
+import { formatUnits, denominationsOf } from './currency';
 
 export interface HistoryEntry { kind: string; at: string; text: string; [k: string]: unknown }
 
@@ -204,6 +204,16 @@ export async function recentPayments(campaignId: string, q: { from?: string; to?
   } catch { return []; }
 }
 
+/** currencyId → the faces it comes in (Currency.denominations), for the recipe check. Never throws. */
+export async function denominationsByCurrency(campaignId: string): Promise<Denominations> {
+  const out: Denominations = new Map();
+  try {
+    const rows = await prisma.currency.findMany({ where: { campaignId }, select: { id: true, denominations: true } });
+    for (const r of rows) out.set(r.id, denominationsOf(r));
+  } catch { /* no faces known */ }
+  return out;
+}
+
 // ── Telling a thing what it is made of (JEWL's compose_item) ─────────────────
 
 export interface PartSpec { name: string; count: number; faceValue?: number; weightLbs?: number; value?: number; bound?: boolean; primaryMaterial?: string; description?: string }
@@ -247,9 +257,10 @@ export async function setParts(campaignId: string, itemRef: string, specs: PartS
     const archData = parseData(arch.data);
     const recipe = Array.isArray(archData.parts) ? partsOf(arch.name, archData as Parameters<typeof partsOf>[1]) : null;
     if (recipe) {
-      const verdict = recipeAllows(recipe, parts);
+      const faces = await denominationsByCurrency(campaignId);
+      const verdict = recipeAllows(recipe, parts, faces);
       if (!verdict.ok) throw new Error(`"${row.name}" is a ${arch.name}: ${verdict.reason}`);
-      finalParts = partsFromRecipe(recipe, parts);
+      finalParts = partsFromRecipe(recipe, parts, faces);
     } else {
       const archValue = typeof archData.value === 'number' ? archData.value : 0;
       if (archValue >= 1) throw new Error(`"${arch.name}" is a forged thing (${archValue} KV) — its recipe is written in the Forge (propose_forge_blueprint), not on one instance`);

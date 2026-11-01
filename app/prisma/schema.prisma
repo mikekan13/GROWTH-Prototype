@@ -1655,6 +1655,10 @@ model Currency {
   scope       String   @default("")
   /// Why the rate is what it is (the anchor objects JEWL priced it against).
   note        String   @default("")
+  /// DENOMINATIONS (Michael 2026-11-01: "a campaign could be on an alien planet that uses 32 different crystals as currency"):
+  /// the faces this currency comes in — JSON [{name, faceValue, form?, weightLbs?, primaryMaterial?}] — set by JEWL when he
+  /// establishes it, never by code. A money thing's recipe says "any denomination of this currency" (ItemPart.each.tenderOf).
+  denominations String @default("[]")
   status      String   @default("ACTIVE") // ACTIVE | RETIRED
   createdBy   String   // userId or 'jewl'
   createdAt   DateTime @default(now())

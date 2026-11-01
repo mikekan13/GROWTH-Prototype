@@ -133,7 +133,9 @@ export const establishCurrencyTool: JewlTool = {
     'may have many (earth alone has ~180). A unit has NO fixed value: anchor krmaPerUnit on the KRMA value of objects ' +
     'in THIS campaign\'s time and place — KV IS the price, so krmaPerUnit = Σ KV ÷ Σ price over several graded anchor ' +
     'objects, calculated at the table, never assumed. A unit is a container: the KRMA it stores (plus its paper or metal). Say the anchor ' +
-    'objects in note. Re-calling with the same code re-rates it. Never invent currency ITEMS — cash lives on the sheet.',
+    'objects in note. Re-calling with the same code re-rates it. GIVE ITS DENOMINATIONS: every face people hand each other (bills, coins, ' +
+    'shards — name, faceValue, form, weight, material); cash in the world is a thing made of these (stock_goods `parts` with faceValue), ' +
+    'and only faces listed here are tender. Bank money lives on the sheet (grant_cash).',
   inputSchema: establishCurrencySchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const r = await establishCurrency(ctx.campaignId, { id: ctx.actorId, role: ctx.actorRole }, input);

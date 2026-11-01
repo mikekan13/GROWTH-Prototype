@@ -37,8 +37,24 @@ export const establishCurrencySchema = z.object({
   krmaPerUnit: z.number().positive().max(1_000_000).describe('KRMA stored in ONE unit — calculated at the table, never assumed: KV is the price, so over several graded anchor objects krmaPerUnit = Σ their KV ÷ Σ their price in units here and now.'),
   scope: z.string().max(200).optional().describe('Where and when it is tender ("Sacramento, 2026").'),
   note: z.string().max(400).optional().describe('The anchor objects and prices the rate was set from.'),
+  denominations: z.array(z.object({
+    name: z.string().min(1).max(80).describe('One face, singular: "twenty-dollar bill", "quarter", "blue shard".'),
+    faceValue: z.number().positive().describe('How many units this one is worth (20; 0.25).'),
+    form: z.string().max(40).optional().describe('bill | coin | shard | chit | …'),
+    weightLbs: z.number().min(0).optional(),
+    primaryMaterial: z.string().max(60).optional(),
+  })).max(64).optional().describe('THE FACES IT COMES IN — every bill, coin or crystal people actually hand each other. Money things in the world are made of these (object permanence); a wad is any number of them. Replaces the list when given.'),
 });
 export type EstablishCurrencyInput = z.infer<typeof establishCurrencySchema>;
+export type Denomination = { name: string; faceValue: number; form?: string; weightLbs?: number; primaryMaterial?: string };
+
+/** The faces a currency comes in, parsed from its row. Pure. */
+export function denominationsOf(row: { denominations?: string | null }): Denomination[] {
+  try {
+    const d = row.denominations ? JSON.parse(row.denominations) : [];
+    return Array.isArray(d) ? d.filter((x) => x && typeof x.name === 'string' && typeof x.faceValue === 'number' && x.faceValue > 0) : [];
+  } catch { return []; }
+}
 
 export interface CurrencyRow {
   id: string;
@@ -49,6 +65,7 @@ export interface CurrencyRow {
   krmaPerUnit: number;
   scope: string;
   note: string;
+  denominations: string;
   status: string;
 }
 
@@ -127,6 +144,7 @@ export async function establishCurrency(
         krmaPerUnit: p.krmaPerUnit,
         ...(p.scope != null ? { scope: p.scope } : {}),
         ...(p.note != null ? { note: p.note } : {}),
+        ...(p.denominations ? { denominations: JSON.stringify(p.denominations) } : {}),
         status: 'ACTIVE',
       },
     });
@@ -136,6 +154,7 @@ export async function establishCurrency(
     data: {
       campaignId, name: p.name.trim(), code, symbol: p.symbol ?? '', krmaPerUnit: p.krmaPerUnit,
       scope: p.scope ?? '', note: p.note ?? '', createdBy: actor.id,
+      denominations: JSON.stringify(p.denominations ?? []),
     },
   });
   return { currency, created: true };

@@ -662,3 +662,6 @@ Unique `(viewerId, subjectId)`; index `(campaignId, viewerId)`. Rows are never d
 
 One row per routine of a being: `name` (the being's register), `triggers` (JSON string[] of cue words), `cadence` (daily | nightly | weekly | always | null), `ends` (JSON `RoutineEnd[]` — `{kind:'hold',item}` / `{kind:'gave',item,to}` / `{kind:'door',door,state}` / `{kind:'at',place}`), `sourceIntentionIds`, `status` (READY | RUNNING | DONE | RETIRED), `cursor` (ends reached, never goes back), `steps` (this instance), `startedCycle`, `lastDoneCycle`. The means are never stored — planned per beat from the live map (`src/daya/routines.ts`). Derived by `services/routine-derive.ts`; run by `services/routine-run.ts`.
 
+### Currency
+A campaign currency (stored-KRMA vehicle, many per campaign, AI-managed). `krmaPerUnit` anchored on objects.
+- `denominations`: JSON `[{name, faceValue, form?, weightLbs?, primaryMaterial?}]` — the faces it comes in, set by JEWL in establish_currency (2026-11-01). Nothing in code knows a currency; a cash thing's recipe is `ItemPart.each.tenderOf = currencyId` ("any denomination").

@@ -116,6 +116,17 @@ describe("the recipe law: an instance never strays from its archetype's KV", () 
     expect(recipeAllows(wadRecipe, [{ ...twenty, count: 2 }, { ...five, count: 1 }])).toEqual({ ok: true });
     expect(recipeAllows(wadRecipe, [{ name: 'fifty-dollar bill', count: 1, each: { tender: { ...USD, faceValue: 50 } } }]).ok).toBe(false);
   });
+  it("money recipes name no faces: 'any denomination of this currency' — the faces live on the Currency (an alien world with 32 crystal currencies)", () => {
+    const cashRecipe = [{ name: 'tender of the United States Dollar', count: 1, each: { tenderOf: 'usd', value: 0, primaryMaterial: 'Paper' } }];
+    const faces = new Map([['usd', [{ name: 'one-dollar bill', faceValue: 1, weightLbs: 0.002 }, { name: 'five-dollar bill', faceValue: 5, weightLbs: 0.002 }, { name: 'twenty-dollar bill', faceValue: 20, weightLbs: 0.002 }]]]);
+    expect(recipeAllows(cashRecipe, [{ ...twenty, count: 2 }, five], faces)).toEqual({ ok: true });
+    expect(recipeAllows(cashRecipe, [{ name: 'fifty-dollar bill', count: 1, each: { tender: { ...USD, faceValue: 50 } } }], faces).ok).toBe(false);
+    expect(recipeAllows(cashRecipe, [{ name: 'blue shard', count: 3, each: { tender: { currencyId: 'shards', code: 'SHD', faceValue: 1 } } }], faces).ok).toBe(false);
+    // No denominations listed yet: the currency itself vouches.
+    expect(recipeAllows(cashRecipe, [{ name: 'fifty-dollar bill', count: 1, each: { tender: { ...USD, faceValue: 50 } } }])).toEqual({ ok: true });
+    const inst = partsFromRecipe(cashRecipe, [{ name: 'a twenty', count: 2, each: { tender: { ...USD, faceValue: 20 } } }], faces);
+    expect(inst[0]).toEqual({ name: 'twenty-dollar bill', count: 2, each: { value: 0, primaryMaterial: 'Paper', weightLbs: 0.002, tender: { ...USD, faceValue: 20 } } });
+  });
   it('KV derives from the parts when they carry one', () => {
     expect(derivedValue(ropeRecipe)).toBe(0.095);
     expect(derivedValue([{ name: 'arrow', count: 20, each: { value: 0.01 } }])).toBe(0.2);

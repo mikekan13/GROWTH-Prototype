@@ -25,6 +25,14 @@ import { NotFoundError } from '@/lib/errors';
 import { createCampaignItem } from './campaign-item';
 import { findCurrency, listCurrencies } from './currency';
 import { partsOf, recipeAllows, partsFromRecipe } from '@/lib/parts';
+import { denominationsByCurrency } from './parts';
+
+/** One recipe part per kind (two money goods of one currency are one "tender of" part). */
+function dedupeRecipe(parts: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = [];
+  for (const p of parts) if (!out.some((o) => String(o.name).toLowerCase() === String(p.name).toLowerCase())) out.push(p);
+  return out;
+}
 import { DEED_RELATIONSHIP } from './genesis-possessions';
 import { itemKvOf, kvMirror, roundKv, WARDROBE_KIT_RE } from '@/lib/item-kv';
 
@@ -204,14 +212,27 @@ export async function placeGoods(campaignId: string, actor: { id: string; role: 
       }
       const before = await prisma.forgeItem.count({ where: { campaignId, type: 'item' } });
       // The recipe on a NEW archetype: the good's kinds, loose kinds at count 1 (a wad holds any number of the bills it names).
-      const recipe = parts ? parts.map((pt) => ({ ...pt, count: pt.bound ? pt.count : 1 })) : null;
+      // MONEY NAMES NO FACES (Michael 2026-11-01): its recipe is "any denomination of this currency"; the faces live on the Currency.
+      const recipe = parts ? dedupeRecipe(parts.map((pt) => {
+        const each = pt.each as Record<string, unknown> | undefined;
+        const tender = each?.tender as { currencyId: string } | undefined;
+        if (tender) {
+          const { tender: _t, ...rest } = each ?? {};
+          void _t;
+          return { name: `tender of ${(g.currency ?? tender.currencyId)}`, count: 1, each: { ...rest, tenderOf: tender.currencyId } };
+        }
+        return { ...pt, count: pt.bound ? pt.count : 1 };
+      })) : null;
       const arch = await findOrMakeArchetype(campaignId, g, actor.id, recipe);
       if ('error' in arch) { res.failed.push({ archetype: g.archetype, reason: arch.error }); continue; }
       // THE RECIPE LAW: an existing archetype's recipe binds the instance.
       if (parts && Array.isArray(arch.data.parts)) {
-        const verdict = recipeAllows(partsOf(g.archetype, arch.data as Parameters<typeof partsOf>[1]), partsOf(g.archetype, { parts } as unknown as Parameters<typeof partsOf>[1]));
+        const faces = await denominationsByCurrency(campaignId);
+        const recipeParts = partsOf(g.archetype, arch.data as Parameters<typeof partsOf>[1]);
+        const instParts = partsOf(g.archetype, { parts } as unknown as Parameters<typeof partsOf>[1]);
+        const verdict = recipeAllows(recipeParts, instParts, faces);
         if (!verdict.ok) { res.failed.push({ archetype: g.archetype, reason: verdict.reason }); continue; }
-        parts = partsFromRecipe(partsOf(g.archetype, arch.data as Parameters<typeof partsOf>[1]), partsOf(g.archetype, { parts } as unknown as Parameters<typeof partsOf>[1])) as unknown as Array<Record<string, unknown>>;
+        parts = partsFromRecipe(recipeParts, instParts, faces) as unknown as Array<Record<string, unknown>>;
       }
       if ((await prisma.forgeItem.count({ where: { campaignId, type: 'item' } })) > before) res.archetypesCreated++;
       const name = g.localName?.trim() || g.archetype.trim();

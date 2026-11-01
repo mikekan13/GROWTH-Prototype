@@ -1,0 +1,39 @@
+{
+  "usd": {
+    "id": "cmvaejra50002bc48m3ujjufr",
+    "campaignId": "cms5z4j6z0000zg48z5vzl2jn",
+    "name": "United States Dollar",
+    "code": "USD",
+    "symbol": "$",
+    "krmaPerUnit": 0.01,
+    "scope": "Contemporary United States, historic urban district",
+    "note": "Anchored: Personal Laptop (~1 KV) sells for ~$100 secondhand; kitchen knife set (~1 KV) ~$30-80; apartment monthly rent ~$1,800-2,400 in a historic urban district. 1 KV ≈ $100 → krmaPerUnit = 0.01.",
+    "denominations": "[]",
+    "status": "ACTIVE",
+    "createdBy": "cmrep1oh300002g48ue1bn5rg",
+    "createdAt": "2026-10-16T03:22:40.733Z",
+    "updatedAt": "2026-10-16T03:22:40.733Z"
+  },
+  "arch": {
+    "id": "cmvalc1db009zm048505znl7x",
+    "campaignId": "cms5z4j6z0000zg48z5vzl2jn",
+    "type": "item",
+    "name": "Folded Paper Bills",
+    "status": "published",
+    "data": "{\"description\":\"Folded Paper Bills.\",\"itemType\":\"consumable\",\"primaryMaterial\":\"Paper\",\"materialClass\":\"Soft\",\"weightLbs\":0.02,\"volumeCuFt\":0.01,\"rarity\":1,\"condition\":3,\"value\":0.2,\"tags\":[\"mundane\"],\"parts\":[{\"name\":\"one-dollar bill\",\"count\":1,\"each\":{\"tender\":{\"currencyId\":\"cmvaejra50002bc48m3ujjufr\",\"code\":\"USD\",\"faceValue\":1},\"weightLbs\":0.002,\"value\":0,\"primaryMaterial\":\"Paper\"}},{\"name\":\"five-dollar bill\",\"count\":1,\"each\":{\"tender\":{\"currencyId\":\"cmvaejra50002bc48m3ujjufr\",\"code\":\"USD\",\"faceValue\":5},\"weightLbs\":0.002,\"value\":0,\"primaryMaterial\":\"Paper\"}},{\"name\":\"ten-dollar bill\",\"count\":1,\"each\":{\"tender\":{\"currencyId\":\"cmvaejra50002bc48m3ujjufr\",\"code\":\"USD\",\"faceValue\":10},\"weightLbs\":0.002,\"value\":0,\"primaryMaterial\":\"Paper\"}},{\"name\":\"twenty-dollar bill\",\"count\":1,\"each\":{\"tender\":{\"currencyId\":\"cmvaejra50002bc48m3ujjufr\",\"code\":\"USD\",\"faceValue\":20},\"weightLbs\":0.002,\"value\":0,\"primaryMaterial\":\"Paper\"}},{\"name\":\"fifty-dollar bill\",\"count\":1,\"each\":{\"tender\":{\"currencyId\":\"cmvaejra50002bc48m3ujjufr\",\"code\":\"USD\",\"faceValue\":50},\"weightLbs\":0.002,\"value\":0,\"primaryMaterial\":\"Paper\"}},{\"name\":\"hundred-dollar bill\",\"count\":1,\"each\":{\"tender\":{\"currencyId\":\"cmvaejra50002bc48m3ujjufr\",\"code\":\"USD\",\"faceValue\":100},\"weightLbs\":0.002,\"value\":0,\"primaryMaterial\":\"Paper\"}}]}",
+    "createdBy": "cmrep1oh300002g48ue1bn5rg",
+    "createdAt": "2026-10-16T06:32:37.871Z",
+    "updatedAt": "2026-11-01T01:51:39.374Z",
+    "isGlobal": false,
+    "sourceGlobalId": null,
+    "authorUserId": "cmrep1oh300002g48ue1bn5rg",
+    "useCount": 0,
+    "royaltyRate": 0,
+    "lastUsedAt": null,
+    "decayStatus": "ACTIVE",
+    "flaggedAt": null,
+    "relationshipTags": null,
+    "karmicValue": "0",
+    "evaluatedAt": null
+  }
+}

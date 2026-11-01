@@ -54,6 +54,12 @@ export interface ItemPart {
   bound?: boolean;
   each?: {
     tender?: Tender;
+    /**
+     * RECIPES ONLY: "any denomination of this currency" (the Currency id). A money thing's recipe never names faces — those
+     * live on the Currency row (Michael 2026-11-01: an alien campaign with 32 crystal currencies); the instance's parts carry
+     * the actual faces as `tender`.
+     */
+    tenderOf?: string;
     weightLbs?: number;
     /** KV of one. */
     value?: number;

@@ -239,15 +239,38 @@ export function billOf(name: string, count: number, tender: Tender, each: Omit<N
 // RECIPE (kinds, per-unit properties, bound or loose) is the archetype's; an instance may differ only in the COUNT of
 // loose parts (the bills in this wad) and in paint (these beads are blue). KV derives from the parts when they carry one.
 
+/** The faces a currency comes in, for the recipe check: currencyId → the face values that exist. */
+export type Denominations = Map<string, Array<{ name: string; faceValue: number; weightLbs?: number; primaryMaterial?: string }>>;
+
+/** The recipe part an instance part answers to: by name, or — for money — the "any denomination of this currency" part. */
+function recipePartFor(recipe: Parts, p: ItemPart, denominations?: Denominations): { r: ItemPart; viaCurrency: boolean } | null {
+  const byName = recipe.find((r) => r.name.toLowerCase() === p.name.toLowerCase());
+  if (byName) return { r: byName, viaCurrency: false };
+  const t = p.each?.tender;
+  if (!t) return null;
+  const any = recipe.find((r) => r.each?.tenderOf === t.currencyId);
+  if (!any) return null;
+  const faces = denominations?.get(t.currencyId);
+  // Without a denominations list the currency itself vouches; with one, the face must exist.
+  if (faces && faces.length && !faces.some((f) => Math.abs(f.faceValue - t.faceValue) < 1e-9)) return null;
+  return { r: any, viaCurrency: true };
+}
+
 /** Does this instance's parts list stay inside the archetype's recipe? Pure. */
-export function recipeAllows(recipe: Parts, parts: Parts): { ok: true } | { ok: false; reason: string } {
-  const byName = new Map(recipe.map((r) => [r.name.toLowerCase(), r]));
+export function recipeAllows(recipe: Parts, parts: Parts, denominations?: Denominations): { ok: true } | { ok: false; reason: string } {
   for (const p of parts) {
-    const r = byName.get(p.name.toLowerCase());
-    if (!r) return { ok: false, reason: `"${p.name}" is not a part of this kind of thing — a thing made of other parts is another thing (forge it)` };
+    const hit = recipePartFor(recipe, p, denominations);
+    if (!hit) {
+      const t = p.each?.tender;
+      const money = t && recipe.some((r) => r.each?.tenderOf === t.currencyId);
+      return { ok: false, reason: money ? `no ${t!.code} comes as a ${p.name} (${t!.faceValue}) — not a face of that currency` : `"${p.name}" is not a part of this kind of thing — a thing made of other parts is another thing (forge it)` };
+    }
+    const { r, viaCurrency } = hit;
     if (r.bound && p.count !== r.count) return { ok: false, reason: `${r.count} ${r.name} are made into it; ${p.count} would make it another thing (forge it)` };
-    const rt = r.each?.tender, pt = p.each?.tender;
-    if ((rt || pt) && JSON.stringify(rt ?? null) !== JSON.stringify(pt ?? null)) return { ok: false, reason: `"${p.name}" is not the money the recipe names` };
+    if (!viaCurrency) {
+      const rt = r.each?.tender, pt = p.each?.tender;
+      if ((rt || pt) && JSON.stringify(rt ?? null) !== JSON.stringify(pt ?? null)) return { ok: false, reason: `"${p.name}" is not the money the recipe names` };
+    }
   }
   for (const r of recipe) if (r.bound && !parts.some((p) => p.name.toLowerCase() === r.name.toLowerCase())) return { ok: false, reason: `${r.name} is made into it and cannot be left out (forge it without)` };
   return { ok: true };
@@ -263,12 +286,31 @@ export function derivedValue(parts: Parts): number | null {
   return Math.round(sum * 10000) / 10000;
 }
 
-/** The instance's parts with the recipe's per-unit truths (each) laid under them — paint on top, mechanics from the archetype. */
-export function partsFromRecipe(recipe: Parts, parts: Parts): Parts {
-  const byName = new Map(recipe.map((r) => [r.name.toLowerCase(), r]));
+/**
+ * The instance's parts with the recipe's per-unit truths (each) laid under them — paint on top, mechanics from the archetype.
+ * A money part answering a "tenderOf" recipe part keeps its own face and takes the denomination's name, weight and material
+ * when the currency lists them.
+ */
+export function partsFromRecipe(recipe: Parts, parts: Parts, denominations?: Denominations): Parts {
   return parts.map((p) => {
-    const r = byName.get(p.name.toLowerCase());
-    if (!r) return p;
+    const hit = recipePartFor(recipe, p, denominations);
+    if (!hit) return p;
+    const { r, viaCurrency } = hit;
+    if (viaCurrency) {
+      const t = p.each!.tender!;
+      const face = denominations?.get(t.currencyId)?.find((f) => Math.abs(f.faceValue - t.faceValue) < 1e-9);
+      const { tenderOf: _o, ...rest } = r.each ?? {};
+      void _o;
+      const each = {
+        ...rest,
+        ...(p.each?.weightLbs != null ? { weightLbs: p.each.weightLbs } : {}),
+        ...(face?.weightLbs != null ? { weightLbs: face.weightLbs } : {}),
+        ...(face?.primaryMaterial ? { primaryMaterial: face.primaryMaterial } : {}),
+        tender: t,
+        ...(p.each?.description ? { description: p.each.description } : {}),
+      };
+      return { name: face?.name ?? p.name, count: p.count, each };
+    }
     const each = { ...(r.each ?? {}), ...(p.each?.description ? { description: p.each.description } : {}) };
     return { name: r.name, count: p.count, ...(r.bound ? { bound: true } : {}), ...(Object.keys(each).length ? { each } : {}) };
   });
