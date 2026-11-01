@@ -148,6 +148,30 @@ function pickPerson(ref: string, world: RoutineWorld) {
   return near.length === 1 ? near[0] : null;
 }
 
+type Payee =
+  | { kind: 'person'; id: string; name: string; person: RoutineWorld['people'][number] }
+  | { kind: 'thing'; id: string; name: string; thing: RoutineWorld['things'][number] }
+  | { kind: 'place'; id: string | null; name: string };
+
+/**
+ * Whom a 'paid' end pays: a person by name, else a thing ("Till cash": the cash turned in at the till), else a place by
+ * room name; last, a role ("the driver") when exactly one person is near. The world's `pay` op takes any of the three.
+ */
+function pickPayee(end: { to: string }, world: RoutineWorld): Payee | null {
+  const named = pickByName(end.to, world.people);
+  if (named) return { kind: 'person', id: named.id, name: named.name, person: named };
+  const t = pickByName(end.to, world.things);
+  if (t) return { kind: 'thing', id: t.id, name: t.name, thing: t };
+  const r = norm(end.to);
+  if (r) {
+    if (world.actor.roomName && norm(world.actor.roomName) === r) return { kind: 'place', id: world.actor.roomId, name: world.actor.roomName };
+    const lying = world.things.find((x) => !x.holderId && x.roomName && norm(x.roomName) === r);
+    if (lying?.roomName) return { kind: 'place', id: lying.roomId, name: lying.roomName };
+  }
+  const p = pickPerson(end.to, world);
+  return p ? { kind: 'person', id: p.id, name: p.name, person: p } : null;
+}
+
 // ── Is an end met? ────────────────────────────────────────────────────────────
 
 export function endMet(end: RoutineEnd, world: RoutineWorld): boolean {
@@ -155,8 +179,8 @@ export function endMet(end: RoutineEnd, world: RoutineWorld): boolean {
     case 'hold': { const t = pickByName(end.item, world.things); return !!t && t.holderId === world.actor.id; }
     case 'gave': { const t = pickByName(end.item, world.things); const p = pickPerson(end.to, world); return !!t && !!p && t.holderId === p.id; }
     case 'paid': {
-      const p = pickPerson(end.to, world);
-      if (!p) return false;
+      const p = pickPayee(end, world);
+      if (!p || !p.id) return false;
       return (world.payments ?? []).some((pay) => pay.to === p.id && pay.amount + 0.005 >= end.amount && (!end.currency || !pay.code || pay.code.toUpperCase() === end.currency.toUpperCase())
         && (world.now == null || pay.cycle == null || world.now - pay.cycle <= PAYMENT_FRESH_CYCLES));
     }
@@ -258,8 +282,9 @@ function stepToward(end: RoutineEnd, world: RoutineWorld): Chain | null {
       return toPerson(p, world, because);
     }
     case 'paid': {
-      const p = pickPerson(end.to, world);
-      if (!p) return null;
+      const payee = pickPayee(end, world);
+      if (!payee) return null;
+      const p = { name: payee.name };
       const money = `${end.amount} ${end.currency ?? ''}`.trim();
       const because = [`${s} ${means} to pay ${p.name} ${money}`];
       const purse = (world.actor.cash ?? []).find((c) => !end.currency || c.code.toUpperCase() === end.currency.toUpperCase()) ?? (end.currency ? null : world.actor.cash?.[0] ?? null);
@@ -267,8 +292,29 @@ function stepToward(end: RoutineEnd, world: RoutineWorld): Chain | null {
         const has = purse ? `${purse.onHand} ${purse.code}` : 'no money';
         return { effect: { op: 'wait', for: `${money} to pay ${p.name} — ${has} in hand` }, act: `has ${has} in hand, not the ${money} for ${p.name}`, step: `pay ${p.name} ${money} when there is money for it`, because: [...because, `${s} ${/^f/i.test(world.actor.sex ?? '') ? 'has' : /^m/i.test(world.actor.sex ?? '') ? 'has' : 'have'} ${has}`] };
       }
-      if (p.reach === 'here' || p.reach === 'through-open') return { effect: { op: 'pay', to: p.name, amount: end.amount, ...(end.currency ? { currency: end.currency } : {}) }, act: `pays ${p.name} ${money}`, step: `pay ${p.name} ${money}`, because };
-      return toPerson(p, world, because);
+      const cur = end.currency ? { currency: end.currency } : {};
+      if (payee.kind === 'thing') {
+        const t = payee.thing;
+        const put = { effect: { op: 'pay' as const, to: t.name, amount: end.amount, ...cur }, act: `puts ${money} into ${the(t.name)}`, step: `put ${money} into ${the(t.name)}`, because };
+        if (t.holderId === world.actor.id) return put;
+        if (!t.holderId) {
+          if (t.roomId && t.roomId === world.actor.roomId) {
+            if (t.distanceFt !== null && t.distanceFt > REACH_FT) return { effect: { op: 'move', to: t.name }, act: `goes to ${the(t.name)}`, step: `go to ${the(t.name)}`, because };
+            return put;
+          }
+          if (t.roomId && t.roomName) return { effect: { op: 'move', to: t.roomName }, act: `goes to ${placeThe(t.roomName)}`, step: `go to ${placeThe(t.roomName)}`, because: [...because, `${the(t.name)} is at ${placeThe(t.roomName)}`] };
+          return null;
+        }
+        const holder = world.people.find((x) => x.id === t.holderId);
+        return holder ? toPerson(holder, world, [...because, `${holder.name} has it`]) : null;
+      }
+      if (payee.kind === 'place') {
+        if (world.actor.roomName && norm(world.actor.roomName) === norm(payee.name)) return { effect: { op: 'pay', to: payee.name, amount: end.amount, ...cur }, act: `puts ${money} down in ${placeThe(payee.name)}`, step: `put ${money} down in ${placeThe(payee.name)}`, because };
+        return { effect: { op: 'move', to: payee.name }, act: `goes to ${placeThe(payee.name)}`, step: `go to ${placeThe(payee.name)}`, because };
+      }
+      const pp = payee.person;
+      if (pp.reach === 'here' || pp.reach === 'through-open') return { effect: { op: 'pay', to: pp.name, amount: end.amount, ...cur }, act: `pays ${pp.name} ${money}`, step: `pay ${pp.name} ${money}`, because };
+      return toPerson(pp, world, because);
     }
     case 'door': {
       const d = pickDoor(end.door, world);
@@ -397,7 +443,11 @@ export function endsInWords(ends: RoutineEnd[], world?: RoutineWorld): string[] 
     switch (e.kind) {
       case 'hold': return `${tick}have the ${norm(e.item)}`;
       case 'gave': return `${tick}hand the ${norm(e.item)} to ${e.to}`;
-      case 'paid': return `${tick}pay ${e.to} ${e.amount}${e.currency ? ` ${e.currency}` : ''}`;
+      case 'paid': {
+        const money = `${e.amount}${e.currency ? ` ${e.currency}` : ''}`;
+        const payee = world ? pickPayee(e, world) : null;
+        return payee && payee.kind !== 'person' ? `${tick}put ${money} into ${payee.kind === 'place' ? placeThe(payee.name) : the(payee.name)}` : `${tick}pay ${e.to} ${money}`;
+      }
       case 'door': return `${tick}the ${norm(e.door)} ${e.state}`;
       case 'at': return `${tick}be at the ${norm(e.place)}`;
     }

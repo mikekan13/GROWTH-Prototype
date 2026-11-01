@@ -3,6 +3,12 @@
 Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all components inventoried)
 
 
+## JEWL world-keeping from the table (2026-11-01)
+
+- `src/ai/copilot/tool-profiles.ts` — `nextGrants` keeps a grant for the rest of the turn (was: dropped when unused for a round). `src/ai/copilot/runtime.ts` — `STAGE_ONLY_TOOLS` no longer holds `stock_goods` / `stock_kit` (requestable on any lane); reply hygiene (echoed `[ISO]: ` stamps stripped); one bounce per dispatch when a granted tool was never used.
+- Tools: `compose_item` (what a thing is made of, under the recipe law), `consume_item` (CONSUMED | LOST | DESTROYED with why; never deletes), `derive_routines` (re-read a character's routines — the engine derives), `place_item` (+ `parts`, `currency`), `move_item` (+ `location` alias, `note`), `move_character_to_location` (a place by name), `read_actors_state` (+ `locationName`, `holds[]` with parts in words).
+- `tmp/jewl-say.ts` — speak to JEWL as the campaign's GM through the copilot route (a short-lived session row; node:http with no timeout). `tmp/jewl-poll.ts` / `tmp/jewl-watch.ts` — read what he did.
+
 ## Parts — what a thing is made of (object permanence, 2026-11-01)
 
 - `src/lib/parts.ts` — PURE. `partsOf(name, data)` (the `parts` list; a lone `tender` thing; a legacy `quantity`; else one of itself), `isComposed`, `looseParts` (not `bound`), `partCount`, `tenderTotal(ms, currencyId?)`, `tenderCurrencies`, `partsInWords` ("a twenty and a five ($25)", "20 arrows"), `pickTender(ms, amount, currencyId?)` (bounded knapsack: least over, fewest pieces; loose tender only), `takeParts` (throws on a bound part unless `unmake`), `addParts`, `dataForParts` (many → `parts`, one piece → `tender`; weight/KV summed; stale quantity/state dropped), `nameForParts`, `billOf`.

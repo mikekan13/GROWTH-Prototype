@@ -34,6 +34,7 @@ import {
   type DispatchKind,
   type ToolProfile,
 } from './tool-profiles';
+import { stripEchoedStamps } from './reply-hygiene';
 import { CANON_REWRITE_NOTE, canonRewriteActive } from '@/services/canon-rewrite';
 import {
   tableChatHistory,
@@ -625,6 +626,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   let rounds = 0;
   let lastStopReason: string | undefined;
   let lastRoundHadTools = false;
+  let bouncedForUnusedGrants = false;
 
   // F-2 construction-site feedback: surfaces (the canvas) show "JEWL is
   // working here" live instead of silence until the reply lands. Best-
@@ -711,10 +713,26 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     // If Claude is done OR didn't call any tools, exit. (A max_tokens stop
     // WITH complete tool calls falls through — we execute what landed and
     // the next round lets it continue the remainder.)
-    if (result.stopReason !== 'tool_use' && result.stopReason !== 'max_tokens') {
-      break;
-    }
-    if (toolUseBlocks.length === 0) {
+    if (toolUseBlocks.length === 0 || (result.stopReason !== 'tool_use' && result.stopReason !== 'max_tokens')) {
+      // Granted and never used (2026-11-01): he pulled a tool with request_tool,
+      // then ended the turn claiming the work was done. Bounce ONCE per dispatch;
+      // the round cap (the for-loop) still applies.
+      if (toolUseBlocks.length === 0 && !bouncedForUnusedGrants && iter + 1 < maxToolIterations) {
+        const unused = grants.filter(g => !toolCallsMade.some(t => t.name === g));
+        if (unused.length > 0) {
+          bouncedForUnusedGrants = true;
+          const list = unused.join(', ');
+          messages.push({ role: 'assistant', content: [{ type: 'text', text: finalText || '(no reply)' }] });
+          messages.push({
+            role: 'user',
+            content: [{
+              type: 'text',
+              text: `[SYSTEM: You pulled ${list} with request_tool and did not use ${unused.length === 1 ? 'it' : 'them'}. Use ${unused.length === 1 ? 'it' : 'them'} now, or say plainly what stopped you — never report that work as done.]`,
+            }],
+          });
+          continue;
+        }
+      }
       break;
     }
 
@@ -847,7 +865,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   }
 
   const response: JewlResponse = {
-    message: finalText,
+    message: stripEchoedStamps(finalText),
     toolCalls: toolCallsMade,
     metadata: {
       model,

@@ -87,7 +87,7 @@ describe('the planner: go → unlock and open → take → pay → tip → shut 
     const got = normalizeEndOrder([
       { kind: 'door', door: 'the way out', state: 'locked' }, { kind: 'gave', item: 'cash', to: 'K' }, { kind: 'gave', item: 'bill', to: 'K' }, { kind: 'hold', item: 'pizza' }, { kind: 'door', door: 'the way out', state: 'open' },
     ]);
-    expect(got.map((e) => (e.kind === 'door' ? `door:${e.state}` : e.kind === 'at' ? `at:${e.place}` : `${e.kind}:${e.item}`))).toEqual(['door:open', 'hold:pizza', 'gave:cash', 'gave:bill', 'door:locked']);
+    expect(got.map((e) => (e.kind === 'door' ? `door:${e.state}` : e.kind === 'at' ? `at:${e.place}` : e.kind === 'paid' ? `paid:${e.to}` : `${e.kind}:${e.item}`))).toEqual(['door:open', 'hold:pizza', 'gave:cash', 'gave:bill', 'door:locked']);
   });
   it('the plan adapts: the Watcher opened the door himself, so she skips straight to waiting for the box', () => {
     const s = nextStep(PIZZA_ENDS, world({ doorFt: 12, doorState: 'open' }))!;
@@ -257,5 +257,58 @@ describe("PAYING IS AN AMOUNT (Michael 2026-11-01): the 'paid' end", () => {
     expect(endsInWords([PAID])).toEqual(['pay Kristopher 22.97 USD']);
     const drafts = parseRoutineDrafts({ routines: [{ name: 'Pizza', triggers: ['knock'], cadence: 'daily', ends: [{ kind: 'paid', to: 'the driver', amount: '22.97', currency: 'usd' }], sourceIntentionIds: [] }] });
     expect(drafts[0].ends).toEqual([{ kind: 'paid', to: 'the driver', amount: 22.97, currency: 'USD' }]);
+  });
+});
+
+describe("PAYING INTO A THING OR A PLACE: the till turn-in", () => {
+  const TILL = 'till-1';
+  const END: RoutineEnd = { kind: 'paid', to: 'Chess Pizza', amount: 22.97, currency: 'USD' };
+  const TILL_END: RoutineEnd = { kind: 'paid', to: 'the till', amount: 22.97, currency: 'USD' };
+  const w = (till: Partial<RoutineWorld['things'][number]>, over: Partial<RoutineWorld> = {}): RoutineWorld => {
+    const base = world({ doorState: 'open' });
+    return {
+      ...base,
+      actor: { ...base.actor, roomId: 'shop', roomName: 'Chess Pizza', cash: [{ code: 'USD', onHand: 40 }] },
+      people: [],
+      things: [{ id: TILL, name: 'Till cash', holderId: null, holderName: null, roomId: 'shop', roomName: 'Chess Pizza', distanceFt: 2, ...till }],
+      payments: [], now: 10, ...over,
+    };
+  };
+  it('a thing in reach: a pay op into it', () => {
+    const s = nextStep([TILL_END], w({}), 0)!;
+    expect(s.effect).toEqual({ op: 'pay', to: 'Till cash', amount: 22.97, currency: 'USD' });
+    expect(s.act).toBe('puts 22.97 USD into the Till cash');
+  });
+  it('a thing across the room: goes to it first', () => {
+    const s = nextStep([TILL_END], w({ distanceFt: 15 }), 0)!;
+    expect(s.effect).toEqual({ op: 'move', to: 'Till cash' });
+  });
+  it('a thing in another room: goes to that room', () => {
+    const s = nextStep([TILL_END], w({ roomId: 'back', roomName: 'Back Office' }, { actor: { ...w({}).actor, roomId: 'shop' } }), 0)!;
+    expect(s.effect).toEqual({ op: 'move', to: 'Back Office' });
+  });
+  it('short of money: waits', () => {
+    const base = w({});
+    expect(nextStep([TILL_END], { ...base, actor: { ...base.actor, cash: [{ code: 'USD', onHand: 5 }] } }, 0)!.effect.op).toBe('wait');
+  });
+  it('a payment recorded to the thing id marks the end met; stale or short does not', () => {
+    expect(endMet(TILL_END, w({}, { payments: [{ to: TILL, amount: 22.97, code: 'USD', cycle: 9.999 }] }))).toBe(true);
+    expect(endMet(TILL_END, w({}, { payments: [{ to: TILL, amount: 10, code: 'USD', cycle: 9.999 }] }))).toBe(false);
+    expect(endMet(TILL_END, w({}, { payments: [{ to: TILL, amount: 30, code: 'USD', cycle: 9.9 }] }))).toBe(false);
+    expect(endMet(TILL_END, w({}))).toBe(false);
+  });
+  it('a place target in the actor room pays; elsewhere moves', () => {
+    const here = w({ name: 'Cash drawer', roomName: 'Chess Pizza' });
+    const s = nextStep([END], here, 0)!;
+    expect(s.effect).toEqual({ op: 'pay', to: 'Chess Pizza', amount: 22.97, currency: 'USD' });
+    expect(endMet(END, { ...here, payments: [{ to: 'shop', amount: 23, code: 'USD', cycle: 9.999 }] })).toBe(true);
+    const away = { ...here, actor: { ...here.actor, roomId: 'street', roomName: 'Street' } };
+    expect(nextStep([END], away, 0)!.effect).toEqual({ op: 'move', to: 'Chess Pizza' });
+  });
+  it('words say put into the till for a thing; the person path still pays a person', () => {
+    expect(endsInWords([TILL_END], w({}))).toEqual(['· put 22.97 USD into the Till cash']);
+    const base = world({ doorState: 'open' });
+    const pw: RoutineWorld = { ...base, actor: { ...base.actor, cash: [{ code: 'USD', onHand: 45 }] }, people: [{ id: KRIS, name: 'Kristopher', roomId: null, roomName: 'Landing', reach: 'through-open', doorBetween: 'Entry door' }], payments: [], now: 10 };
+    expect(nextStep([{ kind: 'paid', to: 'Kristopher', amount: 22.97, currency: 'USD' }], pw, 0)!.effect).toEqual({ op: 'pay', to: 'Kristopher', amount: 22.97, currency: 'USD' });
   });
 });

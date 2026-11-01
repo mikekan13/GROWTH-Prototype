@@ -453,15 +453,24 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           // MONEY IS PARTS OF A THING (Michael 2026-11-01): the bills come out of what the actor carries — fewest pieces, least
           // over — and land as ONE new thing in the receiver's hands, the payment on its history. Never a give of "the cash".
           const people = await prisma.character.findMany({ where: { campaignId, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { id: true, name: true } });
-          const to = people.find((p) => p.id === e.to) ?? people.find((p) => p.name.toLowerCase() === e.to.trim().toLowerCase()) ?? people.find((p) => e.to.toLowerCase().includes(p.name.toLowerCase()));
-          if (!to) { report.refused.push(`pay "${e.to}": no one by that name here`); break; }
-          const toRel = await prisma.entityRelationship.findFirst({ where: { sourceId: to.id, relationshipType: REL }, select: { targetId: true } });
-          if (map && toRel && toRel.targetId !== map.roomId && !(await withinReachThroughOpenWay(campaignId, map, toRel.targetId))) { report.refused.push(`pay ${to.name}: not within reach from ${map.roomName}`); break; }
+          const person = people.find((p) => p.id === e.to) ?? people.find((p) => p.name.toLowerCase() === e.to.trim().toLowerCase()) ?? people.find((p) => e.to.toLowerCase().includes(p.name.toLowerCase()));
+          // MONEY TO A THING OR A PLACE (2026-11-01: the collected cash turned in at the till): the till, a jar, a counter, a room.
+          let to: { id: string; name: string; locationId: string | null; kind: 'character' | 'item' | 'location' } | null = person ? { id: person.id, name: person.name, locationId: null, kind: 'character' } : null;
+          if (!to) {
+            const { resolvePlace } = await import('./placement');
+            const place = await resolvePlace(campaignId, e.to).catch(() => null);
+            if (place) to = { id: place.id, name: place.name, locationId: place.kind === 'item' ? place.locationId : place.id, kind: place.kind };
+          }
+          if (!to) { report.refused.push(`pay "${e.to}": no one and nothing by that name here`); break; }
+          const toRel = to.kind === 'character' ? await prisma.entityRelationship.findFirst({ where: { sourceId: to.id, relationshipType: REL }, select: { targetId: true } }) : null;
+          if (to.kind === 'character') to.locationId = toRel?.targetId ?? null;
+          const targetRoom = to.kind === 'character' ? toRel?.targetId ?? null : to.locationId;
+          if (map && targetRoom && targetRoom !== map.roomId && !(await withinReachThroughOpenWay(campaignId, map, targetRoom))) { report.refused.push(`pay ${to.name}: not within reach from ${map.roomName}`); break; }
           const { payFromHand } = await import('./parts');
           const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? null;
-          const r = await payFromHand(campaignId, { id: actor.id, name: actor.name }, { id: to.id, name: to.name, locationId: toRel?.targetId ?? null }, e.amount, { currency: e.currency, because: actText?.trim() || `paid ${to.name}`, cycle });
+          const r = await payFromHand(campaignId, { id: actor.id, name: actor.name }, to, e.amount, { currency: e.currency, because: actText?.trim() || `paid ${to.name}`, cycle });
           if (!r.ok) { report.refused.push(`pay ${to.name} ${e.amount}${e.currency ? ` ${e.currency}` : ''}: ${r.reason}`); break; }
-          report.applied.push(`${actor.name} hands ${r.words} to ${to.name}${r.over > 0.004 ? ` — ${r.overWords} over the ${e.amount}` : ''}`);
+          report.applied.push(`${actor.name} ${to.kind === 'character' ? 'hands' : 'puts'} ${r.words} ${to.kind === 'character' ? 'to' : 'into'} ${to.name}${r.over > 0.004 ? ` — ${r.overWords} over the ${e.amount}` : ''}`);
           for (const id of [r.itemId, ...r.sourceIds]) await itemChanged(campaignId, id);
           break;
         }

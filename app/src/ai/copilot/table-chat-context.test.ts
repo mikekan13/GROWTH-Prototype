@@ -208,6 +208,21 @@ describe('request_tool — the escape hatch', () => {
     expect(h.createLocation).toHaveBeenCalledTimes(1);
   });
 
+  it('a granted tool never used bounces the turn once, then a final text ends the dispatch', async () => {
+    h.callClaude
+      .mockResolvedValueOnce(turn([{ type: 'tool_use', id: 'a', name: 'request_tool', input: { name: 'create_location' } }]))
+      .mockResolvedValueOnce(turn([{ type: 'text', text: 'built it' }], 'end_turn'))
+      .mockResolvedValueOnce(turn([{ type: 'text', text: 'I did not build it' }], 'end_turn'));
+    const res = await chat('build me a tavern');
+    expect(h.callClaude).toHaveBeenCalledTimes(3);
+    const msgs = h.callClaude.mock.calls[2][0].messages as Array<{ role: string; content: Array<{ text?: string }> }>;
+    const last = msgs[msgs.length - 1];
+    expect(last.role).toBe('user');
+    expect(last.content[0].text).toMatch(/create_location/);
+    expect(res.message).toBe('I did not build it');
+    expect(h.createLocation).not.toHaveBeenCalled();
+  });
+
   it('a heavy tool called in the same round as its request is refused (it arrives next round)', async () => {
     h.callClaude
       .mockResolvedValueOnce(turn([

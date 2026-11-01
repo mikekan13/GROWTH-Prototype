@@ -118,7 +118,7 @@ export type PayResult =
 export async function payFromHand(
   campaignId: string,
   from: { id: string; name: string },
-  to: { id: string; name: string; locationId: string | null },
+  to: { id: string; name: string; locationId: string | null; kind?: 'character' | 'item' | 'location' },
   amount: number,
   opts: { currency?: string; because: string; cycle?: number | null },
 ): Promise<PayResult> {
@@ -172,10 +172,14 @@ export async function payFromHand(
     data: {
       campaignId, name, type: first?.type ?? 'misc', status: 'ACTIVE', createdBy: first?.createdBy ?? from.id, sourceForgeItemId: first?.sourceForgeItemId ?? null,
       data: JSON.stringify({ ...dataForParts(base, taken), ...(typeof base.description === 'string' ? { description: base.description } : {}) }),
-      holderId: to.id, locationId: to.locationId,
+      // MONEY TO A PERSON goes into their hands; MONEY TO A THING OR PLACE (the till, the tip jar, a room) lies there (2026-11-01).
+      holderId: to.kind === 'item' || to.kind === 'location' ? null : to.id, locationId: to.kind === 'location' ? to.id : to.locationId,
       history: JSON.stringify([{ kind: 'paid', at, text: `${words} from ${from.name}: ${opts.because}${pick.over > 0 ? ` (${fmt(pick.over, slot.code)} over)` : ''}`, from: from.id, to: to.id, amount, handed: pick.handed, currencyId: slot.currencyId, code: slot.code, fromItemIds: sourceIds, ...(opts.cycle != null ? { cycle: opts.cycle } : {}) }]),
     },
   });
+  if (to.kind === 'item' || to.kind === 'location') {
+    await prisma.entityRelationship.create({ data: { campaignId, sourceId: made.id, sourceType: 'CAMPAIGN_ITEM', targetId: to.id, targetType: to.kind === 'item' ? 'CAMPAIGN_ITEM' : 'LOCATION', relationshipType: 'located_at', strength: 5 } }).catch(() => undefined);
+  }
   return { ok: true, handed: pick.handed, over: pick.over, code: slot.code, itemId: made.id, name, words, overWords: fmt(pick.over, slot.code), sourceIds };
 }
 
