@@ -119,7 +119,8 @@ export const readActorsStateTool: JewlTool = {
     for (const r of heldRows) {
       let d: Record<string, unknown> = {};
       try { d = r.data ? JSON.parse(r.data) : {}; } catch { d = {}; }
-      const words = isComposed(d as Parameters<typeof isComposed>[0]) || (d as { tender?: unknown }).tender ? ` (${partsInWords(partsOf(r.name, d as Parameters<typeof partsOf>[1]))})` : '';
+      const tender = (d as { tender?: { faceValue: number; code: string } }).tender;
+      const words = isComposed(d as Parameters<typeof isComposed>[0]) ? ` (${partsInWords(partsOf(r.name, d as Parameters<typeof partsOf>[1]))})` : tender ? ` (${tender.faceValue} ${tender.code})` : '';
       const list = holdsByCharacter.get(r.holderId!) ?? [];
       list.push(`${r.name}${words}`);
       holdsByCharacter.set(r.holderId!, list);
