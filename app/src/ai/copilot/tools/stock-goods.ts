@@ -9,7 +9,7 @@ import type { JewlTool, JewlToolHandlerResult } from './types';
 export const stockGoodsTool: JewlTool = {
   name: 'stock_goods',
   description:
-    'Genesis WORLD stage. Stock a room, a wardrobe, a pantry, a drawer in ONE call: up to 120 ordinary things, each a real ' +
+    "Genesis WORLD stage, and world-keeping any time (a shop's stock, a till's cash). Stock a room, a wardrobe, a pantry, a drawer in ONE call: up to 120 ordinary things, each a real " +
     'item she owns, placed in a room or INSIDE ANY OTHER THING — everything is a container (the sink holds a dish, the ' +
     'fridge the eggs, the junk drawer the batteries, a coat pocket a receipt); holders named in the same call are placed ' +
     'first. The canvas shows only what is at the top of a room; what is inside folds into its holder. KV IS THE PRICE ' +

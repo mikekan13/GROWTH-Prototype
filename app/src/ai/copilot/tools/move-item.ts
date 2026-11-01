@@ -11,7 +11,10 @@ import type { JewlTool, JewlToolHandlerResult } from './types';
 
 const inputSchema = z.object({
   item: z.string().min(1).max(200).describe('The thing: its local name (exact) or id.'),
-  into: z.string().min(1).max(200).describe('Where it goes: a room (Location name/id) or a container item (name/id) — a bookcase, a drawer, a box, a bag.'),
+  into: z.string().min(1).max(200).optional().describe('Where it goes: a room (Location name/id) or a container item (name/id) — a bookcase, a drawer, a box, a bag.'),
+  /** The same thing by another name (2026-11-01: JEWL wrote `location` fourteen times in a row and was refused each time). */
+  location: z.string().min(1).max(200).optional(),
+  note: z.string().max(300).optional().describe("Where exactly / how it lies — for the object's ledger."),
   why: z.string().max(200).optional().describe('One line, for the log ("the kitchen things go in the kitchen").'),
 });
 
@@ -24,7 +27,9 @@ export const moveItemTool: JewlTool = {
   inputSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const p = inputSchema.parse(input);
-    const r = await placeItem(ctx.campaignId, { item: p.item, into: p.into });
+    const into = p.into ?? p.location;
+    if (!into) throw new Error('say where it goes (`into`: a room or a container)');
+    const r = await placeItem(ctx.campaignId, { item: p.item, into });
     return {
       output: { ok: true, itemId: r.itemId, name: r.name, into: r.into.name, path: r.path.join(' › ') },
       affected: { items: [{ id: r.itemId }] },

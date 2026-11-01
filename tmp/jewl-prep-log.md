@@ -54,3 +54,10 @@ Source: `npx tsx ../tmp/jewl-watch.ts <sinceISO>` from `app/` (CopilotMessage ro
 - FIXED (engine): account window = last awake; directive `when: 'end'`; concurrent stretch REFUSED; working tick per window; holder dedupe.
 - JEWL's to answer for at the compare: skipped ALL prep (hotel, Chess Pizza, stock, re-derive); put the end state in a directive without saying when; did not ask for Violet's intentions.
 - Michael's pivot (01:05Z): two-fold — JEWL preps; Michael points, Claude fixes the campaign's data. First pointer: "the cash in her wallet" → OBJECT PERMANENCE / parts (see ROADMAP 2026-11-01). Data fixed to the ruling: twenty + five handed ($25 for $22.97, change kept), the numbered five separate, one twenty left in her wallet, receipt PAID, prayer rope composed, routine end = paid 22.97.
+
+## Prep round 1 (Claude in the Watcher's seat, 02:09Z brief → 02:15Z reply)
+- GOOD: three Locations (Chess Pizza, The Hotel — Room 214, Hotel Parking Lot), Kristopher moved to the lot, his car and his things moved to the lot / Room 214 (one move_items call after the schema fight), four things placed at Chess Pizza.
+- ✗ move_item 14× with `location` instead of `into` (6 refused by stage, then 12 schema errors) — he kept retrying the same call. Tool now accepts `location` as an alias.
+- ✗ `stock_goods` is not requestable on the table lane ("not requestable here") — so NO PIZZAS (only "Box of pizza boxes") and "Till cash" made with place_item as PROSE money ("a roll of ones, twos, fives and tens") — the exact fault Michael ruled against. Needs: stock_goods/stock_kit requestable outside genesis; place_item takes `parts`.
+- ✗ Places flat: Room 214 not inside a hotel, the lot not behind it. ✗ No till (a container), cash not parts. ✗ Routines not re-derived; nothing about Violet; she still HOLDS Friday's pizza two days later (the stretch never ate it).
+- 262k input tokens on the local lane (524 once, retried).

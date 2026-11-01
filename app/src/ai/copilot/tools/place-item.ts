@@ -31,6 +31,15 @@ const inputSchema = z.object({
   tags: z.array(z.string()).max(10).optional(),
   location: z.string().optional().describe('Where it sits: a room (Location name/id) or a CONTAINER item (local name/id — a bookcase, a drawer, a box). The world is a top-down map.'),
   holder: z.string().optional().describe('Character (name or id) carrying it — alternative to location.'),
+  parts: z.array(z.object({
+    name: z.string().min(1).max(80),
+    count: z.number().int().min(1).max(10000),
+    faceValue: z.number().min(0).optional().describe("MONEY ONLY: the face of ONE in `currency`."),
+    weightLbs: z.number().min(0).optional(),
+    bound: z.boolean().optional(),
+    primaryMaterial: z.string().max(60).optional(),
+  })).max(24).optional().describe("WHAT IT IS MADE OF, by kind and count (object permanence). MONEY IS ALWAYS PARTS WITH faceValue — a till drawer or a wad is its bills and coins, never a description of them."),
+  currency: z.string().max(12).optional().describe("Currency code for faceValue (default: the campaign's only active currency)."),
   fromForgeItem: z.string().optional().describe(
     'Instantiate from a PUBLISHED Forge blueprint (name or id). Refused while the blueprint ' +
       'is still a draft awaiting GM approval — tell the GM and continue building elsewhere.',
@@ -142,6 +151,13 @@ export const placeItemTool: JewlTool = {
       story: parsed.story ?? null,
       origin: source ? `instantiated from the Forge archetype "${source.name}"` : 'placed directly',
     });
+
+    // WHAT IT IS MADE OF (Michael 2026-11-01): parts under the recipe law; money parts take their face in the campaign currency.
+    let madeOf: string | null = null;
+    if (parsed.parts?.length) {
+      const { setParts } = await import('@/services/parts');
+      madeOf = (await setParts(ctx.campaignId, item.id, parsed.parts, { currency: parsed.currency, because: 'placed with its parts' })).words;
+    }
 
     // Canvas folder membership is driven by located_at EDGES, not the
     // locationId column — without this edge the object renders as a

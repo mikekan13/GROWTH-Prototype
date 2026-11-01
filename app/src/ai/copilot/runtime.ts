@@ -161,8 +161,9 @@ const STAGE_ONLY_TOOLS = new Set([
   'raise_prod', 'end_prod_round',
   // Genesis completion stages (2026-10-12): offered only in their own stage cycle.
   'set_starting_age', 'grant_possession', 'seed_npc', 'seed_location', 'author_vine_goal',
-  // Material life (2026-10-16): WORLD stage only.
-  'read_life_budget', 'establish_currency', 'grant_cash', 'set_income', 'drop_possession', 'stock_goods', 'stock_kit',
+  // Material life (2026-10-16): WORLD stage only — except stocking, which is WORLD-KEEPING too (2026-11-01: JEWL could not
+  // put pizzas at Chess Pizza or cash in a till from the table; stock_goods / stock_kit are requestable on any lane).
+  'read_life_budget', 'establish_currency', 'grant_cash', 'set_income', 'drop_possession',
 ]);
 
 /** Tools offered ONLY on the table lane — a live dispatch from the Watcher
