@@ -111,6 +111,20 @@ export function homeAnchor(data: Record<string, unknown>, status: string): Point
   return { x, y: status === 'ACTIVE' ? y : Math.max(200, y) };
 }
 
+/**
+ * A drawn home with NO child rooms (and none passed in the call) is an open place: its own outline is the single
+ * room, so tokens inside it are filed under the home itself. Null otherwise (indoor behaviour unchanged). Pure.
+ */
+export function openPlaceRoom(
+  home: { id: string; name: string },
+  outline: Point[] | null | undefined,
+  childRoomCount: number,
+  planRoomCount: number,
+): { id: string; name: string; points: Point[] } | null {
+  if (childRoomCount > 0 || planRoomCount > 0 || !outline || outline.length < 3) return null;
+  return { id: home.id, name: home.name, points: outline };
+}
+
 function parseData(raw: string | null): Record<string, unknown> {
   try { const d = raw ? JSON.parse(raw) : {}; return d && typeof d === 'object' && !Array.isArray(d) ? d : {}; } catch { return {}; }
 }
@@ -153,7 +167,10 @@ export async function drawPlaceMap(
   const roomPolys: Array<{ id: string; name: string; points: Point[] }> = [];
   for (const r of plan.rooms) {
     const room = byRef(r.name);
-    if (!room || !childIds.has(room.id)) { report.errors.push(`room "${r.name}" is not a room inside ${home.name}`); continue; }
+    if (!room || !childIds.has(room.id)) {
+      report.errors.push(`no room called "${r.name}" inside ${home.name} — create it with create_location(parentLocation: ${home.name}) or leave rooms empty for an open place`);
+      continue;
+    }
     const points = toWorld(snapOutline(r.outlineFt));
     await setLocationGeometry(campaignId, room.id, actor.userId, actor.role, {
       footprint: { points, scale: DEFAULT_SCALE_FT_PER_UNIT, level, ...(r.ceilingFt ? { height: r.ceilingFt } : plan.ceilingFt ? { height: plan.ceilingFt } : {}) },
@@ -171,6 +188,10 @@ export async function drawPlaceMap(
     const fp = l ? parseFootprint(parseData(l.data).footprint) : null;
     if (l && fp) roomPolys.push({ id: l.id, name: l.name, points: fp.points });
   }
+  // An open place (a parking lot, a field, a street) has no rooms: it IS the room.
+  const homeFootprint = homeOutlineFt ? toWorld(homeOutlineFt) : parseFootprint(homeData.footprint)?.points;
+  const open = openPlaceRoom({ id: home.id, name: home.name }, homeFootprint, childIds.size, plan.rooms.length);
+  if (open) roomPolys.push(open);
   const roomAt = (p: Point, prefer?: string) => {
     const hits = roomPolys.filter(r => pointInPolygon(p, r.points));
     return hits.find(r => r.id === prefer) ?? hits.sort((x, y) => area(x.points) - area(y.points))[0] ?? null;
@@ -248,9 +269,9 @@ export async function drawPlaceMap(
     // WALLS, never trusted from the plan (2026-10-17: the bathroom door was
     // drawn on the outer wall — a door to outside).
     const homeFt = homeOutlineFt ?? (() => { const fp = parseFootprint(homeData.footprint); return fp ? fp.points.map(toFt) : null; })();
-    const roomsFt = roomPolys.map(r => ({ owner: r.name, points: r.points.map(toFt) }));
+    const roomsFt = roomPolys.filter(r => r !== open).map(r => ({ owner: r.name, points: r.points.map(toFt) }));
     const edges = wallEdges([...roomsFt, ...(homeFt ? [{ owner: home.name, points: homeFt }] : [])]);
-    const roomNames = new Set(roomPolys.map(r => r.name.toLowerCase()));
+    const roomNames = new Set(roomPolys.filter(r => r !== open).map(r => r.name.toLowerCase()));
     const existing = parseOpenings(homeData.openings);
     const errorsBefore = report.errors.length;
     const openings: Opening[] = plan.openings.map((o, i) => {

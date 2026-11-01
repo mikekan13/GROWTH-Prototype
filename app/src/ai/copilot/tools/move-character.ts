@@ -13,6 +13,7 @@ import {
   moveCharacterToLocation,
   moveCharacterToLocationSchema,
 } from '@/services/character-location';
+import { prisma } from '@/lib/db';
 import { registerJewlTool } from './registry';
 import { resolveLocationRef } from './create-location';
 import type { JewlTool, JewlToolHandlerResult } from './types';
@@ -27,6 +28,12 @@ export const moveCharacterTool: JewlTool = {
   inputSchema: moveCharacterToLocationSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const parsed = moveCharacterToLocationSchema.parse(input);
+    // A character by NAME is a character: exact name (case-insensitive) or id, within this campaign.
+    const key = parsed.characterId.trim().toLowerCase();
+    const chars = await prisma.character.findMany({ where: { campaignId: ctx.campaignId }, select: { id: true, name: true } });
+    const who = chars.find(c => c.id === parsed.characterId) ?? chars.find(c => c.name.trim().toLowerCase() === key);
+    if (!who) return { output: { ok: false, reason: `No character "${parsed.characterId}" in this campaign (name or id).` } };
+    parsed.characterId = who.id;
     // A place by NAME is a place (2026-11-01: "Hotel Parking Lot" was refused as "Target location not found").
     if (parsed.locationId) {
       const ref = await resolveLocationRef(ctx.campaignId, parsed.locationId);
