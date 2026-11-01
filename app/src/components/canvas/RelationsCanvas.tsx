@@ -34,6 +34,7 @@ import type { GrowthLocation } from "@/types/location";
 import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
 import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/ContextMenu";
+import { StackPicker, tokensAtPoint, type StackEntry } from "./StackPicker";
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight, drawnPlaceRect } from "./FolderGroup";
 import { settle, packFolder, pickRoomAt, type SettleNode, type SettleFolder, type SettlePriority } from "./canvas-settle";
 import CharacterToken from "./CharacterToken";
@@ -2978,6 +2979,35 @@ export default function RelationsCanvas({
   nodesRef.current = nodes;
   const clientToSvgRef = useRef(clientToSvg);
   clientToSvgRef.current = clientToSvg;
+  // STACK PICKER (2026-11-01): a tap where 2+ tokens overlap asks which one.
+  // The pointerdown (capture) records what is under the finger; the token's own
+  // tap -> onOpen then routes through openOrStack. Drags are untouched.
+  const [stackMenu, setStackMenu] = useState<{ x: number; y: number; entries: StackEntry[] } | null>(null);
+  const stackMenuRef = useRef(stackMenu);
+  stackMenuRef.current = stackMenu;
+  const lastDownRef = useRef<{ x: number; y: number; t: number; entries: StackEntry[]; menuWasOpen: boolean } | null>(null);
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      lastDownRef.current = null;
+      if (e.button !== 0 || !e.isTrusted) return;
+      const menuWasOpen = !!stackMenuRef.current;
+      const tgt = e.target as Element | null;
+      if (!tgt || !tgt.closest || !tgt.closest('[data-character-token],[data-item-token]')) return;
+      const entries = tokensAtPoint(e.clientX, e.clientY, id => nodesRef.current.find(n => n.id === id)?.name);
+      lastDownRef.current = { x: e.clientX, y: e.clientY, t: Date.now(), entries, menuWasOpen };
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    return () => document.removeEventListener('pointerdown', onDown, true);
+  }, []);
+  const openOrStack = useCallback((id: string) => {
+    const d = lastDownRef.current;
+    lastDownRef.current = null;
+    if (d && Date.now() - d.t < 4000) {
+      if (d.menuWasOpen) return; // a tap while the picker was open just closes it
+      if (d.entries.length >= 2) { setStackMenu({ x: d.x, y: d.y, entries: d.entries }); return; }
+    }
+    toggleExpand(id); bringNodeToFront(id);
+  }, [toggleExpand, bringNodeToFront]);
   const dropCarriedAt = useCallback((wx: number, wy: number) => {
     const c = carriedRef.current;
     if (!c) return;
@@ -4727,7 +4757,7 @@ export default function RelationsCanvas({
                     isOpen={expandedNodes.has(node.id)}
                     isDraggingNode={isDraggingNode}
                     isDropTarget={invDragHoverCharId === node.id}
-                    onOpen={(id) => { toggleExpand(id); bringNodeToFront(id); }}
+                    onOpen={openOrStack}
                     onPositionChange={commitCharacterMove}
                     onDragOffsetChange={dragCharacterOffset}
                   />
@@ -4910,7 +4940,7 @@ export default function RelationsCanvas({
                     }}
                     isDraggingNode={isDraggingNode}
                     onDelete={onDeleteItem}
-                    onOpen={(id) => { toggleExpand(id); bringNodeToFront(id); }}
+                    onOpen={openOrStack}
                     onPositionChange={(nodeId, x, y) => {
                       beginTx('move'); // undo (2026-10-06)
                       commitGroupDrag(nodeId);
@@ -5331,6 +5361,15 @@ export default function RelationsCanvas({
       {/* ── Right-click on a Location folder → chooser (edit / create
           inside / delete-or-dissolve). One JEWL dialog underneath either
           path — contextual payload decides create vs edit. */}
+      {stackMenu && (
+        <StackPicker
+          entries={stackMenu.entries}
+          x={stackMenu.x}
+          y={stackMenu.y}
+          onPick={(id) => { toggleExpand(id); bringNodeToFront(id); }}
+          onClose={() => setStackMenu(null)}
+        />
+      )}
       {canvasMenu?.mode === 'chooser' && canvasMenu.editLocationId && (() => {
         const f = folders.find(fl => fl.locationInfo?.locationId === canvasMenu.editLocationId);
         const li = f?.locationInfo;
