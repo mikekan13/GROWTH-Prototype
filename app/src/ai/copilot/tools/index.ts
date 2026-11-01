@@ -56,6 +56,7 @@ import './stock-goods';
 import './stock-kit';
 import './compose-item';
 import './consume-item';
+import './derive-routines';
 import './move-items';
 import './organize-place';
 import './draw-place-map';
