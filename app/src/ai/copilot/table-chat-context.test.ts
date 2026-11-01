@@ -175,14 +175,14 @@ describe('budget', () => {
 });
 
 describe('request_tool — the escape hatch', () => {
-  it('grants are for the next round, kept only while used, never across dispatches', () => {
+  it('grants are for the next round and stay for the rest of the turn (2026-11-01), never across dispatches', () => {
     expect(nextGrants([], ['create_location'], ['request_tool'])).toEqual(['create_location']);
     expect(nextGrants(['create_location'], [], ['create_location'])).toEqual(['create_location']);
-    expect(nextGrants(['create_location'], [], ['npc_speak'])).toEqual([]);
+    expect(nextGrants(['create_location'], [], ['npc_speak'])).toEqual(['create_location']);
     expect(handleRequestTool({ name: 'nope' }, ['create_location']).error).toMatch(/not requestable/);
   });
 
-  it('request_tool adds the tool to the NEXT round only; the system block is byte-identical every round', async () => {
+  it('request_tool adds the tool from the NEXT round for the rest of the turn; the system block is byte-identical every round', async () => {
     h.callClaude
       .mockResolvedValueOnce(turn([{ type: 'tool_use', id: 'a', name: 'request_tool', input: { name: 'create_location' } }]))
       .mockResolvedValueOnce(turn([{ type: 'tool_use', id: 'b', name: 'create_location', input: { name: 'Tavern' } }]))
@@ -194,7 +194,7 @@ describe('request_tool — the escape hatch', () => {
     expect(toolNames[0]).toEqual(['npc_speak', 'request_tool']);
     expect(toolNames[1]).toEqual(['npc_speak', 'request_tool', 'create_location']);
     expect(toolNames[2]).toEqual(['npc_speak', 'request_tool', 'create_location']); // used last round → kept
-    expect(toolNames[3]).toEqual(['npc_speak', 'request_tool']); // unused → dropped
+    expect(toolNames[3]).toEqual(['npc_speak', 'request_tool', 'create_location']); // a grant lasts the turn (2026-11-01)
     expect(h.createLocation).toHaveBeenCalledTimes(1);
     expect(res.message).toBe('built');
     expect(new Set(calls.map(c => c.systemPrompt)).size).toBe(1);

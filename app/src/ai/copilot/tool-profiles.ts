@@ -107,9 +107,10 @@ export function profileAllows(name: string, profile?: ToolProfile): boolean {
  * leaves it unused drops it). Nothing carries into another dispatch.
  */
 export function nextGrants(current: readonly string[], requested: readonly string[], used: readonly string[]): string[] {
-  const out = new Set<string>(requested);
-  for (const g of current) if (used.includes(g)) out.add(g);
-  return [...out];
+  // A grant lasts the whole turn (2026-11-01: JEWL pulled create_location, stock_goods and place_item in one round, spent
+  // the next round on the hotel, and found the other two gone — "not available in this stage" ten times over).
+  void used;
+  return [...new Set<string>([...current, ...requested])];
 }
 
 /** The request_tool spec (name/description/JSON schema), listing what may be pulled. */
@@ -118,7 +119,7 @@ export function requestToolSpec(requestable: readonly string[]): { name: string;
     name: REQUEST_TOOL,
     description:
       'Pull ONE heavier tool into your NEXT round (this turn only). Call it, then use the tool on the next round. ' +
-      'A granted tool stays while you keep using it. Requestable: ' + requestable.join(', ') + '.',
+      'A granted tool stays for the rest of this turn. Requestable: ' + requestable.join(', ') + '.',
     inputSchema: {
       type: 'object',
       properties: { name: { type: 'string', description: 'Exact tool name from the requestable list.' } },

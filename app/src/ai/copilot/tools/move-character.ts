@@ -14,6 +14,7 @@ import {
   moveCharacterToLocationSchema,
 } from '@/services/character-location';
 import { registerJewlTool } from './registry';
+import { resolveLocationRef } from './create-location';
 import type { JewlTool, JewlToolHandlerResult } from './types';
 
 export const moveCharacterTool: JewlTool = {
@@ -26,6 +27,12 @@ export const moveCharacterTool: JewlTool = {
   inputSchema: moveCharacterToLocationSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const parsed = moveCharacterToLocationSchema.parse(input);
+    // A place by NAME is a place (2026-11-01: "Hotel Parking Lot" was refused as "Target location not found").
+    if (parsed.locationId) {
+      const ref = await resolveLocationRef(ctx.campaignId, parsed.locationId);
+      if (!ref) return { output: { ok: false, reason: `No Location "${parsed.locationId}" in this campaign (name or id).` } };
+      parsed.locationId = ref.id;
+    }
     // A narrated arrival lands the token inside the drawn room on every canvas (2026-10-27).
     const result = await moveCharacterToLocation(ctx.actorId, ctx.actorRole, { snapCanvas: true, ...parsed });
     return {
