@@ -39,7 +39,7 @@ export function competingSpecific(sentence: string, knowledge: string[]): Compet
         const known = specificsOf(ks, new RegExp(re.source, 'gi'));
         if (!known.length || claimed.some((c) => known.includes(c))) continue;
         const shared = [...anchorsOf(ks, kindRes)].filter((a) => mine.has(a));
-        if (shared.length >= 1) return { kind, claimed, known, memory: ks.trim() };
+        if (shared.length >= (kind === 'number' ? 2 : 1)) return { kind, claimed, known, memory: ks.trim() }; // numbers need two shared words (keeper 2026-11-02: 'five' on the bill vs 'two' in a memory)
       }
     }
   }
@@ -48,5 +48,6 @@ export function competingSpecific(sentence: string, knowledge: string[]): Compet
 
 /** The hint for the one re-voice: the memory quoted, the competing specific named. */
 export function specificsHint(c: CompetingSpecific): string {
-  return `Your memory says: "${c.memory}" You wrote ${c.claimed.join(', ')}; your memory has ${c.known.join(', ')}. Think it again with what you remember, or leave that sentence out.`;
+  // Keeper replay 2026-11-02: the being wrote the correction INTO its thought ("I wrote five, but my memory only has two"). The re-voice is silent.
+  return `What you remember: "${c.memory}" One detail you thought (${c.claimed.join(', ')}) does not match it (${c.known.join(', ')}). Write your whole thought again as it would go through you, with that detail as you remember it or left out. Never mention memory, writing, checking or correcting anything: just think.`;
 }
