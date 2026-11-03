@@ -30,8 +30,10 @@ function letters(n: number): string {
   return s;
 }
 
+/** Escape regex syntax characters only. Under the u flag an escaped "-" or "/" is a SyntaxError (2026-11-03: a place named
+ *  "… fourth-floor walkup studio" broke every cloud call through the gate). */
 function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&');
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function countKind(map: TranslationMap, kind: NameKind): number {
@@ -133,7 +135,9 @@ export async function campaignNames(campaignId: string): Promise<NameEntry[]> {
     }
     for (const l of locs) {
       const name = (l.name ?? '').trim();
-      if (name) push({ name, kind: 'place' });
+      // A description is not a name (2026-11-03: "the lot behind the hotel" went out as "Place-A" and the perception agent
+      // could not know it was a parking lot). Only a place name with a capitalised word past a leading "The" is swapped.
+      if (name && /\b[A-Z]/.test(name.replace(/^the\s+/i, ''))) push({ name, kind: 'place' });
     }
     for (const i of items) {
       const name = (i.name ?? '').trim();

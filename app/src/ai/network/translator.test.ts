@@ -79,3 +79,17 @@ describe('translator', () => {
     expect(translateBack(text, map)).toBe(joined);
   });
 });
+
+describe('names with hyphens, slashes and dashes (2026-11-03: they broke every cloud call)', () => {
+  it('translates and restores without a regex error', () => {
+    const names = [
+      { name: "Violet's apartment — fourth-floor walkup studio", kind: 'place' as const },
+      { name: 'gaming/dev rig', kind: 'thing' as const },
+      { name: 'Violet', kind: 'person' as const },
+    ];
+    const map = newTranslationMap();
+    const out = translateOut("Violet sits at the gaming/dev rig in Violet's apartment — fourth-floor walkup studio.", names, map).text;
+    expect(out).not.toMatch(/Violet|gaming\/dev|fourth-floor/);
+    expect(translateBack(out, map)).toBe("Violet sits at the gaming/dev rig in Violet's apartment — fourth-floor walkup studio.");
+  });
+});
