@@ -141,6 +141,11 @@ function resolveFateDie(character: Partial<GrowthCharacter> | null): FateDie {
  * event for a caller (WP3 event bus / WP4 memory ingest) to persist.
  */
 import { statesHandOver, HAND_OVER_NUDGE, statesPayment, PAYMENT_NUDGE } from './hand-over';
+import { signalLines } from '@/services/item-signal';
+
+function safeJson(raw: string | null): unknown {
+  try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
 
 export async function resolveIntent(
   input: ResolveIntentInput,
@@ -210,6 +215,7 @@ export async function resolveIntent(
     `Wearing: ${held.wearing.length ? held.wearing.join(', ') : 'nothing beyond underwear'}`,
     `Carrying: ${held.carrying.length ? held.carrying.join(', ') : 'nothing'}`,
     `(The entity has ONLY what is listed. No jacket, pocket, bag or tool exists for it unless named here or in the facts.)`,
+    ...signalLines(heldRows.map((r) => ({ name: r.name, holderId: entityCharacterId, data: safeJson(r.data) })), entityCharacterId, cycle),
     '',
     input.narrated ? `## Narrated by the Watcher (it HAPPENED exactly as written)` : `## Declared Intent`,
     intent,

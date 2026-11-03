@@ -437,10 +437,21 @@ async function beatFacts(ctx: EntityContext, cue: string, heldNames: string[] = 
         }
       }
     }
+    // SIGNALS (2026-11-02): a held thing going off right now (ringing, buzzing) is a fact of the world for its holder, and
+    // "not answered" for whoever set it off. Read live from the items' own data every beat.
+    let signals: string[] = [];
+    if (ctx.campaignId) {
+      try {
+        const rows = await prisma.campaignItem.findMany({ where: { campaignId: ctx.campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { name: true, holderId: true, data: true } });
+        const { signalLines } = await import('@/services/item-signal');
+        signals = signalLines(rows.map((r) => { let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; } return { name: r.name, holderId: r.holderId, data: d }; }), ctx.characterId, ctx.cycle);
+      } catch { signals = []; }
+    }
     const lines = [
       ...doorLines,
       ...presence.lines,
       ...knows,
+      ...signals,
       ...money,
       ...ranked.slice(0, 12).map((f) => `${f.subjectKey}: ${f.fact.length > 200 ? `${f.fact.slice(0, 197)}...` : f.fact}`),
     ];

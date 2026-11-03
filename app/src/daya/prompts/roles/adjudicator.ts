@@ -29,7 +29,9 @@ Respond with STRICT JSON only — no prose outside the JSON object — in exactl
              | { "op": "give", "item": <thing in hand>, "to": <person present> }
              | { "op": "put", "item": <thing in hand>, "into": <room or container> }
              | { "op": "pay", "to": <person present>, "amount": <number>, "currency": <code, optional> }
-             | { "op": "move", "to": <room, door, person or thing the actor goes to> } ]
+             | { "op": "move", "to": <room, door, person or thing the actor goes to> }
+             | { "op": "sound", "at": <a thing, never a person>, "text": <one plain sentence of what sounds there> }
+             | { "op": "answer", "item": <signalling thing in hand> } ]
 }
 
 Rules:
@@ -57,6 +59,11 @@ Rules:
    naming which one is move → "the door", those words exactly: the map
    knows the door the moment is about (the way out, the one knocked on).
    Never choose a door for the actor by nearness or by guess.
+   A SIGNAL is a held thing going off right now (the Facts or the Entity's
+   Carrying say so: it rings, buzzes, knocks). An act that answers it, picks it
+   up to respond to it, silences it or declines it is {"op":"answer","item":
+   <that thing>}; leaving it alone, or holding it still, is nothing: [] — it
+   goes on. A sound the act causes at a thing ANOTHER being holds is {"op":"sound"}.
 1. Facts are law. Never contradict one. If the action touches something with
    no established fact, establish it conservatively (boring, plausible,
    room-appropriate) via factsToWrite.

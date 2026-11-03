@@ -44,7 +44,9 @@ export type ActEffect =
   | { op: 'pay'; to: string; amount: number; currency?: string }
   | { op: 'move'; to: string }
   /** A sound the act causes somewhere other than the actor: a called phone rings where IT is, a thrown thing lands. */
-  | { op: 'sound'; at: string; text: string };
+  | { op: 'sound'; at: string; text: string }
+  /** The actor answers (or silences, or declines) a signalling thing they hold — a ringing phone picked up, a buzzer stopped. */
+  | { op: 'answer'; item: string };
 
 export interface MapDoor {
   id: string;
@@ -79,6 +81,8 @@ export function lockOnActorsSide(map: ActorMap, d: MapDoor): boolean {
 }
 
 const REL = 'located_at';
+/** How long a signal on a held thing lasts on its own: a couple of minutes of world time. */
+const SIGNAL_SECONDS = 120;
 const MAX_DEPTH = 8;
 
 function parseData(raw: string | null): Record<string, unknown> {
@@ -326,7 +330,7 @@ export interface ApplyReport {
  * own name, the holder's possessive with the thing's head noun (named-things), then any held thing whose head noun ends the
  * model's noun or vice versa ("smartphone" ~ "phone"), owner first.
  */
-async function soundSite(campaignId: string, at: string): Promise<{ kind: 'thing'; name: string; locationId: string | null } | { kind: 'being'; name: string } | { kind: 'door'; name: string; locationId: string | null; rooms: string[] } | null> {
+async function soundSite(campaignId: string, at: string): Promise<{ kind: 'thing'; name: string; locationId: string | null; itemId: string; holderId: string | null } | { kind: 'being'; name: string } | { kind: 'door'; name: string; locationId: string | null; rooms: string[] } | null> {
   const key = at.trim().toLowerCase().replace(/^the\s+/, '');
   // A door of any home on the map (a knock sounds at the door and is heard on both sides of it).
   if (/\b(door|doorway|gate)\b/.test(key)) {
@@ -357,7 +361,7 @@ async function soundSite(campaignId: string, at: string): Promise<{ kind: 'thing
     thing = (owner ? items.filter((i) => i.holderId === owner.id) : []).find(loose) ?? (owner ? undefined : items.find(loose));
   }
   if (!thing) return null;
-  return { kind: 'thing', name: thing.name, locationId: thing.holderId ? await roomIdOf(thing.holderId) : thing.locationId };
+  return { kind: 'thing', name: thing.name, locationId: thing.holderId ? await roomIdOf(thing.holderId) : thing.locationId, itemId: thing.id, holderId: thing.holderId };
 }
 
 /**
@@ -381,7 +385,27 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           if (!where) { report.refused.push(`sound at "${e.at}": nothing by that name here`); break; }
           if (where.kind === 'being') { report.refused.push(`sound at ${where.name}: a person's senses carry the act; a sound comes from a thing`); break; }
           (report.sounds ??= []).push({ text: e.text, at: where.name, locationId: where.locationId, ...(where.kind === 'door' ? { rooms: where.rooms } : {}) });
+          // A sound at a thing someone ELSE holds is a STATE of that thing until answered (2026-11-02): the holder is told it every beat.
+          if (where.kind === 'thing' && where.holderId && where.holderId !== actor.id) {
+            try {
+              const { clockNow } = await import('./table-clock');
+              const { secondsToCycles } = await import('@/types/time');
+              const { withSignal } = await import('./item-signal');
+              const { cycle, ts } = await clockNow(campaignId);
+              const row = await prisma.campaignItem.findUnique({ where: { id: where.itemId }, select: { data: true } });
+              await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(parseData(row?.data ?? null), { text: e.text, since: cycle, until: cycle + secondsToCycles(SIGNAL_SECONDS, ts), by: actor.id })) } });
+            } catch (err) { console.warn('[world-apply] signal not recorded (non-fatal):', err); }
+          }
           report.applied.push(`sound at ${where.name}: ${e.text}`);
+          break;
+        }
+        case 'answer': {
+          const item = await findItemByName(campaignId, e.item, { holderId: actor.id });
+          if (!item) { report.refused.push(`answer "${e.item}": ${actor.name} is not holding it`); break; }
+          const row = await prisma.campaignItem.findUnique({ where: { id: item.id }, select: { data: true } });
+          const { withoutSignal } = await import('./item-signal');
+          await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withoutSignal(parseData(row?.data ?? null))) } });
+          report.applied.push(`${actor.name} answers "${item.name}"`);
           break;
         }
         case 'door': {
@@ -589,6 +613,7 @@ export function parseActEffects(raw: unknown): ActEffect[] {
         break;
       }
       case 'move': { const to = s(r.to); if (to) out.push({ op: 'move', to }); break; }
+      case 'answer': { const item = s(r.item); if (item) out.push({ op: 'answer', item }); break; }
       case 'sound': { const at = s(r.at); const text = s(r.text); if (at && text) out.push({ op: 'sound', at, text: text.slice(0, 240) }); break; }
       default: break;
     }

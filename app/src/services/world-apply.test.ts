@@ -124,5 +124,6 @@ describe('a sound effect (HW9, 2026-10-29)', () => {
     const { parseActEffects } = await import('./world-apply');
     expect(parseActEffects([{ op: 'sound', at: "Violet's phone", text: "Violet's phone rings in her pocket." }])).toEqual([{ op: 'sound', at: "Violet's phone", text: "Violet's phone rings in her pocket." }]);
     expect(parseActEffects([{ op: 'sound', at: 'x' }])).toEqual([]);
+    expect(parseActEffects([{ op: 'answer', item: 'Her phone' }, { op: 'answer' }])).toEqual([{ op: 'answer', item: 'Her phone' }]);
   });
 });
