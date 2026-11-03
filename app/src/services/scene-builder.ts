@@ -311,7 +311,28 @@ export function statedThoughtSentences(seedSentences: string[]): string[] {
   return out;
 }
 
-/** "Violet's Apartment — Fourth-Floor Walkup Studio" → "Violet's Apartment": the name before its qualifier (as the tagger reads it). Pure. */
+const normSeed = (s: string) => s.toLowerCase().replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[.!?…"]+/g, ' ').replace(/\s+/g, ' ').trim();
+/**
+ * WHAT THE WATCHER DECLARED IS NOT THE VOICE'S TO FILTER (2026-11-02: his narration "He is completely drained…" and his
+ * quoted line "What's the point…" were dropped by the guards that exist for a being's GENERATED thoughts). A built segment is
+ * the Watcher's own when it is one of the seed's quoted lines ('quote' - rendered as speech, verbatim), or sits in the seed
+ * text / is a re-voicing of the seed sentence it is pinned to ('declared'). Anything else is the builder's or the voice's
+ * addition (null) and keeps every guard. Pure.
+ */
+export function declaredByWatcher(text: string, sentence: string, seed: SeedParts): { kind: 'quote'; text: string } | { kind: 'declared' } | null {
+  const t = normSeed(text);
+  if (!t) return null;
+  for (const q of seed.quotes) {
+    const qn = normSeed(q.text);
+    if (qn && (t === qn || t.includes(qn) || qn.includes(t))) return { kind: 'quote', text: q.text };
+  }
+  if (normSeed(seed.full).includes(t)) return { kind: 'declared' };
+  const pinned = splitSentences(seed.full).some((s) => normSeed(s) === normSeed(sentence));
+  if (pinned && cueCoverage(text, sentence) >= 0.5) return { kind: 'declared' };
+  return null;
+}
+
+/** "Violet's Apartment — Fourth-Floor Walkup Studio" →"Violet's Apartment": the name before its qualifier (as the tagger reads it). Pure. */
 export function nameHead(name: string): string {
   const m = name.match(/^(.+?)(?:\s+[—–-]\s+|:\s+|\s+\()/u);
   return (m ? m[1] : name).trim() || name;
@@ -579,8 +600,13 @@ export async function buildScene(
         const text = kind === 'speech' ? s.text.trim() : onlyDerived(s.text.trim(), known);
         if (!text) continue;
         if (kind === 'action' && isSpeechTagAct(text)) continue;
-        const narrated = kind === 'thought' ? takeNarrated(text, s.narrated, String(c.actorId)) : undefined;
-        segments.push({ kind, text, sentence: pinToSeed(typeof s.from === 'string' ? s.from : undefined, text, seedSentences), ...(narrated ? { narrated } : {}) });
+        const pinned = pinToSeed(typeof s.from === 'string' ? s.from : undefined, text, seedSentences);
+        const decl = kind === 'thought' ? declaredByWatcher(text, pinned, seed) : null;
+        // The Watcher's quoted line is the character's spoken line, verbatim - never a thought, never reworded.
+        if (decl?.kind === 'quote') { segments.push({ kind: 'speech', text: decl.text, sentence: pinned }); continue; }
+        // A narrator form of the Watcher's own words may use the Watcher's own words (the seed sentence), not only the thought's.
+        const narrated = kind === 'thought' ? takeNarrated(decl ? `${text} ${pinned}` : text, s.narrated, String(c.actorId)) : undefined;
+        segments.push({ kind, text, sentence: pinned, ...(narrated ? { narrated } : {}) });
       }
       // A thought is the being's own voice or nothing (fromInnerVoice). When the voice spoke and the builder lost all
       // of it, the monologue itself stands as the thought, where the builder had put one.
@@ -605,6 +631,8 @@ export async function buildScene(
         if (s.kind !== 'thought') { vetted.push(s); continue; }
         if (firstThoughtAt < 0) firstThoughtAt = vetted.length;
         if (stated.some((st) => sameSentence(st, s.sentence))) { vetted.push(s); keptThought = true; continue; }
+        // The Watcher's own declaration stands as built; the inner-voice floor is for thoughts the voice/builder ADDS.
+        if (declaredByWatcher(s.text, s.sentence, seed)) { vetted.push(s); keptThought = true; continue; }
         const kept = fromInnerVoice(s.text, voice);
         if (kept) { vetted.push({ ...s, text: kept, ...(s.narrated && kept !== s.text && !narratedIsFaithful(kept, s.narrated) ? { narrated: undefined } : {}) }); keptThought = true; }
         else console.log(`[scene-builder] dropped a thought the voice of ${labelOf(c.actorId)} never had: ${s.text.slice(0, 160)}`);
@@ -632,6 +660,13 @@ export async function buildScene(
           carried.push(act);
           console.log(`[scene-builder] physical doing → act: ${act}`);
         }
+      }
+      // Every line the Watcher put in this speaker's mouth reaches the card verbatim, whatever the builder did with it.
+      for (const q of seed.quotes) {
+        if (q.speakerId !== c.actorId) continue;
+        const qn = normSeed(q.text);
+        if (vetted.some((s) => s.kind === 'speech' && normSeed(s.text).includes(qn))) continue;
+        vetted.push({ kind: 'speech', text: q.text, sentence: q.text });
       }
       // No counting nobody gave it, no table words (the seed and the voices are what may count).
       const heardHere = [seed.full, ...monologues.values()].join(' ');

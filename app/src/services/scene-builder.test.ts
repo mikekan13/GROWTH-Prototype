@@ -228,3 +228,25 @@ describe('isBareHour (HW8 run 7 #13)', () => {
     expect(isBareHour('Seven pizzas, and not one of them mine.')).toBe(false);
   });
 });
+
+import { declaredByWatcher } from './scene-builder';
+describe('declaredByWatcher — the Watcher\'s own words are never the voice\'s to filter (2026-11-02)', () => {
+  const full = 'Kristopher sits in his car. He is completely drained from his daily routine of grieving and delivering pizzas. He says out loud to the empty car. "What\'s the point. This is probably just another dead end." He picks up his cell phone.';
+  const seed: SeedParts = {
+    full, narration: null, actions: [], thoughts: [],
+    quotes: [{ text: 'What\'s the point. This is probably just another dead end.', speakerId: 'kris', speakerLabel: 'Kristopher', context: null }],
+  };
+  const sentences = full.split(/(?<=[.!?])\s+/);
+  it('a quoted line comes back as the speaker\'s spoken line, verbatim', () => {
+    const r = declaredByWatcher('What\'s the point. This is probably just another dead end.', sentences[3], seed);
+    expect(r).toEqual({ kind: 'quote', text: 'What\'s the point. This is probably just another dead end.' });
+  });
+  it('a narration sentence with words no thought carries is kept', () => {
+    expect(declaredByWatcher('Completely drained. The grieving, the deliveries - same loop, every day.', sentences[1], seed)).toEqual({ kind: 'declared' });
+    expect(declaredByWatcher('He is completely drained from his daily routine of grieving and delivering pizzas.', sentences[1], seed)).toEqual({ kind: 'declared' });
+  });
+  it('a being\'s invented thought with no basis in the seed is still not the Watcher\'s (guards stay on)', () => {
+    expect(declaredByWatcher('Am I still the man who built, or the one who broke?', sentences[0], seed)).toBeNull();
+    expect(fromInnerVoice('Am I still the man who built, or the one who broke?', 'Kristopher is tired of the road.')).toBeNull();
+  });
+});
