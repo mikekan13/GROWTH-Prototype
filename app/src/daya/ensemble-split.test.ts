@@ -1,3 +1,5 @@
+// The table's prose runs on the cloud tier in play (proseTier); these fixtures fake the local lane, so the prose stays local here.
+process.env.DAYA_PROSE_TIER = 'L1';
 /**
  * U2b-3 — the split loop driven end to end with every store and neighbor
  * mocked and a fake lane behind the real model client. What is real here:

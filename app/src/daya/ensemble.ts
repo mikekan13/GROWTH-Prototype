@@ -23,7 +23,7 @@ import { parseSegments } from '@/lib/feed-segments';
 import type { GrowthCharacter } from '@/types/growth';
 
 import { resolveDayaEntityId } from './entity';
-import { chat, type DayaChatMessage, type DayaClientOverrides } from './model-client';
+import { chat, proseTier, type DayaChatMessage, type DayaClientOverrides } from './model-client';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { registerHandler, wake, type DayaTrigger, type HandlerResult } from './events';
 import { ingestStimulus, writeMemoryEntry } from './memory';
@@ -1069,7 +1069,8 @@ export async function listenStimulus(
     // channel the spoken reply already uses, wrapped as a thought; the line yields to the recorded beat. A perceived viewer
     // never gets this channel (lib/campaign-stream), so only the Watcher sees a being think.
     const grow = ctx.campaignId && !omniscient ? thoughtStreamer(ctx.campaignId, characterId, ctx.name) : null;
-    const raw = (await chat({ tier: 'L1', subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS, ...(grow ? { onToken: grow.onToken } : {}) }, overrides)).text.trim();
+    // PROSE ON THE CLOUD (Michael 2026-11-03): the inner voice is written by Claude through the wall (tier C = routedChatText, fiction, tone filter); the local lane kept making stock images and misreading the moment.
+    const raw = (await chat({ tier: proseTier(), subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS, ...(grow ? { onToken: grow.onToken } : {}) }, overrides)).text.trim();
     grow?.done();
     // The last line is the being's own say on breaking in; only the thought is kept as its inner state.
     const split = splitImpulse(raw);
@@ -1094,7 +1095,7 @@ export async function listenStimulus(
         console.warn(`[daya/ensemble] ${ctx.name} monologue: "${bad.x.slice(0, 80)}" competes with memory (${bad.c.claimed.join(',')} vs ${bad.c.known.join(',')}) - re-voicing once`);
         let again = '';
         try {
-          const second = (await chat({ tier: 'L1', subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }, { role: 'user', content: specificsHint(bad.c) }], maxTokens: LISTENING_MAX_TOKENS }, overrides)).text.trim();
+          const second = (await chat({ tier: proseTier(), subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }, { role: 'user', content: specificsHint(bad.c) }], maxTokens: LISTENING_MAX_TOKENS }, overrides)).text.trim();
           again = filterVoice(splitImpulse(second).thought, { prior: priorVoice, heard: stimulus.content, hasLightFact: ground.hasLight, prompt: promptStatics }).text;
         } catch (err) { console.warn('[daya/ensemble] specifics re-voice failed (non-fatal):', err instanceof Error ? err.message : err); }
         const rechecked = again && !splitSentences(again).some((x) => competingSpecific(x, knowledge));

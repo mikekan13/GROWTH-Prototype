@@ -39,7 +39,7 @@ import {
   type RenderSubject,
   type VoiceParams,
 } from './renderer-math';
-import { chat, type DayaClientOverrides } from './model-client';
+import { chat, proseTier, type DayaClientOverrides } from './model-client';
 import { resolveDayaEntityId } from './entity';
 
 // ── Public contract (WP5 §1) ────────────────────────────────────────────
@@ -188,7 +188,7 @@ async function voiceRendering(params: VoicingParams): Promise<{ prose: string; u
       : messages;
     return chat(
       {
-        tier: 'L1',
+        tier: proseTier(), // PROSE ON THE CLOUD (Michael 2026-11-03) — see model-client proseTier
         subsystem: 'renderer',
         contentClass: 'fiction',
         entityId: entityDaId,

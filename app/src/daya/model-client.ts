@@ -577,3 +577,13 @@ async function screenLocalAnswer(text: string, params: DayaChatParams): Promise<
   });
   return s.text;
 }
+
+/**
+ * PROSE ON THE CLOUD (Michael 2026-11-03: "If the local model is having trouble doing something then that sounds like
+ * something that should be a job the cloud model should be doing"). The perception voicer and the listening monologue —
+ * the prose the table reads — run on tier C (Claude, through the wall: fiction only, tone filter, table guard). The local
+ * lane kept writing stock images and misreading the moment. DAYA_PROSE_TIER=L1 keeps them local (tests, outages).
+ */
+export function proseTier(): DayaTier {
+  return process.env.DAYA_PROSE_TIER === 'L1' ? 'L1' : 'C';
+}
