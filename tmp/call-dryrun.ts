@@ -68,6 +68,12 @@ async function restore(s: Awaited<ReturnType<typeof snapshot>>, from: Date, sess
 }
 
 async function main() {
+  // RESTORE MODE: roll back a kept run from its snapshot. RESTORE=<snapshot json> FROM=<iso> SESSION=<id>
+  if (process.env.RESTORE) {
+    const snap = JSON.parse(readFileSync(process.env.RESTORE, 'utf8'));
+    await restore(snap, new Date(process.env.FROM!), process.env.SESSION ?? null);
+    console.log('restored from', process.env.RESTORE); return;
+  }
   const camp = await prisma.campaign.findUniqueOrThrow({ where: { id: C }, select: { gmUserId: true } });
   const token = crypto.randomBytes(32).toString('hex');
   await prisma.session.create({ data: { userId: camp.gmUserId, token, expiresAt: new Date(Date.now() + 3 * 3600_000) } });
