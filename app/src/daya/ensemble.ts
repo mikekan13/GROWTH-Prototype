@@ -25,6 +25,7 @@ import type { GrowthCharacter } from '@/types/growth';
 import { resolveDayaEntityId } from './entity';
 import { chat, proseTier, type DayaChatMessage, type DayaClientOverrides } from './model-client';
 import { composeBeat, composerOn, orderPerception } from './composer';
+import { placeOrder } from './orders';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { registerHandler, wake, type DayaTrigger, type HandlerResult } from './events';
 import { ingestStimulus, writeMemoryEntry } from './memory';
@@ -1456,6 +1457,8 @@ export async function answerAsk(
       overrides,
     );
 
+  // What was just said to it or around it, for the speech agent (the composed answer).
+  const heardTexts0 = [...heard, ...(ask.kind === 'spoken' ? [`${ask.by}: ${ask.text}`] : [])];
   const utteranceId = crypto.randomUUID();
   let firstWordAt: number | null = null;
   const gate = createSpeechGate((delta, whole) => {
@@ -1466,7 +1469,22 @@ export async function answerAsk(
 
   let call: Awaited<ReturnType<typeof chat>>;
   try {
-    call = await answerCall({ stream: gate.push });
+    if (composerOn() && ctx.campaignId && ctx.persona.omniscient !== true) {
+      // THE COMPOSED ANSWER (SIMULATION-COMPOSER-DESIGN-2026-11-03): the local composer decides — Say, Do or Rest, and what it
+      // means — from everything it holds; a Say is then worded by the being's speech agent (a nameless cloud order). The
+      // finished line goes through the same gate and every guard below, exactly like a streamed one.
+      call = await answerCall({});
+      const decided = readLine(call.text);
+      let text = call.text;
+      if (decided.kind === 'speak' && decided.content.trim()) {
+        const worded = await placeOrder({ kind: 'speech', brief: { meaning: decided.content, voice: ctx.persona.voiceNotes ?? 'Plain, direct, a cadence of their own.', heard: heardTexts0 } }, { campaignId: ctx.campaignId, entityId: ctx.entityDaId }, overrides);
+        if (worded?.words?.trim()) text = `Say: ${worded.words.trim()}`;
+      }
+      call = { ...call, text };
+      gate.push(text);
+    } else {
+      call = await answerCall({ stream: gate.push });
+    }
   } catch (err) {
     // Close what 'start' opened; the caller maps the error (warming / offline) for the GM's eyes.
     emit({ phase: 'final', utteranceId, characterId, action: 'rest', text: '', revoiced: false });

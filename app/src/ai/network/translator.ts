@@ -144,3 +144,14 @@ export async function campaignNames(campaignId: string): Promise<NameEntry[]> {
     return [];
   }
 }
+
+const NAME_TTL_MS = 30_000;
+const nameCache = new Map<string, { at: number; names: NameEntry[] }>();
+/** campaignNames, cached briefly per campaign (every cloud call of a beat reads the same names). Never throws. */
+export async function campaignNamesCached(campaignId: string): Promise<NameEntry[]> {
+  const hit = nameCache.get(campaignId);
+  if (hit && Date.now() - hit.at < NAME_TTL_MS) return hit.names;
+  const names = await campaignNames(campaignId).catch((): NameEntry[] => []);
+  nameCache.set(campaignId, { at: Date.now(), names });
+  return names;
+}

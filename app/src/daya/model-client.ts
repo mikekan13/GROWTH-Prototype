@@ -436,7 +436,8 @@ async function callAnthropic(
   if (nonSystem.length === 0 && system) { nonSystem = [{ role: 'user', content: system }]; system = ''; }
 
   const res = await routedChatText(
-    { caller: `daya:${params.subsystem}`, lane: 'godhead', contentClass: params.contentClass, campaignId: params.campaignId },
+    // The translator needs the campaign to know whose names to swap: derived from the being when the caller did not pass it.
+    { caller: `daya:${params.subsystem}`, lane: 'godhead', contentClass: params.contentClass, campaignId: params.campaignId ?? (await campaignOfEntity(params.entityId)) ?? undefined },
     {
       system,
       messages: nonSystem,
@@ -591,4 +592,15 @@ export function proseTier(): DayaTier {
   // REVERTED 2026-11-03 (SIMULATION-COMPOSER-DESIGN): sending the one call that holds a whole being to the cloud is the
   // opposite of the design. Prose stays inside the wall until the composer orders narrow, nameless pieces instead.
   return process.env.DAYA_PROSE_TIER === 'C' ? 'C' : 'L1';
+}
+
+const entityCampaign = new Map<string, string | null>();
+/** The campaign a DAYA entity lives in (its character's), cached; null when unknown. Never throws. */
+async function campaignOfEntity(entityId: string | undefined): Promise<string | null> {
+  if (!entityId) return null;
+  if (entityCampaign.has(entityId)) return entityCampaign.get(entityId) ?? null;
+  const row = await prisma.dayaEntity.findUnique({ where: { id: entityId }, select: { character: { select: { campaignId: true } } } }).catch(() => null);
+  const id = (row as { character?: { campaignId?: string | null } | null } | null)?.character?.campaignId ?? null;
+  entityCampaign.set(entityId, id);
+  return id;
 }

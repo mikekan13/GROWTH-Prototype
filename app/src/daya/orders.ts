@@ -13,7 +13,7 @@
  */
 import { z } from 'zod';
 import { chat, type DayaClientOverrides } from './model-client';
-import { campaignNames, newTranslationMap, translateBack, translateOut, type NameEntry } from '@/ai/network/translator';
+
 
 // ── The kinds ───────────────────────────────────────────────────────────────
 
@@ -54,13 +54,24 @@ export type Order =
   | { kind: 'perception'; brief: PerceptionBrief }
   | { kind: 'recall'; brief: RecallBrief }
   | { kind: 'mood'; brief: MoodBrief }
-  | { kind: 'voice'; brief: VoiceBrief };
+  | { kind: 'voice'; brief: VoiceBrief }
+  | { kind: 'speech'; brief: SpeechBrief };
+
+export interface SpeechBrief {
+  /** What the being means to say now, decided by the composer (its rough line). */
+  meaning: string;
+  /** How this being speaks. */
+  voice: string;
+  /** What was just said to it or around it (the last few lines), so the words answer them. */
+  heard: string[];
+}
 
 export const PIECE_SCHEMAS = {
   perception: z.object({ reaches: z.string(), nothing: z.boolean().optional() }),
   recall: z.object({ wakes: z.array(z.object({ i: z.number().int(), why: z.string() })) }),
   mood: z.object({ felt: z.string() }),
   voice: z.object({ thought: z.string() }),
+  speech: z.object({ words: z.string() }),
 } as const;
 export type Piece<K extends Order['kind']> = z.infer<(typeof PIECE_SCHEMAS)[K]>;
 
@@ -117,6 +128,19 @@ export function orderPrompt(order: Order): { system: string; user: string; maxTo
         user: [`A moment ago: ${b.felt}`, `Temperament: ${b.temperament}`, `What just reached it: ${b.perceived}`].join('\n'),
       };
     }
+    case 'speech': {
+      const b = order.brief;
+      return {
+        maxTokens: 120,
+        system: [
+          'You give the words one being says aloud their own voice, in a simulation. You are one part of a larger system: what it means to say is decided; you only word it.',
+          'Write exactly what it says aloud now, one or two short sentences, the way this being talks. Keep the meaning and add no fact, no promise and no name it did not use. Never repeat back what was just said to it.',
+          names,
+          `${JSON_ONLY} {"words": string}`,
+        ].join('\n'),
+        user: [`How this being speaks: ${b.voice}`, 'Just heard:', lines(b.heard.slice(-3)), '', `What it means to say: ${b.meaning}`].join('\n'),
+      };
+    }
     case 'voice': {
       const b = order.brief;
       return {
@@ -148,34 +172,20 @@ export function parsePiece<K extends Order['kind']>(kind: K, text: string): Piec
 
 // ── Placing an order ────────────────────────────────────────────────────────
 
-const NAME_TTL_MS = 30_000;
-const nameCache = new Map<string, { at: number; names: NameEntry[] }>();
-async function namesFor(campaignId: string): Promise<NameEntry[]> {
-  const hit = nameCache.get(campaignId);
-  if (hit && Date.now() - hit.at < NAME_TTL_MS) return hit.names;
-  const names = await campaignNames(campaignId).catch((): NameEntry[] => []);
-  nameCache.set(campaignId, { at: Date.now(), names });
-  return names;
-}
-
 /**
- * Place one order: translate the brief out (names → placeholders), send it on the cloud tier through the wall, map the
- * answer back, parse the piece. Null on any failure (logged). The placeholder map dies with the call; nothing sent is kept.
+ * Place one order on the cloud tier. The wall translates it (every proper name of the campaign swapped for a placeholder
+ * in ai/network/chat, and back in the answer), tones it and screens the answer. Null on any failure (logged).
  */
 export async function placeOrder<O extends Order>(
   order: O,
-  ctx: { campaignId: string; entityId: string; extraNames?: NameEntry[] },
+  ctx: { campaignId: string; entityId: string },
   overrides: DayaClientOverrides = {},
 ): Promise<Piece<O['kind']> | null> {
   const t0 = Date.now();
   try {
     const { system, user, maxTokens } = orderPrompt(order);
-    const names = [...(await namesFor(ctx.campaignId)), ...(ctx.extraNames ?? [])];
-    const map = newTranslationMap();
-    const sys = translateOut(system, names, map).text;
-    const usr = translateOut(user, names, map).text;
-    const res = await chat({ tier: 'C', subsystem: `order_${order.kind}`, contentClass: 'fiction', campaignId: ctx.campaignId, entityId: ctx.entityId, messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }], maxTokens, temperature: order.kind === 'voice' ? 0.8 : 0.3 }, overrides);
-    const piece = parsePiece(order.kind, translateBack(res.text, map));
+    const res = await chat({ tier: 'C', subsystem: `order_${order.kind}`, contentClass: 'fiction', campaignId: ctx.campaignId, entityId: ctx.entityId, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], maxTokens, temperature: order.kind === 'voice' ? 0.8 : 0.3 }, overrides);
+    const piece = parsePiece(order.kind, res.text);
     if (!piece) console.warn(`[orders] ${order.kind}: the answer did not parse (${Date.now() - t0}ms)`);
     return piece as Piece<O['kind']> | null;
   } catch (err) {

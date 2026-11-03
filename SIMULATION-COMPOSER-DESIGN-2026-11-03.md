@@ -80,3 +80,8 @@ Simulation composer  (LOCAL Qwen — the whole world: every being, place, clock,
   - The returned thought passes the same seal, voice filter and specifics check.
 - NOT YET TESTED LIVE: needs the pod (the plan is local) and a replay of Michael's session-2 lines.
 - Step 5 open: the simulation level. The table orchestration (reach judge, standing beats, world sounds, the ask) moves under one local composer holding the world moment.
+- Step 5 (simulation level), 2026-11-03:
+  - The translator sits in the one gate every cloud call passes (`ai/network/chat.ts` routedChatText). Every cloud call is translated: orders, adjudicator, card builder, scene builder, reach judge. Engine calls with no campaign derive it from the being. A count-only log line (`[wall→translator]`) shows it working.
+  - The world's judgement of who perceives what (`perception-reach` reachModelFor) is a cloud order. The map's laws (levels, walls, line of sight, held things, the far side of a signal, standing beats) stay the local composer's rules over the answer.
+  - A being's turn (answerAsk) is composed: the local model decides Say / Do / Rest and the meaning; a Say is worded by the being's speech agent (a nameless cloud order). Every existing guard runs on the finished line.
+  - Still local and still the old shape (open): living a stated stretch (time jumps), the dream tick, the guess check (a local check, which is fine), the old serial loop.

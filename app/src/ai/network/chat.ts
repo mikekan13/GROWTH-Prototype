@@ -20,6 +20,7 @@ import { openAiCompatChat } from './transports/openai-compat';
 import { recordAiCall } from './metering';
 import { auditCloudCall, newToneTally, utf8Bytes } from './audit';
 import { screenModelOutput } from '@/lib/lawfulness-hooks';
+import { campaignNamesCached, newTranslationMap, translateBack, translateOut } from './translator';
 import type { AiUsage, ResolvedLane, TaskDescriptor } from './types';
 
 export type RoutedBlock = AnthropicTextOrImageBlock;
@@ -79,7 +80,13 @@ export async function routedChatText(
   const lane = route(task, [input.system, ...textsOf(messages)]);
 
   const tally = newToneTally();
-  const prep = (text: string) => prepareCloudText(task, lane, text, input.identifiers, tally);
+  // THE TRANSLATOR AT THE WALL (ruling 2026-10-16; SIMULATION-COMPOSER-DESIGN-2026-11-03): on a cloud lane every proper name
+  // of the campaign is swapped for a per-call placeholder before anything leaves, and swapped back in the answer. The map
+  // dies with this call; nothing sent is kept.
+  const names = lane.crossesWall && task.campaignId ? await campaignNamesCached(task.campaignId) : [];
+  const tmap = newTranslationMap();
+  const tr = (text: string) => (names.length && text ? translateOut(text, names, tmap).text : text);
+  const prep = (text: string) => prepareCloudText(task, lane, tr(text), input.identifiers, tally);
   const [system, ...prepared] = await Promise.all([
     prep(input.system),
     ...messages.map(async (m): Promise<RoutedMessage> => (
@@ -126,6 +133,10 @@ export async function routedChatText(
   }
   if (opts.meter !== false) {
     recordAiCall({ lane: lane.lane, provider: lane.provider, model: res.model, caller: task.caller, campaignId: task.campaignId, usage: res.usage });
+  }
+  if (tmap.toReal.size) {
+    res = { ...res, text: translateBack(res.text, tmap) };
+    console.log(`[wall→translator] caller=${task.caller} names_swapped=${tmap.toReal.size}`); // a count, never a name
   }
   // LAWFULNESS (unit 8b): every routed text answer is screened before the
   // caller sees it — the local model is abliterated; on a cloud lane it is a

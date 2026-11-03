@@ -68,10 +68,14 @@ export { perceptionReachOn };
  * 4 s cap and the stub-on-failure live in judgeReach (sim/senses/reach).
  */
 export function reachModelFor(campaignId?: string | null, caller = 'perception-reach'): ReachModel | null {
-  if (!localLane()) return null;
+  // THE WORLD'S JUDGEMENT IS AN ORDER (SIMULATION-COMPOSER-DESIGN-2026-11-03): who perceives what is heavy cognition — the
+  // composer places it with the cloud (nameless, through the wall); the map's laws below (levels, walls, line of sight,
+  // what a being holds) stay the local composer's rules over the answer. BEING_COMPOSER=off keeps the judge local.
+  const onCloud = process.env.BEING_COMPOSER !== 'off';
+  if (!onCloud && !localLane()) return null;
   return async ({ system, user, maxTokens }) => {
     const res = await routedChatText(
-      { caller, lane: 'local', campaignId: campaignId ?? undefined, contentClass: 'fiction' },
+      { caller, lane: onCloud ? 'judgment' : 'local', campaignId: campaignId ?? undefined, contentClass: 'fiction' },
       { system, user, maxTokens, temperature: 0 },
     );
     return res.text;
