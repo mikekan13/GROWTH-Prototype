@@ -17,6 +17,7 @@ const WAIT = Number(process.argv[2] ?? 120) * 1000;
 const KEEP = process.env.KEEP === '1'; // the keeper: leave the session open and the record standing
 const LOG = 'C:/Projects/GRO.WTH/logs/dev-server.out.log';
 const p = prisma as any;
+const NL = String.fromCharCode(10);
 
 function post(path: string, token: string, body: unknown): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
@@ -86,6 +87,35 @@ async function main() {
     const s = await post(`/api/campaigns/${C}/sessions`, token, { action: 'start' });
     sessionId = (() => { try { return JSON.parse(s.body).session?.id ?? JSON.parse(s.body).id ?? null; } catch { return null; } })();
     console.log(`session start ${s.status} ${sessionId ?? s.body.slice(0, 160)}`);
+    // SCRIPT MODE: a whole session's lines, in order, at the Watcher's pace; then the transcript as the table shows it.
+    if (process.env.SCRIPT) {
+      const steps = JSON.parse(readFileSync(process.env.SCRIPT, 'utf8')) as Array<{ line: string; waitS: number }>;
+      for (const [i, st] of steps.entries()) {
+        let rr = await post(`/api/campaigns/${C}/table`, token, { message: st.line });
+        const tk = (() => { try { const j = JSON.parse(rr.body); return j.held?.id ?? j.reconciliation?.id ?? j.ticket?.id ?? null; } catch { return null; } })();
+        if (tk) { await post(`/api/campaigns/${C}/reconcile`, token, { action: 'confirm', ticketId: tk, answer: 'Yes, that is what happens.' }); rr = await post(`/api/campaigns/${C}/table`, token, { message: st.line, confirmTicketId: tk }); console.log(`  (line ${i + 1}: JEWL flagged it — confirmed)`); }
+        console.log(`line ${i + 1} ${rr.status}`);
+        await new Promise((res) => setTimeout(res, st.waitS * 1000));
+      }
+      const ev = await prisma.campaignEvent.findMany({ where: { campaignId: C, createdAt: { gte: from } }, orderBy: { createdAt: 'asc' }, select: { type: true, characterName: true, payload: true } });
+      const out: string[] = [];
+      for (const e of ev) {
+        const pl = JSON.parse(e.payload);
+        if (e.type === 'being_thought') { out.push(NL + `[${e.characterName}]`); for (const sg of (pl.segments ?? [])) out.push(`   ${sg.kind === 'thought' ? '((' + sg.text + '))' : sg.kind === 'speech' ? '"' + sg.text + '"' : '::' + sg.text + '::'}`); if (!(pl.segments ?? []).length && pl.thought) out.push(`   ((${pl.thought}))`); if (pl.scene) out.push(`   scene: ${pl.scene}`); continue; }
+        const text = String(pl.description ?? pl.message ?? '').replace(/\s+/g, ' ');
+        if (pl.eventType === 'session_start') continue;
+        out.push(NL + `[${e.type === 'chat' ? (e.characterName ?? '') + ' says' : 'TABLE'}] ${text}` + (pl.narration && pl.narration !== text ? NL + `   built: ${String(pl.narration).replace(/\s+/g, ' ')}` : ''));
+      }
+      for (const [n, cid] of [['VIOLET', VIOLET], ['KRISTOPHER', KRIS]] as const) {
+        const e = await p.dayaEntity.findUnique({ where: { characterId: cid }, select: { id: true } });
+        const mem = await p.dayaMemoryEntry.findMany({ where: { entityId: e.id, realTime: { gte: from } }, orderBy: { realTime: 'asc' }, select: { source: true, content: true } });
+        out.push(NL + `=== ${n} memories (${mem.length}) ===`, ...mem.map((m: any) => `[${m.source}] ${m.content.replace(/\s+/g, ' ').slice(0, 300)}`));
+      }
+      const tf = `../tmp/replay-${Date.now()}.txt`;
+      writeFileSync(tf, out.join(NL));
+      console.log(NL + `=== TRANSCRIPT (${tf}) ===` + out.join(NL));
+      return;
+    }
     let r = await post(`/api/campaigns/${C}/table`, token, { message: LINE });
     console.log(`line ${r.status} ${r.body.slice(0, 300)}`);
     const ticket = (() => { try { const j = JSON.parse(r.body); return j.reconciliation?.id ?? j.ticket?.id ?? j.ticketId ?? null; } catch { return null; } })();

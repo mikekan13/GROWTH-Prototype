@@ -76,7 +76,7 @@ export function signalLines(items: SignalItem[], viewerId: string, nowCycle: num
     const sig = liveSignal(it.data, nowCycle);
     if (!sig) continue;
     if (it.holderId === viewerId) {
-      out.push(`The ${bare(it.name)} you are holding: ${sig.text} — right now. It goes on until you answer it or it stops; answering it is your act, and so is leaving it.`);
+      out.push(`The ${bare(it.name)} you are holding: ${sig.text} — right now. It goes on until you answer it or it stops; answering it is your act, and so is leaving it. Whoever set it off cannot hear you until you answer it. It does not tell you who set it off: you know who only if your memory or the world's facts say so.`);
     } else if (sig.by === viewerId) {
       out.push(`What you set off is still going: ${sig.text} It has not been answered.`);
     }

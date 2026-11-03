@@ -250,3 +250,30 @@ describe('declaredByWatcher — the Watcher\'s own words are never the voice\'s 
     expect(fromInnerVoice('Am I still the man who built, or the one who broke?', 'Kristopher is tired of the road.')).toBeNull();
   });
 });
+
+import { mergeAdjacentThoughts } from './scene-builder';
+describe('a run of thinking is one thought (session 2, 2026-11-02)', () => {
+  it('joins thoughts that follow each other and keeps a deed between them apart', () => {
+    const out = mergeAdjacentThoughts([
+      { kind: 'thought', text: 'Her voice.', narrated: 'Her voice.' },
+      { kind: 'thought', text: 'Brighter than at the door.', narrated: 'Brighter than at the door.' },
+      { kind: 'action', text: 'He hangs up.' },
+      { kind: 'thought', text: 'Coward.' },
+    ]);
+    expect(out.map((s) => s.kind)).toEqual(['thought', 'action', 'thought']);
+    expect(out[0].text).toBe('Her voice. Brighter than at the door.');
+    expect(out[0].narrated).toBe('Her voice. Brighter than at the door.');
+  });
+});
+
+describe('a sentence said once on a card is not said again (replay 1, 2026-11-02)', () => {
+  it('drops a repeated run of thought', () => {
+    const out = mergeAdjacentThoughts([
+      { kind: 'thought', text: 'I did not expect to call. The car is still.' },
+      { kind: 'thought', text: 'The ring cuts in.' },
+      { kind: 'thought', text: 'I did not expect to call. The car is still.' },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].text).toBe('I did not expect to call. The car is still. The ring cuts in.');
+  });
+});

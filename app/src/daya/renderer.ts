@@ -141,11 +141,20 @@ function buildVoicingSystemPrompt(voice: VoiceParams, level: number, subject: Re
     'You voice a single moment of first-person (or close-second) perception for an AI-controlled character — how something FEELS from inside, never a game report.',
     'You are given an honest CONTENT ENVELOPE: the exact facts and degree of uncertainty this character is allowed to perceive right now. Voice ONLY what is in the envelope, in this character\'s own words — never invent facts outside it, never add numbers or specifics the envelope does not contain.',
     `Perceived subject type: ${subject}. Fidelity: level ${level} out of 5 (0 = no reliable signal, 5 = exact).`,
-    register, rhythm, images,
+    register, rhythm, subject === 'scene' ? '' : images,
     subject === 'scene'
-      ? 'The envelope is the scene around this character right now: what was just narrated, then the place, who is present, what is there. Voice it as one continuous moment of noticing — what draws the eye first, then the rest — in at most 6 sentences. Keep every name and every spoken line exactly as the envelope gives them; drop nothing the envelope marks as said.'
+      ? [
+        'The envelope is the scene around this character right now: what was just narrated, then the place, who is present, what is there. Voice it as one moment of noticing.',
+        'What just happened comes FIRST and is never dropped, softened or turned into something else: a phone ringing stays a phone ringing, a voice saying words stays that voice saying those words. Then only as much of the place as the moment touches.',
+        'Keep every name and every spoken line exactly as the envelope gives them, with the speaker the envelope gives them; never turn another person\'s words into this character\'s own. Drop nothing the envelope marks as said.',
+        // SESSION 2 (2026-11-02): every perception came back as mood-weather ("a held breath", "a wet wool blanket", "the
+        // streetlamps hum their flat orange lie") and the beings' thoughts were built from it. Senses are plain; the voice is in what is noticed.
+        'Plain senses, in plain words: what is seen, heard, felt, smelled, as it is. No metaphors and no similes, no weather of mood (silence as weight, a room holding its breath, light as a lie, the dark pressing in). The character shows in WHAT they notice and the words they would use, not in imagery. A thing not in the envelope is not there.',
+        // Session 2 replay (2026-11-02): "Violet's phone continues to ring as Kristopher prepares himself to leave a voicemail" gave her "Kristopher is gathering his breath on the other end".
+        'What a person who is NOT here with this character is doing elsewhere cannot be sensed: leave it out entirely, unless the envelope says it reaches them (a voice on an answered line). A ringing phone does not tell who is calling.',
+      ].join(' ')
       : '',
-    `Write at most ${subject === 'scene' ? 6 : 3} sentences. First-person or close-second only. Never use game-mechanical vocabulary: no "roll", "DR", "pool", "KRMA", "modifier", "tier", die-type names (d4/d6/d8/d10/d12/d20), or a signed number attached to an attribute name (e.g. "+3 Willpower"). This is lived experience, not a rules readout.`,
+    `Write at most ${subject === 'scene' ? 4 : 3} sentences. First-person or close-second only. Never use game-mechanical vocabulary: no "roll", "DR", "pool", "KRMA", "modifier", "tier", die-type names (d4/d6/d8/d10/d12/d20), or a signed number attached to an attribute name (e.g. "+3 Willpower"). This is lived experience, not a rules readout.`,
   ].filter(Boolean).join('\n');
 }
 

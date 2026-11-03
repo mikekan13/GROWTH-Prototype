@@ -259,6 +259,8 @@ export async function recentThoughtsOf(campaignId: string, characterId: string, 
 }
 
 /** The standing beat's last sentence: a beat in which nothing from beyond the room reached the being. */
+/** How the far side of a being's own live signal opens (a standing beat of its own). */
+export const FAR_SIDE_HEAD = 'What you set off is still going, and you hear it:';
 export const STANDING_BEAT_TAIL = 'Nothing from beyond the room has reached you just now.';
 
 /** How long a being's line waits for its own thought card to be on the page first — the cloud build alone is allowed 30 s (HW8 run 6: 8 s let "It's open." go up 7 s before her card). */
@@ -914,7 +916,7 @@ async function runBeats(
     if (via) lastVia.set(listenerId, via);
     // His own only on the Watcher's stretch that voiced him — never on another being's line (HW8 run 2: her reply
     // reached him "via self" and he remembered her words as the narrator, not as a voice through a door).
-    const own = (truthId === truth.primary && voiced.has(listenerId)) || (via?.includes('self') ?? false);
+    const own = (truthId === truth.primary && voiced.has(listenerId)) || (via?.includes('self') ?? false) || stimulus.own === true;
     // Hearing alone carries sound and words, not the receipt in his hand (HW6 2026-10-25).
     const handed = own ? stimulus.content : audibleOnly(stimulus.content, via);
     let content = handed;
@@ -975,7 +977,7 @@ async function runBeats(
           // THE CARD FOLLOWS THE THOUGHT (speed, 2026-10-29): the beat is posted NOW, the built card lands on it after.
           // A standing beat (nothing reached her) whose whole thought was a repeat has nothing to show: no row (HW12 2026-10-31:
           // an EMPTY card on the record). A real line that reached her still posts the beat, thought or not (the HW9 rule).
-          const standingRepeat = repeat && carried.source === 'perception' && carried.content.endsWith(STANDING_BEAT_TAIL);
+          const standingRepeat = (repeat || !thought?.trim()) && carried.source === 'perception' && (carried.content.endsWith(STANDING_BEAT_TAIL) || carried.content.startsWith(FAR_SIDE_HEAD)); // replay 3 (2026-11-02): an empty far-side card
           if (standingRepeat) console.log(`[table-speak] ${name}: standing beat, repeated thought — no row`);
           const rowId = holding || standingRepeat ? null : await recordBeingThought(campaignId, { userId: actor.userId, username: actor.username }, {
             characterId: listenerId,
@@ -1073,11 +1075,27 @@ async function runBeats(
   const standingIds = new Set<string>();
   const standingBeat = async (listenerId: string, truthId: string | null) => {
     if (process.env.STANDING_BEAT === 'off' || truthId !== truth.primary || voiced.has(listenerId)) return;
+    // THE FAR SIDE OF ONE'S OWN SIGNAL (session 2, 2026-11-02): Kristopher's call rang on Violet's phone for four minutes and
+    // his every beat said "nothing from beyond the room has reached you" — he thought about silence while his own speakers
+    // rang. A being who set off a signal that is still live hears it go on: that is his beat, not the empty standing one.
+    try {
+      const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
+      const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { name: true, holderId: true, data: true } });
+      const { liveSignal } = await import('@/services/item-signal');
+      const going = rows.map((r) => { let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; } return liveSignal(d, cycle); }).find((s) => s?.by === listenerId);
+      if (going) {
+        const content = `${FAR_SIDE_HEAD} ${going.text} Nobody has answered it yet.`;
+        console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: the far side of their own signal — ${content}`);
+        standingIds.add(listenerId);
+        hear(listenerId, { source: 'perception', content, own: true }, { verdict: { beingId: listenerId, reaches: true, via: ['hearing'], noticed: true, salience: 0.6 }, source: 'stub' }, undefined, truthId);
+        return;
+      }
+    } catch (err) { console.warn('[standing-beat] signal check failed (non-fatal):', err instanceof Error ? err.message : err); }
     try {
       const clock = (await clockLine(campaignId))?.replace(/^\[clock\]\s*/, '') ?? null;
       const where = await prisma.entityRelationship.findFirst({ where: { sourceId: listenerId, relationshipType: 'located_at' }, select: { targetId: true } });
       const room = where ? await prisma.location.findUnique({ where: { id: where.targetId }, select: { name: true } }) : null;
-      const content = [clock ? `It is ${clock}.` : null, room ? `You are in the ${nameHead(room.name)}.` : null, STANDING_BEAT_TAIL].filter(Boolean).join(' ');
+      const content = [clock ? `It is ${clock}.` : null, room ? `You are in ${/^the\s/i.test(nameHead(room.name)) ? '' : 'the '}${nameHead(room.name)}.` : null, STANDING_BEAT_TAIL].filter(Boolean).join(' ');
       console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: ${content}`);
       standingIds.add(listenerId);
       // All her senses, none of them given anything (HW10 2026-10-29: via ['sight'] alone told her "this reached you by SIGHT only" of a beat in which nothing reached her).
@@ -1158,7 +1176,15 @@ async function runBeats(
       if (!verdict.reaches) { console.log(`[perception-reach] ${nameOf(id)}: NOT REACHED (${source}) — nothing stored ${what}`);
         // Addressed to this being (a quote that names them, a knock at their door) and it did not carry: the ONE line, nothing else.
         const unheard = didNotHear({ id, name: nameOf(id) }, publicRun.map((u) => ({ text: u.text, kind: u.kind, speakerLabel: u.speaker?.label ?? null, speakerSex: u.speaker?.id ? truth.actors?.[u.speaker.id]?.sex ?? null : null, to: u.to && u.to.scope === 'named' && u.to.ids.includes(id) ? id : null })), truth.actorId ? truth.actors?.[truth.actorId]?.sex ?? null : null);
-        if (unheard && truthId === truth.primary) void postSceneSentence(campaignId, actor, unheard);
+        // ONLY WHERE IT COULD HAVE CARRIED (session 2, 2026-11-02): "Violet did not hear him." after each of Kristopher's lines in
+        // his car, miles away. A being on another level was never in reach of it; there is nothing to miss.
+        if (unheard && truthId === truth.primary) {
+          void (async () => {
+            const { onDifferentLevels } = await import('@/services/elsewhere-world');
+            if (lineActor && await onDifferentLevels(id, lineActor).catch(() => false)) return;
+            await postSceneSentence(campaignId, actor, unheard);
+          })();
+        }
         void standingBeat(id, truthId); return; }
       if (!verdict.noticed) { console.log(`[perception-reach] ${nameOf(id)}: reached via ${verdict.via.join('+')}, UNNOTICED (${source}) — stored noticed=false ${what}`); void storeUnnoticedAtTable(campaignId, id, stim, verdict, truthId); return; }
       console.log(`[perception-reach] ${nameOf(id)}: reached via ${verdict.via.join('+')}, noticed (${source}, salience ${verdict.salience.toFixed(2)}) ${what}`);

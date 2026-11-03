@@ -300,6 +300,18 @@ function findRosterName(window: string, roster: ProseRosterEntry[]): ProseRoster
   return best?.entry ?? null;
 }
 
+/**
+ * A VOICE THAT IS HEARD BELONGS TO ITS OWNER (session 2, 2026-11-02): "Kristopher hears Violet's voice say. 'Hi it's
+ * Violet…'" made Kristopher the speaker (the sentence's subject), and he took the greeting for his own voice. The words
+ * after "<someone> hears <B>'s voice" are B's voice, not the hearer's. B did not speak them here and now (a recording, a
+ * phone, a voice through a wall), so the record names the voice and no mouth: speakerId stays null. Pure.
+ */
+function heardVoiceOwner(sentence: string, roster: ProseRosterEntry[]): ProseRosterEntry | null {
+  const m = sentence.match(/\b(?:hears?|heard|hearing|catch(?:es)?|caught|listens?\s+to|listened\s+to)\b\s+(.{1,80}?)\s+voice\b/i);
+  if (!m) return null;
+  return findRosterName(m[1].replace(/['’]s\b/g, ''), roster);
+}
+
 /** "Violet's closed door" names a door, not a speaker: the possessive names come out before a speaker lookup. */
 function withoutPossessives(window: string): string {
   return window.replace(/\b[\w.-]+['’]s\b/g, ' ');
@@ -544,6 +556,12 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
       // back at Violet's closed door." is Kristopher's sentence, so the words after it are his (HW5
       // 2026-10-25: the possessive "Violet's" beside the quote made her the speaker, and the table had
       // her asking him). A name merely in the window, never a possessive, is the fallback.
+      const voiceOwner = contextSentence ? heardVoiceOwner(contextSentence, roster) : null;
+      if (voiceOwner) {
+        quotes.push({ text: quoteText, speakerId: null, speakerLabel: `${voiceOwner.name}'s voice`, context: contextSentence });
+        cursor = start + m[0].length;
+        continue;
+      }
       const subjectActor = contextSentence ? sentenceActor(contextSentence, roster, recent, { ownedThings: false }) : null;
       const named = subjectActor ?? findRosterName(withoutPossessives(beforeWindow.slice(-160)), roster) ?? (runsOn ? firstRosterName(afterTag.slice(0, 120), roster) : null);
       // No name by the quote: "His voice is warm. 'Take your time.'" → the

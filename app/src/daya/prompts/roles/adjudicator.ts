@@ -31,7 +31,8 @@ Respond with STRICT JSON only — no prose outside the JSON object — in exactl
              | { "op": "pay", "to": <person present>, "amount": <number>, "currency": <code, optional> }
              | { "op": "move", "to": <room, door, person or thing the actor goes to> }
              | { "op": "sound", "at": <a thing, never a person>, "text": <one plain sentence of what sounds there> }
-             | { "op": "answer", "item": <signalling thing in hand> } ]
+             | { "op": "answer", "item": <signalling thing in hand> }
+             | { "op": "stop" } ]
 }
 
 Rules:
@@ -63,7 +64,10 @@ Rules:
    Carrying say so: it rings, buzzes, knocks). An act that answers it, picks it
    up to respond to it, silences it or declines it is {"op":"answer","item":
    <that thing>}; leaving it alone, or holding it still, is nothing: [] — it
-   goes on. A sound the act causes at a thing ANOTHER being holds is {"op":"sound"}.
+   goes on. The one who SET a signal off ends it from their side — hangs up,
+   cancels the call, stops knocking — with {"op":"stop"}; it ends every signal
+   the actor set off. Waiting while it goes on is nothing: [].
+   A sound the act causes at a thing ANOTHER being holds is {"op":"sound"}.
    A call or message makes the CALLED person's carried device sound — name it
    from the "Within reach of a signal" list (never the caller's own phone, and
    never take/give/put a thing on that list).

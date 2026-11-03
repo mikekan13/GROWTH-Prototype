@@ -449,3 +449,17 @@ describe('written text in quotes is not speech (HW10 2026-10-29)', () => {
     expect(p.quotes.map((q) => [q.speakerLabel, q.text])).toEqual([['Violet', 'Chess Pizza?']]);
   });
 });
+
+describe('a voice that is heard belongs to its owner (session 2, 2026-11-02)', () => {
+  const roster = [{ id: 'k', name: 'Kristopher', sex: 'male' }, { id: 'v', name: 'Violet', sex: 'female' }];
+  it('the greeting Kristopher hears is Violet\'s voice, and no one speaks it here', () => {
+    const p = parseTableProse('Kristopher hears Violet\'s voice say. "Hi it\'s Violet... Leave a message." Kristopher hangs up before the beep.', roster as never);
+    expect(p.quotes).toHaveLength(1);
+    expect(p.quotes[0].speakerId).toBeNull();
+    expect(p.quotes[0].speakerLabel).toBe("Violet's voice");
+  });
+  it('a plain spoken line still belongs to its subject', () => {
+    const p = parseTableProse('Kristopher says out loud. "Fuck it." Then he hits redial.', roster as never);
+    expect(p.quotes[0].speakerId).toBe('k');
+  });
+});

@@ -47,7 +47,9 @@ export type ActEffect =
   /** A sound the act causes somewhere other than the actor: a called phone rings where IT is, a thrown thing lands. */
   | { op: 'sound'; at: string; text: string }
   /** The actor answers (or silences, or declines) a signalling thing they hold — a ringing phone picked up, a buzzer stopped. */
-  | { op: 'answer'; item: string };
+  | { op: 'answer'; item: string }
+  /** The one who set a signal off ends it from their side (hangs up, cancels, stops knocking): every live signal the actor caused. */
+  | { op: 'stop' };
 
 export interface MapDoor {
   id: string;
@@ -83,7 +85,7 @@ export function lockOnActorsSide(map: ActorMap, d: MapDoor): boolean {
 
 const REL = 'located_at';
 /** How long a signal on a held thing lasts on its own: a couple of minutes of world time. */
-const SIGNAL_SECONDS = 120;
+const SIGNAL_SECONDS = 600; // a backstop only: a signal goes on until it is answered or stopped (session 2, 2026-11-02: it lapsed between "continues to ring" lines)
 const MAX_DEPTH = 8;
 
 function parseData(raw: string | null): Record<string, unknown> {
@@ -462,6 +464,27 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           report.applied.push(`${actor.name} answers "${item.name}"`);
           break;
         }
+        case 'stop': {
+          const { clockNow } = await import('./table-clock');
+          const { liveSignal, withoutSignal } = await import('./item-signal');
+          const { cycle } = await clockNow(campaignId);
+          const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { id: true, name: true, data: true, holderId: true } });
+          const ended: string[] = [];
+          for (const r of rows) {
+            const d = parseData(r.data ?? null);
+            if (liveSignal(d, cycle)?.by !== actor.id) continue;
+            await prisma.campaignItem.update({ where: { id: r.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
+            ended.push(r.name);
+            // THE HOLDER HEARS IT END (session 2, 2026-11-02): the ringing stopping is something that happens at the holder's place.
+            const holder = r.holderId ? await prisma.character.findUnique({ where: { id: r.holderId }, select: { name: true } }) : null;
+            const at = r.holderId ? await prisma.entityRelationship.findFirst({ where: { sourceId: r.holderId, relationshipType: 'located_at' }, select: { targetId: true } }) : null;
+            const thing = r.name.replace(/^(?:the|her|his|their|my)\s+/i, '');
+            (report.sounds ??= []).push({ text: `${holder?.name ? `${holder.name.split(/\s+/)[0]}'s ${thing}` : `The ${thing}`} goes quiet.`, at: r.name, locationId: at?.targetId ?? null });
+          }
+          if (ended.length) report.applied.push(`${actor.name} stops what they set off: ${ended.join(', ')}`);
+          else report.refused.push(`stop: nothing ${actor.name} set off is still going`);
+          break;
+        }
         case 'door': {
           if (!map) { report.refused.push(`door "${e.door}": the actor stands nowhere on the map`); break; }
           const d = findDoor(map, e.door);
@@ -668,6 +691,7 @@ export function parseActEffects(raw: unknown): ActEffect[] {
       }
       case 'move': { const to = s(r.to); if (to) out.push({ op: 'move', to }); break; }
       case 'answer': { const item = s(r.item); if (item) out.push({ op: 'answer', item }); break; }
+      case 'stop': out.push({ op: 'stop' }); break;
       case 'sound': { const at = s(r.at); const text = s(r.text); if (at && text) out.push({ op: 'sound', at, text: text.slice(0, 240) }); break; }
       default: break;
     }

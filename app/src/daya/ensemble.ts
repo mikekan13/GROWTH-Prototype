@@ -251,8 +251,8 @@ async function callSpiritOnce(
 ): Promise<string> {
   const prompt = buildSpiritPrompt({
     name: ctx.name,
-    identityNarrative: ctx.persona.identityNarrative ?? `${ctx.name}, living her own life, day to day.`,
-    voiceNotes: ctx.persona.voiceNotes ?? 'Plain, direct, her own cadence.',
+    identityNarrative: ctx.persona.identityNarrative ?? `${ctx.name}, living a life of their own, day to day.`,
+    voiceNotes: ctx.persona.voiceNotes ?? 'Plain, direct, a cadence of their own.',
     feltStateBrief: args.feltStateBrief,
     perceptionBlock: args.perceptionBlock,
     recallBlock: args.recallBlock,
@@ -1049,8 +1049,8 @@ export async function listenStimulus(
   try {
     const prompt = buildSpiritListeningPrompt({
       name: ctx.name,
-      identityNarrative: ctx.persona.identityNarrative ?? `${ctx.name}, living her own life, day to day.`,
-      voiceNotes: ctx.persona.voiceNotes ?? 'Plain, direct, her own cadence.',
+      identityNarrative: ctx.persona.identityNarrative ?? `${ctx.name}, living a life of their own, day to day.`,
+      voiceNotes: ctx.persona.voiceNotes ?? 'Plain, direct, a cadence of their own.',
       feltStateBrief,
       standingScene: fullTake ? content : prior!.standingScene,
       // THE REPLAY (Mike 2026-10-25): both beings returned their previous thought verbatim — recall handed the spirit its own recent perception memory. The recall result is pre-rendered prose (no per-memory source/time), so the guard is one sentence beside it.
@@ -1383,8 +1383,8 @@ export async function answerAsk(
   const factLines = askGround.lines.slice(0, 14);
   const prompt = buildSpiritAnsweringPrompt({
     name: ctx.name,
-    identityNarrative: ctx.persona.identityNarrative ?? `${ctx.name}, living her own life, day to day.`,
-    voiceNotes: ctx.persona.voiceNotes ?? 'Plain, direct, her own cadence.',
+    identityNarrative: ctx.persona.identityNarrative ?? `${ctx.name}, living a life of their own, day to day.`,
+    voiceNotes: ctx.persona.voiceNotes ?? 'Plain, direct, a cadence of their own.',
     feltStateBrief: state.feltStateBrief || FELT_FALLBACK,
     standingScene: state.standingScene || 'Nothing beyond what is right in front of you.',
     innerState: state.innerState,

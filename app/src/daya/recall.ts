@@ -24,6 +24,7 @@ import { climb, cueCoverage, ladderCompare, RUNG_RANK, type Rung } from './ladde
 import { parseChain, type MemoryChain } from './chain';
 import { classifyDomains } from './domains';
 import { dueIntentionsFor, type DueIntention } from './intentions';
+import { localUnitsToCycles, type CalendarSpec } from '@/types/time';
 
 export { RECALL_TUNING };
 
@@ -277,6 +278,48 @@ export function seededRandom01(seedKey: string): number {
   h ^= h >>> 17;
   h ^= h << 5;
   return ((h >>> 0) % 1_000_000) / 1_000_000;
+}
+
+type AgeTimescale = { unitsPerMetaCycle: number; calendar: CalendarSpec | null };
+
+/** Meta cycles -> seconds of game time. Pure copy of table-clock's cyclesToSeconds (that module is server-only). */
+function ageCyclesToSeconds(cycles: number, ts: AgeTimescale): number {
+  const perHour = localUnitsToCycles(1, 'hour', ts);
+  return perHour > 0 ? (cycles / perHour) * 3600 : 0;
+}
+
+/** Pure copy of table-clock's spanInWords. */
+function ageSpanInWords(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 10) return 'a few seconds';
+  if (s < 45) return `about ${Math.round(s / 5) * 5} seconds`;
+  if (s < 90) return 'about a minute';
+  if (s < 3600) { const m = Math.round(s / 60); return `about ${m} minute${m === 1 ? '' : 's'}`; }
+  if (s < 5400) return 'about an hour';
+  if (s < 86400) { const h = Math.round(s / 3600); return `about ${h} hour${h === 1 ? '' : 's'}`; }
+  const d = Math.round(s / 86400);
+  return d === 1 ? 'about a day' : `about ${d} days`;
+}
+
+/** "About 2 days ago: " for a memory older than an hour of game time; '' otherwise. Pure. */
+export function agePrefix(seconds: number): string {
+  if (!(seconds >= 3600)) return '';
+  const words = ageSpanInWords(seconds);
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)} ago: `;
+}
+
+/** Best-effort: the campaign timescale for an entity. Null on any failure. */
+async function loadAgeTimescale(entityId: string): Promise<AgeTimescale | null> {
+  try {
+    const ent = await prisma.dayaEntity.findUnique({ where: { id: entityId }, select: { character: { select: { campaignId: true } } } });
+    const campaignId = ent?.character?.campaignId;
+    if (!campaignId) return null;
+    const { ensureDefaultTimescale } = await import('@/services/time');
+    const ts = await ensureDefaultTimescale(campaignId);
+    return { unitsPerMetaCycle: ts.unitsPerMetaCycle, calendar: ts.calendar as CalendarSpec | null };
+  } catch {
+    return null;
+  }
 }
 
 /** Deterministic per (entityId, memoryId, nowCycle) — same request replays identically. */
@@ -547,9 +590,12 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
   }
 
   // Prose: normal content, or a vague distort line for Thorn-distorted memories.
-  const proseLines = surfacedList.map((c) =>
-    c.thornMatch?.mode === 'distort' ? pickBySeed(DISTORT_TEMPLATES, `distort:${c.memory.id}`) : c.memory.content,
-  );
+  const ageTs = surfacedList.length > 0 ? await loadAgeTimescale(req.entityId) : null;
+  const proseLines = surfacedList.map((c) => {
+    if (c.thornMatch?.mode === 'distort') return pickBySeed(DISTORT_TEMPLATES, `distort:${c.memory.id}`);
+    const prefix = ageTs ? agePrefix(ageCyclesToSeconds(req.nowCycle - c.memory.narrativeCycle, ageTs)) : '';
+    return prefix + c.memory.content;
+  });
   let prose: string | null = proseLines.length > 0 ? proseLines.join(' ') : null;
   if (prose && !localSealLint(prose)) prose = SAFE_FALLBACK_PROSE;
 

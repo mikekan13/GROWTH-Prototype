@@ -1,0 +1,9 @@
+[
+  { "line": "Kristopher sits in his car exhausted after his routine of grieving and delivering pizzas. He looks at the 5 dollar bill she gave him a couple nights before and puts the digits in his phone. He takes a deep breath and speaks out loud as he hits dial and his car speakers begin ringing. \"Protect me Lord from anything not from you.\"", "waitS": 75 },
+  { "line": "Violet's phone continues to ring. She knows if she waits another ring that it will go to voicemail.", "waitS": 60 },
+  { "line": "It continues to ring.", "waitS": 50 },
+  { "line": "Kristopher hears Violet's voice say. \"Hi it's Violet... Leave a message.\" Kristopher hangs up before the beep.", "waitS": 60 },
+  { "line": "Kristopher says out loud. \"Fuck it.\" Then he hits redial.", "waitS": 70 },
+  { "line": "Violet's phone continues to ring as Kristopher prepares himself to leave a voicemail.", "waitS": 60 },
+  { "line": "He hangs up the phone realizing that it would be weird to leave a voicemail", "waitS": 70 }
+]

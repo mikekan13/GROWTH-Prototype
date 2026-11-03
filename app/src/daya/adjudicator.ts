@@ -197,6 +197,10 @@ export async function resolveIntent(
   // Who is where (HW4 2026-10-24): the doors alone let a bill pass through a locked one.
   const standRows = await whereOthersStand(campaignId, entityCharacterId, map);
   const whereabouts = whereaboutsLines(map?.roomName ?? null, standRows);
+  // WHAT THE ACTOR SET OFF (session 2, 2026-11-02): a caller who hangs up must see the call he placed is still ringing, or "stop" has nothing to end.
+  const setOff = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null, notIn: [entityCharacterId] } }, select: { name: true, holderId: true, data: true }, take: 300 })
+    .then((rows) => signalLines(rows.map((r) => ({ name: r.name, holderId: r.holderId, data: safeJson(r.data) })), entityCharacterId, cycle))
+    .catch((): string[] => []);
   // A named person on another level: what they carry is reachable only through a signal (their phone rings), never by hand.
   let signalBlock: string[] = [];
   try {
@@ -233,6 +237,7 @@ export async function resolveIntent(
     `Carrying: ${held.carrying.length ? held.carrying.join(', ') : 'nothing'}`,
     `(The entity has ONLY what is listed. No jacket, pocket, bag or tool exists for it unless named here or in the facts.)`,
     ...signalLines(heldRows.map((r) => ({ name: r.name, holderId: entityCharacterId, data: safeJson(r.data) })), entityCharacterId, cycle),
+    ...setOff,
     '',
     ...signalBlock,
     input.narrated ? `## Narrated by the Watcher (it HAPPENED exactly as written)` : `## Declared Intent`,

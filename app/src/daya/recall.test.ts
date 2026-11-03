@@ -14,6 +14,7 @@ import {
   localSealLint,
   poolNorm,
   spreadBudget,
+  agePrefix,
   type ParsedMemory,
 } from './recall';
 
@@ -224,5 +225,16 @@ describe('localSealLint', () => {
   });
   it('passes ordinary experiential prose', () => {
     expect(localSealLint('The mug is warm in my grip. Simple thing, solid thing.')).toBe(true);
+  });
+});
+
+describe('agePrefix', () => {
+  it('is empty under an hour', () => {
+    expect(agePrefix(0)).toBe('');
+    expect(agePrefix(3599)).toBe('');
+  });
+  it('words the age when older', () => {
+    expect(agePrefix(2 * 86400)).toBe('About 2 days ago: ');
+    expect(agePrefix(5 * 3600)).toBe('About 5 hours ago: ');
   });
 });

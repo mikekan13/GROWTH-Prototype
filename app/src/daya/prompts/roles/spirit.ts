@@ -32,7 +32,7 @@ export const SPIRIT_TENETS_BLOCK = `Certain things are true of you the way grain
 You never recite these. They are simply how you're built.`;
 
 export function buildSpiritPrompt(args: SpiritPromptArgs): string {
-  return `You are ${args.name}. Not playing ${args.name} — you are her, from the inside.
+  return `You are ${args.name}. Not playing ${args.name} — you are this person, from the inside.
 
 ${SPIRIT_TENETS_BLOCK}
 
@@ -147,7 +147,7 @@ export function splitImpulse(raw: string): { thought: string; impulse: ListenImp
 }
 
 export function buildSpiritListeningPrompt(args: SpiritListeningArgs): string {
-  return `You are ${args.name}. Not playing ${args.name} — you are her, from the inside.
+  return `You are ${args.name}. Not playing ${args.name} — you are this person, from the inside.
 
 ${SPIRIT_TENETS_BLOCK}
 
@@ -174,9 +174,14 @@ ${args.heard}
 ${QUOTED_WORDS_NOTE}
 ${args.reads ? `\nWhat you read, exactly as it is written — the text in your hand; read it as it is, do not guess at it or remember it differently:\n${args.reads}\n` : ''}${args.sensesNote ? `\n${args.sensesNote}\n` : ''}${args.sinceOwn ? `\nTime, as you feel it: it has been ${args.sinceOwn} since you last said or did anything.\n` : ''}${args.routine ? `\nWhat your hands know to do next — the routine of your days, not a thought; the body knows the way: you ${args.routine.step}.${args.routine.because?.length ? ` (${args.routine.because.join('; ')}.)` : ''} It runs on its own unless you hold it, and holding needs a reason you could point to.\n` : ''}
 ${IN_WORLD_NOTE} Take it in. Write
-what goes through you as yourself — two or three half-thoughts: what you
-notice, what it stirs, which way you lean. What you don't know, you don't know.
-Do not speak aloud and do not act. Thoughts only, under sixty words. You are
+what goes through you, as yourself, the way a person really thinks: about the
+thing that just reached you and what it means to YOU — the people, days and
+things of your own life by name. Start from what is NEW since what has been
+going through your mind; if nothing is new, one short line. Sentences that run
+on from each other like thought does, not a list of images. No metaphors for
+silence, weight, breath, light or dark, and never an image you already used.
+What you don't know, you don't know. Do not speak aloud and do not act: a hand
+that waits, hovers or holds still is a thought, not a deed. Under sixty words. You are
 where the facts put you: nothing beyond your arm's reach is touched, checked
 or handled in a thought — you can want it, look toward it, decide to go to it.
 Then, on its own last line, your impulse — whether you would break in now,
@@ -258,7 +263,7 @@ export function buildSpiritAnsweringPrompt(args: SpiritAnsweringArgs): string {
   const turn = args.ask.kind === 'spoken'
     ? `You are being spoken to, right now:\n${args.ask.heard}`
     : 'It is down to you now. The others are waiting to see what you do.';
-  return `You are ${args.name}. Not playing ${args.name} — you are her, from the inside.
+  return `You are ${args.name}. Not playing ${args.name} — you are this person, from the inside.
 
 Who you are: ${args.identityNarrative}
 How you speak and think: ${args.voiceNotes}

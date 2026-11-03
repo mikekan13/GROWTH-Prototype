@@ -713,9 +713,9 @@ const BEING_SYSTEM = `You set down one being's side of a beat in a novel, from D
 Given what reached the being (HEARD), the being's own listening monologue (its inner voice, first person), and FACTS about where it is:
 - SCENE: 1 or 2 sentences, third person, setting its side of the stage from the facts — where it is, the hour, what reached it. Never invent objects, people, sounds or events that are in neither the monologue nor the facts. Use the world's names exactly as given. The hour as the [clock] line gives it, in words — never the calendar date, never digits. Light only from the facts: no daylight, dusk, sun or "last light" unless a fact says so (an evening in autumn is dark; a lamp lights a room only if a fact lists it lit). If the page already gave the hour or the room (ALREADY ON THE PAGE), do not give them again: one sentence of what is new for this being this beat (what reached it, what changed), or an empty scene.
 - Never count or number events (first/second/third knock) unless the monologue or HEARD counts them. A being's inner voice may count nothing it has not counted on the page: never number knocks or minutes. The [clock] line's light (after dark / daylight) is a FACT to write from, never a label to paste. Never add a movement the text does not state (rising, turning, stepping) to get from one act to the next. A thought that looks FORWARD to an act ("the knock is coming") goes BEFORE that act in the card, never after it.
-- SEGMENTS, in the monologue's order, splitting it. Each sentence of the monologue goes to exactly ONE segment. A sentence that is a physical doing is an action and is NOT also a thought. Never split a sentence: a participle clause stays with its sentence.
+- SEGMENTS, in the monologue's order, splitting it. Each sentence of the monologue goes to exactly ONE segment. A sentence that is a physical doing is an action and is NOT also a thought. Never split a sentence: a participle clause stays with its sentence. Sentences of the same kind that follow each other stay together in ONE segment: a new segment begins only where the kind changes (thought → action → thought), so a run of thinking reads as one run of thought, not a list.
   - thought: its inner voice, first person, as it thinks it (keep its words; trim nothing that matters — never reword it, invert it, or correct it with the facts).
-  - action: only what the monologue says the being PHYSICALLY does now (a hand toward the lock, holding still, a step back) — third person present: "She holds still." Perceptions and feelings are thoughts, not acts. A doing the being could not do from where the FACTS put it (checking the lock from the middle of the room, touching a thing across the room) is dropped — neither action nor thought; the being did not move.
+  - action: only a deliberate physical deed the monologue says the being DOES now, one that moves or changes something (a hand to the lock, a step back, picking the phone up, setting it down) — third person present: "She steps back." Perceptions and feelings are thoughts, not acts. So is everything that is NOT a deed (session 2, 2026-11-02): holding still, waiting, hovering, staring, a thumb over a screen, being about to, deciding, a body as it already is ("my hands are still", "my thumb is cold") — these are thoughts, kept in first person. A doing the being could not do from where the FACTS put it (checking the lock from the middle of the room, touching a thing across the room) is dropped — neither action nor thought; the being did not move.
   - speech: only words the monologue says it says ALOUD, verbatim.
 - NOTHING NEW = NO SCENE: when nothing from beyond the being reached it, or nothing is new, "scene" is an empty string. Never write that nothing changed, nothing happened or nothing reached the being ("Nothing new has reached Violet from beyond the room.", "The knock has settled into silence." are forbidden).
 - DERIVE, NEVER INVENT.
@@ -724,6 +724,30 @@ Given what reached the being (HEARD), the being's own listening monologue (its i
 - Output JSON only: {"scene": string, "segments": [{"kind": "action"|"thought"|"speech", "text": string, "narrated"?: string}]}`;
 
 export interface BuiltBeingCard { scene: string | null; segments: Array<{ kind: 'action' | 'thought' | 'speech'; text: string; narrated?: string }> }
+
+/**
+ * A RUN OF THINKING IS ONE THOUGHT (session 2, 2026-11-02, Michael: "This doesn't read like prose"): every card came out as a
+ * list of one-sentence thoughts. Thought segments that follow each other are joined into one, their narrations too; a new
+ * segment begins only where the kind changes. Pure.
+ */
+export function mergeAdjacentThoughts(segments: BuiltBeingCard['segments']): BuiltBeingCard['segments'] {
+  const out: BuiltBeingCard['segments'] = [];
+  // A sentence said once on a card is not said again (replay 1: Kristopher's whole run of thought came back twice).
+  const seen = new Set<string>();
+  const key = (x: string) => x.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  for (const raw of segments) {
+    if (raw.kind === 'speech') { out.push({ ...raw }); continue; }
+    const fresh = splitSentences(raw.text).filter((x) => { const k = key(x); if (!k || seen.has(k)) return false; seen.add(k); return true; });
+    if (!fresh.length) continue;
+    const s = fresh.length === splitSentences(raw.text).length ? raw : { ...raw, text: fresh.join(' '), narrated: undefined };
+    const prev = out[out.length - 1];
+    if (prev && prev.kind === 'thought' && s.kind === 'thought') {
+      prev.text = `${prev.text} ${s.text}`.trim();
+      if (prev.narrated || s.narrated) prev.narrated = `${prev.narrated ?? ''} ${s.narrated ?? ''}`.trim() || undefined;
+    } else out.push({ ...s });
+  }
+  return out;
+}
 
 /** A being's monologue → its scene line and its card. Null on failure (the monologue stands as one thought). Never throws. */
 export async function buildBeingCard(
@@ -788,6 +812,7 @@ export async function buildBeingCard(
       return text ? [{ ...s, text }] : [];
     });
     sceneClean = filterVoice(scene, { heard: `${heard} ${monologue}`, hasLightFact: cardLight(facts.lines), facts: facts.lines }).text;
+    segments = mergeAdjacentThoughts(segments);
     if (!segments.length) segments.push({ kind: 'thought', text: monologue.trim() });
     console.log(`[scene-builder] ${being.name}'s card built in ${Date.now() - t0}ms: ${segments.length} segment(s)`);
     return { scene: sceneClean || null, segments };

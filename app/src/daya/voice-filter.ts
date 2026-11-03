@@ -65,6 +65,10 @@ const STOCK_IMAGES: Array<{ key: string; re: RegExp; always?: boolean }> = [
   { key: 'suspended ash', always: true, re: /\bsuspended\s+ash\b|\bash\s+(?:hanging|suspended)\b/i },
   { key: 'dead light', always: true, re: /\bdead\s+light\b/i },
   { key: 'weight of the air', re: /\bweight\s+of\s+the\s+air\b|\bair\s+(?:feels\s+)?(?:thick|heavy)\s+with\b/i },
+  // Session 2 replays (2026-11-02): a hand or thumb "hovers" over the phone on nearly every one of Violet's cards.
+  { key: 'hovering hand', re: /\b(?:hand|thumb|finger|fingers)\b[^.!?]{0,30}\bhover\w*\b|\bhover\w*\b[^.!?]{0,20}\b(?:hand|thumb|finger|fingers)\b/i },
+  { key: 'silence rushes back', re: /\bsilence\b[^.!?]{0,30}\b(?:rushes|rushed|floods?|flooded|settles?|settled)\s+(?:back|in)\b/i },
+  { key: 'cooling engine', re: /\bengine\b[^.!?]{0,40}\b(?:tick\w*|cool\w*)\b|\b(?:tick\w*|cool\w*)\b[^.!?]{0,30}\bengine\b/i },
 ];
 
 /** The stock image a sentence uses, if any (its key). Pure. */
