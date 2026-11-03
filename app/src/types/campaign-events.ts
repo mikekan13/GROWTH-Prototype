@@ -279,6 +279,13 @@ export interface JewlWorkingEvent {
   label?: string;
 }
 
+/** A Watcher-only line under the card (2026-11-03): what the world refused or the act lacked. Never reaches a perceived viewer. */
+export interface TableNoteEvent {
+  kind: 'table_note';
+  text: string;
+  actorId: string;
+}
+
 // ── DAYA work sessions (F-3 walking version) ─────────────────────────────
 
 /** Lifecycle of a durable JEWL job — feeds the live job/status surface. */
@@ -389,6 +396,7 @@ export type StreamEventData =
   | CastResultEvent
   | TerminalEventRelay
   | JewlWorkingEvent
+  | TableNoteEvent
   | DayaWorkSessionEvent
   | NeedsInputEvent
   | JewlFocusEvent

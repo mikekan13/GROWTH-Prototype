@@ -50,6 +50,7 @@ export function deliveryFor(conn: Pick<SSEConnection, 'userId' | 'perceived'>, e
   switch (data.kind) {
     case 'being_speaking':
     case 'daya_work_session':
+    case 'table_note': // Watcher-only (2026-11-03)
       return null;
     case 'terminal_event': {
       const te = data.event;

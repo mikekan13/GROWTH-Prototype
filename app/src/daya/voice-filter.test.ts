@@ -116,6 +116,31 @@ describe('held things are stated as held (HW8 run 7 #8)', () => {
   });
 });
 
+import { absentThingsFor } from './absent-things';
+describe('absent things (session 2, 2026-11-03)', () => {
+  const absentThings = [{ name: 'Five-dollar bill with her number', where: 'with someone else' }];
+  it('drops a sentence that places the absent bill here; keeps one that remembers it', () => {
+    const r = filterVoice('The bill is still by the door. I gave him the bill with my number.', { absentThings });
+    expect(r.text).toBe('I gave him the bill with my number.');
+    expect(r.dropped.map((d) => d.why)).toEqual(['absent_thing']);
+  });
+  it('a held thing wins over an absent one sharing a word', () => {
+    const r = filterVoice('The cash is still in my hand.', { absentThings: [{ name: 'Cash from the tip jar', where: 'elsewhere' }], heldNames: ['The cash in her wallet'] });
+    expect(r.text).toBe('The cash is still in my hand.');
+  });
+  it('absentThingsFor: held by someone away, or placed elsewhere; mine and room-mates\' stay', () => {
+    const me = { characterId: 'v', locationId: 'apt', roomMates: ['k2'] };
+    const r = absentThingsFor([
+      { name: 'bill', holderId: 'k', locationId: null },
+      { name: 'cash', holderId: 'v', locationId: null },
+      { name: 'pen', holderId: 'k2', locationId: null },
+      { name: 'car keys', holderId: null, locationId: 'car' },
+      { name: 'lamp', holderId: null, locationId: 'apt' },
+    ], me);
+    expect(r).toEqual([{ name: 'bill', where: 'with someone else' }, { name: 'car keys', where: 'elsewhere' }]);
+  });
+});
+
 describe('the echo guard (HW10 2026-10-29)', () => {
   const prompt = `What just reached you:\nNothing from beyond the room has reached you just now.\nQuoted words are the speaker's own; a name inside them is whoever the speaker is addressing, not the speaker.\n\nNobody is waiting on you; things are still unfolding. Think and speak only in the words of your own life — what just happened, what you notice, what you do now. Take it in.`;
   it('drops the sentences copied from the prompt and keeps her own', () => {

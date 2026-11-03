@@ -33,6 +33,8 @@ export interface VoiceFilterContext {
   absentNames?: string[];
   /** HW8 run 7 #8: names of the things the being HOLDS - a sentence that places one on a shelf / across the room is dropped. */
   heldNames?: string[];
+  /** 2026-11-03: things the ledger puts out of the being's reach (see absent-things.ts) - a sentence that places one HERE / now is dropped (reason 'absent_thing'). */
+  absentThings?: Array<{ name: string; where: string }>;
   /** 'vocab' = only the table's words (a being's DOING: "knocks three times" is not a count). Default 'all'. */
   rules?: 'all' | 'vocab';
   /** The prompt the voice answered (HW10 2026-10-29: the small model copied the prompt's own notes into Violet's thought). A sentence of five words or more that appears in it is an echo, not a thought. */
@@ -121,6 +123,23 @@ export function heldPlacedElsewhere(sentence: string, heldNames: string[]): bool
   return heldNames.some((n) => n.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !HELD_STOP.has(w)).some((w) => new RegExp(`\\b${w}`, 'i').test(sentence)));
 }
 
+// Session 2 live (2026-11-03): "The bill is still by the door" - the bill was in Kristopher's hand, in his car. One regex of the
+// small set of present-tense PLACING phrasings; a sentence that only remembers the thing ("I gave him the bill") has none of them.
+const PLACES_HERE_RE = /\b(?:(?:is|are|sits?|lies|rests?|waits?|stays?|remains?)\s+(?:still\s+|just\s+|right\s+)?(?:by|on|in|at|near|next\s+to|here|there)\b|(?:still|just)\s+(?:by|on|in|at|near)\s+the\b|in\s+my\s+(?:hand|palm|fingers|pocket)|next\s+to\b|right\s+here\b|\bhere\b)/i;
+const ABSENT_STOP = new Set(['the', 'and', 'with', 'her', 'his', 'from', 'number', 'that', 'this', 'their', 'into']);
+const wordsOf = (name: string) => name.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !ABSENT_STOP.has(w));
+/** A sentence that names a thing the ledger puts out of the being's reach and places it here / now. Held things win. Pure. */
+export function placesAbsentThing(sentence: string, absentThings: Array<{ name: string; where: string }>, heldNames: string[] = []): boolean {
+  if (!PLACES_HERE_RE.test(sentence)) return false;
+  const heldWords = new Set(heldNames.flatMap(wordsOf));
+  const s = sentence.toLowerCase();
+  return absentThings.some((t) => {
+    const name = t.name.trim().toLowerCase();
+    if (name && s.includes(name)) return true;
+    return wordsOf(t.name).some((w) => !heldWords.has(w) && new RegExp(`\\b${w}`, 'i').test(sentence));
+  });
+}
+
 /** Is `line` (fuzzily) one of the being's last spoken lines? (HW8 run 7 #7) Pure. */
 export function isSpokenRepeat(line: string, previous: string[]): boolean {
   const toks = (x: string) => new Set(norm(x).split(/[^a-z0-9']+/).filter(Boolean));
@@ -169,6 +188,7 @@ export function filterVoice(text: string, ctx: VoiceFilterContext = {}): { text:
     if (GLASS_RE.test(sentence) && DOOR_RE.test(sentence) && !(ctx.facts ?? []).some((f) => GLASS_RE.test(f))) { drop('a material no fact gives the door: glass'); continue; }
     if (ctx.noOneInView && inViewOfAbsent(sentence, ctx.absentNames ?? [])) { drop('puts an absent being in view when the facts say no one is present'); continue; }
     if (ctx.heldNames?.length && heldPlacedElsewhere(sentence, ctx.heldNames)) { drop('places a held thing somewhere it is not'); continue; }
+    if (ctx.absentThings?.length && placesAbsentThing(sentence, ctx.absentThings, ctx.heldNames ?? [])) { drop('absent_thing'); continue; }
     const count = sentence.match(COUNT_RE);
     if (count && !countedIn(count[0], heard)) { drop(`counting: ${count[0]}`); continue; }
     if (ctx.hasLightFact === false && LIGHT_RE.test(sentence) && !LIGHT_RE.test(heard)) { drop('light or dark with no light fact for the room'); continue; }

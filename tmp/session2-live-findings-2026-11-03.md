@@ -27,3 +27,24 @@ Fix nothing live: the source can change, but :3001 is rebuilt only after the ses
 ## Fixed after the session (commits after daf2202)
 
 Items 1, 2, 3, 4 (the voice is told the openings to avoid, and is asked once more if it repeats one), 6, 7 and 8. Item 5 is covered by the voice rules. The world was restored to before session 2, :3001 rebuilt, and the pod warmed.
+
+## Session 2 live, second run (2026-11-03 evening, build 8456b51) — logged while Michael plays
+
+Michael: "Still having trouble with these cards." Nothing live touched; probes ran as side calls against synthetic pieces.
+
+9. **Violet's first card: "It rang twice before I picked up"** — she never picked up. **Kristopher's: "Four rings now, maybe five. She's not going to pick up, and I already knew that before I dialed"** — the still-going fault again, in the first beat.
+   - Probes: Qwen's plan on clean pieces (3 runs) never invents the deed; the cloud voice on a clean gist (4 runs) never adds one. The fault is in the PIECES handed in:
+   - (a) **Two orphan `being_thought` rows from last night's killed replay** (03:26:58 Violet "My thumb hovers, trembling, over the glass"; 03:27:02 Kristopher "The ringing stops… I didn't expect her to answer"; sessionId null) predate the 03:46 snapshot, so the restore left them. `recentVoiceOf` handed them to both beings as their most recent thoughts, so each opened tonight already past the call.
+   - (b) **`recentVoiceOf` has no time bound.** Session-1 thoughts from two days ago in-world ("I am still holding the door", the receipt) are "recent" and unaged; the voice continues them as the present: "He has not knocked yet" (21:39 card).
+   - FIX (after the session): delete the two orphans; "recent" = thoughts since this session (or the last clock jump); older thoughts, if given at all, carry their age like memories. The in-memory listening state (innerState) must reset at a session start too.
+10. **Rosemary Marsh again** ("Rosemary Marsh would have had a theory", 21:39) — she was not in the recent thoughts this time, so the recall fix did not apply; one mention is fair. Watch it.
+11. **The pieces were not on the record** — the log showed only timings. Added: composer logs perceived / felt / wakes / recent and gist / thought per beat (source only; in the next build).
+12. **Rosemary Marsh in 4 of 7 Violet cards** — not from recall. `identityNarrative` is a 3,982-char chronology with Rosemary six times, and the composer prompt carries ALL of it every beat ("Who Violet is: …"); the mood order gets its first 400 chars as temperament. The plan reaches for the most vivid named figure in front of it. FIX: the composer gets a short standing identity (who she is now, a few sentences); the chronology is memory, and only the recall agent wakes it.
+13. **Kristopher: "I know her well enough to know that — I built that skill reading people…"** (21:42:53) — he met her once. Invented familiarity; the plan/voice had no fact saying how well he knows her. Watch after #12 (less biography in the prompt) and the recent-thought bound.
+14. **Violet after the text chime** (21:42:39): the chime is not in the thought at all; the next card (21:42:56) has "Something chimed." and "The bill is still by the door" again (#9b). 21:44:31: "Something is vibrating in my hand … The screen keeps asking" — a text chime treated like a ringing call (the signal stays live 600 s for any signal; a chime is one sound, then a notification that sits).
+15. **Session end did not stop the pod** (still RUNNING 1081 s after session_end); stopped by hand.
+16. Good: the voicemail line landed right in Kristopher ("The voicemail picks up and I don't leave one. I just listen to her recorded voice"); the voice sounds like her ("which is also, technically, an answer"); no placeholder leaks; "Violet's phone rings/goes quiet/chimes" on the table.
+   - Correction to #15: the server DID stop the pod one second after session_end ("[text-pod] … stopped after 18 min — released"); my status check landed in that same second. Not a fault.
+
+## After the session — Michael: "We keep trying to bandaid fix things"
+Fix pass stopped. Plan written: GROUNDED-BEATS-PLAN-2026-11-03.md (a beat is a record of resolved references, the local model chooses, the cloud writes; the table test replaces live sessions as the test). Tonight's source changes are kept, uncommitted and unbuilt, as Day 1 material.

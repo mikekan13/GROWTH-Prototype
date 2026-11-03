@@ -44,6 +44,8 @@ async function restore(s: Awaited<ReturnType<typeof snapshot>>, from: Date, sess
   const canon = await p.canonEvent.findMany({ where: { campaignId: C, createdAt: win }, select: { id: true } });
   if (canon.length) { await p.canonRevision.deleteMany({ where: { canonEventId: { in: canon.map((c: any) => c.id) } } }); await p.canonEvent.deleteMany({ where: { id: { in: canon.map((c: any) => c.id) } } }); }
   await prisma.campaignEvent.deleteMany({ where: { campaignId: C, createdAt: win } });
+  // NON-SESSION PROSE IS NEVER CANON (Michael 2026-11-03: "not being cleared between tests"): thought rows with no session, whenever written, go too.
+  await prisma.campaignEvent.deleteMany({ where: { campaignId: C, type: 'being_thought', sessionId: null } });
   await p.dayaMemoryEntry.deleteMany({ where: { entityId: { in: entityIds }, realTime: win } });
   await p.dayaIntention.deleteMany({ where: { entityId: { in: entityIds }, createdAt: win } });
   await p.historyEntry.deleteMany({ where: { campaignId: C, realTime: win } }).catch(() => undefined);

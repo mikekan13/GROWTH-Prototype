@@ -69,7 +69,7 @@ import { actInThirdPerson, worldChangeSentences } from '@/daya/act-card';
 import { didNotHear } from '@/daya/did-not-hear';
 import { statedStretchOf, simulateStatedStretch } from '@/services/table-timeskip';
 import { resolveIntent } from '@/daya/adjudicator';
-import { recentVoiceOf, recentCardTextsOf } from '@/daya/voice-history';
+import { recentVoiceOf, recentCardTextsOf, liveVoiceBound } from '@/daya/voice-history';
 import { markAddressedByName } from '@/daya/name-addressed';
 import { splitHeld, readHeldIn } from '@/daya/facts-for-actor';
 import { cueCoverage } from '@/daya/ladder';
@@ -255,7 +255,8 @@ export function cardWithoutRepeats<C extends { scene: string | null; segments: A
 
 /** The being's last `n` recorded thoughts on this campaign (newest first). Never throws. */
 export async function recentThoughtsOf(campaignId: string, characterId: string, n = 3): Promise<string[]> {
-  return recentVoiceOf(campaignId, characterId, n);
+  // Bounded to the live session (2026-11-03): last session's and replay rows are not recent thoughts.
+  return recentVoiceOf(campaignId, characterId, n, await liveVoiceBound(campaignId));
 }
 
 /** The standing beat's last sentence: a beat in which nothing from beyond the room reached the being. */
@@ -961,7 +962,7 @@ async function runBeats(
           const repeat = !!said?.trim() && !thought;
           // The card's repeat window is taken NOW, before this beat's thought is recorded (HW10 2026-10-29: the thought went on
           // the record first, so every card built from it read as a repeat of itself and no card was attached all run).
-          const priorCards = repeat ? [] : await recentCardTextsOf(campaignId, listenerId);
+          const priorCards = repeat ? [] : await recentCardTextsOf(campaignId, listenerId, 3, await liveVoiceBound(campaignId));
           if (repeat) console.log(`[table-speak] ${name}: the whole thought was a repeat — dropped`);
           // HELD REACTIONS: the Watcher's character still listened (memory formed), but his reaction to another being's line waits for his next beat.
           const holding = !repeat && !!thought && !!truth.gmActorId && listenerId === truth.gmActorId && truthId !== truth.primary;
@@ -1656,6 +1657,8 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
         const applied = r.effects?.applied ?? [];
         const refused = r.effects?.refused ?? [];
         if (applied.length || refused.length) console.log(`[table-speak] narrated act by ${a.actorLabel}: ${applied.join('; ') || 'nothing moved'}${refused.length ? ` · refused: ${refused.join('; ')}` : ''}`);
+        // WHAT THE ACT LACKED (2026-11-03): the Watcher is told, on a Watcher-only line; the act still happened.
+        for (const text of refused) broadcastEvent(campaignId, { kind: 'table_note', text, actorId: a.actorId });
         // THE WORLD ANSWERS THE ACT (HW9, Mike 2026-10-29: "it should have had the phone ring when I first had Kristopher
         // call"): a sound the act caused elsewhere is narrated to the table by the world itself, as its own stretch — the
         // reach judge places it at the thing (sim/senses/named-things), so the one holding the phone hears her phone and the

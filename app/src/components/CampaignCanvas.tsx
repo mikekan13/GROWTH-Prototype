@@ -293,6 +293,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         window.dispatchEvent(new CustomEvent('growth:perceived-feed-stale', { detail: { characterId: data.characterId ?? null } }));
       }
 
+      // session 2 live, 2026-11-03: the engine's refusals of a typed line reach the Watcher (truth-record connection only).
+      if (data.kind === 'table_note') {
+        window.dispatchEvent(new CustomEvent('growth:table-note', { detail: { text: data.text } }));
+      }
+
       // Planning board moved (no text) — the chip strip re-reads GET /intents.
       if (data.kind === 'board_changed') {
         window.dispatchEvent(new CustomEvent(BOARD_CHANGED_EVENT));

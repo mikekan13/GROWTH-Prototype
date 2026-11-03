@@ -38,7 +38,7 @@ import { perceive } from './perceive';
 import { filterVoice, droppedLog, hasLightFact, isSpokenRepeat } from './voice-filter';
 import { competingSpecific, specificsHint } from './specifics';
 import { presenceFacts, knowsLine } from './presence-facts';
-import { recentSpokenOf, recentVoiceOf } from './voice-history';
+import { recentSpokenOf, recentVoiceOf, liveVoiceBound } from './voice-history';
 import { nameIsHers, unmarkAddressed } from './name-addressed';
 import { claimVsFact, factHint, type FactLine } from './claim-vs-fact';
 import { actorMap, whereOthersStand } from '@/services/world-apply';
@@ -1052,7 +1052,7 @@ export async function listenStimulus(
   // (the filter's memory). All best-effort: a lookup that fails leaves the section empty.
   const heldRows = await Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: characterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 })).catch((): Array<{ name: string; data: string | null }> => []);
   const [priorVoice, ground] = await Promise.all([
-    ctx.campaignId ? recentVoiceOf(ctx.campaignId, characterId, 30).catch((): string[] => []) : Promise.resolve([] as string[]),
+    ctx.campaignId ? liveVoiceBound(ctx.campaignId).then((b) => recentVoiceOf(ctx.campaignId!, characterId, 30, b)).catch((): string[] => []) : Promise.resolve([] as string[]),
     omniscient ? Promise.resolve({ lines: [] as string[], records: [] as FactLine[], hasLight: true, noOneInView: false, absentNames: [] as string[] }) : beatFacts(ctx, stimulus.content, (heldRows ?? []).map((h) => h.name)),
   ]);
   const heldNow = omniscient ? [] : heldLines(splitHeld(heldRows ?? []), { described: true, written: false, placed: true });
@@ -1414,7 +1414,7 @@ export async function answerAsk(
     heldPromise,
     // The facts the ask touches — and the doors of her own room and the things she holds (HW8 run 6), ranked so the cut keeps them.
     heldPromise.then((rows) => beatFacts(ctx, cue, (rows ?? []).map((h) => h.name))),
-    ctx.campaignId && ctx.persona.omniscient !== true ? recentVoiceOf(ctx.campaignId, characterId, 30).catch((): string[] => []) : Promise.resolve([] as string[]),
+    ctx.campaignId && ctx.persona.omniscient !== true ? liveVoiceBound(ctx.campaignId).then((b) => recentVoiceOf(ctx.campaignId!, characterId, 30, b)).catch((): string[] => []) : Promise.resolve([] as string[]),
   ]);
   const heldText = heldLines(splitHeld(heldRows ?? []), { described: true, placed: true });
   const factLines = askGround.lines.slice(0, 14);

@@ -387,6 +387,18 @@ export default function CampaignTerminal({
     setEvents(prev => mergeEvents(prev, streamEvents));
   }, [streamEventsTick, streamEvents]);
 
+  // session 2 live, 2026-11-03: the engine's refusals of a typed line reach the Watcher.
+  // Transient (not persisted): the muted aside sits under the latest row until reload.
+  const [tableNotes, setTableNotes] = useState<string[]>([]);
+  useEffect(() => {
+    const onNote = (e: Event) => {
+      const text = (e as CustomEvent<{ text?: string }>).detail?.text;
+      if (text) setTableNotes(prev => [...prev, text].slice(-5));
+    };
+    window.addEventListener('growth:table-note', onNote);
+    return () => window.removeEventListener('growth:table-note', onNote);
+  }, []);
+
   // Fallback poll every 30s (in case SSE reconnects and misses events)
   useEffect(() => {
     if (!visible) return;
@@ -1246,6 +1258,12 @@ export default function CampaignTerminal({
               if (nearBottom) el.scrollTop = el.scrollHeight;
             }}
           />
+          {/* The engine's refusal of a typed line: one muted aside under the latest row (Watcher only). */}
+          {!searching && !viewAs && tableNotes.map((t, i) => (
+            <div key={i} data-table-note style={{ padding: '2px 14px', fontFamily: mono, fontSize: 11, lineHeight: 1.5, color: '#6b6b68', fontStyle: 'italic' }}>
+              JEWL: {t}
+            </div>
+          ))}
           </>)}
         </div>
         {/* Session start: the black novel glitches away over the live feed as the pod loads (warmup/). */}

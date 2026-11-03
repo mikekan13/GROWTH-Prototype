@@ -150,6 +150,11 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   }
   const thought = voiced?.thought?.trim() || plan.gist;
   console.log(`[composer] ${a.name}: pieces ${tPieces - t0}ms · plan ${tPlan - tPieces}ms · voice ${Date.now() - tPlan}ms · impulse ${plan.impulse}`);
+  // THE PIECES ON THE RECORD (session 2 live #2, 2026-11-03): a card went wrong and the log showed only timings, so nothing said
+  // which piece carried the fault. Each piece, cut short, so a replay can be read from the server log alone.
+  const cut = (s: string, n = 160) => s.replace(/\s+/g, ' ').slice(0, n);
+  console.log(`[composer] ${a.name} pieces · perceived: ${cut(perceived)} · felt: ${cut(felt, 100)} · wakes: ${wakes.map((w) => cut(w.text, 60)).join(' | ') || '(none)'} · recent: ${a.recent.map((r) => cut(r, 50)).join(' | ') || '(none)'}`);
+  console.log(`[composer] ${a.name} plan · gist: ${cut(plan.gist)}${plan.why ? ` · why: ${cut(plan.why, 60)}` : ''} · thought: ${cut(thought)}`);
   return { perceived, felt, wakes, plan, thought };
 }
 

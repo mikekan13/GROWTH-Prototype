@@ -24,6 +24,7 @@ Respond with STRICT JSON only — no prose outside the JSON object — in exactl
   "factsToSupersede": [{ "id": string, "fact": string }],
   "check": { "attribute": string, "dr": number } | null,
   "experienceEvent": { "content": string, "valence": number, "salience": number },
+  "uses": [string],
   "effects": [ { "op": "door", "door": <door name>, "state": "open"|"closed"|"locked" }
              | { "op": "take", "item": <thing in the room> }
              | { "op": "give", "item": <thing in hand>, "to": <person present> }
@@ -42,6 +43,10 @@ Rules:
    unlock it. The entity has ONLY what its Entity section lists — never
    invent a jacket, a pocket, a bag, a key. "effects" lists every physical
    change the outcome makes to doors, hands and rooms; [] when none.
+   "uses" lists the things the act USES or handles (smokes, pockets, reads,
+   puts on, drinks from, opens with), each named as the Entity section names
+   it when it is there, or as the act names it when it is not — never
+   substitute something the entity does hold; [] when it uses nothing.
    MONEY changing hands is {"op":"pay"} with the AMOUNT the actor means to
    pay (what is due, or what the words say) — never a "give" of "the cash":
    the engine picks the bills out of what the actor carries and says what was

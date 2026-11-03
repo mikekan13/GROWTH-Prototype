@@ -174,6 +174,14 @@ export async function startSession(
     .then((m) => m.startKeepalive(campaignId))
     .catch((err) => console.warn('[campaign-event] L1 keep-warm failed to start', err));
 
+  // A new session starts clean (2026-11-03, session 2 live: the last session's inner state carried over as the present).
+  // The listening map is a per-process cache, so it is cleared whole; the live-session cache is dropped.
+  try {
+    const [{ forgetListening }, { forgetLiveSession }] = await Promise.all([import('@/daya/listening'), import('@/daya/voice-history')]);
+    forgetListening();
+    forgetLiveSession(campaignId);
+  } catch (err) { console.warn('[campaign-event] listening reset failed', err); }
+
   return {
     id: session.id,
     number: session.number,

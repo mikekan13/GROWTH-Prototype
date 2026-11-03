@@ -96,6 +96,33 @@ interface AdjudicatorResponseShape {
   experienceEvent: { content: string; valence: number; salience: number };
   /** Physical effects on the map (door / take / give / put / move). */
   effects?: ActEffect[];
+  /** The held things the act uses or handles (2026-11-03): checked against the ledger after the answer. */
+  uses?: string[];
+}
+
+/** Clean the model's `uses`: strings only, trimmed, no blanks, capped. Pure. */
+export function parseUses(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((x): x is string => typeof x === 'string').map((x) => x.trim()).filter(Boolean).slice(0, 8);
+}
+
+/**
+ * THE LEDGER DECIDES WHAT THE ACT USES (session 2, 2026-11-03: "takes a hit of his weed vape" with no vape in
+ * Kristopher's ledger passed silently). A use matches a name when the names match whole (case-insensitive), or one
+ * contains the other, or a word of 4+ letters in the use appears in the name. No match → a refusal line. Pure.
+ */
+export function unheldUses(uses: string[] | undefined, heldNames: string[], roomNames: string[], actorName = 'The actor'): string[] {
+  const names = [...heldNames, ...roomNames].map((n) => n.toLowerCase());
+  const out: string[] = [];
+  for (const raw of uses ?? []) {
+    const thing = raw.trim();
+    if (!thing) continue;
+    const t = thing.toLowerCase();
+    const words = t.split(/[^a-z0-9']+/).filter((w) => w.length >= 4);
+    const found = names.some((n) => n === t || n.includes(t) || t.includes(n) || words.some((w) => n.includes(w)));
+    if (!found) out.push(`${actorName} has no ${thing} on them`);
+  }
+  return out;
 }
 
 function parseAdjudicatorResponse(text: string): AdjudicatorResponseShape {
@@ -122,6 +149,7 @@ function parseAdjudicatorResponse(text: string): AdjudicatorResponseShape {
       salience: obj.experienceEvent.salience ?? 0,
     },
     effects: parseActEffects(obj.effects),
+    uses: parseUses((obj as { uses?: unknown }).uses),
   };
 }
 
@@ -372,6 +400,14 @@ export async function resolveIntent(
       return { applied: [], refused: [`apply failed: ${err instanceof Error ? err.message : String(err)}`] };
     });
     if (effects.refused.length) console.warn(`[daya/adjudicator] map refused: ${effects.refused.join('; ')}`);
+  }
+
+  // The act happens either way; what it used and the actor does not have is reported to the Watcher (never thrown).
+  // Room items are not on ActorMap, so only what the actor holds is checked (2026-11-03).
+  const unheld = unheldUses(parsed.uses, heldRows.map((r) => r.name), [], character.name);
+  if (unheld.length) {
+    effects = { ...(effects ?? { applied: [], refused: [] }), refused: [...(effects?.refused ?? []), ...unheld] };
+    console.warn(`[daya/adjudicator] unheld uses: ${unheld.join('; ')}`);
   }
 
   return {

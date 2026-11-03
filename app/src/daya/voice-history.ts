@@ -7,15 +7,54 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 
-/** The being's last `n` recorded thoughts on this campaign, newest first, then the last three declaration monologues. */
-export async function recentVoiceOf(campaignId: string, characterId: string, n = 3): Promise<string[]> {
+/** Bound on what counts as recent (2026-11-03, session 2 live: test-replay rows and the last session's thoughts were handed over as the present). */
+export interface VoiceBound { since?: Date; sessionId?: string | null }
+
+/** The where-fragment of a bound: a given sessionId excludes null/other-session rows; `since` excludes older rows. */
+function boundWhere(opts?: VoiceBound): Record<string, unknown> {
+  const w: Record<string, unknown> = {};
+  if (opts?.sessionId) w.sessionId = opts.sessionId;
+  if (opts?.since) w.createdAt = { gte: opts.since };
+  return w;
+}
+
+const LIVE_TTL_MS = 30_000;
+const liveCache = new Map<string, { at: number; v: { id: string; startedAt: Date } | null }>();
+
+/** The campaign's live session (no end), cached 30 s. Never throws: unreadable = null. */
+export async function liveSessionOf(campaignId: string): Promise<{ id: string; startedAt: Date } | null> {
+  const hit = liveCache.get(campaignId);
+  if (hit && Date.now() - hit.at < LIVE_TTL_MS) return hit.v;
   try {
-    const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'being_thought', characterId }, orderBy: { createdAt: 'desc' }, take: n, select: { payload: true } });
+    const row = await prisma.gameSession.findFirst({ where: { campaignId, endedAt: null }, orderBy: { number: 'desc' }, select: { id: true, startedAt: true } });
+    const v = row ? { id: row.id, startedAt: row.startedAt } : null;
+    liveCache.set(campaignId, { at: Date.now(), v });
+    return v;
+  } catch { return null; }
+}
+
+/** Forget the cached live session (a session started or ended). */
+export function forgetLiveSession(campaignId?: string): void {
+  if (campaignId) liveCache.delete(campaignId); else liveCache.clear();
+}
+
+/** The bound for a being's listen beat: the live session's rows only; with no live session, the last hour (test harness runs see their own rows). */
+export async function liveVoiceBound(campaignId: string): Promise<VoiceBound> {
+  const live = await liveSessionOf(campaignId);
+  if (live) return { sessionId: live.id, since: live.startedAt };
+  return { since: new Date(Date.now() - 3_600_000) };
+}
+
+/** The being's last `n` recorded thoughts on this campaign, newest first, then the last three declaration monologues. */
+export async function recentVoiceOf(campaignId: string, characterId: string, n = 3, opts?: VoiceBound): Promise<string[]> {
+  try {
+    const bound = boundWhere(opts);
+    const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'being_thought', characterId, ...bound }, orderBy: { createdAt: 'desc' }, take: n, select: { payload: true } });
     const out = rows.map((r) => { try { return (JSON.parse(r.payload) as { thought?: string }).thought ?? ''; } catch { return ''; } }).filter(Boolean);
     // THE REPLAY, second source (HW8 run 5): a voiced being's pre-listen monologue lives in the declaration payload
     // (`monologues: [{actorId, text}]`), not in a being_thought row — the last 3 declarations count too.
     try {
-      const decls = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'game_event', payload: { contains: '"monologues"' } }, orderBy: { createdAt: 'desc' }, take: 3, select: { payload: true } });
+      const decls = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'game_event', payload: { contains: '"monologues"' }, ...bound }, orderBy: { createdAt: 'desc' }, take: 3, select: { payload: true } });
       for (const d of decls ?? []) {
         try {
           const ms = (JSON.parse(d.payload) as { monologues?: Array<{ actorId?: string; text?: string }> }).monologues ?? [];
@@ -32,9 +71,9 @@ export async function recentVoiceOf(campaignId: string, characterId: string, n =
  * (HW8 run 6: the standing-beat card repeated "The wood doesn't vibrate; it just *is*." from the card before it, a sentence
  * the raw thought comparison missed because the builder had re-set it). Newest first. Never throws.
  */
-export async function recentCardTextsOf(campaignId: string, characterId: string, n = 3): Promise<string[]> {
+export async function recentCardTextsOf(campaignId: string, characterId: string, n = 3, opts?: VoiceBound): Promise<string[]> {
   try {
-    const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'being_thought', characterId }, orderBy: { createdAt: 'desc' }, take: n, select: { payload: true } });
+    const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'being_thought', characterId, ...boundWhere(opts) }, orderBy: { createdAt: 'desc' }, take: n, select: { payload: true } });
     const out: string[] = [];
     for (const r of rows ?? []) {
       try {
