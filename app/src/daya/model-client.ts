@@ -428,9 +428,12 @@ async function callAnthropic(
   if (!client && !process.env.ANTHROPIC_API_KEY && mayCrossWall(params.contentClass)) {
     throw new DayaTierUnavailableError(params.tier, 'ANTHROPIC_API_KEY not configured');
   }
-  const system = params.messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
-  const nonSystem = params.messages
+  let system = params.messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
+  let nonSystem = params.messages
     .filter((m): m is { role: 'user' | 'assistant'; content: string } => m.role !== 'system');
+  // Claude refuses a call with no user turn (2026-11-03: the listening monologue is a system prompt alone on the local lane,
+  // and every cloud call came back 400 "at least one message is required"). The instructions become the one user turn.
+  if (nonSystem.length === 0 && system) { nonSystem = [{ role: 'user', content: system }]; system = ''; }
 
   const res = await routedChatText(
     { caller: `daya:${params.subsystem}`, lane: 'godhead', contentClass: params.contentClass, campaignId: params.campaignId },
