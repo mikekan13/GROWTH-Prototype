@@ -3,7 +3,7 @@ vi.mock('server-only', () => ({}));
 import { placesByLevel, withoutPlacesElsewhere } from './elsewhere';
 import { factsForActor } from '@/daya/facts-for-actor';
 import { signalCause } from './item-signal';
-import { soundMayLandAt, addressedBeings, whereaboutsLines } from './world-apply';
+import { soundMayLandAt, addressedBeings, whereaboutsLines, signalReachLines } from './world-apply';
 
 const places = [
   { id: 'a', name: 'Main Room', parentId: null, level: 0 },
@@ -80,5 +80,26 @@ describe('whereaboutsLines elsewhere', () => {
     const l = whereaboutsLines('Main Room', [{ id: 'k', name: 'Kristopher', roomName: 'Hotel Parking Lot', route: null, elsewhere: true }]);
     expect(l[0]).toMatch(/ELSEWHERE/);
     expect(l[0]).not.toMatch(/Parking/);
+  });
+});
+
+describe('signalReachLines', () => {
+  const rows = [
+    { id: 'v', name: 'Violet Hart', elsewhere: true, carried: ['Her phone', 'Keys'] },
+    { id: 't', name: 'Tess', carried: ['Tess phone'] },
+  ];
+  it('lists a named far person\'s carried things, no room', () => {
+    const out = signalReachLines(['Kristopher dials Violet'], rows, 'k').join('\n');
+    expect(out).toContain('Violet Hart carries: Her phone, Keys');
+    expect(out).not.toMatch(/Tess/);
+  });
+  it('nothing when nobody far is named', () => {
+    expect(signalReachLines(['Kristopher looks at the road'], rows, 'k')).toEqual([]);
+  });
+  it('same-level person is untouched', () => {
+    expect(signalReachLines(['he calls Tess'], rows, 'k')).toEqual([]);
+  });
+  it('the sound lands at the callee\'s held phone', () => {
+    expect(soundMayLandAt({ holderId: 'v', thingRoomId: null, actorId: 'k', actorRoomIds: ['lot'], addressedIds: addressedBeings(['calls Violet'], [{ id: 'v', name: 'Violet Hart' }], 'k') })).toBe(true);
   });
 });

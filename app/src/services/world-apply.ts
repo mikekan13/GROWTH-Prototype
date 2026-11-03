@@ -391,6 +391,18 @@ export function addressedBeings(texts: string[], beings: Array<{ id: string; nam
 }
 
 /**
+ * WITHIN REACH OF A SIGNAL (2026-11-02): a person the act names who stands on ANOTHER map level is out of hands' reach, but
+ * what they carry can sound (a call rings THEIR device, never the caller's own). Lines name only the carried things — never
+ * the person's room or surroundings. Not named, same level, or carrying nothing → nothing. Pure.
+ */
+export function signalReachLines(texts: string[], rows: Array<{ id: string; name: string; elsewhere?: boolean; carried: string[] }>, actorId: string): string[] {
+  const named = new Set(addressedBeings(texts, rows.map((r) => ({ id: r.id, name: r.name })), actorId));
+  const lines = rows.filter((r) => named.has(r.id) && r.elsewhere && r.carried.length).map((r) => `${r.name} carries: ${r.carried.join(', ')}`);
+  if (!lines.length) return [];
+  return ['## Within reach of a signal (not of hands)', ...lines, '(These can SOUND — {"op":"sound","at":<the thing>} — when the act reaches them across the distance. Never take, give or put them; nothing else of that person\'s place is known here.)'];
+}
+
+/**
  * Apply a resolved act's effects to the map. Never throws; each effect lands
  * or is refused with a reason. One `character_update` broadcast at the end
  * when anything moved, so open canvases re-read.

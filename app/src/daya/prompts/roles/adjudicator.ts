@@ -64,6 +64,9 @@ Rules:
    up to respond to it, silences it or declines it is {"op":"answer","item":
    <that thing>}; leaving it alone, or holding it still, is nothing: [] — it
    goes on. A sound the act causes at a thing ANOTHER being holds is {"op":"sound"}.
+   A call or message makes the CALLED person's carried device sound — name it
+   from the "Within reach of a signal" list (never the caller's own phone, and
+   never take/give/put a thing on that list).
 1. Facts are law. Never contradict one. If the action touches something with
    no established fact, establish it conservatively (boring, plausible,
    room-appropriate) via factsToWrite.

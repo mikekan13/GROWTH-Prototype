@@ -21,7 +21,7 @@ import { buildAdjudicatorPrompt } from './prompts/roles/adjudicator';
 import { resolveDayaEntityId } from './entity';
 import { factsForActor, splitHeld } from './facts-for-actor';
 import { placesOnLevels } from '@/services/elsewhere-world';
-import { actorMap, mapFactLines, lockedDoorInTheWay, applyActEffects, parseActEffects, whereOthersStand, whereaboutsLines, type ActEffect, type ApplyReport } from '@/services/world-apply';
+import { actorMap, mapFactLines, lockedDoorInTheWay, applyActEffects, parseActEffects, whereOthersStand, whereaboutsLines, signalReachLines, type ActEffect, type ApplyReport } from '@/services/world-apply';
 
 // ── Contract (Ruling 19 — swappable behind this shape) ─────────────────────
 
@@ -195,7 +195,18 @@ export async function resolveIntent(
   const facts = factsForActor(allFacts, { actorName: character.name, otherNames: others.map((o) => o.name), intent, elsewhere: lv.away, here: lv.here });
   const held = splitHeld(heldRows);
   // Who is where (HW4 2026-10-24): the doors alone let a bill pass through a locked one.
-  const whereabouts = whereaboutsLines(map?.roomName ?? null, await whereOthersStand(campaignId, entityCharacterId, map));
+  const standRows = await whereOthersStand(campaignId, entityCharacterId, map);
+  const whereabouts = whereaboutsLines(map?.roomName ?? null, standRows);
+  // A named person on another level: what they carry is reachable only through a signal (their phone rings), never by hand.
+  let signalBlock: string[] = [];
+  try {
+    const far = standRows.filter((r) => r.elsewhere);
+    if (far.length) {
+      const carriedRows = await prisma.campaignItem.findMany({ where: { holderId: { in: far.map((r) => r.id) }, status: 'ACTIVE' }, select: { name: true, holderId: true, data: true }, take: 200 });
+      const reach = signalReachLines([intent], far.map((r) => ({ id: r.id, name: r.name, elsewhere: true, carried: splitHeld(carriedRows.filter((c) => c.holderId === r.id).map((c) => ({ name: c.name, data: c.data }))).carrying })), entityCharacterId);
+      if (reach.length) signalBlock = [...reach, ''];
+    }
+  } catch { /* no signal list: the model works without it */ }
 
   const factsBlock = facts.length > 0
     ? facts.map(f => `[${f.id}] ${f.subjectKey}: ${f.fact}`).join('\n')
@@ -219,6 +230,7 @@ export async function resolveIntent(
     `(The entity has ONLY what is listed. No jacket, pocket, bag or tool exists for it unless named here or in the facts.)`,
     ...signalLines(heldRows.map((r) => ({ name: r.name, holderId: entityCharacterId, data: safeJson(r.data) })), entityCharacterId, cycle),
     '',
+    ...signalBlock,
     input.narrated ? `## Narrated by the Watcher (it HAPPENED exactly as written)` : `## Declared Intent`,
     intent,
     ...(input.narrated ? [
