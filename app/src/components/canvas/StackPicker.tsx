@@ -12,6 +12,7 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { CtxMenuPanel, ctxMenuStyle } from '@/components/ui/ContextMenu';
+import { useBackCloses } from '@/hooks/useBackCloses';
 
 export interface StackEntry { id: string; name: string; kind: 'character' | 'thing' }
 
@@ -46,6 +47,7 @@ export function StackPicker({ entries, x, y, onPick, onClose }: {
   const ref = useRef<HTMLDivElement | null>(null);
   const cb = useRef({ onPick, onClose });
   cb.current = { onPick, onClose };
+  useBackCloses(true, () => cb.current.onClose(), 'stack-picker');
 
   useEffect(() => {
     const down = (e: PointerEvent) => {

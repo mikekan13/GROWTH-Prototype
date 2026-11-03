@@ -35,6 +35,7 @@ import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
 import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/ContextMenu";
 import { StackPicker, tokensAtPoint, type StackEntry } from "./StackPicker";
+import { useBackCloses } from "@/hooks/useBackCloses";
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight, drawnPlaceRect } from "./FolderGroup";
 import { settle, packFolder, pickRoomAt, type SettleNode, type SettleFolder, type SettlePriority } from "./canvas-settle";
 import CharacterToken from "./CharacterToken";
@@ -994,6 +995,16 @@ export default function RelationsCanvas({
       });
     }
   }, [nodes, expandedNodes, cardPositions, nodePositions]);
+
+  // Back closes the most recently opened card (person sheet / thing card / place card),
+  // one per press. The count in the key re-arms the entry for the next card down.
+  const openCardCount = expandedNodes.size + openPlaces.size;
+  useBackCloses(openCardCount > 0, () => {
+    const lastNode = [...expandedNodes].pop();
+    if (lastNode) { toggleExpand(lastNode); return; }
+    const lastPlace = [...openPlaces].pop();
+    if (lastPlace) togglePlaceCard(lastPlace);
+  }, `card-${openCardCount}`);
 
   const toggleInventory = useCallback((nodeId: string) => {
     setInventoryOpenNodes((prev) => {

@@ -20,6 +20,7 @@ import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from '
 import { usePathname, useRouter } from 'next/navigation';
 import { JEWL_CHAT_CSS, fs, MONO, BEBAS, READ } from '@/components/terminal/jewlChatCss';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
+import { useBackCloses } from '@/hooks/useBackCloses';
 import { openJewlWork } from '@/lib/jewl-work';
 import { GenesisProdAsk, genesisProdActionOf } from './GenesisProdAsk';
 
@@ -187,6 +188,7 @@ export function JewlChip() {
   const campaignId = extractCampaignId(pathname);
 
   const [open, setOpen] = useState(false);
+  useBackCloses(open, () => setOpen(false), 'jewl-panel');
   // Where JEWL materializes. Right-click anchors him AT the click point —
   // he uses the context of where (and what) the GM clicked. null = the
   // hotkey fallback position (lower right). Per Mike 2026-07-29: no

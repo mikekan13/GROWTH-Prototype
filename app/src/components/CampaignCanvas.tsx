@@ -16,6 +16,7 @@ import { readViewAs } from '@/components/terminal/table-feed/ViewAsPicker';
 import type { CanvasModel } from '@/services/canvas-model';
 import { defaultFootprintFromRect, fitPolygonToRect, footprintBounds } from '@/lib/canvas-geometry';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
+import { useBackCloses } from '@/hooks/useBackCloses';
 import CampaignHeader from '@/components/canvas/CampaignHeader';
 import { JewlStatusButton } from '@/components/jewl/JewlWorkPopup';
 import { CHARACTER_APPEARANCE_OPEN_EVENT } from '@/lib/jewl-work';
@@ -149,6 +150,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   }, [activeTab]);
   const [nodes, setNodes] = useState(initialNodes);
   const [showTerminal, setShowTerminal] = useState(false);
+  useBackCloses(showTerminal, () => setShowTerminal(false), 'terminal');
   // P1 mirror: the JEWL header shows "◆ table" while the mic feeds the table;
   // the TERMINAL toggle tab shows the same glyph so the GM sees it with JEWL
   // closed. Blue = feeding, gold = holding an unfinished sentence.
