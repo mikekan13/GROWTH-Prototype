@@ -104,10 +104,13 @@ async function main() {
     const phone = await prisma.campaignItem.findFirst({ where: { campaignId: C, name: 'Her phone' }, select: { data: true, holderId: true } });
     console.log('\nHer phone signal:', JSON.stringify(JSON.parse(phone!.data).signal ?? null), '| holder', phone!.holderId === VIOLET ? 'Violet' : phone!.holderId);
   } finally {
-    await post(`/api/campaigns/${C}/sessions`, token, { action: 'end' }).catch(() => undefined);
-    await restore(snap, from, sessionId);
-    await prisma.session.deleteMany({ where: { token } });
-    console.log('\nrolled back: places, points, holders, record, clock, session');
+    if (process.env.KEEP === '1') { await prisma.session.deleteMany({ where: { token } }); console.log('\nKEPT: session left open, record standing'); }
+    else {
+      // No 'end': ending a session stops the text pod (by design); the restore removes the session row.
+      await restore(snap, from, sessionId);
+      await prisma.session.deleteMany({ where: { token } });
+      console.log('\nrolled back: places, points, holders, record, clock, session');
+    }
   }
 }
 main().catch((e) => { console.error(e instanceof Error ? e.stack : e); process.exitCode = 1; }).finally(() => prisma.$disconnect());

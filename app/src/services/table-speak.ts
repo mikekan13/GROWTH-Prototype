@@ -1407,7 +1407,7 @@ async function runBeats(
 async function speakProseSplit(
   campaignId: string,
   actor: TableActor,
-  input: { message: string; locationId?: string | null; confirmTicketId?: string | null },
+  input: { message: string; locationId?: string | null; confirmTicketId?: string | null; worldEvent?: boolean },
 ): Promise<TableProseResult> {
   const rawMessage = input.message;
   let message = rawMessage;
@@ -1437,6 +1437,8 @@ async function speakProseSplit(
     }
   }
   const planFor = (npcs: typeof roster) => planTableTalk(readTableTalk(message, { present: listeners, npcs, prose: proseCtx }).utterances, 'typed');
+  // THE WORLD'S OWN EVENT (2026-11-02): no being is its actor ("Violet's phone rings" is never her own doing).
+  if (input.worldEvent) { parsed.actions = []; parsed.thoughts = []; }
   let plan = planFor(roster);
 
   // 0. JEWL's read still comes BEFORE anything is written on this path (U2c-5 moves it beside the listening).
@@ -1447,7 +1449,7 @@ async function speakProseSplit(
     roster = await npcRoster();
     parsed = parseTableProse(message, roster, proseCtx);
     plan = planFor(roster);
-  } else if (plan.world.length) {
+  } else if (plan.world.length && !input.worldEvent) {
     const held = await readNarration(campaignId, actor, message, parsed, listeners);
     if (held) return { held, canonEventId: null, dialogue: [], narration: parsed.narration, responses: [] };
   }
