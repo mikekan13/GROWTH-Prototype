@@ -183,6 +183,23 @@ describe('settle — cross-level (option a, 2026-10-06: a card never moves a roo
     const s = r.folderShifts.get('r2')!;
     expect(r.nodeMoves.get('b')).toEqual({ x: 300 + s.dx, y: 520 + s.dy });
   });
+
+  it('dragging a card leaves two unrelated root rooms that already overlap exactly where they were (2026-11-02, phone: "the whole world moved")', () => {
+    const nodes = [card('violet', -100, 900, 'r1'), card('other', -100, 500, 'r1'), card('x', 400, 520, 'r2')];
+    const folders = [folder('r1'), folder('r2')];
+    const r = settle(nodes, folders, { kind: 'node', id: 'violet' });
+    expect(r.folderShifts.size).toBe(0);
+    expect(r.nodeMoves.has('x')).toBe(false);
+  });
+
+  it('a card dragged out of its room grows it into a neighbour that did NOT overlap before: the neighbour is still pushed', () => {
+    const nodes = [card('violet', 0, 500, 'r1'), card('other', 0, 500, 'r1'), card('x', 2000, 520, 'r2')];
+    const folders = [folder('r1'), folder('r2')];
+    const clear = settle(nodes, folders, { kind: 'node', id: 'violet' });
+    expect(clear.folderShifts.size).toBe(0);
+    const grown = settle([card('violet', 1700, 500, 'r1'), card('other', 0, 500, 'r1'), card('x', 2000, 520, 'r2')], folders, { kind: 'node', id: 'violet' });
+    expect(grown.folderShifts.has('r2')).toBe(true);
+  });
 });
 
 describe('packFolder — only the overflowing members move (option a, 2026-10-06)', () => {

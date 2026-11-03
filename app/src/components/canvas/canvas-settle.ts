@@ -211,6 +211,7 @@ function resolveGroup(
   gap: number,
   apply: (id: string, dx: number, dy: number) => void,
   constrain?: (id: string, r: Rect, dx: number, dy: number) => { dx: number; dy: number },
+  skipPair?: (a: string, b: string) => boolean,
 ): boolean {
   let movedAny = false;
   const pinned = new Set(fixed);
@@ -220,6 +221,7 @@ function resolveGroup(
       for (let j = i + 1; j < ids.length; j++) {
         const A = ids[i], B = ids[j];
         const aFolder = isFolder(A), bFolder = isFolder(B);
+        if (skipPair && skipPair(A, B)) continue;
         let anchor = A, mover = B;
         if (aFolder !== bFolder) {
           // Card vs room: the card yields, never the room. The held card
@@ -319,6 +321,40 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
     return false;
   };
 
+  // A card in hand cannot have made two rooms overlap. When a CARD was moved,
+  // two rooms that already overlap WITHOUT it are somebody else's standing
+  // overlap (measured 2026-11-02 on Violet's phone: dragging her inside the
+  // apartment shoved an overlapping root room — and its 13 cards — 1546 units,
+  // "the whole world moved"). Those pairs are left alone; any room the card's
+  // drop made grow into a neighbour still gets pushed. A folder move/resize
+  // (priority folder) keeps resolving everything, as before.
+  const standingFolderOverlap = new Set<string>();
+  if (priority?.kind === 'node' && nodeById.has(priority.id)) {
+    const without = deriveFolderRects(nodes.filter((n) => n.id !== priority.id), folders, opts);
+    // A room the card was the ONLY content of (and the ancestors that held only
+    // that room) would be measured as an empty placeholder: not a standing rect.
+    const emptied = new Set<string>();
+    let from: string | null = nodeById.get(priority.id)!.folderId;
+    let via: string | null = null;
+    while (from && folderById.has(from) && !emptied.has(from)) {
+      const keeps = nodes.some((n) => n.id !== priority.id && n.folderId === from) || folders.some((c) => c.parentId === from && c.id !== via);
+      if (keeps) break;
+      emptied.add(from);
+      via = from;
+      from = folderById.get(from)!.parentId;
+    }
+    const ids = folders.map((f) => f.id).filter((id) => !emptied.has(id));
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const ra = without.get(ids[i]), rb = without.get(ids[j]);
+        if (!ra || !rb) continue;
+        const v = pushVector(ra, rb, 0);
+        if (v.dx !== 0 || v.dy !== 0) { standingFolderOverlap.add(`${ids[i]}|${ids[j]}`); standingFolderOverlap.add(`${ids[j]}|${ids[i]}`); }
+      }
+    }
+  }
+  const skipStandingPair = (a: string, b: string) => standingFolderOverlap.size > 0 && standingFolderOverlap.has(`${a}|${b}`);
+
   const shiftSubtree = (folderId: string, dx: number, dy: number) => {
     const stack = [folderId];
     while (stack.length) {
@@ -384,6 +420,7 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
           }
           return { dx, dy };
         },
+        skipStandingPair,
       );
       moved = moved || movedHere;
       // Member moves change this parent's rect for the next (shallower) group.
