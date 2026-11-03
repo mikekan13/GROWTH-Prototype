@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { loginAction } from '@/app/actions/login';
 import { useRouter } from 'next/navigation';
 
-export default function AuthForm() {
+export default function AuthForm({ initialError }: { initialError?: string } = {}) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(initialError ?? '');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -76,8 +77,10 @@ export default function AuthForm() {
         </button>
       </div>
 
-      {/* method="post": if the page's script is not running (2026-11-02, a phone), the browser's own submit must never put credentials in the URL. */}
-      <form onSubmit={handleSubmit} method="post" className="space-y-2">
+      {/* LOGIN WITHOUT SCRIPT (2026-11-02): the login form posts to a server action, so the browser's own submit — a phone's
+          password manager filling and sending before the bundle has loaded — logs in and redirects the same as the scripted path.
+          Register keeps the fetch handler. */}
+      <form {...(mode === 'login' ? { action: loginAction } : { onSubmit: handleSubmit, method: 'post' as const })} className="space-y-2">
         {mode === 'register' && (
           <>
             <input

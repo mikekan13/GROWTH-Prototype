@@ -4,7 +4,8 @@ import AuthForm from '@/components/AuthForm';
 import GrowthLogo from '@/components/GrowthLogo';
 import GlitchText from '@/components/GlitchText';
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error: loginError } = await searchParams;
   const session = await getSession();
   if (session) {
     redirect(session.user.role === 'ADMIN' ? '/terminal' : '/hub');
@@ -194,7 +195,7 @@ export default async function Home() {
 
         {/* Auth form */}
         <div className="flex justify-center pb-2">
-          <AuthForm />
+          <AuthForm initialError={loginError} />
         </div>
 
         {/* Bottom decorative */}

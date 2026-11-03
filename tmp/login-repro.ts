@@ -14,6 +14,7 @@ async function main() {
   for (const [label, opts] of [
     ['phone', { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' }],
     ['desktop', { viewport: { width: 1400, height: 900 } }],
+    ['no-script phone', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, javaScriptEnabled: false }],
   ] as const) {
     const ctx = await browser.newContext(opts as Parameters<typeof browser.newContext>[0]);
     const page = await ctx.newPage();
@@ -29,7 +30,8 @@ async function main() {
     await page.fill('input[name="login"], input[type="text"], input[type="email"]', 'nobody').catch(() => undefined);
     await page.fill('input[type="password"]', 'wrong-password').catch(() => undefined);
     await Promise.all([page.waitForTimeout(3000), page.press('input[type="password"]', 'Enter').catch(() => undefined)]);
-    console.log(label + ': url after submit=' + page.url().replace(/password=[^&]*/, 'password=***') + ' | react on form=' + hydrated + ' | posted to /api/auth=' + posted);
+    const shown = await page.evaluate(() => document.body.innerText.includes('Invalid credentials') || document.body.innerText.includes('Login failed') || document.body.innerText.includes('required')).catch(() => false);
+    console.log(label + ': url after submit=' + page.url().replace(/password=[^&]*/, 'password=***') + ' | react on form=' + hydrated + ' | posted to /api/auth=' + posted + ' | error shown=' + shown);
     if (failed.length) console.log('  failed loads:' + NL + '  ' + [...new Set(failed)].slice(0, 8).join(NL + '  '));
     console.log(errors.length ? '  errors:' + NL + '  ' + [...new Set(errors)].slice(0, 8).join(NL + '  ') : '  no console/page errors');
     await ctx.close();
