@@ -20,3 +20,14 @@ export function useBackCloses(open: boolean, onClose: () => void, key: string) {
     return () => s.close(id);
   }, [open, key]);
 }
+
+/** Page level: Back with no overlay open re-centres instead of leaving the page. */
+export function useBackRecenters(onRecenter: () => void) {
+  const cb = useRef(onRecenter);
+  cb.current = onRecenter;
+  useEffect(() => {
+    const s = stack();
+    if (!s) return;
+    return s.setBase(() => cb.current());
+  }, []);
+}

@@ -35,7 +35,7 @@ import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
 import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/ContextMenu";
 import { StackPicker, tokensAtPoint, type StackEntry } from "./StackPicker";
-import { useBackCloses } from "@/hooks/useBackCloses";
+import { useBackCloses, useBackRecenters } from "@/hooks/useBackCloses";
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight, drawnPlaceRect } from "./FolderGroup";
 import { settle, packFolder, pickRoomAt, type SettleNode, type SettleFolder, type SettlePriority } from "./canvas-settle";
 import CharacterToken from "./CharacterToken";
@@ -1005,6 +1005,8 @@ export default function RelationsCanvas({
     const lastPlace = [...openPlaces].pop();
     if (lastPlace) togglePlaceCard(lastPlace);
   }, `card-${openCardCount}`);
+  // With no card/overlay open, Back re-centres the canvas (same home as the Space key) instead of leaving the page.
+  useBackRecenters(() => { setCamera({ x: -BASE_WIDTH / 2, y: -BASE_HEIGHT / 2 }); setZoom(1); });
 
   const toggleInventory = useCallback((nodeId: string) => {
     setInventoryOpenNodes((prev) => {

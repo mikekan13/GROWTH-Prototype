@@ -3,7 +3,7 @@
 // never accumulates dead entries. No React, no DOM globals: `win` is injected.
 
 export interface BackWin {
-  history: { pushState(state: unknown, title: string): void; back(): void };
+  history: { pushState(state: unknown, title: string): void; back(): void; readonly state?: unknown };
   addEventListener(type: 'popstate', fn: () => void): void;
 }
 
@@ -12,11 +12,16 @@ interface Entry { id: number; key: string; onClose: () => void; pushed: boolean;
 export function createBackStack(win: BackWin) {
   const stack: Entry[] = [];
   let nextId = 1;
+  let baseRecenter: (() => void) | null = null; // page-level sentinel: Back with no overlay recenters
+  let basePushed = false;
   let expected = 0; // popstates we caused ourselves (history.back()) and must ignore
 
   const back = () => { expected++; win.history.back(); };
 
+  const pushBase = () => { win.history.pushState({ growthBase: true }, ''); basePushed = true; };
+
   const flushPushes = () => {
+    if (baseRecenter && !basePushed) pushBase();
     for (const e of stack) {
       if (!e.pushed && !e.dead) { win.history.pushState({ growthOverlay: e.key }, ''); e.pushed = true; }
     }
@@ -36,7 +41,13 @@ export function createBackStack(win: BackWin) {
       if (expected === 0) { sweep(); if (expected === 0) flushPushes(); }
       return;
     }
-    // A real Back: closes the topmost live overlay only.
+    // A real Back: closes the topmost live overlay only; with none open, recenter and keep the page.
+    if (!stack.some(e => !e.dead) && baseRecenter) {
+      stack.length = 0;
+      baseRecenter();
+      pushBase(); // the sentinel was just popped; put it back so the page stays on the stack
+      return;
+    }
     while (stack.length) {
       const e = stack.pop()!;
       if (e.dead) continue;
@@ -63,6 +74,14 @@ export function createBackStack(win: BackWin) {
       if (!e.pushed) { stack.splice(i, 1); return; }
       if (i === stack.length - 1) { stack.pop(); back(); sweep(); }
       else e.dead = true; // buried: swept when it reaches the top
+    },
+    /** Register the page-level sentinel (below all overlay entries). Returns an unregister fn. */
+    setBase(onRecenter: () => void): () => void {
+      baseRecenter = onRecenter;
+      const st = win.history.state as { growthBase?: boolean } | null | undefined;
+      if (st && st.growthBase) basePushed = true; // already standing on a sentinel (remount)
+      else if (expected === 0) pushBase();
+      return () => { if (baseRecenter === onRecenter) baseRecenter = null; };
     },
     depth: () => stack.filter(e => !e.dead).length,
   };

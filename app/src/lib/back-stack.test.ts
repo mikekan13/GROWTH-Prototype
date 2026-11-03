@@ -8,6 +8,7 @@ function fake() {
   const win: BackWin = {
     history: {
       pushState(s) { hist.splice(idx + 1); hist.push(s); idx++; },
+      get state() { return hist[idx]; },
       back() { pending++; },
     },
     addEventListener(_t, f) { fn = f; },
@@ -55,5 +56,45 @@ describe('back-stack', () => {
     const f = fake(); const s = createBackStack(f.win);
     const a = s.open('a', () => {}); s.close(a); f.land();
     expect(f.hist()).toBe(0);
+  });
+
+  describe('page base (recenter)', () => {
+    it('Back with no overlay recenters and the page stays on the stack', () => {
+      const f = fake(); const s = createBackStack(f.win); let rc = 0;
+      s.setBase(() => rc++);
+      expect(f.hist()).toBe(1);
+      f.userBack();
+      expect(rc).toBe(1); expect(f.hist()).toBe(1); // sentinel re-pushed, never at index 0
+      f.userBack();
+      expect(rc).toBe(2); expect(f.hist()).toBe(1);
+    });
+    it('Back with an overlay closes it and does not recenter', () => {
+      const f = fake(); const s = createBackStack(f.win); let rc = 0; let closed = 0;
+      s.setBase(() => rc++);
+      s.open('a', () => closed++);
+      expect(f.hist()).toBe(2);
+      f.userBack();
+      expect(closed).toBe(1); expect(rc).toBe(0); expect(f.hist()).toBe(1);
+    });
+    it('two Backs: overlay then recenter', () => {
+      const f = fake(); const s = createBackStack(f.win); const log: string[] = [];
+      s.setBase(() => log.push('recenter'));
+      s.open('a', () => log.push('close'));
+      f.userBack(); f.userBack();
+      expect(log).toEqual(['close', 'recenter']); expect(f.hist()).toBe(1);
+    });
+    it('our own history.back() from a UI close does not recenter', () => {
+      const f = fake(); const s = createBackStack(f.win); let rc = 0;
+      s.setBase(() => rc++);
+      const id = s.open('a', () => {});
+      s.close(id); f.land();
+      expect(rc).toBe(0); expect(f.hist()).toBe(1);
+    });
+    it('a remount on a sentinel does not push a second one', () => {
+      const f = fake(); const s = createBackStack(f.win);
+      const off = s.setBase(() => {}); off();
+      s.setBase(() => {});
+      expect(f.hist()).toBe(1);
+    });
   });
 });
