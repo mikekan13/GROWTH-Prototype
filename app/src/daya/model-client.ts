@@ -588,5 +588,7 @@ async function screenLocalAnswer(text: string, params: DayaChatParams): Promise<
  * lane kept writing stock images and misreading the moment. DAYA_PROSE_TIER=L1 keeps them local (tests, outages).
  */
 export function proseTier(): DayaTier {
-  return process.env.DAYA_PROSE_TIER === 'L1' ? 'L1' : 'C';
+  // REVERTED 2026-11-03 (SIMULATION-COMPOSER-DESIGN): sending the one call that holds a whole being to the cloud is the
+  // opposite of the design. Prose stays inside the wall until the composer orders narrow, nameless pieces instead.
+  return process.env.DAYA_PROSE_TIER === 'C' ? 'C' : 'L1';
 }
