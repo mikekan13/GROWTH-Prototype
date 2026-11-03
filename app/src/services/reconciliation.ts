@@ -61,7 +61,9 @@ import {
 } from '@/services/reconciliation-rules';
 import { parseChain } from '@/daya/chain';
 import { actorMap } from '@/services/world-apply';
-import { doorStateLines, answeredLines, familiarityLines, itemLine, memoryKeys, touchingMemories } from '@/services/reconciliation-context';
+import { clockNow, cyclesToSeconds, spanInWords, hourInWords } from '@/services/table-clock';
+import { cycleToLocalDate } from '@/types/time';
+import { presentLines, doorStateLines, answeredLines, familiarityLines, itemLine, memoryKeys, touchingMemories } from '@/services/reconciliation-context';
 
 export interface TableActorLike { userId: string; username?: string; role: string }
 
@@ -98,6 +100,7 @@ async function simStateSummary(campaignId: string, listeners: Array<{ id: string
   const memoryLines: string[] = [];
   const familiarity: string[] = [];
   const doorsNow: Array<{ name: string; between: string[]; state: string }> = [];
+  const standing: Array<{ name: string; place: string | null }> = [];
   for (const l of listeners) {
     const rel = await prisma.entityRelationship.findFirst({ where: { sourceId: l.id, relationshipType: 'located_at' }, select: { targetId: true } });
     const loc = rel ? await prisma.location.findUnique({ where: { id: rel.targetId }, select: { name: true, data: true } }) : null;
@@ -106,6 +109,7 @@ async function simStateSummary(campaignId: string, listeners: Array<{ id: string
     const here = rel ? await prisma.entityRelationship.findMany({ where: { targetId: rel.targetId, relationshipType: 'located_at', sourceId: { not: l.id } }, select: { sourceId: true } }) : [];
     const hereChars = here.length ? await prisma.character.findMany({ where: { id: { in: here.map((h) => h.sourceId) } }, select: { id: true, name: true } }) : [];
     const names = hereChars.map((c) => c.name);
+    standing.push({ name: l.name, place: loc?.name ?? null });
     // What he has on him (HW6 2026-10-25: the pizza on Kristopher's ledger was "a new presence" to JEWL every
     // line, because nothing told him what anyone was holding).
     const held = await prisma.campaignItem.findMany({ where: { campaignId, holderId: l.id, status: { notIn: ['DESTROYED', 'CONSUMED', 'LOST'] } }, select: { name: true, data: true }, take: 40 });
@@ -134,7 +138,20 @@ async function simStateSummary(campaignId: string, listeners: Array<{ id: string
   }
   const locations = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { name: true, status: true }, take: 60 });
   const npcs = await prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { name: true }, take: 60 });
-  const recent = await prisma.canonEvent.findMany({ where: { campaignId, kind: { in: ['narration', 'declaration', 'dialogue'] } }, orderBy: { createdAt: 'desc' }, take: 8, select: { narration: true } });
+  const recent = await prisma.canonEvent.findMany({ where: { campaignId, kind: { in: ['narration', 'declaration', 'dialogue'] } }, orderBy: { createdAt: 'desc' }, take: 8, select: { narration: true, cycle: true } });
+  // THE PRESENT (2026-11-02): the clock now, the time since the last canon event, who stands where - never fatal.
+  let present: string[] = [];
+  try {
+    const { cycle, ts } = await clockNow(campaignId);
+    const ld = cycleToLocalDate(cycle, ts);
+    const sinceSec = recent.length ? cyclesToSeconds(cycle - recent[0].cycle, ts) : 0;
+    present = presentLines({
+      date: ld.dayName ? `${ld.dayName}, ${ld.formatted}` : ld.formatted,
+      hour: ld.hour ?? null, hourWords: ld.hour === undefined ? null : hourInWords(ld.hour),
+      sinceLastCanon: sinceSec >= 5 ? spanInWords(sinceSec) : null,
+      standing,
+    });
+  } catch { present = presentLines({ date: null, hour: null, hourWords: null, sinceLastCanon: null, standing }); }
   // What the beings themselves just did and said (their chat rows, via: being).
   // Hello world 2026-10-17: JEWL asked to rewind "the door is open" when
   // Violet's own last act was to shut it — he read the GM, not the beings.
@@ -157,6 +174,7 @@ async function simStateSummary(campaignId: string, listeners: Array<{ id: string
   } catch { /* none */ }
   const answered = await prisma.reconciliation.findMany({ where: { campaignId, answer: { not: null } }, orderBy: { createdAt: 'desc' }, take: 5, select: { message: true, answer: true } });
   return {
+    present: present.join('\n') || '(unknown)',
     memories: memoryLines.join('\n') || '(none touch this line)',
     familiarity: familiarity.join('\n') || '(none recorded)',
     told: answeredLines(answered.reverse()).join('\n') || '(nothing yet)',
@@ -176,8 +194,8 @@ async function jewlRead(campaignId: string, message: string, listeners: Array<{ 
     const res = await chat({
       tier: 'C', subsystem: 'reconciliation', contentClass: 'fiction',
       messages: [
-        { role: 'system', content: `You are JEWL, the copilot running the table underneath a GROWTH Watcher (the GM). Before a line of narration becomes canon you read it against the simulated world. THE DOORS: their live states, and what the beings changed lately, are given below - a narration that contradicts a door's CURRENT state (he waits for a door to open that the sim has had OPEN since she opened it) is a contradicted_fact: stop and ask, "the sim has the entry door OPEN since Violet opened it - mistake, or are we going somewhere new?". Decide whether it is DIFFERENT ENOUGH from the sim to stop and ask — the Watcher may have misspoken, or may be improvising somewhere new. Ordinary additive narration inside the current scene is NOT a discrepancy. Kinds: relocation (a being is narrated somewhere other than where the sim has it), new_presence (a person the roster lacks is here and matters), new_thing (the narration has someone hold, read, hand over, get into or handle a THING — a receipt, a key, a note, a bag, a car — that is on no one's holding list, not among the things in the room and not in what he owns elsewhere: the world does not have it, so no being can know what it is or what is written on it; ask the Watcher what it is and what it says or shows. A thing he OWNS elsewhere — his car, his coat at the hotel — is his: getting into his car is not a new thing), contradicted_fact (the narration contradicts what the world holds), contradiction (the Watcher contradicts his own recent narration), continuity (a jump the scene did not set up). Respond with ONLY JSON: {"discrepant": boolean, "kinds": string[], "summary": one plain sentence of what differs, "question": one or two sentences in JEWL's own voice to the Watcher — plain, unbothered, ending by asking whether it was a mistake or whether we are going somewhere new, "needs": [{"kind": "location"|"npc"|"item", "name": short name the narration implies, "description": what the narration says about it, "holder": for an item, the name of the character holding it, else null}], "relocate": boolean (true when the awake beings should now be at the narrated place)}. needs lists only what the world would have to HAVE for this narration to be true and does not already have. HOW TO CHECK BEFORE YOU STOP: the lists below carry the TEXT written on things ("text written on it"), what each being remembers that touches the line, and how well the beings know each other. You may call something unknown ONLY when it is absent from ALL of: what the beings hold, the things in the room, what they own elsewhere, the text written on those things, the beings' memories, and the Watcher's earlier answers. Knowing a NAME is not a new thing when that name is printed on a thing the being holds or is in his memory (a receipt reading CUSTOMER: VIOLET means he knows her first name). A stop MUST say in its summary what you checked ("I checked the receipt's text and Kristopher's memories; neither ..."). Never assert a negative you did not check; if the lists do not settle it, do not stop.` },
-        { role: 'user', content: `AWAKE BEINGS AND WHERE THE SIM HAS THEM:\n${state.beings}\n\nPLACES THE CAMPAIGN HAS:\n${state.locations}\n\nPEOPLE THE CAMPAIGN HAS:\n${state.npcs}\n\nTHE WATCHER'S RECENT NARRATION:\n${state.recent}\n\nTHE DOORS RIGHT NOW (live) AND WHAT THE BEINGS CHANGED LATELY:\n${state.doors}\n\nWHAT THE BEINGS THEMSELVES JUST DID AND SAID (these are canon too — the Watcher's next line is read as following them):\n${state.acts}\n\nWHAT THE BEINGS REMEMBER THAT TOUCHES THIS LINE:\n${state.memories}\n\nHOW WELL THEY KNOW EACH OTHER:\n${state.familiarity}\n\nTHE WATCHER TOLD JEWL EARLIER (do not ask these again):\n${state.told}\n\nNEW NARRATION:\n${message}` },
+        { role: 'system', content: `You are JEWL, the copilot running the table underneath a GROWTH Watcher (the GM). Before a line of narration becomes canon you read it against the simulated world. THE DOORS: their live states, and what the beings changed lately, are given below - a narration that contradicts a door's CURRENT state (he waits for a door to open that the sim has had OPEN since she opened it) is a contradicted_fact: stop and ask, "the sim has the entry door OPEN since Violet opened it - mistake, or are we going somewhere new?". Decide whether it is DIFFERENT ENOUGH from the sim to stop and ask — the Watcher may have misspoken, or may be improvising somewhere new. Ordinary additive narration inside the current scene is NOT a discrepancy. THE PRESENT block is "now": the recent narration below it is the PAST, and the last canon scene is not where the story stands. A line set in the present (where the beings stand now, at the clock's hour) that refers back to earlier events by an elapsed time consistent with the clock ("a couple nights before" when two days have passed) is CONTINUITY, not a jump - do not flag it as continuity or relocation. Kinds: relocation (a being is narrated somewhere other than where the sim has it), new_presence (a person the roster lacks is here and matters), new_thing (the narration has someone hold, read, hand over, get into or handle a THING — a receipt, a key, a note, a bag, a car — that is on no one's holding list, not among the things in the room and not in what he owns elsewhere: the world does not have it, so no being can know what it is or what is written on it; ask the Watcher what it is and what it says or shows. A thing he OWNS elsewhere — his car, his coat at the hotel — is his: getting into his car is not a new thing), contradicted_fact (the narration contradicts what the world holds), contradiction (the Watcher contradicts his own recent narration), continuity (a jump the scene did not set up). Respond with ONLY JSON: {"discrepant": boolean, "kinds": string[], "summary": one plain sentence of what differs, "question": one or two sentences in JEWL's own voice to the Watcher — plain, unbothered, ending by asking whether it was a mistake or whether we are going somewhere new, "needs": [{"kind": "location"|"npc"|"item", "name": short name the narration implies, "description": what the narration says about it, "holder": for an item, the name of the character holding it, else null}], "relocate": boolean (true when the awake beings should now be at the narrated place)}. needs lists only what the world would have to HAVE for this narration to be true and does not already have. HOW TO CHECK BEFORE YOU STOP: the lists below carry the TEXT written on things ("text written on it"), what each being remembers that touches the line, and how well the beings know each other. You may call something unknown ONLY when it is absent from ALL of: what the beings hold, the things in the room, what they own elsewhere, the text written on those things, the beings' memories, and the Watcher's earlier answers. Knowing a NAME is not a new thing when that name is printed on a thing the being holds or is in his memory (a receipt reading CUSTOMER: VIOLET means he knows her first name). A stop MUST say in its summary what you checked ("I checked the receipt's text and Kristopher's memories; neither ..."). Never assert a negative you did not check; if the lists do not settle it, do not stop.` },
+        { role: 'user', content: `THE PRESENT (the clock and where everyone stands NOW):\n${state.present}\n\nAWAKE BEINGS AND WHERE THE SIM HAS THEM:\n${state.beings}\n\nPLACES THE CAMPAIGN HAS:\n${state.locations}\n\nPEOPLE THE CAMPAIGN HAS:\n${state.npcs}\n\nTHE WATCHER'S RECENT NARRATION:\n${state.recent}\n\nTHE DOORS RIGHT NOW (live) AND WHAT THE BEINGS CHANGED LATELY:\n${state.doors}\n\nWHAT THE BEINGS THEMSELVES JUST DID AND SAID (these are canon too — the Watcher's next line is read as following them):\n${state.acts}\n\nWHAT THE BEINGS REMEMBER THAT TOUCHES THIS LINE:\n${state.memories}\n\nHOW WELL THEY KNOW EACH OTHER:\n${state.familiarity}\n\nTHE WATCHER TOLD JEWL EARLIER (do not ask these again):\n${state.told}\n\nNEW NARRATION:\n${message}` },
       ],
       maxTokens: 500, temperature: 0,
     });

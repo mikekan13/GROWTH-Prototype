@@ -66,6 +66,34 @@ export function answeredLines(tickets: Array<{ message: string; answer: string |
  * (a door they opened, a thing they moved) - so a narration that waits for a door to open that the sim has OPEN since she opened it is
  * a contradicted_fact JEWL stops on. Pure.
  */
+export interface PresentInput {
+  /** Formatted calendar date, e.g. "Monday, 19th of October, Year 2026"; null when the clock is unreadable. */
+  date: string | null;
+  /** Local hour 0..23 and its words ("the evening"). */
+  hour: number | null;
+  hourWords: string | null;
+  /** Elapsed time since the last canon event, in words ("about 2 days"); null when unknown or none. */
+  sinceLastCanon: string | null;
+  /** Each awake being and the place the sim has them standing in NOW. */
+  standing: Array<{ name: string; place: string | null }>;
+}
+
+/**
+ * THE PRESENT: the campaign clock, the time since the last canon event, and where each being stands now - so a line set
+ * in the present that points back at earlier events ("a couple nights before") is checked against the clock, not
+ * against the last canon scene. Pure.
+ */
+export function presentLines(p: PresentInput): string[] {
+  const out: string[] = [];
+  if (p.date) {
+    const h = p.hour === null ? '' : ` at ${String(Math.floor(p.hour)).padStart(2, '0')}:00${p.hourWords ? ` (${p.hourWords})` : ''}`;
+    out.push(`the world clock reads ${p.date}${h}`);
+  }
+  if (p.sinceLastCanon) out.push(`${p.sinceLastCanon} have passed since the last canon event below - the recent narration is the PAST, the present is the clock above`);
+  for (const s of p.standing) out.push(`right now ${s.name} stands ${s.place ? `in "${s.place}"` : 'nowhere on the canvas'}`);
+  return out;
+}
+
 export function doorStateLines(doors: Array<{ name: string; between: string[]; state: string }>, lately: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];

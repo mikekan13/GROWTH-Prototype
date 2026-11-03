@@ -39,3 +39,17 @@ describe('doorStateLines (HW8 run 7 #1c)', () => {
     expect(lines).toEqual(['the entry door (between landing and apartment) is OPEN', 'recently: Violet: She turns the deadbolt and then the knob.']);
   });
 });
+
+import { presentLines } from './reconciliation-context';
+describe('presentLines', () => {
+  it('gives the clock, the elapsed time and where each being stands now', () => {
+    const l = presentLines({ date: 'Monday, 19th of October', hour: 22, hourWords: 'late evening', sinceLastCanon: 'about 2 days', standing: [{ name: 'Kristopher', place: 'Hotel Parking Lot' }, { name: 'Violet', place: null }] });
+    expect(l[0]).toBe('the world clock reads Monday, 19th of October at 22:00 (late evening)');
+    expect(l[1]).toContain('about 2 days have passed');
+    expect(l[2]).toBe('right now Kristopher stands in "Hotel Parking Lot"');
+    expect(l[3]).toBe('right now Violet stands nowhere on the canvas');
+  });
+  it('omits what is unknown', () => {
+    expect(presentLines({ date: null, hour: null, hourWords: null, sinceLastCanon: null, standing: [] })).toEqual([]);
+  });
+});
