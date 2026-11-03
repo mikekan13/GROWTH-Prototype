@@ -76,7 +76,8 @@ export default function AuthForm() {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-2">
+      {/* method="post": if the page's script is not running (2026-11-02, a phone), the browser's own submit must never put credentials in the URL. */}
+      <form onSubmit={handleSubmit} method="post" className="space-y-2">
         {mode === 'register' && (
           <>
             <input
