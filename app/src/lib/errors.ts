@@ -110,6 +110,18 @@ export class WithheldContentError extends AppError {
 }
 
 /**
+ * A CONTINUITY QUESTION (Michael 2026-11-03: "just like someone at a table stopping and asking a continuity or rule
+ * question"): the Watcher's line uses a thing the actor does not have on them. The line is withheld until answered —
+ * add the thing (resend with confirmUnheld) or change the line. 422, `withheld` is the question itself.
+ */
+export class UnheldThingError extends AppError {
+  constructor(message: string, public things: string[], public actorId: string) {
+    super(message, 422);
+    this.name = 'UnheldThingError';
+  }
+}
+
+/**
  * The RunPod portrait endpoint refused or could not be reached. `code` is the
  * stable machine string the client switches on; `message` is the honest line
  * the admin sees instead of "pipeline returned null".

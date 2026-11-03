@@ -13,6 +13,8 @@ const proseBodySchema = z.object({
   locationId: z.string().min(1).nullable().optional(),
   /** The Watcher answered JEWL's popup with "continue": the ticket is CONFIRMED and the world was spun up. */
   confirmTicketId: z.string().min(1).nullable().optional(),
+  /** The Watcher answered a continuity question with "it exists" (2026-11-03): the missing things are added to the actor's hands, the line plays. */
+  confirmUnheld: z.boolean().optional(),
 });
 
 // Pre-09-26 shapes, still honored for scripts/tests.

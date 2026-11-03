@@ -1,7 +1,7 @@
 // API route utility — converts service/validation errors to HTTP responses
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
-import { AppError, ClothingFromInventoryError, EditOutOfScopeError, LocalLaneError, PortraitEndpointError } from './errors';
+import { AppError, ClothingFromInventoryError, EditOutOfScopeError, LocalLaneError, PortraitEndpointError, UnheldThingError } from './errors';
 
 export function errorResponse(error: unknown): NextResponse {
   if (error instanceof ZodError) {
@@ -18,6 +18,10 @@ export function errorResponse(error: unknown): NextResponse {
   }
   if (error instanceof ClothingFromInventoryError || error instanceof EditOutOfScopeError) {
     return NextResponse.json({ error: error.code, message: error.message }, { status: error.status });
+  }
+  if (error instanceof UnheldThingError) {
+    // 2026-11-03: `withheld` is what the table-test harness reads; `error` is what the speak bar shows.
+    return NextResponse.json({ error: error.message, withheld: error.message, reason: 'unheld_thing', things: error.things, actorId: error.actorId }, { status: 422 });
   }
   if (error instanceof AppError) {
     return NextResponse.json({ error: error.message }, { status: error.status });

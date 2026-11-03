@@ -27,6 +27,8 @@ const w = vi.hoisted(() => ({
   judge: vi.fn(),
   card: vi.fn(),
   carry: null as null | { speakerId: string; route: unknown[] },
+  resolve: vi.fn(),
+  makeItem: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -60,6 +62,8 @@ vi.mock('@/services/canon', () => ({
   attachTruthToMemory: vi.fn(async (memoryId: string, canonEventId: string, extra: string[] = []) => { w.attached.push({ memoryId, canonEventId }); w.extras[memoryId] = extra; return true; }),
   attachTruthToRecentMemories: vi.fn(async () => 0),
 }));
+vi.mock('@/daya/adjudicator', () => ({ resolveIntent: w.resolve }));
+vi.mock('@/services/campaign-item', () => ({ createCampaignItem: w.makeItem }));
 vi.mock('@/services/perception-reach', async (orig) => ({ ...(await orig<typeof import('@/services/perception-reach')>()), judgeCanonReach: w.judge }));
 vi.mock('@/services/world-apply', async (orig) => {
   const real = await orig<typeof import('@/services/world-apply')>();
@@ -137,6 +141,8 @@ beforeEach(() => {
   w.answer.mockReset();
   answerWith({});
   w.readNarration.mockReset().mockResolvedValue(null);
+  w.resolve.mockReset().mockResolvedValue({ unheldThings: [], effects: { applied: [], refused: [] } });
+  w.makeItem.mockReset().mockResolvedValue({});
 });
 afterEach(() => {
   process.env = { ...savedEnv };
@@ -714,5 +720,34 @@ describe('a quoted line is always sound (HW8 run 7 #4)', () => {
     await flush(); await flush(); await flush();
     const toMara = w.listen.mock.calls.filter((c) => c[0] === 'mara').map((c) => c[2].content as string);
     expect(toMara.some((c) => c.includes('Are you ok?'))).toBe(true);
+  });
+});
+
+describe('a line that uses a thing the actor does not have is WITHHELD until answered (2026-11-03)', () => {
+  const line = 'Tess takes a hit of her weed vape.';
+  for (const split of [false, true]) {
+    it(`${split ? 'split' : 'serial'} loop: nothing is recorded, the 422 error carries the question, the table is told`, async () => {
+      if (split) process.env.TABLE_SPLIT_LOOP = 'on';
+      w.resolve.mockResolvedValue({ unheldThings: ['weed vape'] });
+      const err = await speakProse('camp', actor, { message: line }).catch((e) => e);
+      expect(err).toMatchObject({ name: 'UnheldThingError', status: 422, things: ['weed vape'], actorId: 'tess', message: 'Tess has no weed vape on them. Add it, or change the line.' });
+      expect(w.canon).toEqual([]);
+      expect(w.makeItem).not.toHaveBeenCalled();
+      expect(w.broadcasts.some((b) => b.kind === 'table_note' && b.actorId === 'tess')).toBe(true);
+    });
+    it(`${split ? 'split' : 'serial'} loop: confirmUnheld adds the thing to her hands and plays the line`, async () => {
+      if (split) process.env.TABLE_SPLIT_LOOP = 'on';
+      w.resolve.mockResolvedValue({ unheldThings: ['weed vape'] });
+      await speakProse('camp', actor, { message: line, confirmUnheld: true });
+      expect(w.makeItem).toHaveBeenCalledWith('camp', 'gm', 'WATCHER', expect.objectContaining({
+        name: 'weed vape', holderId: 'tess', data: expect.objectContaining({ addedAtTable: true, description: `Added at the table: ${line}` }),
+      }));
+      expect(w.canon.some((c) => c.kind === 'narration')).toBe(true);
+    });
+  }
+  it('a line that uses nothing missing plays as before', async () => {
+    await speakProse('camp', actor, { message: line });
+    expect(w.makeItem).not.toHaveBeenCalled();
+    expect(w.canon.some((c) => c.kind === 'narration')).toBe(true);
   });
 });

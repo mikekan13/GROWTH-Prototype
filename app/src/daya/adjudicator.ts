@@ -37,6 +37,11 @@ export interface ResolveIntentInput {
    * skipped (the Watcher is the authority on what was said); the map still refuses what it cannot do.
    */
   narrated?: boolean;
+  /**
+   * Read the act and report what it uses that the actor lacks, writing nothing (2026-11-03: the table withholds a line
+   * that uses a thing the actor does not have). The model's answer is kept for the real call that follows.
+   */
+  dryRun?: boolean;
 }
 
 export interface ExperienceEvent {
@@ -62,6 +67,8 @@ export interface AdjudicationResult {
   effects?: ApplyReport;
   /** The map refused the act outright (a locked door), no model asked. */
   mapBlocked?: boolean;
+  /** dryRun only: the things the act uses that the actor does not hold. */
+  unheldThings?: string[];
 }
 
 /** Swappable resolution contract — a future physics engine implements this
@@ -111,7 +118,7 @@ export function parseUses(raw: unknown): string[] {
  * Kristopher's ledger passed silently). A use matches a name when the names match whole (case-insensitive), or one
  * contains the other, or a word of 4+ letters in the use appears in the name. No match → a refusal line. Pure.
  */
-export function unheldUses(uses: string[] | undefined, heldNames: string[], roomNames: string[], actorName = 'The actor'): string[] {
+export function unheldThings(uses: string[] | undefined, heldNames: string[], roomNames: string[]): string[] {
   const names = [...heldNames, ...roomNames].map((n) => n.toLowerCase());
   const out: string[] = [];
   for (const raw of uses ?? []) {
@@ -120,9 +127,26 @@ export function unheldUses(uses: string[] | undefined, heldNames: string[], room
     const t = thing.toLowerCase();
     const words = t.split(/[^a-z0-9']+/).filter((w) => w.length >= 4);
     const found = names.some((n) => n === t || n.includes(t) || t.includes(n) || words.some((w) => n.includes(w)));
-    if (!found) out.push(`${actorName} has no ${thing} on them`);
+    if (!found) out.push(thing);
   }
   return out;
+}
+
+/** The refusal lines for those things, in the Watcher's words. Pure. */
+export function unheldUses(uses: string[] | undefined, heldNames: string[], roomNames: string[], actorName = 'The actor'): string[] {
+  return unheldThings(uses, heldNames, roomNames).map((thing) => `${actorName} has no ${thing} on them`);
+}
+
+// The dry run's parsed answer waits here for the real call (one model ask per act, not two). Five minutes, then forgotten.
+const PREFLIGHT_TTL_MS = 5 * 60_000;
+const preflight = new Map<string, { at: number; parsed: AdjudicatorResponseShape }>();
+function preflightKey(i: ResolveIntentInput): string { return `${i.campaignId}|${i.entityCharacterId}|${i.narrated ? 'n' : 'd'}|${i.intent}`; }
+function preflightGet(key: string, take: boolean): AdjudicatorResponseShape | null {
+  const hit = preflight.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > PREFLIGHT_TTL_MS) { preflight.delete(key); return null; }
+  if (take) preflight.delete(key);
+  return hit.parsed;
 }
 
 function parseAdjudicatorResponse(text: string): AdjudicatorResponseShape {
@@ -289,7 +313,9 @@ export async function resolveIntent(
   // against the entity like every other subsystem's does.
   const entityDaId = await resolveDayaEntityId(entityCharacterId);
 
-  const modelResult = await chat(
+  const pfKey = preflightKey(input);
+  const cachedParsed = preflightGet(pfKey, !input.dryRun);
+  const modelResult = cachedParsed ? null : await chat(
     {
       tier: 'C',
       subsystem: 'adjudicator',
@@ -303,11 +329,11 @@ export async function resolveIntent(
     overrides,
   );
 
-  let parsed = parseAdjudicatorResponse(modelResult.text);
+  let parsed = cachedParsed ?? parseAdjudicatorResponse(modelResult!.text);
 
   // A NARRATED HAND-OVER WITH NO EFFECT IS A MISS (HW12 2026-10-31): one more ask, with the miss named. The model still
   // maps the words to the carried thing; the engine only knows the sentence said something changed hands.
-  if (input.narrated && !parsed.effects?.length && (statesHandOver(intent) || statesPayment(intent))) {
+  if (!cachedParsed && input.narrated && !parsed.effects?.length && (statesHandOver(intent) || statesPayment(intent))) {
     console.log(`[daya/adjudicator] narrated hand-over came back with no effects — asking once more: "${intent.slice(0, 80)}"`);
     try {
       const again = await chat(
@@ -325,6 +351,16 @@ export async function resolveIntent(
     } catch (err) {
       console.warn('[daya/adjudicator] the second ask failed (the first answer stands):', err instanceof Error ? err.message : err);
     }
+  }
+
+  // DRY RUN (2026-11-03): report what the act uses that the actor lacks; nothing is written, the answer is kept.
+  if (input.dryRun) {
+    preflight.set(pfKey, { at: Date.now(), parsed });
+    return {
+      outcome: intent, factsWritten: [], factsSuperseded: [],
+      experienceEvent: parsed.experienceEvent,
+      unheldThings: unheldThings(parsed.uses, heldRows.map((r) => r.name), []),
+    };
   }
 
   const factsSuperseded: WorldFactRecord[] = [];

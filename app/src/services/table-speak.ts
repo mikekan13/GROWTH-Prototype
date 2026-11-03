@@ -27,7 +27,7 @@
  */
 import 'server-only';
 import { prisma } from '@/lib/db';
-import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
+import { ForbiddenError, NotFoundError, UnheldThingError, ValidationError } from '@/lib/errors';
 import { assertLawfulInput } from '@/services/lawful-intake';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { createCampaignEvent } from '@/services/campaign-event';
@@ -69,6 +69,7 @@ import { actInThirdPerson, worldChangeSentences } from '@/daya/act-card';
 import { didNotHear } from '@/daya/did-not-hear';
 import { statedStretchOf, simulateStatedStretch } from '@/services/table-timeskip';
 import { resolveIntent } from '@/daya/adjudicator';
+import { createCampaignItem } from '@/services/campaign-item';
 import { recentVoiceOf, recentCardTextsOf, liveVoiceBound } from '@/daya/voice-history';
 import { markAddressedByName } from '@/daya/name-addressed';
 import { splitHeld, readHeldIn } from '@/daya/facts-for-actor';
@@ -261,7 +262,8 @@ export async function recentThoughtsOf(campaignId: string, characterId: string, 
 
 /** The standing beat's last sentence: a beat in which nothing from beyond the room reached the being. */
 /** How the far side of a being's own live signal opens (a standing beat of its own). */
-export const FAR_SIDE_HEAD = 'What you set off is still going, and you hear it:';
+// Table test 2026-11-03: "and you hear it" had Kristopher hearing the chime of a text he sent across town; what he senses of it is the perception agent's call.
+export const FAR_SIDE_HEAD = 'What you set off is still going:';
 export const STANDING_BEAT_TAIL = 'Nothing from beyond the room has reached you just now.';
 
 /** How long a being's line waits for its own thought card to be on the page first — the cloud build alone is allowed 30 s (HW8 run 6: 8 s let "It's open." go up 7 s before her card). */
@@ -684,7 +686,7 @@ async function deliverToTable(
 export async function speakProse(
   campaignId: string,
   actor: TableActor,
-  input: { message: string; locationId?: string | null; confirmTicketId?: string | null; worldEvent?: boolean },
+  input: { message: string; locationId?: string | null; confirmTicketId?: string | null; confirmUnheld?: boolean; worldEvent?: boolean },
 ): Promise<TableProseResult> {
   if (!isWatcherOrAbove(actor.role)) {
     throw new ForbiddenError('GM/ADMIN only — the table is a Watcher-seat surface');
@@ -704,6 +706,8 @@ export async function speakProse(
   // THE WORLD'S OWN EVENT (2026-11-02): "Violet's phone rings" is something that HAPPENS to her, caused by another's act —
   // never her own doing. No being is its actor, no narrated act is read from it, and JEWL does not reconcile it.
   if (input.worldEvent) { parsed.actions = []; parsed.thoughts = []; }
+  // A THING THE ACTOR DOES NOT HAVE (2026-11-03): the line waits for the Watcher's answer; nothing below has run yet.
+  if (!input.confirmTicketId) await withholdUnheld(campaignId, actor, parsed.actions, !!input.confirmUnheld, message);
 
   // 0. JEWL reads it against the sim BEFORE it becomes canon (Mike 09-26,
   //    fluid-canon ruling). A confirmed ticket means the Watcher already
@@ -1439,7 +1443,7 @@ async function runBeats(
 async function speakProseSplit(
   campaignId: string,
   actor: TableActor,
-  input: { message: string; locationId?: string | null; confirmTicketId?: string | null; worldEvent?: boolean },
+  input: { message: string; locationId?: string | null; confirmTicketId?: string | null; confirmUnheld?: boolean; worldEvent?: boolean },
 ): Promise<TableProseResult> {
   const rawMessage = input.message;
   let message = rawMessage;
@@ -1472,6 +1476,8 @@ async function speakProseSplit(
   // THE WORLD'S OWN EVENT (2026-11-02): no being is its actor ("Violet's phone rings" is never her own doing).
   if (input.worldEvent) { parsed.actions = []; parsed.thoughts = []; }
   let plan = planFor(roster);
+  // A THING THE ACTOR DOES NOT HAVE (2026-11-03): the line waits for the Watcher's answer; nothing below has run yet.
+  if (!input.confirmTicketId) await withholdUnheld(campaignId, actor, parsed.actions, !!input.confirmUnheld, message);
 
   // 0. JEWL's read still comes BEFORE anything is written on this path (U2c-5 moves it beside the listening).
   //    A message with nothing in the world (only an ask, only ignored talk) has nothing for him to read.
@@ -1637,6 +1643,52 @@ async function liveStatedTime(campaignId: string, actor: TableActor, adv: Awaite
  * no check, the words stand, the model names what it did to doors, hands and rooms, and world-apply
  * lands it. Fire-and-forget: the table never waits on it; what the map refuses is logged.
  */
+/**
+ * WITHHOLD UNTIL ANSWERED (Michael 2026-11-03: "just like someone at a table stopping and asking a continuity or rule
+ * question"). Each narrated act that reaches the adjudicator is read once, dry (nothing written); if it uses a thing the
+ * actor does not have on them, the whole line is NOT played and is not recorded — a 422 carries the question. The Watcher
+ * answers by changing the line, or by resending with confirmUnheld: each missing thing is then put in the actor's hands
+ * as a plain item, and the line plays. The engine never invents the thing silently. A model that fails here does not stop the line.
+ */
+async function withholdUnheld(
+  campaignId: string,
+  actor: { userId: string; role: string },
+  actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined,
+  confirm: boolean,
+  line: string,
+): Promise<void> {
+  const readable = (actions ?? []).filter((a) => a.actorId && a.text.trim() && !isRecall(a.text) && !detectActiveCheck(a.text));
+  if (!readable.length) return;
+  const cycle = (await feedCycle(campaignId).catch(() => null)) ?? 0;
+  const read = await Promise.all(readable.map(async (a) => {
+    try {
+      const r = await resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: a.text, cycle, narrated: true, dryRun: true });
+      return { a, things: r.unheldThings ?? [] };
+    } catch (err) {
+      console.warn(`[table-speak] unheld-use read for ${a.actorLabel} failed (the line plays):`, err instanceof Error ? err.message : err);
+      return { a, things: [] as string[] };
+    }
+  }));
+  const missing = read.filter((x) => x.things.length);
+  if (!missing.length) return;
+  if (confirm) {
+    for (const { a, things } of missing) {
+      for (const thing of things) {
+        await createCampaignItem(campaignId, actor.userId, actor.role, {
+          name: thing, type: 'misc', holderId: a.actorId,
+          data: { description: `Added at the table: ${line}`, condition: 3, weightLevel: 1, tags: [], addedAtTable: true },
+          origin: 'added at the table',
+        });
+      }
+      console.log(`[table-speak] added at the table for ${a.actorLabel}: ${things.join(', ')}`);
+    }
+    return;
+  }
+  const lines = missing.flatMap(({ a, things }) => things.map((t) => `${a.actorLabel} has no ${t} on them.`));
+  for (const { a, things } of missing) for (const t of things) broadcastEvent(campaignId, { kind: 'table_note', text: `${a.actorLabel} has no ${t} on them. Add it, or change the line.`, actorId: a.actorId });
+  throw new UnheldThingError(`${lines.join(' ')} Add it, or change the line.`, missing.flatMap((x) => x.things), missing[0].a.actorId);
+}
+
 function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined, gm?: { userId: string; username: string }): void {
   for (const a of actions ?? []) {
     if (!a.actorId || !a.text.trim()) continue;

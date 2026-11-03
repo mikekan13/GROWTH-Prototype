@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({ prisma: {} }));
 
-import { unheldUses, parseUses } from './adjudicator';
+import { unheldUses, unheldThings, parseUses } from './adjudicator';
 
 describe('unheldUses', () => {
   const held = ['Weed vape pen', 'Personal phone'];
@@ -20,6 +20,12 @@ describe('unheldUses', () => {
   it('empty uses is nothing', () => {
     expect(unheldUses([], held, [])).toEqual([]);
     expect(unheldUses(undefined, held, [])).toEqual([]);
+  });
+});
+
+describe('unheldThings', () => {
+  it('names the bare things, for the continuity question', () => {
+    expect(unheldThings(['weed vape', 'phone'], ['Personal phone'], [])).toEqual(['weed vape']);
   });
 });
 
