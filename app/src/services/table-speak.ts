@@ -681,7 +681,7 @@ async function deliverToTable(
 export async function speakProse(
   campaignId: string,
   actor: TableActor,
-  input: { message: string; locationId?: string | null; confirmTicketId?: string | null },
+  input: { message: string; locationId?: string | null; confirmTicketId?: string | null; worldEvent?: boolean },
 ): Promise<TableProseResult> {
   if (!isWatcherOrAbove(actor.role)) {
     throw new ForbiddenError('GM/ADMIN only — the table is a Watcher-seat surface');
@@ -698,6 +698,9 @@ export async function speakProse(
   const roster = await proseRoster(campaignId);
   const proseCtx = { recentActors: await recentTableActors(campaignId, roster), lastVoiced: await lastVoicedActor(campaignId, roster) };
   const parsed = parseTableProse(message, roster, proseCtx);
+  // THE WORLD'S OWN EVENT (2026-11-02): "Violet's phone rings" is something that HAPPENS to her, caused by another's act —
+  // never her own doing. No being is its actor, no narrated act is read from it, and JEWL does not reconcile it.
+  if (input.worldEvent) { parsed.actions = []; parsed.thoughts = []; }
 
   // 0. JEWL reads it against the sim BEFORE it becomes canon (Mike 09-26,
   //    fluid-canon ruling). A confirmed ticket means the Watcher already
@@ -709,7 +712,7 @@ export async function speakProse(
     const rosterNow = await proseRoster(campaignId);
     delete parsed.actions;
     Object.assign(parsed, parseTableProse(message, rosterNow, proseCtx));
-  } else {
+  } else if (!input.worldEvent) {
     const held = await readNarration(campaignId, actor, message, parsed, listeners);
     if (held) return { held, canonEventId: null, dialogue: [], narration: parsed.narration, responses: [] };
   }
@@ -1628,7 +1631,7 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
         for (const snd of r.effects?.sounds ?? []) {
           if (!gm) break;
           console.log(`[table-speak] the world sounds at ${snd.at}: ${snd.text}`);
-          await narrateAtTable(campaignId, { userId: gm.userId, username: gm.username, role: 'WATCHER' } as TableActor, { message: snd.text, locationId: snd.locationId ?? null })
+          await narrateAtTable(campaignId, { userId: gm.userId, username: gm.username, role: 'WATCHER' } as TableActor, { message: snd.text, locationId: snd.locationId ?? null, worldEvent: true })
             .catch((err) => console.warn('[table-speak] the world\'s sound was not narrated (non-fatal):', err instanceof Error ? err.message : err));
         }
       })
@@ -1766,9 +1769,9 @@ export function forgetSpokenTable(campaignId?: string): void {
 export async function narrateAtTable(
   campaignId: string,
   actor: TableActor,
-  input: { message: string; actorId?: string | null; targetId?: string | null; locationId?: string | null },
+  input: { message: string; actorId?: string | null; targetId?: string | null; locationId?: string | null; worldEvent?: boolean },
 ): Promise<TableNarrateResult> {
-  return speakProse(campaignId, actor, { message: input.message, locationId: input.locationId ?? null });
+  return speakProse(campaignId, actor, { message: input.message, locationId: input.locationId ?? null, worldEvent: input.worldEvent });
 }
 
 /**
