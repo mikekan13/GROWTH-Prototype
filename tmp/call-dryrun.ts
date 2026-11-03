@@ -33,7 +33,8 @@ async function snapshot() {
   const edges = await p.entityRelationship.findMany({ where: { campaignId: C, relationshipType: 'located_at', sourceType: { in: ['CHARACTER', 'CAMPAIGN_ITEM'] } } });
   const items = await prisma.campaignItem.findMany({ where: { campaignId: C }, select: { id: true, holderId: true, locationId: true, status: true, data: true, history: true } });
   const camp = await prisma.campaign.findUniqueOrThrow({ where: { id: C }, select: { currentCycle: true } });
-  return { chars, edges, items, cycle: camp.currentCycle };
+  const factIds = (await p.worldFact.findMany({ where: { campaignId: C }, select: { id: true, supersededById: true } }));
+  return { chars, edges, items, cycle: camp.currentCycle, factIds };
 }
 
 async function restore(s: Awaited<ReturnType<typeof snapshot>>, from: Date, sessionId: string | null) {
@@ -45,9 +46,12 @@ async function restore(s: Awaited<ReturnType<typeof snapshot>>, from: Date, sess
   await p.dayaMemoryEntry.deleteMany({ where: { entityId: { in: entityIds }, realTime: win } });
   await p.dayaIntention.deleteMany({ where: { entityId: { in: entityIds }, createdAt: win } });
   await p.historyEntry.deleteMany({ where: { campaignId: C, realTime: win } }).catch(() => undefined);
-  const facts = await p.worldFact.findMany({ where: { campaignId: C, createdAt: win } }).catch(() => [] as any[]);
-  for (const f of facts) await p.worldFact.updateMany({ where: { supersededById: f.id }, data: { supersededById: null } });
-  if (facts.length) await p.worldFact.deleteMany({ where: { id: { in: facts.map((f: any) => f.id) } } });
+  // Facts have no timestamp: anything not in the snapshot is new; superseded links go back as they were.
+  const known = new Map(s.factIds.map((f: any) => [f.id, f.supersededById]));
+  const nowFacts = await p.worldFact.findMany({ where: { campaignId: C }, select: { id: true, supersededById: true } });
+  const added = nowFacts.filter((f: any) => !known.has(f.id)).map((f: any) => f.id);
+  if (added.length) await p.worldFact.deleteMany({ where: { id: { in: added } } });
+  for (const f of nowFacts) if (known.has(f.id) && known.get(f.id) !== f.supersededById) await p.worldFact.update({ where: { id: f.id }, data: { supersededById: known.get(f.id) ?? null } });
   await p.familiarityChange.deleteMany({ where: { createdAt: win } }).catch(() => undefined);
   await p.reconciliation.deleteMany({ where: { campaignId: C, createdAt: win } }).catch(() => undefined);
   await p.lastKnown.deleteMany({ where: { updatedAt: win } }).catch(() => undefined);

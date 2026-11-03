@@ -203,7 +203,11 @@ export async function resolveIntent(
     const far = standRows.filter((r) => r.elsewhere);
     if (far.length) {
       const carriedRows = await prisma.campaignItem.findMany({ where: { holderId: { in: far.map((r) => r.id) }, status: 'ACTIVE' }, select: { name: true, holderId: true, data: true }, take: 200 });
-      const reach = signalReachLines([intent], far.map((r) => ({ id: r.id, name: r.name, elsewhere: true, carried: splitHeld(carriedRows.filter((c) => c.holderId === r.id).map((c) => ({ name: c.name, data: c.data }))).carrying })), entityCharacterId);
+      // Named in the act, or simply KNOWN to the actor: a call names no one but reaches whom the caller knows (2026-11-02).
+      const { knownElsewhere } = await import('@/services/elsewhere-world');
+      const known = new Set(await knownElsewhere(campaignId, entityCharacterId));
+      const nameHint = far.filter((r) => known.has(r.id)).map((r) => r.name);
+      const reach = signalReachLines([intent, ...nameHint], far.map((r) => ({ id: r.id, name: r.name, elsewhere: true, carried: splitHeld(carriedRows.filter((c) => c.holderId === r.id).map((c) => ({ name: c.name, data: c.data }))).carrying })), entityCharacterId);
       if (reach.length) signalBlock = [...reach, ''];
     }
   } catch { /* no signal list: the model works without it */ }

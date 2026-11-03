@@ -1,0 +1,21 @@
+import { writeFileSync } from 'node:fs';
+import { prisma } from '../app/src/lib/db';
+import { ensureDefaultTimescale } from '../app/src/services/time';
+import { secondsToCycles } from '../app/src/types/time';
+const C = 'cms5z4j6z0000zg48z5vzl2jn', VIOLET = 'cms60ndtn0000kw48ioq10i68', ASPHALT = 'cmvx8qwny0052vg48nwda5s23';
+(async () => {
+  const p = prisma as any;
+  const camp = await prisma.campaign.findUniqueOrThrow({ where: { id: C }, select: { currentCycle: true } });
+  const ts = await ensureDefaultTimescale(C) as any;
+  const e = await p.dayaEntity.findUnique({ where: { characterId: VIOLET }, select: { id: true } });
+  const stale = await p.dayaIntention.findMany({ where: { entityId: e.id, status: 'PENDING', description: { startsWith: 'Violet is in her apartment on Saturday evening' } } });
+  const asphalt = await prisma.location.findUnique({ where: { id: ASPHALT } });
+  writeFileSync(`data/archive/prep-fixes-2-${Date.now()}.json`, JSON.stringify({ cycle: camp.currentCycle, stale, asphalt }, null, 1));
+  const to = camp.currentCycle + secondsToCycles(3 * 3600, ts);
+  await prisma.campaign.update({ where: { id: C }, data: { currentCycle: to } });
+  await p.dayaIntention.deleteMany({ where: { id: { in: stale.map((s: any) => s.id) } } });
+  await prisma.location.update({ where: { id: ASPHALT }, data: { name: 'the lot behind the hotel' } });
+  await p.worldFact.create({ data: { campaignId: C, subjectKey: 'violet.friday_pizza', fact: 'Violet ate Friday night\'s pizza that same night; the box is long gone.', establishedAtCycle: camp.currentCycle, establishedBy: 'gm' } }).catch(async (err: Error) => console.log('fact create failed:', err.message.split('\n').slice(-3).join(' ')));
+  console.log(`clock ${camp.currentCycle} → ${to} (+3 h); stale directives removed: ${stale.length}; zone renamed`);
+  process.exit(0);
+})();

@@ -1138,8 +1138,17 @@ async function runBeats(
       // No verdict, or only the fallback's, for a being NOT in the line's actor's room: hearing alone (HW8 run 5, 2026-10-26) — never the unfiltered stretch.
       const lineActor = truthId === truth.primary ? truth.actorId ?? null : null;
       if ((!verdict || source === 'fallback') && otherRoomFrom(id, lineActor)) {
-        console.log(`[perception-reach] ${nameOf(id)}: ${verdict ? 'fallback verdict' : 'no verdict'} across rooms → hearing only ${what}`);
-        hear(id, stim, { verdict: { beingId: id, reaches: true, via: ['hearing'], noticed: true, salience: 0.5 }, source: 'stub' }, askFor, truthId);
+        // ANOTHER LEVEL IS ANOTHER PLACE (2026-11-02: Violet at home "heard" Kristopher's prayer in his car this way).
+        void (async () => {
+          const { onDifferentLevels } = await import('@/services/elsewhere-world');
+          if (lineActor && await onDifferentLevels(id, lineActor)) {
+            console.log(`[perception-reach] ${nameOf(id)}: elsewhere (another map level) — not reached ${what}`);
+            void standingBeat(id, truthId);
+            return;
+          }
+          console.log(`[perception-reach] ${nameOf(id)}: ${verdict ? 'fallback verdict' : 'no verdict'} across rooms → hearing only ${what}`);
+          hear(id, stim, { verdict: { beingId: id, reaches: true, via: ['hearing'], noticed: true, salience: 0.5 }, source: 'stub' }, askFor, truthId);
+        })();
         return;
       }
       if (!verdict) { console.log(`[perception-reach] ${nameOf(id)}: no verdict (${source}) → heard as before ${what}`); hear(id, stim, undefined, askFor, truthId); return; }

@@ -425,6 +425,10 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           if (where.kind === 'thing') {
             const people = await prisma.character.findMany({ where: { campaignId, status: { notIn: ['DEAD', 'RETIRED'] } }, select: { id: true, name: true } });
             const addressedIds = addressedBeings([actText ?? '', e.at], people, actor.id);
+            // A call names no one ("the bill she gave him… hits dial"): whoever the caller KNOWS on another level is reachable
+            // through a device the caller holds (2026-11-02).
+            const holdsSomething = await prisma.campaignItem.count({ where: { campaignId, holderId: actor.id, status: 'ACTIVE' } });
+            if (holdsSomething) { const { knownElsewhere } = await import('./elsewhere-world'); for (const k of await knownElsewhere(campaignId, actor.id)) if (!addressedIds.includes(k)) addressedIds.push(k); }
             const actorRoomIds = [map?.roomId, map?.home.id].filter((x): x is string => !!x);
             if (!soundMayLandAt({ holderId: where.holderId, thingRoomId: where.locationId, actorId: actor.id, actorRoomIds, addressedIds })) {
               report.refused.push(`sound at ${where.name}: ${actor.name}'s act cannot reach it — not held by ${actor.name} or the person addressed, and not in ${map?.roomName ?? 'the actor\'s place'}`);
