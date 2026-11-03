@@ -90,6 +90,8 @@ export function composerPrompt(a: Omit<ComposeArgs, 'campaignId' | 'entityId' | 
     'Decide:',
     `- "gist": what goes through ${a.name} now, as plain first-person notes, 1 to 3 short sentences. Start from what is NEW in the perception and what it means to ${a.name} — the people, days and things of their own life. Only what the pieces and facts give; what ${a.name} does not know, they do not know. Thought only: no deed and no words said aloud.`,
     // Composer replay 2 (2026-11-03): the plan had Kristopher "already left a voicemail" and "went inside and the pizza is fine" — he was in his car the whole time.
+    // Session 2 live (2026-11-03): with the phone still ringing, Kristopher's plan had "she didn't pick up".
+    `- Something still going (a ringing, a knocking, a voice) is still going: ${a.name} never thinks it has ended or gone unanswered for good unless the perception says it stopped.`,
     `- The gist lives in THIS moment. Nothing happens in it that has not happened in the perception, the facts or a memory: ${a.name} has not gone anywhere, done anything, received anything or been told anything unless one of those says so. Where they are is where the facts put them. A wish or a plan is said as one ("I should go in"), never as done.`,
     `- "impulse": "speak" if ${a.name} would say something now, "act" if they would do something now, "stay" if they let it sit.`,
     '- "why": when staying, what holds them, in a few words.',
@@ -121,7 +123,7 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   const fragments = a.memories.slice(0, 8).map((m, i) => ({ i, text: m.text, ...(m.age ? { age: m.age } : {}) }));
   const [mood, rec] = await Promise.all([
     placeOrder({ kind: 'mood', brief: { felt: a.feltBefore, perceived, temperament: a.identity.slice(0, 400) } }, ctx, overrides),
-    fragments.length ? placeOrder({ kind: 'recall', brief: { cue: perceived, fragments } }, ctx, overrides) : Promise.resolve(null as Piece<'recall'> | null),
+    fragments.length ? placeOrder({ kind: 'recall', brief: { cue: perceived, fragments, recent: a.recent } }, ctx, overrides) : Promise.resolve(null as Piece<'recall'> | null),
   ]);
   const felt = mood?.felt?.trim() || a.feltBefore;
   const wakes = (rec?.wakes ?? []).filter((w) => fragments[w.i]).slice(0, 3).map((w) => ({ text: `${fragments[w.i].age ? `${fragments[w.i].age}: ` : ''}${fragments[w.i].text}`, why: w.why }));
@@ -139,7 +141,13 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   if (!plan) return null;
   const tPlan = Date.now();
 
-  const voiced = await placeOrder({ kind: 'voice', brief: { gist: plan.gist, voice: a.voice, recent: a.recent } }, ctx, overrides);
+  // A VOICE, NOT A FORMULA (session 2 live, 2026-11-03: card after card of Violet's opened "I think I …").
+  const avoidOpenings = [...new Set(a.recent.map(openingOf).filter(Boolean))];
+  let voiced = await placeOrder({ kind: 'voice', brief: { gist: plan.gist, voice: a.voice, recent: a.recent, avoidOpenings } }, ctx, overrides);
+  if (voiced?.thought && avoidOpenings.includes(openingOf(voiced.thought))) {
+    console.log(`[composer] ${a.name}: the voice opened like a recent thought ("${openingOf(voiced.thought)}") - once more`);
+    voiced = (await placeOrder({ kind: 'voice', brief: { gist: plan.gist, voice: a.voice, recent: a.recent, avoidOpenings: [...avoidOpenings, openingOf(voiced.thought)] } }, ctx, overrides)) ?? voiced;
+  }
   const thought = voiced?.thought?.trim() || plan.gist;
   console.log(`[composer] ${a.name}: pieces ${tPieces - t0}ms · plan ${tPlan - tPieces}ms · voice ${Date.now() - tPlan}ms · impulse ${plan.impulse}`);
   return { perceived, felt, wakes, plan, thought };
@@ -152,4 +160,9 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
  */
 export function composerOn(): boolean {
   return process.env.BEING_COMPOSER !== 'off';
+}
+
+/** The first three words of a thought, lowercased and bare ("i think i"), the unit a formula repeats. Pure. */
+export function openingOf(text: string): string {
+  return (text.toLowerCase().match(/[a-z']+/g) ?? []).slice(0, 3).join(' ');
 }

@@ -45,3 +45,11 @@ describe('the composer — the local plan', () => {
     expect(parsePlan('{"gist":"x","impulse":"shout"}')).toBeNull();
   });
 });
+
+import { openingOf } from './composer';
+describe('a voice, not a formula (session 2 live, 2026-11-03)', () => {
+  it('reads the opening of a thought', () => {
+    expect(openingOf('I think I notice the room is doing something.')).toBe('i think i');
+    expect(openingOf("  Eight months of nothing.")).toBe('eight months of');
+  });
+});

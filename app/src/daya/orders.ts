@@ -32,6 +32,8 @@ export interface RecallBrief {
   cue: string;
   /** Candidate memories (already scored locally), each with its age in words. */
   fragments: Array<{ i: number; text: string; age?: string }>;
+  /** Its recent thoughts: a memory already in them wakes again only if this moment truly calls for it. */
+  recent?: string[];
 }
 export interface MoodBrief {
   /** How the being felt a moment ago, in words. */
@@ -48,6 +50,8 @@ export interface VoiceBrief {
   voice: string;
   /** Its recent thoughts: never repeat their sentences or images. */
   recent: string[];
+  /** Openings its recent thoughts already used ("I think I"): the thought must not begin with any of them. */
+  avoidOpenings?: string[];
 }
 
 export type Order =
@@ -110,10 +114,11 @@ export function orderPrompt(order: Order): { system: string; user: string; maxTo
           'You judge which memories wake in one being, in a simulation. You are one part of a larger system: you only judge recall.',
           'Given what the being just took in and a list of its memories (with how long ago each was), pick the ones that would truly come to mind now — at most 3 — and say in a few plain words what each means to it NOW.',
           'Never invent a memory and never change one; an old memory stays old (say so if it matters). Pick none if none fit.',
+          'A memory the being has already been thinking about (its recent thoughts) wakes again only if this moment truly calls for it; do not bring the same memory back beat after beat.',
           names,
           `${JSON_ONLY} {"wakes": [{"i": number, "why": string}]}`,
         ].join('\n'),
-        user: [`Just took in: ${b.cue}`, 'Memories:', ...b.fragments.map((f) => `[${f.i}]${f.age ? ` (${f.age})` : ''} ${f.text}`)].join('\n'),
+        user: [`Just took in: ${b.cue}`, ...(b.recent?.length ? ['Recent thoughts:', lines(b.recent.slice(0, 4))] : []), 'Memories:', ...b.fragments.map((f) => `[${f.i}]${f.age ? ` (${f.age})` : ''} ${f.text}`)].join('\n'),
       };
     }
     case 'mood': {
@@ -154,7 +159,7 @@ export function orderPrompt(order: Order): { system: string; user: string; maxTo
           names,
           `${JSON_ONLY} {"thought": string}`,
         ].join('\n'),
-        user: [`How this being speaks and thinks: ${b.voice}`, 'Recent thoughts (do not repeat):', lines(b.recent.slice(0, 4)), '', `The thought: ${b.gist}`].join('\n'),
+        user: [`How this being speaks and thinks: ${b.voice}`, 'Recent thoughts (do not repeat):', lines(b.recent.slice(0, 4)), ...(b.avoidOpenings?.length ? [`Do not begin with: ${b.avoidOpenings.map((o) => `"${o}"`).join(', ')}`] : []), '', `The thought: ${b.gist}`].join('\n'),
       };
     }
   }

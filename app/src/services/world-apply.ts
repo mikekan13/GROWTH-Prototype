@@ -437,7 +437,14 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
               break;
             }
           }
-          (report.sounds ??= []).push({ text: e.text, at: where.name, locationId: where.locationId, ...(where.kind === 'door' ? { rooms: where.rooms } : {}) });
+          // WHOSE THING (session 2 live, 2026-11-03: the table read "Her phone rings."): a sound at a held thing that opens on a
+          // bare possessive names its holder, so the page and every being read whose it is.
+          let soundText = e.text;
+          if (where.kind === 'thing' && where.holderId && /^(?:her|his|their)\s/i.test(soundText)) {
+            const holderName = (await prisma.character.findUnique({ where: { id: where.holderId }, select: { name: true } }).catch(() => null))?.name?.split(/\s+/)[0];
+            if (holderName) soundText = soundText.replace(/^(?:her|his|their)\s/i, `${holderName}'s `);
+          }
+          (report.sounds ??= []).push({ text: soundText, at: where.name, locationId: where.locationId, ...(where.kind === 'door' ? { rooms: where.rooms } : {}) });
           // A sound at a thing someone ELSE holds is a STATE of that thing until answered (2026-11-02): the holder is told it every beat.
           if (where.kind === 'thing' && where.holderId) {
             try {
@@ -449,10 +456,10 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
               const rowData = parseData(row?.data ?? null);
               // Who caused it: the actor when it sounds at another's thing; a call already going keeps its caller when the sound is narrated at the actor's own.
               const cause = signalCause({ holderId: where.holderId, actorId: actor.id, narrated: opts.narrated, existingBy: liveSignal(rowData, cycle)?.by });
-              if (cause.record) await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: e.text, since: cycle, until: cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}) })) } });
+              if (cause.record) await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: soundText, since: cycle, until: cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}) })) } });
             } catch (err) { console.warn('[world-apply] signal not recorded (non-fatal):', err); }
           }
-          report.applied.push(`sound at ${where.name}: ${e.text}`);
+          report.applied.push(`sound at ${where.name}: ${soundText}`);
           break;
         }
         case 'answer': {

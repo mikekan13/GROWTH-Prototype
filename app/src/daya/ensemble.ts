@@ -1122,7 +1122,12 @@ export async function listenStimulus(
     if (voiced.text && !omniscient && !sealed.usedFallback) {
       const knowledge = [recallBlock, ...ground.lines, ...heldNow];
       const bad = splitSentences(voiced.text).map((x) => ({ x, c: competingSpecific(x, knowledge) })).find((y) => y.c);
-      if (bad?.c) {
+      // COMPOSED: never re-voice through the old single monologue (session 2 live, 2026-11-03: Violet's composed thought was
+      // re-voiced by it into "I check my pockets again … the five-dollar bill is gone"). The competing sentence is dropped.
+      if (bad?.c && composing) {
+        console.log(`[daya/ensemble] ${ctx.name} composed thought: "${bad.x.slice(0, 80)}" competes with memory - dropped`);
+        voiced.text = splitSentences(voiced.text).filter((x) => !competingSpecific(x, knowledge)).join(' ');
+      } else if (bad?.c) {
         console.warn(`[daya/ensemble] ${ctx.name} monologue: "${bad.x.slice(0, 80)}" competes with memory (${bad.c.claimed.join(',')} vs ${bad.c.known.join(',')}) - re-voicing once`);
         let again = '';
         try {
