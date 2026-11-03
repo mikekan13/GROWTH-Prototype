@@ -20,7 +20,7 @@ import { openAiCompatChat } from './transports/openai-compat';
 import { recordAiCall } from './metering';
 import { auditCloudCall, newToneTally, utf8Bytes } from './audit';
 import { screenModelOutput } from '@/lib/lawfulness-hooks';
-import { campaignNamesCached, newTranslationMap, translateBack, translateOut } from './translator';
+import { campaignNamesCached, neutralizeStrayPlaceholders, newTranslationMap, translateBack, translateOut } from './translator';
 import type { AiUsage, ResolvedLane, TaskDescriptor } from './types';
 
 export type RoutedBlock = AnthropicTextOrImageBlock;
@@ -137,6 +137,11 @@ export async function routedChatText(
   if (tmap.toReal.size) {
     res = { ...res, text: translateBack(res.text, tmap) };
     console.log(`[wall→translator] caller=${task.caller} names_swapped=${tmap.toReal.size}`); // a count, never a name
+  }
+  if (lane.crossesWall) {
+    // A PLACEHOLDER NOTHING STANDS BEHIND (session 2 live, 2026-11-03: "Person-A" reached the page) never leaves the gate.
+    const stray = neutralizeStrayPlaceholders(res.text);
+    if (stray.count) { console.warn(`[wall→translator] caller=${task.caller} stray_placeholders=${stray.count} (neutralized)`); res = { ...res, text: stray.text }; }
   }
   // LAWFULNESS (unit 8b): every routed text answer is screened before the
   // caller sees it — the local model is abliterated; on a cloud lane it is a

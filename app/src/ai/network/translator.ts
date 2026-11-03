@@ -151,6 +151,20 @@ export async function campaignNames(campaignId: string): Promise<NameEntry[]> {
 
 const NAME_TTL_MS = 30_000;
 const nameCache = new Map<string, { at: number; names: NameEntry[] }>();
+/**
+ * A placeholder with no name behind it, left in an answer after translateBack (the model invented or borrowed one), becomes
+ * a neutral word by kind so it never reaches the page: Person → someone, Place → somewhere, Thing → something. Pure.
+ */
+export function neutralizeStrayPlaceholders(text: string): { text: string; count: number } {
+  let count = 0;
+  const words: Record<string, [string, string]> = { Person: ['someone', "someone's"], User: ['someone', "someone's"], Place: ['somewhere', "somewhere's"], Thing: ['something', "something's"], Org: ['some outfit', "some outfit's"] };
+  const out = text.replace(/\b(Person|Place|Thing|Org|User)-[A-Z]{1,2}\b(['’]s)?/g, (_m, kind: string, poss?: string) => {
+    count++;
+    return poss ? words[kind][1] : words[kind][0];
+  });
+  return { text: out, count };
+}
+
 /** campaignNames, cached briefly per campaign (every cloud call of a beat reads the same names). Never throws. */
 export async function campaignNamesCached(campaignId: string): Promise<NameEntry[]> {
   const hit = nameCache.get(campaignId);

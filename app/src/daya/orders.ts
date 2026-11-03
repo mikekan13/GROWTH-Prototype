@@ -82,7 +82,8 @@ const lines = (xs: string[]) => (xs.length ? xs.map((x) => `- ${x}`).join('\n') 
 
 /** The system + user text of an order. Placeholders (Person-A, Place-B …) stand for names; keep them exactly as written. */
 export function orderPrompt(order: Order): { system: string; user: string; maxTokens: number } {
-  const names = 'Names appear as placeholders (Person-A, Place-B, Thing-C). Keep every placeholder exactly as written.';
+  // No example placeholders here (session 2 live, 2026-11-03: the model borrowed the example "Person-A" for someone unnamed, and it leaked onto the page).
+  const names = 'Some names in the text may be replaced by placeholders: keep any you see exactly as written. Never invent a placeholder; refer to someone unnamed as he, she, they or someone.';
   switch (order.kind) {
     case 'perception': {
       const b = order.brief;

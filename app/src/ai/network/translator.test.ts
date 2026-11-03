@@ -93,3 +93,11 @@ describe('names with hyphens, slashes and dashes (2026-11-03: they broke every c
     expect(translateBack(out, map)).toBe("Violet sits at the gaming/dev rig in Violet's apartment — fourth-floor walkup studio.");
   });
 });
+
+import { neutralizeStrayPlaceholders } from './translator';
+describe('a stray placeholder never reaches the page (session 2 live, 2026-11-03)', () => {
+  it('neutralizes by kind, possessive kept', () => {
+    expect(neutralizeStrayPlaceholders("I expect Person-A to come. Person-B's phone. At Place-C.")).toEqual({ text: "I expect someone to come. someone's phone. At somewhere.", count: 3 });
+    expect(neutralizeStrayPlaceholders('No placeholders here.').count).toBe(0);
+  });
+});

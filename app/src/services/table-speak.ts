@@ -1082,9 +1082,13 @@ async function runBeats(
       const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
       const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { name: true, holderId: true, data: true } });
       const { liveSignal } = await import('@/services/item-signal');
-      const going = rows.map((r) => { let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; } return liveSignal(d, cycle); }).find((s) => s?.by === listenerId);
-      if (going) {
-        const content = `${FAR_SIDE_HEAD} ${going.text} Nobody has answered it yet.`;
+      const goingRow = rows.map((r) => { let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; } return { r, s: liveSignal(d, cycle) }; }).find((x) => x.s?.by === listenerId);
+      const going = goingRow?.s ?? null;
+      if (going && goingRow) {
+        // WHOSE THING IT IS (session 2 live, 2026-11-03): "Her phone rings." left Kristopher thinking of "the ringing from the other night".
+        const holder = goingRow.r.holderId ? (await prisma.character.findUnique({ where: { id: goingRow.r.holderId }, select: { name: true } }).catch(() => null))?.name?.split(/\s+/)[0] ?? null : null;
+        const thing = goingRow.r.name.replace(/^(?:the|her|his|their|my)\s+/i, '');
+        const content = `${FAR_SIDE_HEAD} ${going.text}${holder ? ` It is ${holder}'s ${thing}, going now because of what you did.` : ''} Nobody has answered it yet.`;
         console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: the far side of their own signal — ${content}`);
         standingIds.add(listenerId);
         hear(listenerId, { source: 'perception', content, own: true }, { verdict: { beingId: listenerId, reaches: true, via: ['hearing'], noticed: true, salience: 0.6 }, source: 'stub' }, undefined, truthId);
