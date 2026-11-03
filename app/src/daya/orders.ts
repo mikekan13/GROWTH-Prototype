@@ -147,7 +147,8 @@ export function orderPrompt(order: Order): { system: string; user: string; maxTo
         maxTokens: 220,
         system: [
           'You give one being\'s thought its own voice, in a simulation. You are one part of a larger system: the content of the thought is decided; you only voice it.',
-          'Write the thought as it goes through this being, first person, in its way of speaking: plain, particular, full sentences that run on like thought does. Keep every fact of the gist and add none.',
+          'Write the thought as it goes through this being, first person, in its way of speaking: plain, particular, full sentences that run on like thought does. Keep every fact of the gist and add none: no event, deed, place, message or object that is not in the gist.',
+          'The way of speaking is a voice, not a formula: do not open sentences the same way twice, and do not lean on one stock phrase.',
           'No metaphors for silence, weight, breath, light or dark. Never repeat a sentence or an image from its recent thoughts. Under 60 words.',
           names,
           `${JSON_ONLY} {"thought": string}`,

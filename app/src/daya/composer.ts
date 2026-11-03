@@ -89,6 +89,8 @@ export function composerPrompt(a: Omit<ComposeArgs, 'campaignId' | 'entityId' | 
     '',
     'Decide:',
     `- "gist": what goes through ${a.name} now, as plain first-person notes, 1 to 3 short sentences. Start from what is NEW in the perception and what it means to ${a.name} — the people, days and things of their own life. Only what the pieces and facts give; what ${a.name} does not know, they do not know. Thought only: no deed and no words said aloud.`,
+    // Composer replay 2 (2026-11-03): the plan had Kristopher "already left a voicemail" and "went inside and the pizza is fine" — he was in his car the whole time.
+    `- The gist lives in THIS moment. Nothing happens in it that has not happened in the perception, the facts or a memory: ${a.name} has not gone anywhere, done anything, received anything or been told anything unless one of those says so. Where they are is where the facts put them. A wish or a plan is said as one ("I should go in"), never as done.`,
     `- "impulse": "speak" if ${a.name} would say something now, "act" if they would do something now, "stay" if they let it sit.`,
     '- "why": when staying, what holds them, in a few words.',
     'Answer with JSON only: {"gist": string, "impulse": "speak"|"act"|"stay", "why"?: string}',
