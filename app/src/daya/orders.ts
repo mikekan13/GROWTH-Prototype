@@ -43,9 +43,22 @@ export interface MoodBrief {
   /** Its standing temperament (from its sheet / persona), in words. */
   temperament: string;
 }
+export interface VoiceRecord {
+  perceived: string | null;
+  felt: string;
+  going: Array<{ text: string; mine: boolean; holder: string }>;
+  near: string[];
+  remember: Array<{ text: string; age?: string; why: string }>;
+  about: string[];
+  imagine?: string;
+  impulse: 'speak' | 'act' | 'stay';
+  why?: string;
+}
 export interface VoiceBrief {
-  /** What the being is thinking, decided by the composer: plain gist, first person or notes. */
-  gist: string;
+  /** THE RECORD (GROUNDED-BEATS-PLAN-2026-11-03): what the being may think in - resolved references only. */
+  record?: VoiceRecord;
+  /** Older shape: a decided gist to voice (the fallback and the tests). */
+  gist?: string;
   /** How this being speaks and thinks (voice notes). */
   voice: string;
   /** Its recent thoughts: never repeat their sentences or images. */
@@ -98,6 +111,8 @@ export function orderPrompt(order: Order): { system: string; user: string; maxTo
           'Given the being\'s working senses, its surroundings and what just happened, write what reaches it, first person, as it takes it in.',
           'What just happened comes first and is never dropped, softened or turned into something else. Plain senses in plain words: no metaphors, no similes, no mood.',
           'Only what these senses can carry from where the being is. What someone elsewhere does cannot be sensed unless a sound, signal or voice carries it here. A ringing phone does not say who is calling.',
+          // Table test 2026-11-03: Kristopher, in his car, "heard" the chime of the text he had just sent to a phone two miles away.
+          'When what just happened is something the being itself set off ELSEWHERE (a call it placed, a message it sent, a knock it gave), it senses only what carries back to where it is: a call it placed rings in its own ear; a message it sent is only known to be sent; the other person is not heard. Say what it knows and what, if anything, it hears.',
           b.own ? 'This was the being\'s own doing: it knows it as its own act ("I …").' : '',
           'At most 4 sentences. If nothing reaches the being, say so with "nothing": true and an empty "reaches".',
           names,
@@ -152,14 +167,16 @@ export function orderPrompt(order: Order): { system: string; user: string; maxTo
       return {
         maxTokens: 220,
         system: [
-          'You give one being\'s thought its own voice, in a simulation. You are one part of a larger system: the content of the thought is decided; you only voice it.',
-          'Write the thought as it goes through this being, first person, in its way of speaking: plain, particular, full sentences that run on like thought does. Keep every fact of the gist and add none: no event, deed, place, message or object that is not in the gist.',
+          'You give one being\'s thought its own voice, in a simulation. You are one part of a larger system: WHAT the being is thinking is decided below; you only put it in its voice.',
+          'Write the thought as it goes through this being, first person, in its way of speaking: plain, particular, full sentences that run on like thought does.',
+          // THE RECORD (GROUNDED-BEATS-PLAN-2026-11-03 section 3b): nothing outside it.
+          'Say only what the record gives. Nothing is here but what is HERE WITH IT. Nothing happens but what REACHED IT. What it REMEMBERS is then, with its age, never now. What it PICTURES is pictured ("I can see her..."), never done. Something STILL GOING is still going: never say it ended, was answered or was ignored. In a thought it does nothing and says nothing aloud.',
           'The way of speaking is a voice, not a formula: do not open sentences the same way twice, and do not lean on one stock phrase.',
           'No metaphors for silence, weight, breath, light or dark. Never repeat a sentence or an image from its recent thoughts. Under 60 words.',
           names,
           `${JSON_ONLY} {"thought": string}`,
         ].join('\n'),
-        user: [`How this being speaks and thinks: ${b.voice}`, 'Recent thoughts (do not repeat):', lines(b.recent.slice(0, 4)), ...(b.avoidOpenings?.length ? [`Do not begin with: ${b.avoidOpenings.map((o) => `"${o}"`).join(', ')}`] : []), '', `The thought: ${b.gist}`].join('\n'),
+        user: [`How this being speaks and thinks: ${b.voice}`, 'Recent thoughts (do not repeat):', lines(b.recent.slice(0, 4)), ...(b.avoidOpenings?.length ? [`Do not begin with: ${b.avoidOpenings.map((o) => `"${o}"`).join(', ')}`] : []), '', ...recordLines(b)].join('\n'),
       };
     }
   }
@@ -175,6 +192,23 @@ export function parsePiece<K extends Order['kind']>(kind: K, text: string): Piec
   } catch {
     return null;
   }
+}
+
+/** The record as the voice order sees it; the older gist when there is no record. Pure. */
+export function recordLines(b: VoiceBrief): string[] {
+  const r = b.record;
+  if (!r) return [`The thought: ${b.gist ?? ''}`];
+  const remembered = r.remember.map((m) => `${m.age ? `${m.age}: ` : ''}${m.text} - ${m.why}`);
+  return ['THE RECORD:',
+    `WHAT JUST REACHED IT: ${r.perceived ?? 'nothing new'}`,
+    `HOW IT FEELS: ${r.felt}`,
+    r.going.length ? `STILL GOING: ${r.going.map((g) => `${g.text}${g.mine ? ' (it set this off itself and knows it)' : ''}`).join('; ')}` : '',
+    `HERE WITH IT (the only things it may place here): ${r.near.length ? r.near.join('; ') : 'nothing in particular'}`,
+    r.remember.length ? 'IT REMEMBERS (then, not now):' : '',
+    ...(r.remember.length ? [lines(remembered)] : []),
+    r.imagine ? `IT PICTURES (has not happened): ${r.imagine}` : '',
+    `IT IS THINKING ABOUT: ${r.about.length ? r.about.join('; ') : 'what just reached it, and how it feels'}`,
+  ].filter(Boolean);
 }
 
 // ── Placing an order ────────────────────────────────────────────────────────

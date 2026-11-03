@@ -300,7 +300,12 @@ function ageSpanInWords(seconds: number): string {
   if (s < 5400) return 'about an hour';
   if (s < 86400) { const h = Math.round(s / 3600); return `about ${h} hour${h === 1 ? '' : 's'}`; }
   const d = Math.round(s / 86400);
-  return d === 1 ? 'about a day' : `about ${d} days`;
+  // Table test 2026-11-03: "About 3105 days ago: Rosemary fell" — a being counts years, not days.
+  if (d < 14) return d === 1 ? 'about a day' : `about ${d} days`;
+  if (d < 60) { const w = Math.round(d / 7); return `about ${w} week${w === 1 ? '' : 's'}`; }
+  if (d < 700) { const m = Math.round(d / 30.4); return m === 1 ? 'about a month' : `about ${m} months`; }
+  const y = Math.round(d / 365.25);
+  return y === 1 ? 'about a year' : `about ${y} years`;
 }
 
 /** "About 2 days ago: " for a memory older than an hour of game time; '' otherwise. Pure. */

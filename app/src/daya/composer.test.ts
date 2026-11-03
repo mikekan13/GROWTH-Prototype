@@ -3,7 +3,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('./model-client', () => ({ chat: vi.fn() }));
 vi.mock('@/ai/network/translator', async () => await vi.importActual('@/ai/network/translator'));
 import { orderPrompt, parsePiece } from './orders';
-import { composerPrompt, parsePlan } from './composer';
+import { chooserPrompt, parseChoice, resolveRecord, recordIsEmpty, recordGist, candidateLines, openingOf, type Candidates } from './composer';
 import { newTranslationMap, translateOut, translateBack } from '@/ai/network/translator';
 
 describe('orders — narrow, nameless pieces (SIMULATION-COMPOSER-DESIGN-2026-11-03)', () => {
@@ -29,27 +29,62 @@ describe('orders — narrow, nameless pieces (SIMULATION-COMPOSER-DESIGN-2026-11
   });
 });
 
-describe('the composer — the local plan', () => {
-  it('holds the pieces and asks for a gist, an impulse and why', () => {
-    const p = composerPrompt(
-      { name: 'Violet', identity: 'A writer.', desires: 'Quiet.', innerSoFar: '', held: ['her phone'], facts: ['The door is locked.'], sinceOwn: 'about a minute' },
-      { perceived: 'My phone rings.', felt: 'You are tense.', wakes: [{ text: 'About 2 days ago: he came to the door', why: 'it might be him' }] },
-    );
-    expect(p).toContain('PERCEPTION (what just reached Violet): My phone rings.');
-    expect(p).toContain('it might be him');
+const C: Candidates = {
+  near: ['her phone', 'the couch'],
+  going: [{ text: "Violet's phone rings.", mine: false, holder: 'Violet' }],
+  remember: [{ text: 'he came to the door with the pizza', age: 'About 2 days ago', why: 'the same pull, to not answer' }],
+};
+
+describe('the composer chooses; it does not write (GROUNDED-BEATS-PLAN-2026-11-03 §3)', () => {
+  it('numbers the candidates by kind', () => {
+    expect(candidateLines(C)).toEqual(['N1: her phone', 'N2: the couch', "G1: Violet's phone rings.", 'M1: About 2 days ago: he came to the door with the pizza — the same pull, to not answer']);
+  });
+  it('asks for codes, a picture, an impulse and why — and says it writes nothing', () => {
+    const p = chooserPrompt({ name: 'Violet', identity: 'A writer.', desires: 'Quiet.', innerSoFar: '', sinceOwn: 'about a minute' }, 'My phone rings.', 'You are tense.', C);
+    expect(p).toContain('WHAT JUST REACHED VIOLET: My phone rings.');
+    expect(p).toContain('N1: her phone');
+    expect(p).toMatch(/You write nothing/);
     expect(p).toMatch(/"impulse": "speak"\|"act"\|"stay"/);
   });
-  it('parses a plan and refuses an empty gist', () => {
-    expect(parsePlan('{"gist":"It rings. I let it.","impulse":"stay","why":"not ready"}')).toEqual({ gist: 'It rings. I let it.', impulse: 'stay', why: 'not ready' });
-    expect(parsePlan('{"gist":"  ","impulse":"stay"}')).toBeNull();
-    expect(parsePlan('{"gist":"x","impulse":"shout"}')).toBeNull();
+  it('resolves codes against the list and drops the rest', () => {
+    const ch = parseChoice('{"about":["G1","M1","Z9","n1"],"imagine":"He is in his car, waiting.","impulse":"stay","why":"not ready"}', C);
+    expect(ch).toEqual({ about: ['G1', 'M1', 'N1'], imagine: 'He is in his car, waiting.', impulse: 'stay', why: 'not ready' });
+    expect(parseChoice('{"about":[],"impulse":"shout"}', C)).toBeNull();
+    expect(parseChoice('no json', C)).toBeNull();
+  });
+  it('the record names what the codes point at; remembered things carry their age', () => {
+    const ch = parseChoice('{"about":["M1","N1"],"imagine":null,"impulse":"stay"}', C)!;
+    const r = resolveRecord(ch, 'My phone rings.', 'You are tense.', C);
+    expect(r.about).toEqual(['he came to the door with the pizza', 'her phone']);
+    expect(r.remember[0].age).toBe('About 2 days ago');
+    expect(r.going).toEqual(C.going);
+    expect(recordIsEmpty(r)).toBe(false);
+    expect(recordGist(r)).toContain('reached: My phone rings.');
+  });
+  it('nothing reached, nothing going, nothing chosen: no beat', () => {
+    const quiet: Candidates = { near: ['her phone'], going: [], remember: [] };
+    const ch = parseChoice('{"about":[],"imagine":null,"impulse":"stay","why":"nothing to do"}', quiet)!;
+    const r = resolveRecord(ch, null, 'You are steady.', quiet);
+    expect(recordIsEmpty(r)).toBe(true);
+    // A picture alone is a beat (ruling 2, 2026-11-03).
+    const ch2 = parseChoice('{"about":[],"imagine":"He might call again.","impulse":"stay"}', quiet)!;
+    expect(recordIsEmpty(resolveRecord(ch2, null, 'You are steady.', quiet))).toBe(false);
+  });
+  it('the voice order renders the record and forbids what is outside it', () => {
+    const ch = parseChoice('{"about":["G1"],"imagine":"He is waiting in his car.","impulse":"stay"}', C)!;
+    const r = resolveRecord(ch, 'My phone rings.', 'You are tense.', C);
+    const { system, user } = orderPrompt({ kind: 'voice', brief: { record: r, voice: 'Plain.', recent: [] } });
+    expect(user).toContain("STILL GOING: Violet's phone rings.");
+    expect(user).toContain('HERE WITH IT (the only things it may place here): her phone; the couch');
+    expect(user).toContain('IT PICTURES (has not happened): He is waiting in his car.');
+    expect(system).toMatch(/never say it ended/);
+    expect(system).toMatch(/does nothing and says nothing aloud/);
   });
 });
 
-import { openingOf } from './composer';
 describe('a voice, not a formula (session 2 live, 2026-11-03)', () => {
   it('reads the opening of a thought', () => {
     expect(openingOf('I think I notice the room is doing something.')).toBe('i think i');
-    expect(openingOf("  Eight months of nothing.")).toBe('eight months of');
+    expect(openingOf('  Eight months of nothing.')).toBe('eight months of');
   });
 });

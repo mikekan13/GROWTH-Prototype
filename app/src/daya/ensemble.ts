@@ -36,6 +36,7 @@ import { currentFacts, type WorldFactRecord } from './world-ledger';
 import { factsForActor, splitHeld, heldLines } from './facts-for-actor';
 import { perceive } from './perceive';
 import { filterVoice, droppedLog, hasLightFact, isSpokenRepeat } from './voice-filter';
+import { absentThingsFor } from './absent-things';
 import { competingSpecific, specificsHint } from './specifics';
 import { presenceFacts, knowsLine } from './presence-facts';
 import { recentSpokenOf, recentVoiceOf, liveVoiceBound } from './voice-history';
@@ -1061,6 +1062,34 @@ export async function listenStimulus(
   const heldNow = omniscient ? [] : heldLines(splitHeld(heldRows ?? []), { described: true, written: false, placed: true });
   // How long it has let things sit, in the world's time (table-clock): part of what it feels.
   const sinceOwn = ctx.campaignId ? await sinceOwnInWords(ctx.campaignId, ctx.entityDaId, prior?.lastOwnCycle ?? null).catch(() => null) : null;
+  // THE LEDGER'S GROUND FOR THE RECORD (GROUNDED-BEATS-PLAN-2026-11-03): where every thing is, who shares the room, what is still
+  // going. Near = in its hands or its room, people in view; absent = elsewhere (a thought placing one here is dropped); going = a live
+  // signal it holds or set off itself. Best-effort, like the rest of the ground.
+  type Sig = { text?: string; until?: number; by?: string };
+  const ledger = (omniscient || !ctx.campaignId) ? null : await Promise.resolve().then(() => Promise.all([
+    prisma.campaignItem.findMany({ where: { campaignId: ctx.campaignId!, status: 'ACTIVE' }, select: { name: true, holderId: true, locationId: true, data: true } }),
+    prisma.entityRelationship.findMany({ where: { campaignId: ctx.campaignId!, relationshipType: 'located_at', sourceType: 'CHARACTER' }, select: { sourceId: true, targetId: true } }),
+    prisma.character.findMany({ where: { campaignId: ctx.campaignId! }, select: { id: true, name: true } }),
+  ])).then(([items, edges, chars]) => {
+    const mine = locationId ?? edges.find((e) => e.sourceId === characterId)?.targetId ?? null;
+    const roomMates = edges.filter((e) => e.sourceId !== characterId && mine && e.targetId === mine).map((e) => e.sourceId);
+    const nameOf = (id: string | null) => chars.find((c) => c.id === id)?.name ?? 'someone';
+    const nowMs = Date.now();
+    const going: Array<{ text: string; mine: boolean; holder: string }> = [];
+    for (const it of items) {
+      let sig: Sig | null = null;
+      try { sig = (JSON.parse(it.data ?? '{}') as { signal?: Sig | null }).signal ?? null; } catch { /* none */ }
+      if (!sig?.text || !(typeof sig.until === 'number') || sig.until < nowMs) continue;
+      if (it.holderId === characterId) going.push({ text: sig.text, mine: false, holder: ctx.name });
+      else if (sig.by === characterId) going.push({ text: sig.text, mine: true, holder: nameOf(it.holderId) });
+    }
+    const near = [
+      ...items.filter((it) => !it.holderId && it.locationId && it.locationId === mine).map((it) => it.name),
+      ...roomMates.map((id) => nameOf(id)),
+    ];
+    return { absentThings: absentThingsFor(items, { characterId, locationId: mine, roomMates }), near, going };
+  }).catch(() => null);
+  const absentThings = ledger?.absentThings ?? [];
   try {
     const prompt = buildSpiritListeningPrompt({
       name: ctx.name,
@@ -1097,12 +1126,17 @@ export async function listenStimulus(
         desires: desiresBlock, feltBefore: feltStateBrief, envelope: envelope ?? content, event: stimulus.content, senses: stimulus.via?.filter((v) => v !== 'self') ?? ['sight', 'hearing'], own,
         perceived: content,
         memories: (recallResult.surfaced ?? []).filter((s) => !!s.content).map((s) => ({ text: s.content!, ...(s.age ? { age: s.age } : {}) })),
-        innerSoFar: innerState, recent: priorVoice.slice(0, 4), held: heldNow, facts: ground.lines.slice(0, 10), sinceOwn,
+        // Run 2 (2026-11-03): the record's near things are NAMES ("Her phone"), not the described held lines ("The Her phone: Her phone - camera, map...").
+        innerSoFar: innerState, recent: priorVoice.slice(0, 4), held: (heldRows ?? []).map((h) => h.name), near: ledger?.near ?? [], going: ledger?.going ?? [], facts: ground.lines.slice(0, 10), sinceOwn,
       }, overrides);
       if (beat) {
         composedFelt = beat.felt;
         composedPieces = { perceived: beat.perceived, felt: beat.felt, wakes: beat.wakes, recent: priorVoice.slice(0, 4), gist: beat.plan.gist, impulse: beat.plan.impulse, ...(beat.plan.why ? { why: beat.plan.why } : {}) };
-        raw = `${beat.thought}\nImpulse: ${beat.plan.impulse}${beat.plan.impulse === 'stay' && beat.plan.why ? ` — ${beat.plan.why}` : ''}`;
+        // AN EMPTY RECORD IS NO BEAT (table test 2026-11-03: "Nothing new reaches you" became "the phone is still chiming in my hand").
+        raw = beat.empty ? `\nImpulse: ${beat.plan.impulse}${beat.plan.why ? ` — ${beat.plan.why}` : ''}` : `${beat.thought}\nImpulse: ${beat.plan.impulse}${beat.plan.impulse === 'stay' && beat.plan.why ? ` — ${beat.plan.why}` : ''}`;
+      } else {
+        // The local choice failed: the being keeps its earlier state; never the old single monologue (it invents).
+        raw = '\nImpulse: stay';
       }
     }
     if (!raw) raw = (await chat({ tier: proseTier(), subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS, ...(grow ? { onToken: grow.onToken } : {}) }, overrides)).text.trim();
@@ -1118,7 +1152,7 @@ export async function listenStimulus(
     // being's own earlier thoughts, handed back in "what has been going through your mind", read as echoes and were dropped).
     const promptStatics = buildSpiritListeningPrompt({ name: '', identityNarrative: '', voiceNotes: '', feltStateBrief: '', standingScene: '', recallBlock: ' (Your most recent thoughts are given so you can continue from them. Never repeat a sentence you have already thought; think the NEXT thing.)', desiresBlock: '', innerSoFar: '', heard: '', sinceOwn: null, sensesNote: sensesNoteFor(stimulus.via, own), facts: [], held: [], reads: '' });
     const voiced = (!sealed.usedFallback && sealed.text && !omniscient)
-      ? filterVoice(sealed.text, { prior: priorVoice, heard: stimulus.content, hasLightFact: ground.hasLight, facts: ground.lines, noOneInView: ground.noOneInView, absentNames: ground.absentNames, heldNames: (heldRows ?? []).map((h) => h.name), prompt: promptStatics })
+      ? filterVoice(sealed.text, { prior: priorVoice, heard: stimulus.content, hasLightFact: ground.hasLight, facts: ground.lines, noOneInView: ground.noOneInView, absentNames: ground.absentNames, absentThings, heldNames: (heldRows ?? []).map((h) => h.name), prompt: promptStatics })
       : { text: sealed.text, dropped: [] };
     const log = droppedLog(ctx.name, 'monologue', voiced.dropped);
     if (log) console.log(log);
