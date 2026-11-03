@@ -2,10 +2,12 @@
 
 /**
  * Level switcher (Mike 2026-10-16: "then we just need verticality too…
- * stories and such"). One story at a time: an elevator panel in the canvas's
- * gold-on-black Terminal language. ALL shows every level (today's canvas).
+ * stories and such"). One story at a time. Compact pill at the TOP-left (the
+ * bottom is the Terminal drawer / JEWL chip's — Mike 2026-11-02, phone): shows
+ * the current level, tap to open a menu. Levels are named by what is on them
+ * (the top-level places drawn there), falling back to the raw level.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { levelLabel } from '@/lib/canvas-geometry';
 
 interface LevelSwitcherProps {
@@ -14,39 +16,47 @@ interface LevelSwitcherProps {
   /** null = ALL. */
   active: number | null;
   onChange: (level: number | null) => void;
+  /** Top-level place names per level. */
+  names?: Record<number, string[]>;
 }
 
 const GOLD = '#D0A030';
+const HEADER = 'var(--font-header), "Bebas Neue", sans-serif';
 
-export default function LevelSwitcher({ levels, active, onChange }: LevelSwitcherProps) {
+function rawName(l: number): string {
+  return l === 0 ? 'Ground' : l > 0 ? `Level ${l}` : `Below ${-l}`;
+}
+
+export default function LevelSwitcher({ levels, active, onChange, names }: LevelSwitcherProps) {
+  const [open, setOpen] = useState(false);
   if (levels.length === 0) return null;
-  const btn = (label: string, value: number | null, title: string) => {
+  const nameOf = (l: number) => {
+    const n = names?.[l];
+    return n && n.length ? n.join(' / ') : rawName(l);
+  };
+  const current = active === null ? 'All levels' : nameOf(active);
+  const stop = { onPointerDown: (e: React.PointerEvent) => e.stopPropagation() };
+  const item = (key: string, text: string, sub: string, value: number | null) => {
     const on = active === value;
     return (
       <button
-        key={label}
+        key={key}
         type="button"
-        title={title}
         aria-pressed={on}
-        data-level-switch={label}
-        onClick={(e) => { e.stopPropagation(); onChange(value); }}
-        onPointerDown={(e) => e.stopPropagation()}
+        data-level-switch={key}
+        onClick={(e) => { e.stopPropagation(); onChange(value); setOpen(false); }}
+        {...stop}
         style={{
-          minWidth: 44,
-          height: 36,
-          padding: '0 10px',
-          background: on ? GOLD : 'rgba(10,10,10,0.92)',
-          color: on ? '#0a0a0a' : GOLD,
-          border: `1px solid ${GOLD}`,
-          borderRadius: 2,
-          fontFamily: 'var(--font-header), "Bebas Neue", sans-serif',
-          fontSize: 15,
-          letterSpacing: '0.08em',
-          cursor: 'pointer',
-          touchAction: 'manipulation',
+          display: 'flex', alignItems: 'baseline', gap: 8, width: '100%', minHeight: 40,
+          padding: '6px 10px', textAlign: 'left',
+          background: on ? GOLD : 'transparent', color: on ? '#0a0a0a' : GOLD,
+          border: 'none', borderTop: `1px solid rgba(208,160,48,0.25)`,
+          fontFamily: HEADER, fontSize: 15, letterSpacing: '0.06em',
+          cursor: 'pointer', touchAction: 'manipulation',
         }}
       >
-        {label}
+        <span style={{ opacity: 0.75, minWidth: 24 }}>{sub}</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
       </button>
     );
   };
@@ -54,27 +64,37 @@ export default function LevelSwitcher({ levels, active, onChange }: LevelSwitche
     <div
       data-level-switcher
       style={{
-        position: 'absolute',
-        left: 16,
-        bottom: 16,
-        zIndex: 60,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        padding: 6,
+        position: 'absolute', left: 12, top: 12, zIndex: 60,
+        maxWidth: 'min(260px, calc(100vw - 24px))',
         background: 'linear-gradient(135deg, rgba(10,10,10,0.97) 0%, rgba(26,26,26,0.97) 100%)',
-        border: `1px solid ${GOLD}`,
-        borderRadius: 2,
+        border: `1px solid ${GOLD}`, borderRadius: 2,
         boxShadow: '0 4px 18px rgba(34, 171, 148, 0.2)',
-        pointerEvents: 'auto',
-        userSelect: 'none',
+        pointerEvents: 'auto', userSelect: 'none',
       }}
     >
-      <div style={{ color: GOLD, fontFamily: 'var(--font-header), "Bebas Neue", sans-serif', fontSize: 11, letterSpacing: '0.12em', textAlign: 'center', opacity: 0.85 }}>
-        LEVEL
-      </div>
-      {btn('ALL', null, 'Every level at once')}
-      {levels.map(l => btn(levelLabel(l), l, l === 0 ? 'Ground / outdoors' : l > 0 ? `Story ${l}` : `Below ground ${-l}`))}
+      <button
+        type="button"
+        data-level-toggle
+        aria-expanded={open}
+        title="Choose map level"
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        {...stop}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6, width: '100%', height: 32, padding: '0 10px',
+          background: 'transparent', color: GOLD, border: 'none',
+          fontFamily: HEADER, fontSize: 14, letterSpacing: '0.08em',
+          cursor: 'pointer', touchAction: 'manipulation',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 10 }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+          {item('ALL', 'All levels', '', null)}
+          {levels.map(l => item(levelLabel(l), nameOf(l), levelLabel(l), l))}
+        </div>
+      )}
     </div>
   );
 }

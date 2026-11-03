@@ -554,6 +554,22 @@ export default function RelationsCanvas({
     }));
   }, [folders]);
   const levels = useMemo(() => levelsPresent(leveledPlaces), [leveledPlaces]);
+  // What is ON each level: the top-level (root) places drawn there, for the picker's labels.
+  const levelNames = useMemo(() => {
+    const autos = folders.filter(f => f.id.startsWith('auto-') && f.locationInfo);
+    const ids = new Set(autos.map(f => f.locationInfo!.locationId));
+    const childIds = new Set<string>();
+    for (const f of autos) for (const id of f.nodeIds) if (ids.has(id)) childIds.add(id);
+    const levelById = new Map(leveledPlaces.map(p => [p.id, p.level]));
+    const out: Record<number, string[]> = {};
+    for (const f of autos) {
+      if (childIds.has(f.locationInfo!.locationId)) continue;
+      const lv = levelById.get(f.id);
+      if (lv == null || !f.name) continue;
+      (out[lv] ??= []).push(f.name);
+    }
+    return out;
+  }, [folders, leveledPlaces]);
   const hiddenFolderIds = useMemo(() => {
     const s = new Set<string>();
     if (activeLevel === null) return s;
@@ -5325,7 +5341,7 @@ export default function RelationsCanvas({
       {/* The map's level switcher (2026-10-16): one story at a time. Only when there IS more
           than one story — a lone "All / G" covered the Terminal (Mike 2026-10-17). */}
       {levels.length > 1 && (
-        <LevelSwitcher levels={levels} active={activeLevel} onChange={setActiveLevel} />
+        <LevelSwitcher levels={levels} active={activeLevel} onChange={setActiveLevel} names={levelNames} />
       )}
 
       {/* Carry mode (touch): what you hold rides along; the world moves under it. */}
