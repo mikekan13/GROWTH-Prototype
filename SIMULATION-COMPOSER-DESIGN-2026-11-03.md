@@ -68,3 +68,15 @@ Simulation composer  (LOCAL Qwen — the whole world: every being, place, clock,
 - Does the composer write the final words of a thought, or place the voice agent's words? (Working assumption: agents
   draft; the composer has the final say.)
 - Which orders run per beat by default, and which only when the composer asks for them.
+
+## Progress
+
+- 2026-11-03, step 1 done: prose is back inside the wall (`proseTier` defaults to L1).
+- Step 2 done: `ai/network/translator.ts` (translateOut / translateBack / campaignNames, 9 tests).
+- Step 3 done: `daya/orders.ts` with perception, recall, mood and voice orders. Each has its own narrow brief and JSON piece, and goes through the translator on tier C (the wall).
+- Step 4 done (being level): `daya/composer.ts`.
+  - Flow: perception order (placed in listenStimulus before the memory is stored) → mood and recall orders → LOCAL plan (gist, impulse, why) → voice order.
+  - Wired into `listenStimulus` behind the rollout guard `BEING_COMPOSER` (on by default, `off` = the old monologue). The soul sim does not run when composing.
+  - The returned thought passes the same seal, voice filter and specifics check.
+- NOT YET TESTED LIVE: needs the pod (the plan is local) and a replay of Michael's session-2 lines.
+- Step 5 open: the simulation level. The table orchestration (reach judge, standing beats, world sounds, the ask) moves under one local composer holding the world moment.

@@ -83,6 +83,8 @@ export interface SurfacedMemory {
   arousal?: number;
   valence?: number;
   content?: string;
+  /** How long ago it happened, in words ("About 2 days ago"); absent under an hour (orders: the recall agent knows what is old). */
+  age?: string;
 }
 
 export interface RecallResult {
@@ -646,7 +648,7 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
 
   return {
     prose,
-    surfaced: surfacedList.map((c) => ({ memoryId: c.memory.id, score: c.score, rung: rungOf.get(c.memory.id)?.rung, arousal: c.memory.arousal, valence: c.memory.valence, content: c.memory.content })),
+    surfaced: surfacedList.map((c) => ({ memoryId: c.memory.id, score: c.score, rung: rungOf.get(c.memory.id)?.rung, arousal: c.memory.arousal, valence: c.memory.valence, content: c.memory.content, ...(ageTs ? { age: agePrefix(ageCyclesToSeconds(req.nowCycle - c.memory.narrativeCycle, ageTs)).replace(/:\s*$/, '') || undefined } : {}) })),
     failedFeel,
     deferred,
     ...(due.length ? { intentions: due.map((d) => d.description) } : {}),

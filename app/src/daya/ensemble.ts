@@ -24,6 +24,7 @@ import type { GrowthCharacter } from '@/types/growth';
 
 import { resolveDayaEntityId } from './entity';
 import { chat, proseTier, type DayaChatMessage, type DayaClientOverrides } from './model-client';
+import { composeBeat, composerOn, orderPerception } from './composer';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { registerHandler, wake, type DayaTrigger, type HandlerResult } from './events';
 import { ingestStimulus, writeMemoryEntry } from './memory';
@@ -955,9 +956,17 @@ export async function listenStimulus(
   let standing: ListenTimings['standing'] = 'raw';
   let locationId = prior?.locationId ?? null;
   let mirrorAudit: Record<string, unknown> | undefined;
+  // THE COMPOSER (SIMULATION-COMPOSER-DESIGN-2026-11-03): the local side builds the honest envelope (no voicing) and orders
+  // the perception from a cloud agent — narrow, nameless, this being's senses only. The memory stores what the agent returned.
+  const composing = composerOn() && !omniscient && !!ctx.campaignId;
+  let envelope: string | null = null;
   if (isMirrored(ctx)) {
     try {
-      const p = await perceive(characterId, ctx.campaignId!, raw, stimulus.source, overrides, { standing: 'once' });
+      const p = await perceive(characterId, ctx.campaignId!, raw, stimulus.source, overrides, { standing: 'once', ...(composing ? { voice: false } : {}) });
+      if (composing) {
+        envelope = p.prose;
+        p.prose = await orderPerception({ envelope: p.prose, event: raw, senses: stimulus.via?.filter((v) => v !== 'self') ?? ['sight', 'hearing'], own }, { campaignId: ctx.campaignId!, entityId: ctx.entityDaId }, overrides);
+      }
       content = p.prose;
       standing = p.standing;
       locationId = p.locationId;
@@ -971,7 +980,8 @@ export async function listenStimulus(
   // Felt state runs beside the tagger; mood does not turn every few seconds, so a recent brief is reused.
   const soulFresh = !!prior?.feltStateBrief && tPerceived - prior.feltAt < SOUL_REFRESH_MS;
   const runSoul = async () => { const s = Date.now(); const brief = await runSoulSim(ctx, overrides); return { brief, ms: Date.now() - s }; };
-  const soulPending = soulFresh ? null : runSoul();
+  // Composing: mood is the mood agent's order, placed inside the composer — the local soul sim does not run.
+  const soulPending = soulFresh || composing ? null : runSoul();
   const desiresPending = buildDesiresBlockForCharacter(characterId);
 
   const [ingest, desiresBlock] = await Promise.all([
@@ -1030,6 +1040,7 @@ export async function listenStimulus(
   let innerUpdated = false;
   let impulse: ListenImpulse = 'stay';
   let stayReason: string | null = null;
+  let composedFelt: string | null = null;
   // What rose against doing: the strongest survival-rung memory this stretch surfaced (the dice decide a routine step against it).
   const resistance = (recallResult.surfaced ?? [])
     .filter((s) => s.rung === 'survival' && typeof s.arousal === 'number' && s.arousal >= 0.7 && (s.valence ?? 0) <= -0.3 && !!s.content)
@@ -1069,8 +1080,27 @@ export async function listenStimulus(
     // channel the spoken reply already uses, wrapped as a thought; the line yields to the recorded beat. A perceived viewer
     // never gets this channel (lib/campaign-stream), so only the Watcher sees a being think.
     const grow = ctx.campaignId && !omniscient ? thoughtStreamer(ctx.campaignId, characterId, ctx.name) : null;
-    // PROSE ON THE CLOUD (Michael 2026-11-03): the inner voice is written by Claude through the wall (tier C = routedChatText, fiction, tone filter); the local lane kept making stock images and misreading the moment.
-    const raw = (await chat({ tier: proseTier(), subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS, ...(grow ? { onToken: grow.onToken } : {}) }, overrides)).text.trim();
+    // THE COMPOSER (SIMULATION-COMPOSER-DESIGN-2026-11-03): the local simulation composes this being's moment from its
+    // agents' pieces (mood and recall orders, a local plan, the voice order). The answer is put in the monologue's own shape
+    // (thought, then the impulse line) so the seal, the voice filter and the specifics check below run on it unchanged. A
+    // failed plan falls back to the old single monologue.
+    let raw = '';
+    if (composing) {
+      const beat = await composeBeat({
+        campaignId: ctx.campaignId!, entityId: ctx.entityDaId, name: ctx.name,
+        identity: ctx.persona.identityNarrative ?? `${ctx.name}, living a life of their own, day to day.`,
+        voice: ctx.persona.voiceNotes ?? 'Plain, direct, a cadence of their own.',
+        desires: desiresBlock, feltBefore: feltStateBrief, envelope: envelope ?? content, event: stimulus.content, senses: stimulus.via?.filter((v) => v !== 'self') ?? ['sight', 'hearing'], own,
+        perceived: content,
+        memories: (recallResult.surfaced ?? []).filter((s) => !!s.content).map((s) => ({ text: s.content!, ...(s.age ? { age: s.age } : {}) })),
+        innerSoFar: innerState, recent: priorVoice.slice(0, 4), held: heldNow, facts: ground.lines.slice(0, 10), sinceOwn,
+      }, overrides);
+      if (beat) {
+        composedFelt = beat.felt;
+        raw = `${beat.thought}\nImpulse: ${beat.plan.impulse}${beat.plan.impulse === 'stay' && beat.plan.why ? ` — ${beat.plan.why}` : ''}`;
+      }
+    }
+    if (!raw) raw = (await chat({ tier: proseTier(), subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS, ...(grow ? { onToken: grow.onToken } : {}) }, overrides)).text.trim();
     grow?.done();
     // The last line is the being's own say on breaking in; only the thought is kept as its inner state.
     const split = splitImpulse(raw);
@@ -1119,7 +1149,7 @@ export async function listenStimulus(
 
   // Fold into the LATEST state: an answer may have been given while this stretch was being worked.
   const folded = foldPerception(getListening(characterId), { prose: content, standing: standing === 'full' ? 'full' : 'new', locationId }, tDone);
-  setListening(characterId, { ...folded, innerState, feltStateBrief, feltAt, recallBlock, desiresBlock, impulse });
+  setListening(characterId, { ...folded, innerState, feltStateBrief: composedFelt ?? feltStateBrief, feltAt: composedFelt ? Date.now() : feltAt, recallBlock, desiresBlock, impulse });
 
   return {
     status: 'listened',

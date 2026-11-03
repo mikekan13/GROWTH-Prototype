@@ -1,5 +1,6 @@
-// The table's prose runs on the cloud tier in play (proseTier); these fixtures fake the local lane, so the prose stays local here.
+// The prose path in play is the composer (orders); these fixtures fake one local lane, so both prose and composer stay local and off here.
 process.env.DAYA_PROSE_TIER = 'L1';
+process.env.BEING_COMPOSER = 'off'; // these fixtures fake one local lane; the composer's cloud orders are tested in composer.test.ts
 /**
  * U2b-3 — the split loop driven end to end with every store and neighbor
  * mocked and a fake lane behind the real model client. What is real here:
