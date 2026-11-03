@@ -1,0 +1,42 @@
+{
+  "name": "the-call",
+  "world": {
+    "snapshot": "data/archive/call-dryrun-snapshot-1793677610237.json",
+    "from": "2026-11-03T21:28:00Z"
+  },
+  "expectWithheld": [
+    5
+  ],
+  "steps": [
+    {
+      "line": "Kristopher sits in his car exhausted from his daily routine of existential dread, mourning and pizza deliveries. He dials Violet's phone number into his phone. He doesn't even know if it is actually her number or just a random five that a pretty girl tipped him.",
+      "waitS": 45,
+      "voice": "michael"
+    },
+    {
+      "line": "The call goes to voicemail and Kristopher hangs up when he hears her voice.",
+      "waitS": 45,
+      "voice": "michael"
+    },
+    {
+      "line": "Kristopher realizes she did indeed give him her number. He texts the number a small message. \"Is this a beautiful woman with purple hair who ruins Hawaiian pizza with black olives?\"",
+      "waitS": 45,
+      "voice": "michael"
+    },
+    {
+      "line": "Kristopher puts his phone down. \"Ok I did my part. Now I wait.\"",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "Kristopher turns music on from his phone and he sits back resting his eyes. \"Now I wait.\"",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "Kristopher takes a hit of his weed vape.",
+      "waitS": 60,
+      "voice": "michael"
+    }
+  ]
+}

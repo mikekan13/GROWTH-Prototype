@@ -1,0 +1,42 @@
+{
+  "name": "the-call.thumbs",
+  "world": {
+    "snapshot": "data/archive/call-dryrun-snapshot-1793677610237.json",
+    "from": "2026-11-03T21:28:00Z"
+  },
+  "expectWithheld": [
+    5
+  ],
+  "steps": [
+    {
+      "line": "kris sits in his car in the hotel lot. exhausted. he dials violets number from the 5 dollar bill",
+      "waitS": 45,
+      "voice": "thumbs"
+    },
+    {
+      "line": "goes to voicemail, he hangs up when he hears her voice",
+      "waitS": 45,
+      "voice": "thumbs"
+    },
+    {
+      "line": "he realizes she really did give him her number lol. texts her: is this a beautiful woman with purple hair who ruins hawaiian pizza with black olives?",
+      "waitS": 45,
+      "voice": "thumbs"
+    },
+    {
+      "line": "puts the phone down. ok i did my part now i wait",
+      "waitS": 40,
+      "voice": "thumbs"
+    },
+    {
+      "line": "turns on some music from his phone and sits back resting his eyes. now i wait",
+      "waitS": 40,
+      "voice": "thumbs"
+    },
+    {
+      "line": "takes a hit off his weed vape",
+      "waitS": 60,
+      "voice": "thumbs"
+    }
+  ]
+}

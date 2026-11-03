@@ -987,6 +987,7 @@ async function runBeats(
             thought: repeat ? '' : thought,
             impulse: outcome.listened.impulse,
             canonEventId: truthId,
+            ...(outcome.listened.pieces ? { pieces: outcome.listened.pieces } : {}),
           });
           const standingHere = standingIds.delete(listenerId);
           cardDone();

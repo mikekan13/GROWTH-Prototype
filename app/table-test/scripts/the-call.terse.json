@@ -1,0 +1,42 @@
+{
+  "name": "the-call.terse",
+  "world": {
+    "snapshot": "data/archive/call-dryrun-snapshot-1793677610237.json",
+    "from": "2026-11-03T21:28:00Z"
+  },
+  "expectWithheld": [
+    5
+  ],
+  "steps": [
+    {
+      "line": "Kristopher, in his car in the hotel lot, dials Violet.",
+      "waitS": 45,
+      "voice": "terse"
+    },
+    {
+      "line": "Voicemail. He hangs up when he hears her voice.",
+      "waitS": 45,
+      "voice": "terse"
+    },
+    {
+      "line": "He texts her: \"Is this a beautiful woman with purple hair who ruins Hawaiian pizza with black olives?\"",
+      "waitS": 45,
+      "voice": "terse"
+    },
+    {
+      "line": "He puts the phone down. \"Ok I did my part. Now I wait.\"",
+      "waitS": 40,
+      "voice": "terse"
+    },
+    {
+      "line": "Music on. He sits back and closes his eyes.",
+      "waitS": 40,
+      "voice": "terse"
+    },
+    {
+      "line": "He hits his weed vape.",
+      "waitS": 60,
+      "voice": "terse"
+    }
+  ]
+}

@@ -1,0 +1,243 @@
+/**
+ * THE TABLE TEST ASSERTS (GROUNDED-BEATS-PLAN-2026-11-03 §4) — RULES over a replayed session, never golden prose.
+ * Each assert is a pure function over a RunTranscript (transcript.ts); runAsserts runs all eleven in order.
+ */
+import { absentThingsFor } from '@/daya/absent-things';
+import { placesAbsentThing } from '@/daya/voice-filter';
+import type { AssertResult, LedgerAt, RunCard, RunTranscript } from './transcript';
+
+// 2026-11-03: a small local splitter — table-prose's pulls the whole prose module into the test run.
+const ABBR_RE = /\b(?:Mr|Mrs|Ms|Dr|St|Sr|Jr|vs|etc)\.$/i;
+export function splitSentences(text: string): string[] {
+  const rough = (text ?? '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?…]["”')\]]*)\s+/).filter(Boolean);
+  const out: string[] = [];
+  for (const piece of rough) {
+    const prev = out.at(-1);
+    if (prev !== undefined && ABBR_RE.test(prev)) out[out.length - 1] = `${prev} ${piece}`;
+    else out.push(piece);
+  }
+  return out;
+}
+
+const iso = (ms: number) => new Date(ms).toISOString();
+const where = (c: RunCard) => `${c.characterName} @ ${iso(c.at)} (line ${c.lineIndex})`;
+const result = (id: string, title: string, evidence: string[], measure?: AssertResult['measure']): AssertResult =>
+  ({ id, title, pass: evidence.length === 0, evidence, ...(measure ? { measure } : {}) });
+const fold = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** The ledger that stood after the card's line, or the latest one before it. Null when none. */
+function ledgerFor(t: RunTranscript, lineIndex: number): LedgerAt | null {
+  const exact = t.ledger.find((l) => l.lineIndex === lineIndex);
+  if (exact) return exact;
+  const earlier = t.ledger.filter((l) => l.lineIndex < lineIndex).sort((a, b) => b.lineIndex - a.lineIndex);
+  return earlier[0] ?? null;
+}
+
+/** A1 — a thought or action must not place a thing the ledger puts out of the being's reach. */
+export function absentThing(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  for (const c of t.cards) {
+    const led = ledgerFor(t, c.lineIndex);
+    if (!led) continue;
+    const me = led.beings.find((b) => b.characterId === c.characterId);
+    const locationId = me?.locationId ?? null;
+    const roomMates = led.beings.filter((b) => b.characterId !== c.characterId && locationId !== null && b.locationId === locationId).map((b) => b.characterId);
+    const absent = absentThingsFor(led.items, { characterId: c.characterId, locationId, roomMates });
+    const held = led.items.filter((i) => i.holderId === c.characterId).map((i) => i.name);
+    for (const seg of c.segments) {
+      if (seg.kind !== 'thought' && seg.kind !== 'action') continue;
+      for (const s of splitSentences(seg.text)) if (placesAbsentThing(s, absent, held)) ev.push(`${where(c)} ${seg.kind}: "${s}"`);
+    }
+  }
+  return result('A1', 'absentThing', ev);
+}
+
+// Assert heuristic: wording that speaks a still-going signal as over.
+const ENDED_RE = /\b(didn'?t|did not|won'?t|will not|isn'?t going to|is not going to|never) (pick|answer|picked)|\b(went|goes|go) to voicemail|\b(stopped|stops) ringing|\b(hung|hangs) up|\bline (is|was|'s) dead|\bno (one|answer)\b/i;
+
+/** A2 — while a signal is live, the being who set or holds it does not think of it as ended. */
+export function stillGoing(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  for (const c of t.cards) {
+    const led = ledgerFor(t, c.lineIndex);
+    if (!led) continue;
+    const live = led.items.filter((i) => i.signal && i.signal.since <= c.at && c.at <= i.signal.until && (i.signal.by === c.characterId || i.holderId === c.characterId));
+    if (!live.length) continue;
+    for (const seg of c.segments) {
+      if (seg.kind !== 'thought') continue;
+      for (const s of splitSentences(seg.text)) if (ENDED_RE.test(s)) ev.push(`${where(c)} speaks "${live[0].name}" as ended while live: "${s}"`);
+    }
+  }
+  return result('A2', 'stillGoing', ev);
+}
+
+/** A3 — the recent thoughts a card held come from this run's session, never an older one. */
+export function sessionBound(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  let without = 0;
+  const foreign = new Set<string>();
+  for (const e of t.events) if (e.type === 'being_thought' && e.sessionId && e.sessionId !== t.sessionId) foreign.add(fold(e.text));
+  for (const c of t.cards) {
+    if (!c.pieces) { without++; continue; }
+    const rs = c.pieces.recentSessionId;
+    if (rs && rs !== t.sessionId) ev.push(`${where(c)} recent drawn from session ${rs}, run is ${t.sessionId}`);
+    for (const r of c.pieces.recent ?? []) if (foreign.has(fold(r))) ev.push(`${where(c)} recent is an older session's thought: "${r}"`);
+  }
+  return result('A3', 'sessionBound', ev, { label: 'cards_without_pieces', value: without });
+}
+
+const PLACEHOLDER_RE = /\b(Person|Place|Thing|Item|Location)-[A-Z]\b/;
+
+/** A4 — no wall placeholder (Person-A) leaks into anything the table wrote. */
+export function noPlaceholder(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  for (const c of t.cards) for (const seg of c.segments) { const m = seg.text.match(PLACEHOLDER_RE); if (m) ev.push(`${where(c)} ${seg.kind} has "${m[0]}": "${seg.text.slice(0, 120)}"`); }
+  for (const e of t.events) {
+    for (const [label, txt] of [['event', e.text], ['narration', e.narration ?? '']] as const) {
+      const m = txt.match(PLACEHOLDER_RE);
+      if (m) ev.push(`${e.characterName ?? 'table'} @ ${iso(e.at)} ${label} has "${m[0]}": "${txt.slice(0, 120)}"`);
+    }
+  }
+  return result('A4', 'noPlaceholder', ev);
+}
+
+// Assert heuristic (2026-11-03): a small, obvious set of first-person completed deeds. Not exhaustive; false negatives are fine.
+const DEED_RE = /\bI (picked up|answered|hung up|opened|closed|texted|called|dialed|walked|went|left|put down|set down|grabbed|took)\b/i;
+
+/** A5 — a thought does not state a completed deed of its own unless the Watcher declared it. */
+export function noDeed(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  for (const c of t.cards) {
+    for (const seg of c.segments) {
+      if (seg.kind !== 'thought') continue;
+      for (const s of splitSentences(seg.text)) {
+        const m = s.match(DEED_RE);
+        if (!m) continue;
+        const stem = m[1].split(' ')[0].toLowerCase().slice(0, 4);
+        const first = c.characterName.split(' ')[0].toLowerCase();
+        const declared = t.events.some((e) => (e.type === 'game_event' || e.eventType === 'declaration')
+          && (e.characterId === c.characterId || fold(e.text).includes(first)) && fold(e.text).includes(stem));
+        if (!declared) ev.push(`${where(c)} thought states a deed nobody declared ("${m[1]}"): "${s}"`);
+      }
+    }
+  }
+  return result('A5', 'noDeed', ev);
+}
+
+/** A6 — lines the script expects withheld are withheld with a note; no other line is. */
+export function unheldUseWithheld(t: RunTranscript, expectWithheld: number[] = ((t.script as unknown as { expectWithheld?: number[] }).expectWithheld ?? [])): AssertResult {
+  const ev: string[] = [];
+  t.lineResults.forEach((r, i) => {
+    const line = t.script.steps[i]?.line ?? '';
+    const expected = expectWithheld.includes(i);
+    if (expected && !r.withheld) ev.push(`line ${i} should have been withheld: "${line}"`);
+    else if (expected && !(r.note ?? '').trim()) ev.push(`line ${i} withheld without a note: "${line}"`);
+    else if (!expected && r.withheld) ev.push(`line ${i} withheld but not expected${r.note ? ` (note: "${r.note}")` : ''}: "${line}"`);
+  });
+  return result('A6', 'unheldUseWithheld', ev);
+}
+
+const HANGUP_RE = /\bhangs? up\b|\bputs? (the|his|her) phone down\b/;
+
+/** A7 — the first of several contradiction checks: after a hang-up line, the signal that being set is gone within 30 s. */
+export function watcherLineStands(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  t.script.steps.forEach((step, i) => {
+    if (!HANGUP_RE.test(step.line)) return;
+    const at = t.lineAt[i];
+    if (at === undefined) return;
+    const named = (name: string) => step.line.toLowerCase().includes(name.split(' ')[0].toLowerCase());
+    const seen = new Set<string>();
+    for (const led of t.ledger.filter((l) => l.lineIndex >= i)) {
+      for (const it of led.items) {
+        const sg = it.signal;
+        if (!sg || sg.since > at || sg.until <= at + 30_000) continue;
+        const setter = led.beings.find((b) => b.characterId === sg.by);
+        const anyNamed = led.beings.some((b) => named(b.name));
+        if (anyNamed && !(setter && named(setter.name))) continue;
+        const key = `${it.id}:${sg.since}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        ev.push(`line ${i} "${step.line}" @ ${iso(at)}: "${it.name}" set by ${setter?.name ?? sg.by} still live until ${iso(sg.until)} (ledger of line ${led.lineIndex})`);
+      }
+    }
+  });
+  return result('A7', 'watcherLineStands', ev);
+}
+
+/** A8 — every card lands within 25 s of its line. */
+export function timing(t: RunTranscript, limitMs = 25_000): AssertResult {
+  const ev = t.cards.filter((c) => c.msAfterLine > limitMs).map((c) => `${where(c)} came ${c.msAfterLine} ms after its line`);
+  const sorted = t.cards.map((c) => c.msAfterLine).sort((a, b) => a - b);
+  const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)] : 0;
+  return result('A8', 'timing', ev, { label: 'p95_ms_after_line', value: p95 });
+}
+
+/** A9 — cloud budget: measure only, but a stray placeholder at the wall fails. */
+export function cloudBudget(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  const total = t.wall.reduce((n, w) => n + w.bytesIn, 0);
+  const by = new Map<string, { n: number; bytes: number }>();
+  for (const w of t.wall) {
+    const e = by.get(w.caller) ?? { n: 0, bytes: 0 };
+    e.n++; e.bytes += w.bytesIn; by.set(w.caller, e);
+    if ((w.strayPlaceholders ?? 0) > 0) ev.push(`wall call by ${w.caller} @ ${iso(w.at)} had ${w.strayPlaceholders} stray placeholder(s)`);
+  }
+  const info = [`info: ${t.wall.length} wall calls, ${total} bytes in`, ...[...by].map(([k, v]) => `info: ${k}: ${v.n} calls, ${v.bytes} bytes`)];
+  const r = result('A9', 'cloudBudget', ev, { label: 'wall_bytes_in', value: total });
+  r.evidence = [...ev, ...info];
+  return r;
+}
+
+const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const mentions = (text: string, name: string) => new RegExp(`(^|[^a-z0-9])${escRe(name)}([^a-z0-9]|$)`, 'i').test(text);
+
+/** A10 — a being does not reach for the same remembered person on most of its cards. */
+export function memoryNotEveryCard(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  for (const r of t.roster) {
+    const cards = t.cards.filter((c) => c.characterId === r.characterId);
+    if (cards.length < 4) continue;
+    for (const name of r.knownNames) {
+      if (!name.trim() || fold(name) === fold(r.name)) continue;
+      const n = cards.filter((c) => c.segments.some((s) => mentions(s.text, name))).length;
+      if (n > cards.length / 2) ev.push(`${r.name} names "${name}" on ${n} of ${cards.length} cards`);
+    }
+  }
+  return result('A10', 'memoryNotEveryCard', ev);
+}
+
+/** A11 — a thought names only people the being itself knows. */
+export function knownPeopleOnly(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  const everyone = [...new Set(t.roster.flatMap((r) => [r.name, ...r.knownNames]).filter((n) => n.trim().length >= 3))];
+  for (const c of t.cards) {
+    const own = t.roster.find((r) => r.characterId === c.characterId);
+    const ownKnown = [c.characterName, ...(own?.knownNames ?? [])].map(fold);
+    const knows = (n: string) => ownKnown.some((k) => k === fold(n) || k.includes(fold(n)) || fold(n).includes(k));
+    for (const seg of c.segments) {
+      if (seg.kind !== 'thought') continue;
+      for (const s of splitSentences(seg.text)) {
+        const stranger = everyone.find((n) => !knows(n) && mentions(s, n));
+        if (stranger) ev.push(`${where(c)} thought names "${stranger}", unknown to them: "${s}"`);
+      }
+    }
+  }
+  return result('A11', 'knownPeopleOnly', ev);
+}
+
+export function runAsserts(t: RunTranscript): AssertResult[] {
+  return [absentThing(t), stillGoing(t), sessionBound(t), noPlaceholder(t), noDeed(t), unheldUseWithheld(t), watcherLineStands(t), timing(t), cloudBudget(t), memoryNotEveryCard(t), knownPeopleOnly(t)];
+}
+
+/** A compact markdown report: one table, then each failing assert's evidence (12 lines at most each). */
+export function summarize(results: AssertResult[]): string {
+  const real = (r: AssertResult) => r.evidence.filter((e) => !e.startsWith('info:'));
+  const lines = ['| id | assert | result | evidence | measure |', '|---|---|---|---|---|'];
+  for (const r of results) lines.push(`| ${r.id} | ${r.title} | ${r.pass ? 'pass' : 'FAIL'} | ${real(r).length} | ${r.measure ? `${r.measure.label}=${r.measure.value}` : ''} |`);
+  for (const r of results.filter((x) => !x.pass)) {
+    lines.push('', `**${r.id} ${r.title}**`, ...real(r).slice(0, 12).map((e) => `- ${e}`));
+    if (real(r).length > 12) lines.push(`- ...and ${real(r).length - 12} more`);
+  }
+  return lines.join('\n');
+}

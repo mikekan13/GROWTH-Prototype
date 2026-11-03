@@ -925,6 +925,8 @@ export interface ListenResult {
   stayReason?: string | null;
   /** The survival-rung memory that rose this stretch (arousal ≥ 0.7, valence ≤ −0.3), strongest first — what a routine step would have to be done against. */
   resistance?: { content: string; arousal: number } | null;
+  /** THE PIECES ON THE RECORD (table test, 2026-11-03): what the composer held when it made this thought; absent on the old single-monologue path. */
+  pieces?: { perceived: string; felt: string; wakes: Array<{ text: string; why: string }>; recent: string[]; gist: string; impulse: ListenImpulse; why?: string };
 }
 
 const FELT_FALLBACK = 'Right now, in your body and mood: steady, holding your own.';
@@ -1042,6 +1044,7 @@ export async function listenStimulus(
   let impulse: ListenImpulse = 'stay';
   let stayReason: string | null = null;
   let composedFelt: string | null = null;
+  let composedPieces: ListenResult['pieces'] | null = null;
   // What rose against doing: the strongest survival-rung memory this stretch surfaced (the dice decide a routine step against it).
   const resistance = (recallResult.surfaced ?? [])
     .filter((s) => s.rung === 'survival' && typeof s.arousal === 'number' && s.arousal >= 0.7 && (s.valence ?? 0) <= -0.3 && !!s.content)
@@ -1098,6 +1101,7 @@ export async function listenStimulus(
       }, overrides);
       if (beat) {
         composedFelt = beat.felt;
+        composedPieces = { perceived: beat.perceived, felt: beat.felt, wakes: beat.wakes, recent: priorVoice.slice(0, 4), gist: beat.plan.gist, impulse: beat.plan.impulse, ...(beat.plan.why ? { why: beat.plan.why } : {}) };
         raw = `${beat.thought}\nImpulse: ${beat.plan.impulse}${beat.plan.impulse === 'stay' && beat.plan.why ? ` — ${beat.plan.why}` : ''}`;
       }
     }
@@ -1159,6 +1163,7 @@ export async function listenStimulus(
 
   return {
     status: 'listened',
+    ...(composedPieces ? { pieces: composedPieces } : {}),
     memoryEntryId: ingest.memoryEntryId,
     innerUpdated,
     impulse,

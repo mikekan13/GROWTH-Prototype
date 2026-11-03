@@ -1,0 +1,42 @@
+{
+  "name": "the-call.paragraph",
+  "world": {
+    "snapshot": "data/archive/call-dryrun-snapshot-1793677610237.json",
+    "from": "2026-11-03T21:28:00Z"
+  },
+  "expectWithheld": [
+    5
+  ],
+  "steps": [
+    {
+      "line": "The lot behind The Hotel is quiet at this hour, four lamps and nothing moving. Kristopher sits in the Fusion with the engine off and the heater ticking as it cools, worn through by a day of deliveries and the same grief he carries everywhere. He thumbs the digits from the five-dollar bill into his phone, not sure the number is even hers, and presses call.",
+      "waitS": 45,
+      "voice": "paragraph"
+    },
+    {
+      "line": "It rings and rings and then her recorded voice comes on, and the sound of it is enough; he ends the call before the beep without leaving anything.",
+      "waitS": 45,
+      "voice": "paragraph"
+    },
+    {
+      "line": "He sits with the phone dark in his hand, then decides she did mean to give him the number, and types a message and sends it before he can think better of it: \"Is this a beautiful woman with purple hair who ruins Hawaiian pizza with black olives?\"",
+      "waitS": 45,
+      "voice": "paragraph"
+    },
+    {
+      "line": "He sets the phone face-down on the passenger seat. \"Ok. I did my part. Now I wait.\"",
+      "waitS": 40,
+      "voice": "paragraph"
+    },
+    {
+      "line": "He puts some music on from the phone, low, and leans the seat back and rests his eyes. \"Now I wait.\"",
+      "waitS": 40,
+      "voice": "paragraph"
+    },
+    {
+      "line": "After a while he reaches for his weed vape and takes a long pull.",
+      "waitS": 60,
+      "voice": "paragraph"
+    }
+  ]
+}

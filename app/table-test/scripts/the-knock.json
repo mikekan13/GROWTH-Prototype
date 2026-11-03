@@ -1,0 +1,95 @@
+{
+  "name": "the-knock",
+  "world": {
+    "snapshot": "TODO-session-1-start-snapshot",
+    "from": "TODO"
+  },
+  "expectWithheld": [],
+  "steps": [
+    {
+      "line": "Kristopher arrives on the fourth floor. His eyes tired and wet from crying all day between deliveries. He walks to the door as he recalls the current customer.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "He lets out a small sigh as he knocks gently on the door.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "He checks the receipt to see if the order has been paid yet.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "Kristopher was about to knock again when the door opens and Violet stands in front of him. For a moment he just stares at her and then he looks down quickly at the receipt to read off the price.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "He slowly hands her the box and tries to read off the price, but he is obviously taken by her beauty. He pushes down the blush in his cheeks and manages a large genuine smile.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "Kristopher stares at her and spurts out the numbers all wrong... \"I.... Im sorry the receipt is right there I apparently forgot how to read.\" His cheeks blush as he holds the box awkwardly.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "He chuckles nervously and then settles himself by reciting the Jesus prayer in his head. \"I made it.\" He sits there awkwardly staring at her. \"I'm sorry... I don't know why I said that.\" He laughs. \"You probably don't care who made it you just want to eat it right?\" He fumbles off the receipt and reads the price off.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "He doesn't understand her reply but he just nods in agreement. He smiles but can realize their exchange has been super awkward.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "He finally hands the box to her. \"Twenty-two ninety seven.\" His smile beams as he finally reads the receipt out loud correctly.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "His hand brushes hers as he fully releases the box. He stares at her smiling as he waits for her to pay.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "The cash passes to Kristopher.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "He looks at the 23 dollars that she hands him. He keeps staring at her as his hand touches hers again.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "The five-dollar bill with her number passes to Kristopher.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "Kristopher looks at the bill, then at the phone number. He just holds the bill in his hand reading it over and over, already memorizing the digits without even realizing it.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "Kristopher just stands there dumbfounded. He goes to speak but can't find any words.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "He finally manages to form words as he speaks through the door. \"Thank you.\"",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "His head is swimming as he rushes off the landing and back down the stairs.",
+      "waitS": 40,
+      "voice": "michael"
+    }
+  ]
+}
