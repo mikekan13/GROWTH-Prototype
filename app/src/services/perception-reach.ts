@@ -213,12 +213,17 @@ async function sightGeometry(campaignId: string, sourceId: string | null | undef
   const out = new Map<string, { los: boolean; feet: number }>();
   if (!sourceId) return out;
   try {
-    const { map } = await loadWorldLevel(campaignId, await levelOfBeing(sourceId));
+    const srcLevel = await levelOfBeing(sourceId);
+    const { map } = await loadWorldLevel(campaignId, srcLevel);
     if (!map.rooms.length) return out;
     const src = await beingStanding(map, sourceId);
     if (!src) return out;
     for (const id of beingIds) {
       if (id === sourceId) continue;
+      // ANOTHER LEVEL IS ANOTHER PLACE (2026-11-02: Violet at home was ruled "REACHED — clear line, 0 ft" from Kristopher's
+      // car on the hotel's level): a being on a different level is never measured on this map.
+      const lvl = await levelOfBeing(id);
+      if (srcLevel !== null && lvl !== null && lvl !== srcLevel) { out.set(id, { los: false, feet: Number.POSITIVE_INFINITY }); continue; }
       const s = await beingStanding(map, id);
       if (!s) continue;
       const feet = Math.hypot(s.point.x - src.point.x, s.point.y - src.point.y) / UNITS_PER_FT;
@@ -313,6 +318,12 @@ export async function judgeCanonReach(
       const v = j.verdicts.get(b.id);
       if (!v) continue;
       const g = geometry.get(b.id);
+      // Elsewhere: nothing but the being's own acts and what reaches it through a carried thing (a call) crosses levels.
+      if (g && g.feet === Number.POSITIVE_INFINITY && v.reaches && !v.via.includes('self')) {
+        console.log(`[perception-reach] ${b.name}: elsewhere (another map level) — not reached`);
+        j.verdicts.set(b.id, { ...v, reaches: false, via: [] });
+        continue;
+      }
       const held = throughWalls(event, b, v, walls, g?.los);
       if (held !== v) { console.log(`[perception-reach] ${b.name}: a wall is a wall — ${v.via.join('+')} → ${held.reaches ? held.via.join('+') : 'nothing'}`); j.verdicts.set(b.id, held); }
       // The map is sure: a clear ray within a few feet reaches, whatever the judge said (HW12).
