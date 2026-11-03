@@ -20,6 +20,7 @@ import { currentFacts, establishFact, supersede, type WorldFactRecord } from './
 import { buildAdjudicatorPrompt } from './prompts/roles/adjudicator';
 import { resolveDayaEntityId } from './entity';
 import { factsForActor, splitHeld } from './facts-for-actor';
+import { placesOnLevels } from '@/services/elsewhere-world';
 import { actorMap, mapFactLines, lockedDoorInTheWay, applyActEffects, parseActEffects, whereOthersStand, whereaboutsLines, type ActEffect, type ApplyReport } from '@/services/world-apply';
 
 // ── Contract (Ruling 19 — swappable behind this shape) ─────────────────────
@@ -190,7 +191,8 @@ export async function resolveIntent(
 
   // The actor's facts (facts-for-actor): never another character's own, the
   // intent's subjects first, capped — not the whole campaign ledger.
-  const facts = factsForActor(allFacts, { actorName: character.name, otherNames: others.map((o) => o.name), intent });
+  const lv = await placesOnLevels(campaignId, entityCharacterId);
+  const facts = factsForActor(allFacts, { actorName: character.name, otherNames: others.map((o) => o.name), intent, elsewhere: lv.away, here: lv.here });
   const held = splitHeld(heldRows);
   // Who is where (HW4 2026-10-24): the doors alone let a bill pass through a locked one.
   const whereabouts = whereaboutsLines(map?.roomName ?? null, await whereOthersStand(campaignId, entityCharacterId, map));
@@ -344,7 +346,7 @@ export async function resolveIntent(
   let effects: ApplyReport | undefined;
   const succeeded = !roll || roll.success;
   if (succeeded && parsed.effects?.length) {
-    effects = await applyActEffects(campaignId, entityCharacterId, parsed.effects, intent).catch((err) => {
+    effects = await applyActEffects(campaignId, entityCharacterId, parsed.effects, intent, { narrated: !!input.narrated }).catch((err) => {
       console.error('[daya/adjudicator] applying act effects failed (non-fatal):', err);
       return { applied: [], refused: [`apply failed: ${err instanceof Error ? err.message : String(err)}`] };
     });

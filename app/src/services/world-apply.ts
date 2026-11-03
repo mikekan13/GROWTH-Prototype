@@ -34,6 +34,7 @@ import { writeDoorState } from '@/services/door-state';
 import { resolveMoveRef, moveBeing, describeMove, leaveMap, arriveOnMap, locationPointOn, type MoveTarget } from '@/services/being-movement';
 import { loadWorldLevel, levelOfLocation, thingStanding, beingStanding, clearBeingPoint } from '@/services/spatial-world';
 import { perceiveMapChange } from '@/services/spatial-perception';
+import { placesOnLevels } from '@/services/elsewhere-world';
 
 export type ActEffect =
   | { op: 'door'; door: string; state: DoorState }
@@ -198,6 +199,8 @@ export interface Whereabouts {
   roomName: string | null;
   /** [] = in the actor's room; null = no way through on the map (or unplaced). */
   route: PassageEdge[] | null;
+  /** On another map level: somewhere else entirely, reached only through what is carried (a call). */
+  elsewhere?: boolean;
 }
 
 /** Every other character placed relative to the actor's room. Never throws (→ []). */
@@ -211,10 +214,12 @@ export async function whereOthersStand(campaignId: string, actorCharacterId: str
     const rels = await prisma.entityRelationship.findMany({ where: { sourceId: { in: others.map((o) => o.id) }, relationshipType: REL }, select: { sourceId: true, targetId: true } });
     const roomOf = new Map(rels.map((r) => [r.sourceId, locs.find((l) => l.id === r.targetId)?.name ?? null]));
     const graph = passageGraph(locs.flatMap((l) => parseOpenings(parseData(l.data).openings)));
+    // ANOTHER LEVEL IS ANOTHER PLACE: a being filed on a different level is told only as "elsewhere" — its room's name is not handed over.
+    const away = new Set((await placesOnLevels(campaignId, actorCharacterId)).away.map((n) => n.toLowerCase()));
     return others.map((o) => {
       const roomName = roomOf.get(o.id) ?? null;
       const route = map && roomName ? routeBetween(graph, map.roomName, roomName) : null;
-      return { id: o.id, name: o.name, roomName, route };
+      return { id: o.id, name: o.name, roomName, route, ...(roomName && away.has(roomName.toLowerCase()) ? { elsewhere: true } : {}) };
     });
   } catch (err) {
     console.warn('[world-apply] whereabouts unreadable (non-fatal):', err instanceof Error ? err.message : err);
@@ -226,6 +231,7 @@ export async function whereOthersStand(campaignId: string, actorCharacterId: str
 export function whereaboutsLines(actorRoom: string | null, rows: Whereabouts[]): string[] {
   return rows.map((w) => {
     if (!w.roomName) return `${w.name}: nowhere on the map — not here.`;
+    if (w.elsewhere) return `${w.name}: ELSEWHERE, far from here, not on this map — out of sight and out of reach; only what is carried (a phone) reaches across. Nothing of ${w.name}'s place is here.`;
     if (w.route && w.route.length === 0) return `${w.name}: HERE, in ${w.roomName} with the actor.`;
     if (w.route) {
       const sealed = w.route.some((e) => e.kind === 'door' && e.state !== 'open');
@@ -365,11 +371,31 @@ async function soundSite(campaignId: string, at: string): Promise<{ kind: 'thing
 }
 
 /**
+ * A SOUND IS ONLY AT A THING THE ACT CAN AFFECT (2026-11-02: the call became "sound at Mozzarella (cooler)", a thing at Chess
+ * Pizza on another level). Allowed: a thing the actor holds, a thing lying in the actor's own place, or a thing held by a person
+ * the act addresses (the callee's phone). Nothing else — a random item in another place is refused. Pure.
+ */
+export function soundMayLandAt(o: { holderId: string | null; thingRoomId: string | null; actorId: string; actorRoomIds: string[]; addressedIds: string[] }): boolean {
+  if (o.holderId) return o.holderId === o.actorId || o.addressedIds.includes(o.holderId);
+  return !!o.thingRoomId && o.actorRoomIds.includes(o.thingRoomId);
+}
+
+/** The beings an act addresses: any other being whose first name or full name the text (the act, the sound's target) speaks. Pure. */
+export function addressedBeings(texts: string[], beings: Array<{ id: string; name: string }>, actorId: string): string[] {
+  const hay = texts.join(' \n ').toLowerCase();
+  return beings.filter((b) => b.id !== actorId).filter((b) => {
+    const n = b.name.toLowerCase().trim();
+    const first = n.split(/\s+/)[0] ?? n;
+    return [n, first].some((w) => w.length >= 3 && new RegExp(`\\b${w.replace(/[^a-z0-9' ]/g, '')}\\b`).test(hay));
+  }).map((b) => b.id);
+}
+
+/**
  * Apply a resolved act's effects to the map. Never throws; each effect lands
  * or is refused with a reason. One `character_update` broadcast at the end
  * when anything moved, so open canvases re-read.
  */
-export async function applyActEffects(campaignId: string, actorCharacterId: string, effects: ActEffect[], actText?: string): Promise<ApplyReport> {
+export async function applyActEffects(campaignId: string, actorCharacterId: string, effects: ActEffect[], actText?: string, opts: { narrated?: boolean } = {}): Promise<ApplyReport> {
   const report: ApplyReport = { applied: [], refused: [] };
   if (!effects.length) return report;
   const actor = await prisma.character.findUnique({ where: { id: actorCharacterId }, select: { id: true, name: true, campaignId: true, campaign: { select: { gmUserId: true } } } });
@@ -384,16 +410,28 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           const where = await soundSite(campaignId, e.at);
           if (!where) { report.refused.push(`sound at "${e.at}": nothing by that name here`); break; }
           if (where.kind === 'being') { report.refused.push(`sound at ${where.name}: a person's senses carry the act; a sound comes from a thing`); break; }
+          if (where.kind === 'thing') {
+            const people = await prisma.character.findMany({ where: { campaignId, status: { notIn: ['DEAD', 'RETIRED'] } }, select: { id: true, name: true } });
+            const addressedIds = addressedBeings([actText ?? '', e.at], people, actor.id);
+            const actorRoomIds = [map?.roomId, map?.home.id].filter((x): x is string => !!x);
+            if (!soundMayLandAt({ holderId: where.holderId, thingRoomId: where.locationId, actorId: actor.id, actorRoomIds, addressedIds })) {
+              report.refused.push(`sound at ${where.name}: ${actor.name}'s act cannot reach it — not held by ${actor.name} or the person addressed, and not in ${map?.roomName ?? 'the actor\'s place'}`);
+              break;
+            }
+          }
           (report.sounds ??= []).push({ text: e.text, at: where.name, locationId: where.locationId, ...(where.kind === 'door' ? { rooms: where.rooms } : {}) });
           // A sound at a thing someone ELSE holds is a STATE of that thing until answered (2026-11-02): the holder is told it every beat.
-          if (where.kind === 'thing' && where.holderId && where.holderId !== actor.id) {
+          if (where.kind === 'thing' && where.holderId) {
             try {
               const { clockNow } = await import('./table-clock');
               const { secondsToCycles } = await import('@/types/time');
-              const { withSignal } = await import('./item-signal');
+              const { withSignal, signalCause, liveSignal } = await import('./item-signal');
               const { cycle, ts } = await clockNow(campaignId);
               const row = await prisma.campaignItem.findUnique({ where: { id: where.itemId }, select: { data: true } });
-              await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(parseData(row?.data ?? null), { text: e.text, since: cycle, until: cycle + secondsToCycles(SIGNAL_SECONDS, ts), by: actor.id })) } });
+              const rowData = parseData(row?.data ?? null);
+              // Who caused it: the actor when it sounds at another's thing; a call already going keeps its caller when the sound is narrated at the actor's own.
+              const cause = signalCause({ holderId: where.holderId, actorId: actor.id, narrated: opts.narrated, existingBy: liveSignal(rowData, cycle)?.by });
+              if (cause.record) await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: e.text, since: cycle, until: cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}) })) } });
             } catch (err) { console.warn('[world-apply] signal not recorded (non-fatal):', err); }
           }
           report.applied.push(`sound at ${where.name}: ${e.text}`);

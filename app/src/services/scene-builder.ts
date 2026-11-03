@@ -25,6 +25,8 @@ import { prisma } from '@/lib/db';
 import { routedChatText } from '@/ai/network/chat';
 import { actorMap, mapFactLines, whereOthersStand, whereaboutsLines } from '@/services/world-apply';
 import { factsForActor, splitHeld, heldLines, readHeldIn } from '@/daya/facts-for-actor';
+import { placesOnLevels } from '@/services/elsewhere-world';
+import { withoutPlacesElsewhere } from '@/services/elsewhere';
 import { presentCycle, type FeedTimescale } from '@/lib/feed-segments';
 import type { CalendarSpec } from '@/types/time';
 import { splitSentences, type ProseAction, type ProseQuote, type ProseThought } from '@/services/table-prose';
@@ -432,7 +434,8 @@ export async function sceneFacts(campaignId: string, actorIds: string[]): Promis
       // established facts and its memories do NOT go to the cloud builder. Only facts about the place he stands in
       // ride along (the stage); what he is, what he has lived, stays inside until the translator name-swap exists.
       const room = (await actorMap(actorId))?.roomName?.toLowerCase() ?? null;
-      const placeFacts = factsForActor(allFacts, { actorName: me.name, otherNames: chars.filter((c) => c.id !== actorId).map((c) => c.name), intent: '' })
+      const lv = await placesOnLevels(campaignId, actorId);
+      const placeFacts = factsForActor(allFacts, { actorName: me.name, otherNames: chars.filter((c) => c.id !== actorId).map((c) => c.name), intent: '', elsewhere: lv.away, here: lv.here })
         .filter((f) => room && f.fact.toLowerCase().includes(room) && !/\bis in\b.*\binside\b/i.test(f.fact));
       for (const f of placeFacts.slice(0, 8)) lines.push(`[fact · the place] ${f.fact}`);
       // THE DOOR AS IT IS (HW8 run 6: "the glass is a barrier I chose" — the door is wood): the facts keyed to a door of this room (its
@@ -525,6 +528,7 @@ Rules — all of them, every time:
 - SCENE: 0 to 4 sentences that set the stage from the facts — the place, the hour, the door and its state, what the actor holds, what is written on a thing he reads. THE PAGE REMEMBERS ITSELF: when ALREADY ON THE PAGE is given, do not describe again what it already set (the room, its light, its fixtures, a thing's text) — write only what is NEW this beat: a changed hour, a changed door, a thing now held or read for the first time, who moved; when nothing changed, one short sentence or an empty scene. Never restate the actor's acts or thoughts in the scene. Use the world's names EXACTLY as given in NAMES (so the record can tag them). The hour as the [clock] line gives it, in words — never the calendar date, never a year, never digits. Light only from the facts: no daylight, dusk or sun unless a fact says so (an evening in autumn is dark; a lamp lights a room only if a fact lists it lit). The [clock] line's light (after dark / daylight) is a FACT to write from, never a label to paste.
 - NOTHING NEW = NO SCENE: when nothing is new this beat, "scene" is an empty string. Never write that nothing changed, nothing happened or nothing reached anyone ("Nothing on the landing has changed." is forbidden). When something happened that a character did NOT perceive, say what they missed from the narrator ("Violet did not hear him."); when truly nothing happened on that side, write nothing.
 - A thing the seed names that is not in the FACTS does not exist on the page: the actor reaches for it and does not find it, or the sentence stays as the seed put it. Never describe what it looks like or what is written on it.
+- EACH ACTOR'S CARD IS FRAMED BY THAT ACTOR'S OWN PLACE (the "[place · X stands in]" line naming them). An actor marked ELSEWHERE from another is never placed in that other's surroundings: a ring, a voice or a call reaches them where THEY stand; the car, the lot, the room of the one calling are not around them.
 - ONE CARD PER ACTOR named in the seed, segments in the SEED's order:
   - action: third person, present tense, the actor as "He"/"She" or by name: "He wipes his eyes." Only acts the seed states. An ATTEMPT is not its outcome: "looking for the receipt" never becomes "finds the receipt", "reaches for the handle" never opens the door, "listens" never hears — the outcome is the Watcher's or the world's to give, never yours. Never count or number events (first/second/third knock) unless the seed or the monologue counts them. Never add a movement the text does not state (rising, turning, stepping) to get from one act to the next. A thought that looks FORWARD to an act ("the knock is coming") goes BEFORE that act in the card, never after it. Backstory inside a seed act ("from the tears he was crying in the car") is not an act — it belongs in the scene as a fact a bystander could see (red eyes), or nowhere.
   - thought: the actor's INNER VOICE, strictly first person ("I", "my"), free indirect, as he would think it — never "he"/"his" inside a thought, never reported ("He thinks it is odd" is wrong; "Only one apartment on the whole floor. Odd." is right). A prayer in his head is the prayer itself. A being's inner voice may count nothing it has not counted on the page: never number knocks or minutes. When a MONOLOGUE is given for an actor, blend it into his thoughts — it is his inner voice this beat; keep what the seed said he thought and let the monologue colour and extend it. A sentence of the monologue in which the actor PHYSICALLY does something ("the receipt crinkles in my fist", "my thumb rubs the ink", "my hand hovers") is not a thought: make it a small action segment in third person ("The receipt crinkles in his fist.") — unless it contradicts or undoes an act the seed states (the seed knocked: no hovering hand, no "I don't knock"), in which case drop it. A bare speech tag ("He speaks.") is never a segment: the speech segment is the record of it. A thought is TAKEN from the monologue and the seed's own thoughts word for word, or trimmed — you never reword it, never turn it inside out, never correct it with what the world says: if he misread a thing, that is his misread and it stands. What the seed states he thinks, wonders, remembers or feels, and the questions that run on from it, is his thought as the Watcher voiced it: keep it, in the first person.
@@ -715,6 +719,7 @@ Given what reached the being (HEARD), the being's own listening monologue (its i
   - speech: only words the monologue says it says ALOUD, verbatim.
 - NOTHING NEW = NO SCENE: when nothing from beyond the being reached it, or nothing is new, "scene" is an empty string. Never write that nothing changed, nothing happened or nothing reached the being ("Nothing new has reached Violet from beyond the room.", "The knock has settled into silence." are forbidden).
 - DERIVE, NEVER INVENT.
+- THE BEING'S OWN PLACE ONLY. Set its side of the stage ONLY from the place lines that say where THIS being stands. Another being who is ELSEWHERE (another place, reached only by a call or a carried thing) has a place that is not this being's: never put that place, its sounds, its air or its objects (a car, a lot, a room) around this being — what reaches it across the distance is the voice or the ring, in ITS surroundings.
 - Every thought segment also carries "narrated": the same thought reported by an omniscient narrator, third person, past tense, meaning kept, no added fact or image, about the same length or shorter ("I know this door." -> "She knew this door."). Action and speech segments carry none.
 - Output JSON only: {"scene": string, "segments": [{"kind": "action"|"thought"|"speech", "text": string, "narrated"?: string}]}`;
 
@@ -730,7 +735,8 @@ export async function buildBeingCard(
   opts: { timeoutMs?: number } = {},
 ): Promise<BuiltBeingCard | null> {
   if (!sceneBuilderOn() || !monologue.trim()) return null;
-  const page = await pageSoFar(campaignId);
+  // The being's card is framed by ITS place: what the page set in a place on another level is not set before it.
+  const page = withoutPlacesElsewhere(await pageSoFar(campaignId), (await placesOnLevels(campaignId, being.id)).away);
   const user = [
     `BEING: ${being.name} [${being.id}]`,
     `HEARD (what reached it this beat): ${heard}`,

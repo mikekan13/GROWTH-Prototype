@@ -40,6 +40,7 @@ import { recentSpokenOf, recentVoiceOf } from './voice-history';
 import { nameIsHers, unmarkAddressed } from './name-addressed';
 import { claimVsFact, factHint, type FactLine } from './claim-vs-fact';
 import { actorMap, whereOthersStand } from '@/services/world-apply';
+import { placesOnLevels } from '@/services/elsewhere-world';
 import { splitSentences } from '@/services/table-prose';
 import { getFamiliarity, familiarityAt } from '@/services/familiarity';
 import { resolveIntent, type AdjudicationResult, type MechanicsRollHook } from './adjudicator';
@@ -372,13 +373,14 @@ const ACT_CHAIN_CAP = 1;
  */
 async function actorFacts(ctx: EntityContext, intent: string, opts: { ranked?: boolean; cap?: number } = {}): Promise<WorldFactRecord[]> {
   if (!ctx.campaignId) return [];
-  const [all, others] = await Promise.all([
+  const [all, others, lv] = await Promise.all([
     currentFacts(ctx.campaignId),
     Promise.resolve()
       .then(() => prisma.character.findMany({ where: { campaignId: ctx.campaignId!, id: { not: ctx.characterId }, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { name: true } }))
       .catch((): Array<{ name: string }> => []),
+    placesOnLevels(ctx.campaignId, ctx.characterId),
   ]);
-  return factsForActor(all, { actorName: ctx.name, otherNames: others.map((o) => o.name), intent, ...(opts.ranked ? { ranked: true } : {}), ...(opts.cap ? { cap: opts.cap } : {}) });
+  return factsForActor(all, { actorName: ctx.name, otherNames: others.map((o) => o.name), intent, elsewhere: lv.away, here: lv.here,...(opts.ranked ? { ranked: true } : {}), ...(opts.cap ? { cap: opts.cap } : {}) });
 }
 
 /**

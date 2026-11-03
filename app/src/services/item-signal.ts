@@ -48,6 +48,20 @@ export function withoutSignal(data: unknown): Data {
   return base;
 }
 
+/**
+ * WHO CAUSED A SIGNAL, and whether it is recorded at all (2026-11-02: a Watcher-narrated "Violet's phone rings" ran through
+ * Violet's own adjudication, the phone was HERS, and no ringing state was written). A sound at a thing someone ELSE holds is
+ * caused by the actor. A sound at a thing the ACTOR holds is the actor's own act only when the act was the actor's own; when the
+ * Watcher narrated it (or any cause not the actor's), the actor is the one it happens TO: it is recorded, caused by whoever
+ * already set that thing off (a call in progress keeps its caller), else by no one. Pure.
+ */
+export function signalCause(opts: { holderId: string | null; actorId: string; narrated?: boolean; existingBy?: string }): { record: boolean; by?: string } {
+  if (!opts.holderId) return { record: false };
+  if (opts.holderId !== opts.actorId) return { record: true, by: opts.actorId };
+  if (!opts.narrated) return { record: false };
+  return { record: true, ...(opts.existingBy && opts.existingBy !== opts.actorId ? { by: opts.existingBy } : {}) };
+}
+
 export interface SignalItem { name: string; holderId: string | null; data: unknown }
 
 const bare = (name: string) => name.replace(/^(?:the|her|his|their)\s+/i, '');

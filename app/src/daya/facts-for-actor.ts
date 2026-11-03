@@ -29,11 +29,20 @@ const INTENT_STOP = new Set(['the', 'and', 'her', 'his', 'she', 'him', 'them', '
 
 export function factsForActor<T extends FactLike>(
   all: T[],
-  opts: { actorName: string; otherNames: string[]; intent: string; cap?: number; ranked?: boolean },
+  opts: { actorName: string; otherNames: string[]; intent: string; cap?: number; ranked?: boolean; elsewhere?: string[]; here?: string[] },
 ): T[] {
   const cap = opts.cap ?? ACTOR_FACTS_CAP;
   const me = slug(opts.actorName);
   const mine = new Set([me, me.split('_')[0]!].filter(Boolean));
+  // PLACES ON ANOTHER LEVEL ARE ANOTHER BEING'S WORLD (2026-11-02: the hotel lot and the car reached Violet at home): a fact keyed
+  // to a place the actor is not in (see services/elsewhere) is never handed over, by key — not by what the words say.
+  const away = (opts.elsewhere ?? []).map(slug).filter(Boolean);
+  const isAway = (head: string) => away.some((a) => head === a || head.startsWith(`${a}_`));
+  // A key that opens with a character's name (`kristopher_hotel.*`, `kristopher_position`) is that character's own, as is `kristopher.*`.
+  // A place the actor is in (or on its level) is never "owned": `violet_apartment.*` stays for a visitor on the landing.
+  const hereSlugs = (opts.here ?? []).map(slug).filter(Boolean);
+  const isHere = (head: string) => hereSlugs.some((h) => head === h || head.startsWith(`${h}_`) || h.startsWith(`${head}_`));
+  const ownedBy = (head: string, names: Set<string>) => names.has(head) || (!isHere(head) && [...names].some((n) => head.startsWith(`${n}_`)));
   const others = new Set<string>();
   for (const n of opts.otherNames) {
     const s = slug(n);
@@ -52,7 +61,7 @@ export function factsForActor<T extends FactLike>(
     return s;
   };
   const kept = all
-    .map((f, i) => ({ f, i, s: others.has(subjectHead(f.subjectKey)) ? -1 : score(f) }))
+    .map((f, i) => { const head = subjectHead(f.subjectKey); return { f, i, s: !mine.has(head) && (ownedBy(head, others) || isAway(head)) ? -1 : score(f) }; })
     .filter((x) => x.s >= 0);
   // RANKED (HW8 run 6): a caller that will cut the list again (the answer prompt takes ten) gets it most-relevant-first, so the door
   // the ask arrived through is not cut as "oldest".
