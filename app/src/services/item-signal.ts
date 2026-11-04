@@ -9,6 +9,10 @@
  * adjudicator's `answer` effect), when the thing leaves the hand, or when `until` passes. Pure — no database here.
  */
 
+export type SignalKind = 'call' | 'text' | 'other';
+/** ringing: going, unanswered · connected: answered, a line open both ways · received: a message landed, unread until answered. */
+export type SignalState = 'ringing' | 'connected' | 'received';
+
 export interface ItemSignal {
   text: string;
   /** Campaign cycle it began. */
@@ -17,6 +21,11 @@ export interface ItemSignal {
   until: number;
   /** The character whose act set it off (the caller). */
   by?: string;
+  /** Day 6 (2026-11-04, "a hard fail on phones"): a call or a text is a THING in the ledger, with a state the holder perceives on every change. */
+  kind?: SignalKind;
+  state?: SignalState;
+  /** The words a message carries, exactly as written. */
+  words?: string;
 }
 
 type Data = Record<string, unknown>;
@@ -31,13 +40,58 @@ export function liveSignal(data: unknown, nowCycle: number): ItemSignal | null {
   const since = typeof r.since === 'number' ? r.since : 0;
   const until = typeof r.until === 'number' ? r.until : Number.POSITIVE_INFINITY;
   if (nowCycle >= until || nowCycle < since) return null;
-  return { text: r.text.trim(), since, until, ...(typeof r.by === 'string' && r.by ? { by: r.by } : {}) };
+  const kind = r.kind === 'call' || r.kind === 'text' || r.kind === 'other' ? r.kind : undefined;
+  const state = r.state === 'ringing' || r.state === 'connected' || r.state === 'received' ? r.state : undefined;
+  return {
+    text: r.text.trim(), since, until,
+    ...(typeof r.by === 'string' && r.by ? { by: r.by } : {}),
+    ...(kind ? { kind } : {}), ...(state ? { state } : {}),
+    ...(typeof r.words === 'string' && r.words.trim() ? { words: r.words.trim().slice(0, 600) } : {}),
+  };
+}
+
+/** The same signal in another state (answered: connected, no end of its own). Does not mutate. */
+export function signalInState(sig: ItemSignal, state: SignalState): ItemSignal {
+  return { ...sig, state, ...(state === 'connected' ? { until: Number.POSITIVE_INFINITY } : {}) };
+}
+
+/**
+ * THE PARTIES ON A LINE (session 5, 2026-11-04: Violet answered and "Hello" reached nobody — the map decided who could hear).
+ * For every connected signal: the holder of the sounding thing and the one who set it off. Pure.
+ */
+export function connectedParties(items: Array<{ holderId: string | null; data: unknown }>, nowCycle: number): Array<{ holderId: string; by: string }> {
+  const out: Array<{ holderId: string; by: string }> = [];
+  for (const it of items) {
+    const sig = liveSignal(it.data, nowCycle);
+    if (sig?.state === 'connected' && it.holderId && sig.by) out.push({ holderId: it.holderId, by: sig.by });
+  }
+  return out;
+}
+
+/** True when `a` and `b` are the two parties of one connected signal. Pure. */
+export function onTheLine(parties: Array<{ holderId: string; by: string }>, a: string, b: string): boolean {
+  return a !== b && parties.some((p) => (p.holderId === a && p.by === b) || (p.holderId === b && p.by === a));
+}
+
+/**
+ * What a signal IS to one side, from the ledger alone (the record's STILL GOING line). The holder's phone is "my phone";
+ * the caller is told of the other's thing. Pure.
+ */
+export function signalTextFor(sig: ItemSignal, side: 'holder' | 'caller', other?: string | null): string {
+  const who = other ?? (side === 'holder' ? 'someone' : 'them');
+  if (sig.state === 'connected') return side === 'holder' ? `You are on the line with ${who}: the call is answered and open.` : `${who} answered: you are on the line with ${who}.`;
+  if (sig.state === 'received') return side === 'holder' ? `${sig.text} It reads: "${sig.words ?? '…'}"` : `Your message reached ${who}.${sig.words ? ` It said: "${sig.words}"` : ''} Nothing has come back yet.`;
+  return side === 'holder' ? `${sig.text} It is ringing now and not answered.` : `${sig.text} It is still going; nobody has answered it.`;
 }
 
 /** The item's data with a signal set (a newer one replaces an older). Does not mutate. */
 export function withSignal(data: unknown, signal: ItemSignal): Data {
   const base: Data = data && typeof data === 'object' && !Array.isArray(data) ? { ...(data as Data) } : {};
-  base.signal = { text: signal.text.slice(0, 240), since: signal.since, until: signal.until, ...(signal.by ? { by: signal.by } : {}) };
+  base.signal = {
+    text: signal.text.slice(0, 240), since: signal.since, until: Number.isFinite(signal.until) ? signal.until : null,
+    ...(signal.by ? { by: signal.by } : {}), ...(signal.kind ? { kind: signal.kind } : {}), ...(signal.state ? { state: signal.state } : {}),
+    ...(signal.words ? { words: signal.words.slice(0, 600) } : {}),
+  };
   return base;
 }
 
@@ -76,9 +130,13 @@ export function signalLines(items: SignalItem[], viewerId: string, nowCycle: num
     const sig = liveSignal(it.data, nowCycle);
     if (!sig) continue;
     if (it.holderId === viewerId) {
-      out.push(`The ${bare(it.name)} you are holding: ${sig.text} — right now. It goes on until you answer it or it stops; answering it is your act, and so is leaving it. Whoever set it off cannot hear you until you answer it. It does not tell you who set it off: you know who only if your memory or the world's facts say so.`);
+      if (sig.state === 'connected') out.push(`The ${bare(it.name)} you are holding: the call is answered and open. What you say reaches the one on the line, and what they say reaches you, until one of you hangs up.`);
+      else if (sig.state === 'received') out.push(`The ${bare(it.name)} you are holding: a message has come in. It reads: "${sig.words ?? '…'}". Whoever sent it cannot hear you; writing back is your act.`);
+      else out.push(`The ${bare(it.name)} you are holding: ${sig.text} — right now. It goes on until you answer it or it stops; answering it is your act, and so is leaving it. Whoever set it off cannot hear you until you answer it. It does not tell you who set it off: you know who only if your memory or the world's facts say so.`);
     } else if (sig.by === viewerId) {
-      out.push(`What you set off is still going: ${sig.text} It has not been answered.`);
+      if (sig.state === 'connected') out.push(`What you set off was answered: you are on the line. What you say reaches them now.`);
+      else if (sig.state === 'received') out.push(`Your message reached them.${sig.words ? ` It said: "${sig.words}".` : ''} Nothing has come back yet.`);
+      else out.push(`What you set off is still going: ${sig.text} It has not been answered.`);
     }
   }
   return out;

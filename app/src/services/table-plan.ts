@@ -47,6 +47,8 @@ export interface PlannedStimulus {
   reads?: string;
   /** A standing beat: the world as it stands around the listener, nothing new in it (run 3, 2026-11-03: the composer treats it as quiet). */
   standing?: boolean;
+  /** Day 6 (2026-11-04, finding 21): the Watcher addressed this being's own moment ("Violet realizes…", "Time to decide"): it owes a card. */
+  prompted?: boolean;
 }
 
 /** The out-of-character rules that are safe to act on when the words were spoken, not typed. */

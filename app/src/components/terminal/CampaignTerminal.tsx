@@ -15,6 +15,7 @@ import CopilotChat from './CopilotChat';
 import TableSpeakBar from './TableSpeakBar';
 import PlanningChips from './PlanningChips';
 import BeingSpeakingLines from './BeingSpeakingLines';
+import { createCardReveal } from './table-feed/card-reveal';
 import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE, TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import TableFeed from './table-feed/TableFeed';
 import { perceptionFeedOn, PERCEIVED_FEED_STALE_EVENT } from '@/lib/perception-feed';
@@ -398,6 +399,44 @@ export default function CampaignTerminal({
     window.addEventListener('growth:table-note', onNote);
     return () => window.removeEventListener('growth:table-note', onNote);
   }, []);
+
+  // Ruling 10 (2026-11-04): a card is shown ONCE, in its final words. While a being's record is built, a quiet
+  // pending row (its name and a pulsing mark) sits under the latest line; the card replaces it, typed out once.
+  interface PendingBeing { characterId: string; name: string; lineId: string | null; at: number; fading?: boolean }
+  const [pendingBeings, setPendingBeings] = useState<PendingBeing[]>([]);
+  useEffect(() => {
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const later = (fn: () => void, ms: number) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); };
+    const onListening = (e: Event) => {
+      const d = (e as CustomEvent<{ characterId?: string; characterName?: string; lineId?: string | null; at?: number }>).detail;
+      if (!d?.characterId) return;
+      const at = d.at ?? Date.now();
+      // One row per being per line: a second listening for the same being replaces it.
+      setPendingBeings(prev => [...prev.filter(p => p.characterId !== d.characterId), { characterId: d.characterId!, name: d.characterName || 'someone present', lineId: d.lineId ?? null, at }]);
+      // Safety: a pending mark never outlives a lost event.
+      later(() => setPendingBeings(prev => prev.filter(p => !(p.characterId === d.characterId && p.at === at))), 120000);
+    };
+    const onDone = (e: Event) => {
+      const d = (e as CustomEvent<{ characterId?: string; posted?: boolean }>).detail;
+      if (!d?.characterId || d.posted !== false) return; // posted: the card itself takes the row's place
+      setPendingBeings(prev => prev.map(p => (p.characterId === d.characterId ? { ...p, fading: true } : p)));
+      later(() => setPendingBeings(prev => prev.filter(p => !(p.characterId === d.characterId && p.fading))), 400);
+    };
+    // The withheld-line question (a table note) takes the pending rows' place.
+    const onNoteClear = () => setPendingBeings([]);
+    window.addEventListener('growth:being-listening', onListening);
+    window.addEventListener('growth:being-done', onDone);
+    window.addEventListener('growth:table-note', onNoteClear);
+    return () => {
+      window.removeEventListener('growth:being-listening', onListening);
+      window.removeEventListener('growth:being-done', onDone);
+      window.removeEventListener('growth:table-note', onNoteClear);
+      timers.forEach(clearTimeout);
+    };
+  }, []);
+  const cardReveal = useRef(createCardReveal()).current;
+  const revealView = useRef<string | null>(null);
+  const freshCardsRef = useRef<string[]>([]);
 
   // Fallback poll every 30s (in case SSE reconnects and misses events)
   useEffect(() => {
@@ -967,6 +1006,23 @@ export default function CampaignTerminal({
   // Narrative only, play only: mechanical rows become numberless lines where the
   // mapper knows them, and every feed line links to the mechanics behind it.
   const narrated = useMemo(() => withNarration(feedEvents, sessions), [feedEvents, sessions]);
+  // Cards on screen: the first sighting after history has loaded starts the typing clock (card-reveal.ts); a refetch
+  // or remount never re-types a card that has been shown.
+  useMemo(() => {
+    if (loading) return;
+    if (revealView.current !== (viewAs ?? '')) { revealView.current = viewAs ?? ''; cardReveal.reset(); }
+    const ids = narrated.events.filter(e => e.payload?.kind === 'being_thought').map(e => e.id);
+    const fresh = cardReveal.observe(ids);
+    if (fresh.length) freshCardsRef.current = [...freshCardsRef.current, ...fresh];
+  }, [narrated, loading, viewAs, cardReveal]);
+  // A new card for a being takes its pending row's place.
+  useEffect(() => {
+    if (!freshCardsRef.current.length) return;
+    const ids = new Set(freshCardsRef.current);
+    freshCardsRef.current = [];
+    const who = new Set(narrated.events.filter(e => ids.has(e.id) && e.characterId).map(e => e.characterId as string));
+    if (who.size) setPendingBeings(prev => (prev.some(p => who.has(p.characterId)) ? prev.filter(p => !who.has(p.characterId)) : prev));
+  }, [narrated]);
   const hits = useMemo(() => {
     if (!searching) return 0;
     const q = query.trim().toLowerCase();
@@ -1242,6 +1298,7 @@ export default function CampaignTerminal({
             emptyFrom={emptyFrom}
             foldKey={`growth:feed-folds:${campaignId}`}
             perceived={perceivedFeed}
+            typed={cardReveal}
             query={query}
             encounter={encounter}
           />
@@ -1258,6 +1315,17 @@ export default function CampaignTerminal({
               if (nearBottom) el.scrollTop = el.scrollHeight;
             }}
           />
+          {/* A being is listening (ruling 10): its name and a quiet pulsing mark until its card lands. */}
+          {!searching && !viewAs && pendingBeings.length > 0 && (
+            <div data-pending-beings style={{ padding: '2px 14px' }}>
+              <style>{'@keyframes tf-pend{0%,80%,100%{opacity:.2}40%{opacity:1}}.tf-pend-dot{display:inline-block;animation:tf-pend 1.2s infinite}.tf-pend-dot:nth-child(2){animation-delay:.2s}.tf-pend-dot:nth-child(3){animation-delay:.4s}@media (prefers-reduced-motion:reduce){.tf-pend-dot{animation:none}}'}</style>
+              {pendingBeings.map(p => (
+                <div key={p.characterId} data-pending-being={p.characterId} style={{ fontFamily: mono, fontSize: 11, lineHeight: 1.5, color: novelOnly ? 'rgba(255,255,255,0.45)' : '#6b6b68', opacity: p.fading ? 0 : 1, transition: 'opacity 400ms ease' }}>
+                  {p.name} <span aria-label="thinking"><span className="tf-pend-dot">.</span><span className="tf-pend-dot">.</span><span className="tf-pend-dot">.</span></span>
+                </div>
+              ))}
+            </div>
+          )}
           {/* The engine's refusal of a typed line: one muted aside under the latest row (Watcher only). */}
           {!searching && !viewAs && tableNotes.map((t, i) => (
             <div key={i} data-table-note style={{ padding: '2px 14px', fontFamily: mono, fontSize: 11, lineHeight: 1.5, color: '#6b6b68', fontStyle: 'italic' }}>

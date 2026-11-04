@@ -104,3 +104,22 @@ export async function recentSpokenOf(campaignId: string, characterId: string, n 
     return out;
   } catch { return []; }
 }
+
+/**
+ * The memories that WOKE in the being's last `n` cards (payload.pieces.wakes), newest first — Day 6 (2026-11-04, finding 23):
+ * Rosemary on the porch steps woke in six of Violet's seven cards. A memory that woke a beat or two ago is a recent thought,
+ * not a wake. Never throws.
+ */
+export async function recentWakesOf(campaignId: string, characterId: string, n = 2, opts?: VoiceBound): Promise<string[]> {
+  try {
+    const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'being_thought', characterId, ...boundWhere(opts) }, orderBy: { createdAt: 'desc' }, take: n, select: { payload: true } });
+    const out: string[] = [];
+    for (const r of rows ?? []) {
+      try {
+        const p = JSON.parse(r.payload) as { pieces?: { wakes?: Array<{ text?: string }> } };
+        for (const w of p.pieces?.wakes ?? []) if (w.text) out.push(w.text.replace(/^[^:]{1,40}:\s*/, ''));
+      } catch { /* skip */ }
+    }
+    return out;
+  } catch { return []; }
+}

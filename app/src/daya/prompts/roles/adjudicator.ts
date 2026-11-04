@@ -79,6 +79,10 @@ Rules:
    A call or message makes the CALLED person's carried device sound — name it
    from the "Within reach of a signal" list (never the caller's own phone, and
    never take/give/put a thing on that list).
+   A MESSAGE CARRIES ITS WORDS: a text or note that is sent is {"op":"sound",
+   "at":<the receiver's device>,"text":<how it sounds, e.g. "Violet's phone
+   chimes.">,"words":<the message exactly as written>,"kind":"text"}; a call
+   is {"op":"sound",...,"kind":"call"}.
    A MESSAGE WRITTEN IS A MESSAGE SENT (session 4, 2026-11-04): when the line
    gives the words of a text or note the actor writes, types or begins ("The
    text reads: …"), the act SENDS it in this moment — the called device sounds

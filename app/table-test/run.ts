@@ -87,8 +87,9 @@ async function ledgerAt(lineIndex: number): Promise<LedgerAt> {
   const chars = await prisma.character.findMany({ where: { campaignId: C }, select: { id: true, name: true } });
   const edges = await p.entityRelationship.findMany({ where: { campaignId: C, relationshipType: 'located_at', sourceType: 'CHARACTER' }, select: { sourceId: true, targetId: true } });
   const where = new Map<string, string>(edges.map((e: any) => [e.sourceId, e.targetId]));
+  const cycle = (await prisma.campaign.findUnique({ where: { id: C }, select: { currentCycle: true } }))?.currentCycle ?? 0;
   return {
-    lineIndex, at: Date.now(),
+    lineIndex, at: Date.now(), cycle,
     items: items.map((i) => { let signal = null; try { signal = (JSON.parse(i.data ?? '{}') as any).signal ?? null; } catch { /* none */ } return { id: i.id, name: i.name, holderId: i.holderId, locationId: i.locationId, status: i.status, signal }; }),
     beings: chars.map((c) => ({ characterId: c.id, name: c.name, locationId: where.get(c.id) ?? null })),
   };

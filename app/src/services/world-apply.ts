@@ -45,7 +45,7 @@ export type ActEffect =
   | { op: 'pay'; to: string; amount: number; currency?: string }
   | { op: 'move'; to: string }
   /** A sound the act causes somewhere other than the actor: a called phone rings where IT is, a thrown thing lands. */
-  | { op: 'sound'; at: string; text: string }
+  | { op: 'sound'; at: string; text: string; words?: string; kind?: 'call' | 'text' | 'other' }
   /** The actor answers (or silences, or declines) a signalling thing they hold — a ringing phone picked up, a buzzer stopped. */
   | { op: 'answer'; item: string }
   /** The one who set a signal off ends it from their side (hangs up, cancels, stops knocking): every live signal the actor caused. */
@@ -455,8 +455,15 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
               const row = await prisma.campaignItem.findUnique({ where: { id: where.itemId }, select: { data: true } });
               const rowData = parseData(row?.data ?? null);
               // Who caused it: the actor when it sounds at another's thing; a call already going keeps its caller when the sound is narrated at the actor's own.
-              const cause = signalCause({ holderId: where.holderId, actorId: actor.id, narrated: opts.narrated, existingBy: liveSignal(rowData, cycle)?.by });
-              if (cause.record) await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: soundText, since: cycle, until: cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}) })) } });
+              const existing = liveSignal(rowData, cycle);
+              const cause = signalCause({ holderId: where.holderId, actorId: actor.id, narrated: opts.narrated, existingBy: existing?.by });
+              // Day 6 (2026-11-04): a call or a text is a THING with a state. A message lands as `received` with its words; a ring is
+              // `ringing`; a sound narrated at a thing already answered (connected) leaves the open line as it is.
+              if (cause.record && existing?.state !== 'connected') {
+                const kind = e.kind ?? (e.words ? 'text' : existing?.kind ?? 'call');
+                const state = e.words ? 'received' : 'ringing';
+                await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: soundText, since: cycle, until: cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}), kind, state, ...(e.words ? { words: e.words } : existing?.words ? { words: existing.words } : {}) })) } });
+              }
             } catch (err) { console.warn('[world-apply] signal not recorded (non-fatal):', err); }
           }
           report.applied.push(`sound at ${where.name}: ${soundText}`);
@@ -466,9 +473,21 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           const item = await findItemByName(campaignId, e.item, { holderId: actor.id });
           if (!item) { report.refused.push(`answer "${e.item}": ${actor.name} is not holding it`); break; }
           const row = await prisma.campaignItem.findUnique({ where: { id: item.id }, select: { data: true } });
-          const { withoutSignal } = await import('./item-signal');
-          await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withoutSignal(parseData(row?.data ?? null))) } });
-          report.applied.push(`${actor.name} answers "${item.name}"`);
+          const { withoutSignal, withSignal, liveSignal, signalInState } = await import('./item-signal');
+          const { clockNow } = await import('./table-clock');
+          const { cycle } = await clockNow(campaignId);
+          const d = parseData(row?.data ?? null);
+          const sig = liveSignal(d, cycle);
+          // Day 6 (2026-11-04): answering a RINGING call opens the line (connected: speech crosses both ways until someone hangs up);
+          // answering a received message is reading it (the signal is done); answering a thing that is quiet clears whatever was there.
+          if (sig && sig.state !== 'received' && sig.by) {
+            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withSignal(d, signalInState(sig, 'connected'))) } });
+            const caller = await prisma.character.findUnique({ where: { id: sig.by }, select: { name: true } }).catch(() => null);
+            report.applied.push(`${actor.name} answers "${item.name}" — on the line with ${caller?.name ?? 'the caller'}`);
+          } else {
+            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
+            report.applied.push(`${actor.name} answers "${item.name}"`);
+          }
           break;
         }
         case 'stop': {
@@ -479,14 +498,18 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           const ended: string[] = [];
           for (const r of rows) {
             const d = parseData(r.data ?? null);
-            if (liveSignal(d, cycle)?.by !== actor.id) continue;
+            const was = liveSignal(d, cycle);
+            if (was?.by !== actor.id) continue;
             await prisma.campaignItem.update({ where: { id: r.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
             ended.push(r.name);
             // THE HOLDER HEARS IT END (session 2, 2026-11-02): the ringing stopping is something that happens at the holder's place.
+            // Day 6 (2026-11-04): and what it was — a call that rang out is a missed call; an open line that ends has gone dead.
             const holder = r.holderId ? await prisma.character.findUnique({ where: { id: r.holderId }, select: { name: true } }) : null;
             const at = r.holderId ? await prisma.entityRelationship.findFirst({ where: { sourceId: r.holderId, relationshipType: 'located_at' }, select: { targetId: true } }) : null;
             const thing = r.name.replace(/^(?:the|her|his|their|my)\s+/i, '');
-            (report.sounds ??= []).push({ text: `${holder?.name ? `${holder.name.split(/\s+/)[0]}'s ${thing}` : `The ${thing}`} goes quiet.`, at: r.name, locationId: at?.targetId ?? null });
+            const whose = holder?.name ? `${holder.name.split(/\s+/)[0]}'s ${thing}` : `The ${thing}`;
+            const endText = was.state === 'connected' ? `${whose}: the line goes dead; the call is over.` : was.kind === 'call' || !was.kind ? `${whose} goes quiet — a missed call.` : `${whose} goes quiet.`;
+            (report.sounds ??= []).push({ text: endText, at: r.name, locationId: at?.targetId ?? null });
           }
           if (ended.length) report.applied.push(`${actor.name} stops what they set off: ${ended.join(', ')}`);
           else report.refused.push(`stop: nothing ${actor.name} set off is still going`);
@@ -699,7 +722,11 @@ export function parseActEffects(raw: unknown): ActEffect[] {
       case 'move': { const to = s(r.to); if (to) out.push({ op: 'move', to }); break; }
       case 'answer': { const item = s(r.item); if (item) out.push({ op: 'answer', item }); break; }
       case 'stop': out.push({ op: 'stop' }); break;
-      case 'sound': { const at = s(r.at); const text = s(r.text); if (at && text) out.push({ op: 'sound', at, text: text.slice(0, 240) }); break; }
+      case 'sound': {
+        const at = s(r.at); const text = s(r.text); const words = s(r.words); const kind = s(r.kind);
+        if (at && text) out.push({ op: 'sound', at, text: text.slice(0, 240), ...(words ? { words: words.slice(0, 600) } : {}), ...(kind === 'call' || kind === 'text' || kind === 'other' ? { kind } : {}) });
+        break;
+      }
       default: break;
     }
   }

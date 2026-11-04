@@ -61,13 +61,15 @@ export interface RunCard {
   msAfterLine: number;            // card time − the line's time
 }
 
-export interface LedgerItem { id: string; name: string; holderId: string | null; locationId: string | null; status: string; signal?: { text: string; since: number; until: number; by: string } | null }
+export interface LedgerItem { id: string; name: string; holderId: string | null; locationId: string | null; status: string; signal?: { text: string; since: number; until: number | null; by?: string; state?: string; kind?: string; words?: string } | null }
 export interface LedgerBeing { characterId: string; name: string; locationId: string | null }
 
 /** The ledger as it stood right after a line was played (and settled). */
 export interface LedgerAt {
   lineIndex: number;
   at: number;
+  /** The campaign's cycle when the snapshot was taken — signals live in cycles, not ms (Day 6, 2026-11-04). */
+  cycle?: number;
   items: LedgerItem[];
   beings: LedgerBeing[];
 }

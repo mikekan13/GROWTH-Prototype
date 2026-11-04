@@ -61,7 +61,8 @@ export function stillGoing(t: RunTranscript): AssertResult {
   for (const c of t.cards) {
     const led = ledgerFor(t, c.lineIndex);
     if (!led) continue;
-    const live = led.items.filter((i) => i.signal && i.signal.since <= c.at && c.at <= i.signal.until && (i.signal.by === c.characterId || i.holderId === c.characterId));
+    const now = led.cycle ?? Number.POSITIVE_INFINITY;
+    const live = led.items.filter((i) => i.signal && i.signal.since <= now && now < (i.signal.until ?? Number.POSITIVE_INFINITY) && (i.signal.by === c.characterId || i.holderId === c.characterId));
     if (!live.length) continue;
     for (const seg of c.segments) {
       if (seg.kind !== 'thought') continue;
@@ -151,14 +152,15 @@ export function watcherLineStands(t: RunTranscript): AssertResult {
     for (const led of t.ledger.filter((l) => l.lineIndex >= i)) {
       for (const it of led.items) {
         const sg = it.signal;
-        if (!sg || sg.since > at || sg.until <= at + 30_000) continue;
+        const now = led.cycle ?? Number.POSITIVE_INFINITY;
+        if (!sg || sg.since > now || (sg.until ?? Number.POSITIVE_INFINITY) <= now) continue;
         const setter = led.beings.find((b) => b.characterId === sg.by);
         const anyNamed = led.beings.some((b) => named(b.name));
         if (anyNamed && !(setter && named(setter.name))) continue;
         const key = `${it.id}:${sg.since}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        ev.push(`line ${i} "${step.line}" @ ${iso(at)}: "${it.name}" set by ${setter?.name ?? sg.by} still live until ${iso(sg.until)} (ledger of line ${led.lineIndex})`);
+        ev.push(`line ${i} "${step.line}" @ ${iso(at)}: "${it.name}" set by ${setter?.name ?? sg.by} still live until cycle ${sg.until ?? '∞'} (ledger of line ${led.lineIndex})`);
       }
     }
   });
@@ -251,8 +253,100 @@ export function soundReferenced(t: RunTranscript): AssertResult {
   return result('A12', 'soundReferenced', ev, { label: 'cards_without_pieces', value: without });
 }
 
+// ── Day 6 (2026-11-04, sessions 3–5: "a hard fail on phones") ──────────────────────────────────────────────────────────────
+
+type ScriptExpect = { expectSignal?: number[]; expectHeard?: Array<{ line: number; by: string }> };
+const expectOf = (t: RunTranscript): ScriptExpect => (t.script as unknown as ScriptExpect);
+const lineOf = (t: RunTranscript, at: number): number => t.lineAt.reduce((acc, lt, idx) => (lt <= at ? idx : acc), -1);
+const declarations = (t: RunTranscript) => t.events.filter((e) => e.type === 'game_event' && e.eventType === 'declaration').map((e) => ({ ...e, lineIndex: lineOf(t, e.at) }));
+const perceivedSomething = (c: { pieces?: { perceived?: string } }) => !!c.pieces?.perceived && !/^nothing (new )?reach/i.test(c.pieces.perceived.trim());
+
+/** A14 — a call or a message is a THING in the ledger: after the lines the script names, a device someone else holds carries a live signal. */
+export function signalBound(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  for (const i of expectOf(t).expectSignal ?? []) {
+    const led = t.ledger.find((l) => l.lineIndex === i);
+    if (!led) { ev.push(`L${i + 1}: no ledger snapshot`); continue; }
+    const live = led.items.filter((it) => it.signal?.text && it.holderId && it.signal.by && it.signal.by !== it.holderId);
+    if (!live.length) ev.push(`L${i + 1}: no signal on any held device after the line (${t.script.steps[i]?.line.slice(0, 60)}…)`);
+  }
+  return result('A14', 'signalBound', ev);
+}
+
+/** A15 — one deed, one sound: a line never writes the same world event twice (finding 13: two rings in one second). */
+export function oneSoundPerLine(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  const seen = new Map<string, number>();
+  for (const d of declarations(t)) {
+    const key = `${d.lineIndex}|${d.text.trim().toLowerCase()}`;
+    seen.set(key, (seen.get(key) ?? 0) + 1);
+  }
+  for (const [key, n] of seen) if (n > 1) { const [li, text] = key.split('|'); ev.push(`L${Number(li) + 1}: "${text}" ×${n}`); }
+  return result('A15', 'oneSoundPerLine', ev);
+}
+
+/** A18 — a Watcher line that goes through a being ("Violet realizes…", "Time to decide") yields a card from that being (finding 21). */
+export function promptYieldsCard(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  for (const d of declarations(t)) {
+    const thoughts = Array.isArray(d.payload.thoughts) ? (d.payload.thoughts as Array<{ actorId?: string; actorLabel?: string }>) : [];
+    for (const th of thoughts) {
+      if (!th.actorId) continue;
+      if (!t.cards.some((c) => c.characterId === th.actorId && c.lineIndex === d.lineIndex)) ev.push(`L${d.lineIndex + 1}: ${th.actorLabel ?? th.actorId} was addressed and posted no card`);
+    }
+  }
+  return result('A18', 'promptYieldsCard', ev);
+}
+
+/** A19 — a possession as subject ("Her phone rings again") is a world event the holder PERCEIVES, never the holder's deed (finding 22). */
+export function possessionNotDeed(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  for (const d of declarations(t)) {
+    const acts = Array.isArray(d.payload.actions) ? (d.payload.actions as Array<{ actorId?: string; actorLabel?: string; text?: string; owned?: boolean }>) : [];
+    for (const a of acts.filter((x) => x.owned && x.actorId)) {
+      const mine = t.cards.filter((c) => c.characterId === a.actorId && c.lineIndex === d.lineIndex);
+      if (!mine.length) { ev.push(`L${d.lineIndex + 1}: "${a.text}" — ${a.actorLabel} posted no card for what happened to their thing`); continue; }
+      for (const c of mine) {
+        if (!perceivedSomething(c)) ev.push(`L${d.lineIndex + 1}: ${a.actorLabel} perceived nothing of "${a.text}" (perceived: ${c.pieces?.perceived ?? '—'})`);
+        if (c.segments.some((s) => s.kind === 'action' && a.text && s.text.toLowerCase().includes(a.text.toLowerCase().slice(0, 24)))) ev.push(`L${d.lineIndex + 1}: "${a.text}" carded as ${a.actorLabel}'s deed`);
+      }
+    }
+  }
+  return result('A19', 'possessionNotDeed', ev);
+}
+
+/** A20 — under a thing still going in its own hands, a being does not stay more than three beats running (finding 23: thirty stays). */
+export function staysBounded(t: RunTranscript, maxRun = 3): AssertResult {
+  const ev: string[] = [];
+  const byBeing = new Map<string, typeof t.cards>();
+  for (const c of [...t.cards].sort((a, b) => a.at - b.at)) byBeing.set(c.characterId, [...(byBeing.get(c.characterId) ?? []), c]);
+  let worst = 0;
+  for (const [, cards] of byBeing) {
+    let run = 0;
+    for (const c of cards) {
+      const going = !!c.pieces?.gist && /\bgoing:/.test(c.pieces.gist);
+      run = going && c.pieces?.impulse === 'stay' ? run + 1 : 0;
+      worst = Math.max(worst, run);
+      if (run === maxRun + 1) ev.push(`${c.characterName}: ${run} stays running while something of theirs was still going (L${c.lineIndex + 1})`);
+    }
+  }
+  return result('A20', 'staysBounded', ev, { label: 'longest_stay_run', value: worst });
+}
+
+/** A21 — a connected call is a channel: after the lines the script names, the named being heard what was said (finding 24). */
+export function lineCarries(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  for (const h of expectOf(t).expectHeard ?? []) {
+    const cards = t.cards.filter((c) => c.lineIndex === h.line && c.characterName.toLowerCase().startsWith(h.by.toLowerCase()));
+    if (!cards.length) { ev.push(`L${h.line + 1}: ${h.by} posted no card`); continue; }
+    if (!cards.some(perceivedSomething)) ev.push(`L${h.line + 1}: ${h.by} perceived nothing (${cards.map((c) => c.pieces?.perceived ?? '—').join(' | ')})`);
+  }
+  return result('A21', 'lineCarries', ev);
+}
+
 export function runAsserts(t: RunTranscript): AssertResult[] {
-  return [absentThing(t), stillGoing(t), sessionBound(t), noPlaceholder(t), noDeed(t), unheldUseWithheld(t), watcherLineStands(t), timing(t), cloudBudget(t), memoryNotEveryCard(t), knownPeopleOnly(t), soundReferenced(t)];
+  return [absentThing(t), stillGoing(t), sessionBound(t), noPlaceholder(t), noDeed(t), unheldUseWithheld(t), watcherLineStands(t), timing(t), cloudBudget(t), memoryNotEveryCard(t), knownPeopleOnly(t), soundReferenced(t),
+    signalBound(t), oneSoundPerLine(t), promptYieldsCard(t), possessionNotDeed(t), staysBounded(t), lineCarries(t)];
 }
 
 /** A compact markdown report: one table, then each failing assert's evidence (12 lines at most each). */

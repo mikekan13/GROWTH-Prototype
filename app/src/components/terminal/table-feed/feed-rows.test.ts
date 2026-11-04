@@ -218,3 +218,35 @@ describe('non-event scene lines are no row at all (Mike 2026-10-26)', () => {
     expect(rows.map((r) => r.type)).toEqual(['character']);
   });
 });
+
+describe('owned actions read as narration', () => {
+  it("a possession's sentence is a narration row in its place, not in the character's card", () => {
+    const description = 'Warden sets the lamp down. Her phone rings again. "Sit."';
+    const rows = eventRows(ev({
+      kind: 'game_event', eventType: 'declaration', description, narration: null,
+      speech: [{ speakerId: 'warden', speakerLabel: 'Warden', text: 'Sit.' }],
+      actions: [
+        { actorId: 'warden', actorLabel: 'Warden', text: 'sets the lamp down', sentence: 'Warden sets the lamp down.' },
+        { actorId: 'warden', actorLabel: 'Warden', text: 'phone rings again', sentence: 'Her phone rings again.', owned: true },
+      ],
+      thoughts: [],
+    }), roster);
+    const card = rows.find((r) => r.type === 'character');
+    expect(card).toMatchObject({ type: 'character', characterId: 'warden' });
+    const texts = card && card.type === 'character' ? card.segments.map((s) => s.text) : [];
+    expect(texts).toContain('sets the lamp down');
+    expect(texts.join(' ')).not.toContain('phone');
+    const owned = rows.find((r) => r.type === 'narration' && r.text === 'Her phone rings again.');
+    expect(owned).toBeTruthy();
+  });
+
+  it('an owned action alone leaves no card at all', () => {
+    const rows = eventRows(ev({
+      kind: 'game_event', eventType: 'declaration', description: 'Her phone rings again.', narration: null,
+      speech: [], thoughts: [],
+      actions: [{ actorId: 'warden', actorLabel: 'Warden', text: 'phone rings again', owned: true }],
+    }), roster);
+    expect(rows.map((r) => r.type)).toEqual(['narration']);
+    expect(rows[0]).toMatchObject({ text: 'phone rings again' });
+  });
+});

@@ -239,7 +239,7 @@ describe('a sentence about a part or thing of his is his card (HW3 2026-10-24)',
   const table = [{ id: 'kris', name: 'Kristopher', sex: 'Male' }, { id: 'violet', name: 'Violet', sex: 'Female' }];
   it('"A tear falls from his eye." is Kristopher\'s, and the quote after it is his too', () => {
     const p = parseTableProse('A tear falls from his eye. "Please lady I am having the worst week of my life."', table, { recentActors: [table[1], table[0]] });
-    expect(p.actions).toEqual([{ text: 'A tear falls from his eye', actorId: 'kris', actorLabel: 'Kristopher' }]);
+    expect(p.actions).toEqual([{ text: 'A tear falls from his eye', actorId: 'kris', actorLabel: 'Kristopher', owned: true }]);
     expect(p.quotes[0]).toMatchObject({ speakerId: 'kris' });
     expect(p.narration).toBeNull();
   });
@@ -461,5 +461,30 @@ describe('a voice that is heard belongs to its owner (session 2, 2026-11-02)', (
   it('a plain spoken line still belongs to its subject', () => {
     const p = parseTableProse('Kristopher says out loud. "Fuck it." Then he hits redial.', roster as never);
     expect(p.quotes[0].speakerId).toBe('k');
+  });
+});
+
+describe('Day 6 (2026-11-04): a thing of theirs is not their deed; a misspelled name is that person', () => {
+  const table: ProseRosterEntry[] = [{ id: 'vi', name: 'Violet', sex: 'female' }, { id: 'kris', name: 'Kristopher', sex: 'male' }];
+  it('"Her phone rings again." is attributed to Violet but owned (finding 22)', () => {
+    const p = parseTableProse('Her phone rings again.', table, { recentActors: [table[0]] });
+    expect(p.actions).toEqual([{ text: 'Her phone rings again', actorId: 'vi', actorLabel: 'Violet', owned: true }]);
+  });
+  it('"Violets phone continues to ring." (no apostrophe) is Violet\'s thing, owned', () => {
+    const p = parseTableProse('Violets phone continues to ring.', table, {});
+    expect(p.actions?.[0]).toMatchObject({ actorId: 'vi', owned: true });
+  });
+  it('"She answers the phone." is her deed, not owned', () => {
+    const p = parseTableProse('She answers the phone.', table, { recentActors: [table[0]] });
+    expect(p.actions).toEqual([{ text: 'Answers the phone', actorId: 'vi', actorLabel: 'Violet' }]);
+  });
+  it('"Christopher sits in his car." is Kristopher (finding 5: speech-to-text spelled him wrong)', () => {
+    const p = parseTableProse('Christopher sits in his car.', table, {});
+    expect(p.actions).toEqual([{ text: 'Christopher sits in his car', actorId: 'kris', actorLabel: 'Kristopher' }]);
+  });
+  it('a name far from everyone stays narration', () => {
+    const p = parseTableProse('Daniel sits in his car.', table, {});
+    expect(p.actions).toBeUndefined();
+    expect(p.narration).toBe('Daniel sits in his car.');
   });
 });

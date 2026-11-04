@@ -298,6 +298,14 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         window.dispatchEvent(new CustomEvent('growth:table-note', { detail: { text: data.text } }));
       }
 
+      // Ruling 10 (2026-11-04): a being is listening / done — the terminal shows a quiet pending row.
+      if (data.kind === 'being_listening') {
+        window.dispatchEvent(new CustomEvent('growth:being-listening', { detail: { characterId: data.characterId, characterName: data.characterName, lineId: data.lineId ?? null, at: data.at } }));
+      }
+      if (data.kind === 'being_done') {
+        window.dispatchEvent(new CustomEvent('growth:being-done', { detail: { characterId: data.characterId, lineId: data.lineId ?? null, posted: data.posted, at: data.at } }));
+      }
+
       // Planning board moved (no text) — the chip strip re-reads GET /intents.
       if (data.kind === 'board_changed') {
         window.dispatchEvent(new CustomEvent(BOARD_CHANGED_EVENT));

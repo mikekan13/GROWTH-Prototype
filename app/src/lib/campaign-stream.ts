@@ -52,6 +52,9 @@ export function deliveryFor(conn: Pick<SSEConnection, 'userId' | 'perceived'>, e
     case 'daya_work_session':
     case 'table_note': // Watcher-only (2026-11-03)
       return null;
+    case 'being_listening': // every viewer sees that a being is listening (ruling 10, 2026-11-04): no story text, only a name already on the table
+    case 'being_done':
+      return event;
     case 'terminal_event': {
       const te = data.event;
       const own = mine(te.characterId) || (te.actorUserId === conn.userId && te.actor === 'player');

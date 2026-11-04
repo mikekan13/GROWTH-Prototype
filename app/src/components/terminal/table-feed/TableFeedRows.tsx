@@ -8,7 +8,8 @@
  * lock on desktop, tap on touch, bottom sheet under 600 px). Nothing here is
  * hold-triggered; taps are `click`.
  */
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { type CardReveal, segmentChars, revealChars, revealDuration, truncateSegments } from './card-reveal';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { segmentMarks, splitEntities, presentCycle, realClock, type FeedSegment, type FeedTimescale, type EntityName } from '@/lib/feed-segments';
 import type { FeedRowModel, CharacterRowModel, NarrationRowModel, BarRowModel, WithdrawnRowModel, BeatRowModel, RollRowModel, Via } from './feed-rows';
@@ -46,15 +47,18 @@ interface FeedContextValue {
   onOpenLog?: (ids: string[]) => void;
   /** Rows to mark (the Log rows a feed link jumped to). */
   highlight?: Set<string>;
+  /** A being's new card is typed out once (ruling 10); history and refetched cards show whole. */
+  typed?: CardReveal;
 }
 
 const FeedContext = createContext<FeedContextValue>({ entities: new Map(), names: [], timescale: null });
 
-export function TableFeedProvider({ entities, timescale, onRevert, reverting, onOpenLog, highlight, perceived, children }: {
+export function TableFeedProvider({ entities, timescale, onRevert, reverting, onOpenLog, highlight, perceived, typed, children }: {
   entities: FeedEntity[]; timescale: FeedTimescale | null;
   onRevert?: (entryId: string) => void; reverting?: string | null;
   onOpenLog?: (ids: string[]) => void; highlight?: Set<string>;
   perceived?: boolean;
+  typed?: CardReveal;
   children: React.ReactNode;
 }) {
   const value = useMemo<FeedContextValue>(() => ({
@@ -65,8 +69,9 @@ export function TableFeedProvider({ entities, timescale, onRevert, reverting, on
     reverting,
     onOpenLog,
     highlight,
+    typed,
     ...(perceived ? { perceived: true } : {}),
-  }), [entities, timescale, onRevert, reverting, onOpenLog, highlight, perceived]);
+  }), [entities, timescale, onRevert, reverting, onOpenLog, highlight, perceived, typed]);
   return <FeedContext.Provider value={value}>{children}</FeedContext.Provider>;
 }
 
@@ -305,11 +310,22 @@ export function CharacterRow({ row, caret, withdrawn }: { row: CharacterRowModel
   const [rawOpen, setRawOpen] = useState(false);
   const exclude = useMemo(() => (row.characterId ? [row.characterId] : []), [row.characterId]);
   const attrs = useRowAttrs(row.key);
+  const { typed } = useContext(FeedContext);
+  const total = segmentChars(row.segments);
+  const start = row.via === 'being' ? typed?.startOf(row.key) : undefined;
+  const [now, setNow] = useState(() => Date.now());
+  const typing = start !== undefined && now - start < revealDuration(total);
+  useEffect(() => {
+    if (!typing) return;
+    const t = setInterval(() => setNow(Date.now()), 40);
+    return () => clearInterval(t);
+  }, [typing]);
+  const shownSegments = typing ? truncateSegments(row.segments, revealChars(total, now - (start as number))) : row.segments;
   return (
     <div className={`row cl${withdrawn ? ' gone' : ''}`} data-row="character" data-via={row.via} {...attrs}>
       <PortraitChip row={row} />
       <div className="body">
-        <Segments segments={row.segments} exclude={exclude} name={row.name} at={hhmm(row.timestamp)} caret={caret} />
+        <Segments segments={shownSegments} exclude={exclude} name={row.name} at={hhmm(row.timestamp)} caret={caret || typing} />
         {withdrawn && <span className="fix">Line withdrawn</span>}
       </div>
       <div className="side">{!caret && !withdrawn && <RawToggle via={row.via} open={rawOpen} onToggle={() => setRawOpen((o) => !o)} />}{!caret && <LogLink refs={row.logRefs} />}</div>

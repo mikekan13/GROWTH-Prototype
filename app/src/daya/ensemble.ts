@@ -39,7 +39,7 @@ import { filterVoice, droppedLog, hasLightFact, isSpokenRepeat } from './voice-f
 import { absentThingsFor } from './absent-things';
 import { competingSpecific, specificsHint } from './specifics';
 import { presenceFacts, knowsLine } from './presence-facts';
-import { recentSpokenOf, recentVoiceOf, liveVoiceBound } from './voice-history';
+import { recentSpokenOf, recentVoiceOf, liveVoiceBound, recentWakesOf } from './voice-history';
 import { nameIsHers, unmarkAddressed } from './name-addressed';
 import { claimVsFact, factHint, type FactLine } from './claim-vs-fact';
 import { actorMap, whereOthersStand } from '@/services/world-apply';
@@ -898,6 +898,8 @@ export interface TableStimulus {
   routine?: { step: string; because: string[] };
   /** A standing beat: the world as it stands, nothing new in it (run 3, 2026-11-03). */
   standing?: boolean;
+  /** Day 6 (2026-11-04, finding 21): the Watcher addressed this being's own moment; the quiet-beat rule does not apply. */
+  prompted?: boolean;
 }
 
 export interface ListenTimings {
@@ -930,6 +932,8 @@ export interface ListenResult {
   resistance?: { content: string; arousal: number } | null;
   /** THE PIECES ON THE RECORD (table test, 2026-11-03): what the composer held when it made this thought; absent on the old single-monologue path. */
   pieces?: { beatKey?: string; perceived: string; felt: string; wakes: Array<{ text: string; why: string }>; recent: string[]; gist: string; impulse: ListenImpulse; why?: string };
+  /** Day 6 (2026-11-04, finding 23): the act the being CHOSE from its record's list when its impulse was act — the table runs it. */
+  act?: string;
 }
 
 const FELT_FALLBACK = 'Right now, in your body and mood: steady, holding your own.';
@@ -1047,6 +1051,7 @@ export async function listenStimulus(
   let impulse: ListenImpulse = 'stay';
   let stayReason: string | null = null;
   let composedFelt: string | null = null;
+  let composedAct: string | null = null;
   let composedPieces: ListenResult['pieces'] | null = null;
   // What rose against doing: the strongest survival-rung memory this stretch surfaced (the dice decide a routine step against it).
   const resistance = (recallResult.surfaced ?? [])
@@ -1067,23 +1072,26 @@ export async function listenStimulus(
   // THE LEDGER'S GROUND FOR THE RECORD (GROUNDED-BEATS-PLAN-2026-11-03): where every thing is, who shares the room, what is still
   // going. Near = in its hands or its room, people in view; absent = elsewhere (a thought placing one here is dropped); going = a live
   // signal it holds or set off itself. Best-effort, like the rest of the ground.
-  type Sig = { text?: string; until?: number; by?: string };
   const ledger = (omniscient || !ctx.campaignId) ? null : await Promise.resolve().then(() => Promise.all([
     prisma.campaignItem.findMany({ where: { campaignId: ctx.campaignId!, status: 'ACTIVE' }, select: { name: true, holderId: true, locationId: true, data: true } }),
     prisma.entityRelationship.findMany({ where: { campaignId: ctx.campaignId!, relationshipType: 'located_at', sourceType: 'CHARACTER' }, select: { sourceId: true, targetId: true } }),
     prisma.character.findMany({ where: { campaignId: ctx.campaignId! }, select: { id: true, name: true } }),
-  ])).then(([items, edges, chars]) => {
+  ])).then(async ([items, edges, chars]) => {
     const mine = locationId ?? edges.find((e) => e.sourceId === characterId)?.targetId ?? null;
     const roomMates = edges.filter((e) => e.sourceId !== characterId && mine && e.targetId === mine).map((e) => e.sourceId);
     const nameOf = (id: string | null) => chars.find((c) => c.id === id)?.name ?? 'someone';
-    const nowMs = Date.now();
-    const going: Array<{ text: string; mine: boolean; holder: string }> = [];
+    // Day 6 (2026-11-04): the signal's end is a CYCLE; it was compared with Date.now() and every signal read as over — Violet's
+    // phone rang thirty times with STILL GOING empty in her record. The ledger's clock judges, and the state rides along.
+    const { liveSignal, signalTextFor } = await import('@/services/item-signal');
+    const going: Array<{ text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received'; other?: string; words?: string }> = [];
     for (const it of items) {
-      let sig: Sig | null = null;
-      try { sig = (JSON.parse(it.data ?? '{}') as { signal?: Sig | null }).signal ?? null; } catch { /* none */ }
-      if (!sig?.text || !(typeof sig.until === 'number') || sig.until < nowMs) continue;
-      if (it.holderId === characterId) going.push({ text: sig.text, mine: false, holder: ctx.name });
-      else if (sig.by === characterId) going.push({ text: sig.text, mine: true, holder: nameOf(it.holderId) });
+      let d: unknown = null;
+      try { d = JSON.parse(it.data ?? '{}'); } catch { d = null; }
+      const sig = liveSignal(d, ctx.cycle);
+      if (!sig) continue;
+      const state = sig.state ?? 'ringing';
+      if (it.holderId === characterId) going.push({ text: signalTextFor(sig, 'holder', sig.by ? nameOf(sig.by) : null), mine: false, holder: ctx.name, state, ...(sig.by ? { other: nameOf(sig.by) } : {}), ...(sig.words ? { words: sig.words } : {}) });
+      else if (sig.by === characterId) going.push({ text: signalTextFor(sig, 'caller', nameOf(it.holderId)), mine: true, holder: nameOf(it.holderId), state, other: nameOf(it.holderId), ...(sig.words ? { words: sig.words } : {}) });
     }
     const near = [
       ...items.filter((it) => !it.holderId && it.locationId && it.locationId === mine).map((it) => it.name),
@@ -1128,6 +1136,8 @@ export async function listenStimulus(
         desires: desiresBlock, feltBefore: feltStateBrief, envelope: envelope ?? content, event: stimulus.content, senses: stimulus.via?.filter((v) => v !== 'self') ?? ['sight', 'hearing'], own,
         perceived: content,
         standing: stimulus.standing === true,
+        prompted: stimulus.prompted === true,
+        recentWakes: await liveVoiceBound(ctx.campaignId!).then((b) => recentWakesOf(ctx.campaignId!, characterId, 2, b)).catch(() => [] as string[]),
         memories: (recallResult.surfaced ?? []).filter((s) => !!s.content).map((s) => ({ text: s.content!, ...(s.age ? { age: s.age } : {}) })),
         // Run 2 (2026-11-03): the record's near things are NAMES ("Her phone"), not the described held lines ("The Her phone: Her phone - camera, map...").
         innerSoFar: innerState, recent: priorVoice.slice(0, 4), held: (heldRows ?? []).map((h) => h.name), near: ledger?.near ?? [], going: ledger?.going ?? [], facts: ground.lines.slice(0, 10), sinceOwn,
@@ -1135,6 +1145,7 @@ export async function listenStimulus(
       }, overrides);
       if (beat) {
         composedFelt = beat.felt;
+        composedAct = beat.record.act ?? null;
         composedPieces = { beatKey: beat.beatKey, perceived: beat.perceived, felt: beat.felt, wakes: beat.wakes, recent: priorVoice.slice(0, 4), gist: beat.plan.gist, impulse: beat.plan.impulse, ...(beat.plan.why ? { why: beat.plan.why } : {}) };
         // AN EMPTY RECORD IS NO BEAT (table test 2026-11-03: "Nothing new reaches you" became "the phone is still chiming in my hand").
         raw = beat.empty ? `\nImpulse: ${beat.plan.impulse}${beat.plan.why ? ` — ${beat.plan.why}` : ''}` : `${beat.thought}\nImpulse: ${beat.plan.impulse}${beat.plan.impulse === 'stay' && beat.plan.why ? ` — ${beat.plan.why}` : ''}`;
@@ -1204,6 +1215,7 @@ export async function listenStimulus(
   return {
     status: 'listened',
     ...(composedPieces ? { pieces: composedPieces } : {}),
+    ...(composedAct ? { act: composedAct } : {}),
     memoryEntryId: ingest.memoryEntryId,
     innerUpdated,
     impulse,
@@ -1731,7 +1743,7 @@ async function ownRecentActs(campaignId: string, characterId: string): Promise<s
       let p: any;
       try { p = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload; } catch { continue; }
       if (p?.eventType !== 'declaration') continue;
-      const acts: Array<{ actorId?: string; text: string; sentence?: string }> = Array.isArray(p.actions) ? p.actions : [];
+      const acts: Array<{ actorId?: string; text: string; sentence?: string; owned?: boolean }> = (Array.isArray(p.actions) ? p.actions : []).filter((a: { owned?: boolean }) => !a.owned);
       const speech: Array<{ actorId?: string; speakerId?: string; text: string }> = Array.isArray(p.speech) ? p.speech : [];
       const who = (s: { actorId?: string; speakerId?: string }) => s.actorId ?? s.speakerId;
       const mine = acts.filter((a) => a.actorId === characterId);

@@ -286,6 +286,24 @@ export interface TableNoteEvent {
   actorId: string;
 }
 
+/** A being has started listening to a line (ruling 10, 2026-11-04): every viewer shows a quiet pending mark until its card lands. */
+export interface BeingListeningEvent {
+  kind: 'being_listening';
+  characterId: string;
+  characterName: string;
+  lineId?: string | null;
+  at: number;
+}
+
+/** A being finished with a line: `posted` true when a card was (or will be) posted, false when its record was empty. */
+export interface BeingDoneEvent {
+  kind: 'being_done';
+  characterId: string;
+  lineId?: string | null;
+  posted: boolean;
+  at: number;
+}
+
 // ── DAYA work sessions (F-3 walking version) ─────────────────────────────
 
 /** Lifecycle of a durable JEWL job — feeds the live job/status surface. */
@@ -397,6 +415,8 @@ export type StreamEventData =
   | TerminalEventRelay
   | JewlWorkingEvent
   | TableNoteEvent
+  | BeingListeningEvent
+  | BeingDoneEvent
   | DayaWorkSessionEvent
   | NeedsInputEvent
   | JewlFocusEvent

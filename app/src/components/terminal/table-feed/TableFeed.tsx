@@ -178,12 +178,15 @@ export default function TableFeed({
   logRefs,
   onOpenLog,
   reveal,
+  typed,
   emptyText = '[THE TABLE IS QUIET]',
   perceived = false,
   children,
 }: {
   /** Perception unit 9: the events are this viewer's perceived feed — spans/tooltips come only from the lines' own tokens. */
   perceived?: boolean;
+  /** A being's new card is typed out once (ruling 10, 2026-11-04). */
+  typed?: import('./card-reveal').CardReveal;
   campaignId: string;
   events: TerminalEvent[];
   entities: FeedEntity[];
@@ -275,7 +278,7 @@ export default function TableFeed({
   const empty = shown ? shown.length === 0 : flatRows.length === 0;
 
   return (
-    <TableFeedProvider entities={feedEntities} perceived={perceived} timescale={timescale} onRevert={onRevert} reverting={reverting} onOpenLog={onOpenLog} highlight={reveal ?? undefined}>
+    <TableFeedProvider entities={feedEntities} perceived={perceived} timescale={timescale} onRevert={onRevert} reverting={reverting} onOpenLog={onOpenLog} highlight={reveal ?? undefined} typed={typed}>
       <style>{TABLE_FEED_CSS}</style>
       <div className={`tf${searching ? ' searching' : ''}`} data-table-feed data-hits={found ? found.hits : undefined}>
         {empty && <div className="empty">{loading ? 'Loading…' : searching ? '[NO LINE MATCHES]' : emptyText}</div>}

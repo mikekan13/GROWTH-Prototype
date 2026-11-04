@@ -61,6 +61,7 @@ import {
 import { parseTableProse, splitSentences, closeUnclosedQuote, type ProseQuote, type ProseRosterEntry, type ProseThought } from '@/services/table-prose';
 import { ensureKeepalive } from '@/daya/l1-keepalive';
 import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, dismissReconciliation, type ReconTicket } from '@/services/reconciliation';
+import { emitBeingListening, emitBeingDone } from '@/services/being-presence';
 import { advanceClockForLine } from '@/services/table-clock';
 import type { ListenImpulse } from '@/daya/prompts/roles/spirit';
 import { recordBeingThought, attachBeingCard, type BeingThoughtRecord } from '@/services/being-thought';
@@ -560,8 +561,8 @@ export async function lastVoicedActor(campaignId: string, roster: ProseRosterEnt
 }
 
 /** Every being the Watcher voiced in this message: the actors of its `::actions::` and the speakers of its quotes. */
-function voicedIn(parsed: { actions?: Array<{ actorId: string }>; thoughts?: Array<{ actorId: string }>; quotes: Array<{ speakerId: string | null }> }): string[] {
-  return [...new Set([...(parsed.actions ?? []).map((a) => a.actorId), ...(parsed.thoughts ?? []).map((t) => t.actorId), ...parsed.quotes.map((q) => q.speakerId).filter((id): id is string => !!id)])];
+function voicedIn(parsed: { actions?: Array<{ actorId: string; owned?: boolean }>; thoughts?: Array<{ actorId: string }>; quotes: Array<{ speakerId: string | null }> }): string[] {
+  return [...new Set([...(parsed.actions ?? []).filter((a) => !a.owned).map((a) => a.actorId), ...(parsed.thoughts ?? []).map((t) => t.actorId), ...parsed.quotes.map((q) => q.speakerId).filter((id): id is string => !!id)])];
 }
 
 /** The roster by id, for a being's own voice (name + sex). */
@@ -938,6 +939,8 @@ async function runBeats(
     if (pre) truth.preListened!.delete(listenerId);
     let cardDone: () => void = () => {};
     cardPosted.set(listenerId, new Promise<void>((r) => { cardDone = r; }));
+    // THE THINKING CARD (ruling 10, 2026-11-04): the table is told this being is listening; a card or a fade follows, once.
+    emitBeingListening(campaignId, { characterId: listenerId, characterName: listeners.find((l) => l.id === listenerId)?.name ?? listenerId, lineId: truthId });
     // ORDINARY COMPETENCE (2026-10-30): before the being listens, is a routine of its called up by what reached it, or
     // already running? Its next step is planned from the live world and handed to the listen as a fact about itself.
     // Never for the being the Watcher voiced (his voicing is the override) and never on its own act.
@@ -994,6 +997,7 @@ async function runBeats(
             ...(outcome.listened.pieces ? { pieces: outcome.listened.pieces } : {}),
           });
           const standingHere = standingIds.delete(listenerId);
+          emitBeingDone(campaignId, { characterId: listenerId, lineId: truthId, posted: !!rowId });
           cardDone();
           if (!repeat && !holding && sceneBuilderOn() && thought && !own && rowId) {
             // A COMPOSED THOUGHT NEEDS NO BUILDER (Day 5, 2026-11-04): the record bounded it and the voice wrote it whole. When the
@@ -1018,7 +1022,7 @@ async function runBeats(
               if (card) await attachBeingCard(campaignId, rowId, { scene: card.scene, segments: card.segments });
             });
           }
-        } else cardDone();
+        } else { emitBeingDone(campaignId, { characterId: listenerId, lineId: truthId, posted: false }); cardDone(); }
         // null = an answer took this stretch over; that answer stores it and points it at the truth.
         if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId, truthId);
         if (reached && outcome.listened?.memoryEntryId) {
@@ -1040,6 +1044,18 @@ async function runBeats(
         // THE BEING'S OWN SAY (Mike 2026-10-24: "the entities themselves should have a say if they
         // want to answer"): a listen that ends in "speak" or "act" earns the turn the ask did not give.
         const impulse = outcome.listened?.impulse;
+        // THE CHOSEN ACT (Day 6, 2026-11-04, finding 23: thirty stays, one act): a being whose record chose an act DOES it — the act
+        // is carded as its deed and read by the world (answer / hang up / write back), like a Watcher-narrated act but its own.
+        const chosenAct = impulse === 'act' ? outcome.listened?.act?.trim() ?? '' : '';
+        if (chosenAct && !granted.has(listenerId) && !voiced.has(listenerId)) {
+          granted.add(listenerId);
+          const actorName = listeners.find((l) => l.id === listenerId)?.name ?? listenerId;
+          console.log(`[table-speak] ${actorName}: acts on its own record — ${chosenAct}`);
+          await awaitCard(cardPosted.get(listenerId));
+          await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listenerId, name: actorName, sex: truth.actors?.[listenerId]?.sex }, chosenAct).catch((err) => console.warn('[table-speak] act card not posted (non-fatal):', err instanceof Error ? err.message : err));
+          narratedActs(campaignId, [{ actorId: listenerId, actorLabel: actorName, text: chosenAct }], { userId: actor.userId, username: actor.username }, { narrated: false });
+          return;
+        }
         if (askFor && (impulse === 'speak' || impulse === 'act') && !granted.has(listenerId) && !voiced.has(listenerId)) {
           await answer(listenerId, askFor);
         } else if (routine && !askFor && impulse === 'act' && !granted.has(listenerId) && !voiced.has(listenerId)) {
@@ -1102,7 +1118,12 @@ async function runBeats(
         // WHOSE THING IT IS (session 2 live, 2026-11-03): "Her phone rings." left Kristopher thinking of "the ringing from the other night".
         const holder = goingRow.r.holderId ? (await prisma.character.findUnique({ where: { id: goingRow.r.holderId }, select: { name: true } }).catch(() => null))?.name?.split(/\s+/)[0] ?? null : null;
         const thing = goingRow.r.name.replace(/^(?:the|her|his|their|my)\s+/i, '');
-        const content = `${FAR_SIDE_HEAD} ${going.text}${holder ? ` It is ${holder}'s ${thing}, going now because of what you did.` : ''} Nobody has answered it yet.`;
+        // Day 6 (2026-11-04): the far side by the signal's STATE — ringing, answered (on the line), a message delivered.
+        const content = going.state === 'connected'
+          ? `${holder ?? 'They'} answered${holder ? ` ${holder}'s ${thing}` : ''}. You are on the line with ${holder ?? 'them'} now: what you say reaches them, and what they say reaches you.`
+          : going.state === 'received'
+            ? `Your message reached${holder ? ` ${holder}'s ${thing}` : ' them'}.${going.words ? ` It said: "${going.words}".` : ''} Nothing has come back yet.`
+            : `${FAR_SIDE_HEAD} ${going.text}${holder ? ` It is ${holder}'s ${thing}, going now because of what you did.` : ''} Nobody has answered it yet.`;
         console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: the far side of their own signal — ${content}`);
         standingIds.add(listenerId);
         hear(listenerId, { source: 'perception', content, own: true }, { verdict: { beingId: listenerId, reaches: true, via: ['hearing'], noticed: true, salience: 0.6 }, source: 'stub' }, undefined, truthId);
@@ -1132,7 +1153,8 @@ async function runBeats(
       const mine = thoughts.filter((t) => t.actorId === id);
       if (mine.length) {
         const thinking = mine.map((t) => t.sentence).join(' ');
-        stims.set(id, s ? { ...s, content: `${s.content}\n${thinking}`, own: true } : { source: 'perception', content: thinking, own: true });
+        // Day 6 (2026-11-04, finding 21): what the Watcher says goes through a being is a PROMPT to it — it owes a card.
+        stims.set(id, s ? { ...s, content: `${s.content}\n${thinking}`, own: true, prompted: true } : { source: 'perception', content: thinking, own: true, prompted: true });
       } else if (s) stims.set(id, s);
     }
     if (withOwnWords) {
@@ -1717,7 +1739,7 @@ async function withholdUnheld(
   throw new UnheldThingError(`${lines.join(' ')} Add it, or change the line.`, missing.flatMap((x) => x.things), missing[0].a.actorId);
 }
 
-function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined, gm?: { userId: string; username: string }): void {
+function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined, gm?: { userId: string; username: string }, opts: { narrated?: boolean } = {}): void {
   // ONE DEED, ONE SOUND (session 4, 2026-11-04, finding 13): "He dials her number… then he hits call" are two steps of one deed; each
   // rang her phone, and the table heard two rings in the same second. The same sound at the same place from one line plays once.
   const sounded = new Set<string>();
@@ -1736,7 +1758,7 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
       continue;
     }
     void feedCycle(campaignId)
-      .then((cycle) => resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: a.text, cycle: cycle ?? 0, narrated: true }))
+      .then((cycle) => resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: a.text, cycle: cycle ?? 0, narrated: opts.narrated ?? true }))
       .then(async (r) => {
         const applied = r.effects?.applied ?? [];
         const refused = r.effects?.refused ?? [];

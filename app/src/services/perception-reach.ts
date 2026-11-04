@@ -316,12 +316,33 @@ export async function judgeCanonReach(
     j = await judgeReach(event, beings, { model, timeoutMs: REACH_TUNING.timeoutMs * 3 });
   }
   if (j.source === 'fallback') console.warn(`[perception-reach] world-sim fell back to the stub after ${j.ms}ms: ${j.error}`);
+  // A CONNECTED CALL IS A CHANNEL (session 5, 2026-11-04: Violet answered, said "Hello", and it reached nobody — the judge and the
+  // map know rooms, not lines). What a party on an open line says or does aloud reaches the other party through the device,
+  // whatever the map says; the judge's verdict for them is overruled, and the level check below is skipped.
+  const onLine = new Set<string>();
+  if (event.sourceId && (event.kind === 'speech' || event.kind === 'action' || event.kind === 'narration')) {
+    try {
+      const [{ connectedParties, onTheLine }, items, camp] = await Promise.all([
+        import('./item-signal'),
+        prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { holderId: true, data: true } }),
+        prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }),
+      ]);
+      const parties = connectedParties(items.map((it) => { let d: unknown = null; try { d = it.data ? JSON.parse(it.data) : null; } catch { d = null; } return { holderId: it.holderId, data: d }; }), camp?.currentCycle ?? 0);
+      for (const b of beings) {
+        if (b.id === event.sourceId || !onTheLine(parties, event.sourceId, b.id)) continue;
+        onLine.add(b.id);
+        console.log(`[perception-reach] ${b.name}: on the line with ${event.sourceName ?? event.sourceId} — reached through the phone (hearing)`);
+        j.verdicts.set(b.id, { beingId: b.id, reaches: true, via: ['hearing'], noticed: true, salience: 0.9 });
+      }
+    } catch (err) { console.warn('[perception-reach] line check failed (non-fatal):', err instanceof Error ? err.message : err); }
+  }
   if (walls.length || event.locationId) {
     const geometry = opts.atScene ? new Map<string, { los: boolean; feet: number }>() : await sightGeometry(campaignId, event.sourceId, beings.map((b) => b.id));
     for (const b of beings) {
       const v = j.verdicts.get(b.id);
       if (!v) continue;
       const g = geometry.get(b.id);
+      if (onLine.has(b.id)) continue;
       // Elsewhere: nothing but the being's own acts and what reaches it through a carried thing (a call) crosses levels.
       if (g && g.feet === Number.POSITIVE_INFINITY && v.reaches && !v.via.includes('self')) {
         console.log(`[perception-reach] ${b.name}: elsewhere (another map level) — not reached`);

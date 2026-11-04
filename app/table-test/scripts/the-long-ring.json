@@ -1,0 +1,20 @@
+{
+  "name": "the-long-ring",
+  "world": {
+    "snapshot": "data/archive/call-dryrun-snapshot-1793677610237.json",
+    "from": "2026-11-03T21:28:00Z"
+  },
+  "expectSignal": [0, 8],
+  "expectHeard": [{ "line": 6, "by": "Violet" }, { "line": 8, "by": "Violet" }],
+  "steps": [
+    { "line": "Kristopher sits in his car drained after his daily routine of grieving, battling existential dread, and pizza deliveries. He dials the number Violet put on the five dollar bill.", "waitS": 45, "voice": "michael" },
+    { "line": "Violet's phone rings again.", "waitS": 40, "voice": "michael" },
+    { "line": "Kristopher steadies himself by saying the Jesus prayer in his mind. Violets phone continues to ring.", "waitS": 40, "voice": "michael" },
+    { "line": "Violet realizes if she lets it ring one more time then it will go to voicemail. Time to decide.", "waitS": 40, "voice": "michael" },
+    { "line": "Her phone rings again.", "waitS": 40, "voice": "michael" },
+    { "line": "Violet answers her phone.", "waitS": 40, "voice": "michael" },
+    { "line": "Kristopher says over the phone, \"Hello? I'm sorry, I tried to hang up and it just wouldn't.\"", "waitS": 45, "voice": "michael" },
+    { "line": "Violet hangs up without a word.", "waitS": 40, "voice": "michael" },
+    { "line": "Kristopher texts Violet: \"Is this the woman with purple hair who ruins Hawaiian pizza with black olives?\"", "waitS": 45, "voice": "michael" }
+  ]
+}

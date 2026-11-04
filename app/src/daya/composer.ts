@@ -22,7 +22,8 @@ import { logTraining } from './training-log';
 export type Impulse = 'speak' | 'act' | 'stay';
 
 /** Something still going that this being knows of: a signal it can hear, or one it set off itself. */
-export interface GoingRef { text: string; mine: boolean; holder: string }
+/** Day 6 (2026-11-04): a going thing carries its state, the other party and any words, from the ledger. */
+export interface GoingRef { text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received'; other?: string; words?: string }
 
 /** THE BEAT RECORD — every field is a resolved reference; the voice may say nothing outside it. */
 export interface BeatRecord {
@@ -38,6 +39,8 @@ export interface BeatRecord {
   about: string[];
   /** Its own acts and words from the table's last lines this session, latest first (finding 17, 2026-11-04): it knows these. */
   did?: string[];
+  /** Day 6 (2026-11-04, finding 23): what the being DOES now, chosen from the list of acts it could take — set only when impulse is act. */
+  act?: string;
   /** A picture of what has not happened (ruling 2, 2026-11-03): allowed, marked, voiced as imagined. */
   imagine?: string;
   impulse: Impulse;
@@ -70,6 +73,10 @@ export interface ComposeArgs {
   going?: GoingRef[];
   /** The being's own acts and words in this session, latest first, as the table said them (finding 17, 2026-11-04). */
   did?: string[];
+  /** Day 6 (2026-11-04, finding 21): the Watcher addressed this being's own moment; it owes a card — the quiet-beat rule is off. */
+  prompted?: boolean;
+  /** Day 6 (2026-11-04, finding 23): memories that woke in its last cards — recent thoughts, not wakes. */
+  recentWakes?: string[];
   facts: string[];
   sinceOwn?: string | null;
   /** Already perceived (the perception order was placed before the memory was stored): skip that order. */
@@ -153,6 +160,31 @@ export interface Candidates {
   near: string[];
   going: GoingRef[];
   remember: Array<{ text: string; age?: string; why: string }>;
+  /** Day 6 (2026-11-04, finding 23: 30 stays, 1 act): the acts the being COULD take now, derived from what is going and what it holds. */
+  acts?: string[];
+}
+
+/**
+ * THE ACTS A BEING COULD TAKE NOW, from the ledger alone (Day 6, 2026-11-04, finding 23: a phone rang thirty times in her hand and
+ * "act" was never chosen — the list offered things, signals and memories, and "act" had no object). A held signal offers its own
+ * answers; the one who set it off can end it; and there is always leaving things be. Pure.
+ */
+export function actsFor(going: GoingRef[], held: string[]): string[] {
+  const out: string[] = [];
+  for (const g of going) {
+    const who = g.other ?? (g.mine ? g.holder : 'whoever it is');
+    if (!g.mine) {
+      if (g.state === 'connected') out.push(`say something to ${who} on the line`, 'hang up');
+      else if (g.state === 'received') out.push('read the message', `write back to ${who}`);
+      else out.push('answer it', 'decline it and let it go', 'silence it and leave it');
+    } else {
+      if (g.state === 'connected') out.push(`say something to ${who} on the line`, 'hang up');
+      else if (g.state === 'received') out.push(`write ${who} again`);
+      else out.push('hang up', 'keep waiting on the line');
+    }
+  }
+  out.push(held.length ? 'put down what you are holding and go on with what you were doing' : 'go on with what you were doing');
+  return [...new Set(out)].slice(0, 6);
 }
 
 /** The numbered lists the local model chooses from. Pure. */
@@ -161,6 +193,7 @@ export function candidateLines(c: Candidates): string[] {
   c.near.forEach((n, i) => out.push(`N${i + 1}: ${n}`));
   c.going.forEach((g, i) => out.push(`G${i + 1}: ${g.text}${g.mine ? ' (you set this off)' : ''}`));
   c.remember.forEach((m, i) => out.push(`M${i + 1}: ${m.age ? `${m.age}: ` : ''}${m.text} — ${m.why}`));
+  (c.acts ?? []).forEach((a, i) => out.push(`A${i + 1}: ${a}`));
   return out;
 }
 
@@ -179,7 +212,7 @@ export function chooserPrompt(a: { name: string; identity: string; desires: stri
     '',
     `WHAT JUST REACHED ${a.name.toUpperCase()}: ${perceived ?? 'nothing new'}`,
     `HOW ${a.name.toUpperCase()} FEELS: ${felt}`,
-    `WHAT ${a.name.toUpperCase()} COULD BE THINKING ABOUT (N = here with them, G = still going, M = remembered, then):`,
+    `WHAT ${a.name.toUpperCase()} COULD BE THINKING ABOUT (N = here with them, G = still going, M = remembered, then) AND COULD DO (A):`,
     lines.length ? lines.join('\n') : '(nothing)',
     '',
     'Choose:',
@@ -187,9 +220,10 @@ export function chooserPrompt(a: { name: string; identity: string; desires: stri
     // Table test run 2 (2026-11-03): with nothing new, Violet thought about her key ring and her shirts, card after card.
     `- When NOTHING reached ${a.name} and nothing is still going, the usual answer is nothing at all: "about": [] and no picture. A thing merely in their hands is not a thought. Choose something only when a memory or a picture truly presses on them in this quiet.`,
     `- "imagine": a picture ${a.name} holds right now of what they cannot see or know - what someone elsewhere may be doing, what may come next - one short sentence, or null. Built only from what is on the list and what reached them; it is a picture, never a thing seen or done, and it knows nothing the list does not.`,
-    `- "impulse": "speak" if ${a.name} would say something now, "act" if they would do something now, "stay" if they let it sit.`,
-    '- "why": when staying, what holds them, in a few words.',
-    'Answer with JSON only: {"about": string[], "imagine": string|null, "impulse": "speak"|"act"|"stay", "why"?: string}',
+    `- "impulse": "speak" if ${a.name} would say something now, "act" if they would do something now, "stay" if they let it sit. Something still going in their own hands asks for an answer sooner or later: a person who lets it go on and on is choosing that, and says why.`,
+    `- "act": when the impulse is "act", the A code of what ${a.name} does now (required then; only codes from the list).`,
+    '- "why": what holds them when they stay, or what moves them when they act, in a few words.',
+    'Answer with JSON only: {"about": string[], "imagine": string|null, "impulse": "speak"|"act"|"stay", "act"?: string, "why"?: string}',
   ].filter(Boolean).join('\n');
 }
 
@@ -197,9 +231,10 @@ const CHOICE_SCHEMA = z.object({
   about: z.array(z.string()).default([]),
   imagine: z.string().nullable().optional(),
   impulse: z.enum(['speak', 'act', 'stay']),
+  act: z.string().nullable().optional(),
   why: z.string().nullable().optional(),
 });
-export interface Choice { about: string[]; imagine?: string; impulse: Impulse; why?: string }
+export interface Choice { about: string[]; imagine?: string; impulse: Impulse; act?: string; why?: string }
 
 /** The choice out of the local answer, with every code resolved against the candidates; null when it does not parse. Pure. */
 export function parseChoice(text: string, c: Candidates): Choice | null {
@@ -211,7 +246,11 @@ export function parseChoice(text: string, c: Candidates): Choice | null {
     const valid = new Set(candidateLines(c).map((l) => l.split(':')[0]));
     const about = [...new Set(p.data.about.map((x) => x.trim().toUpperCase()).filter((x) => valid.has(x)))].slice(0, 3);
     const imagine = p.data.imagine?.trim();
-    return { about, ...(imagine ? { imagine } : {}), impulse: p.data.impulse, ...(p.data.why ? { why: p.data.why } : {}) };
+    const actCode = p.data.act?.trim().toUpperCase();
+    const act = actCode && /^A\d+$/.test(actCode) && valid.has(actCode) ? actCode : undefined;
+    // An "act" with nothing chosen to do is a stay (the table runs only an act it can name).
+    const impulse = p.data.impulse === 'act' && !act ? 'stay' : p.data.impulse;
+    return { about, ...(imagine ? { imagine } : {}), impulse, ...(act && impulse === 'act' ? { act } : {}), ...(p.data.why ? { why: p.data.why } : {}) };
   } catch {
     return null;
   }
@@ -227,7 +266,8 @@ export function resolveRecord(choice: Choice, perceived: string | null, felt: st
     return undefined;
   }).filter((x): x is string => !!x);
   const remember = choice.about.filter((x) => x.startsWith('M')).map((x) => c.remember[Number(x.slice(1)) - 1]).filter(Boolean);
-  return { perceived, felt, going: c.going, near: c.near, remember, about, ...(choice.imagine ? { imagine: choice.imagine } : {}), impulse: choice.impulse, ...(choice.why ? { why: choice.why } : {}) };
+  const act = choice.act ? c.acts?.[Number(choice.act.slice(1)) - 1] : undefined;
+  return { perceived, felt, going: c.going, near: c.near, remember, about, ...(choice.imagine ? { imagine: choice.imagine } : {}), impulse: choice.impulse, ...(act ? { act } : {}), ...(choice.why ? { why: choice.why } : {}) };
 }
 
 /** A record with nothing in it is no beat. Pure. */
@@ -242,6 +282,7 @@ export function recordGist(r: BeatRecord): string {
     r.going.length ? `going: ${r.going.map((g) => g.text).join('; ')}` : '',
     r.about.length ? `about: ${r.about.join('; ')}` : 'about nothing in particular',
     r.imagine ? `pictures: ${r.imagine}` : '',
+    r.act ? `does: ${r.act}` : '',
   ].filter(Boolean);
   return parts.join(' · ');
 }
@@ -259,7 +300,9 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   const ctx = { campaignId: a.campaignId, entityId: a.entityId, beatKey };
   const self = await standingSelfOf(a.entityId, a.name, a.identity, overrides);
   const perceivedRaw = a.perceived ?? (await orderPerception({ envelope: a.envelope, event: a.event, senses: a.senses, own: a.own }, ctx, overrides));
-  const perceived = a.standing || NOTHING.test(perceivedRaw.trim()) ? null : perceivedRaw;
+  // Day 6 (2026-11-04, finding 21): a Watcher line about the being's own moment ("Violet realizes… Time to decide") is a prompt —
+  // what reached it is the Watcher's words, never "nothing new"; it owes a card.
+  const perceived = a.standing || (!a.prompted && NOTHING.test(perceivedRaw.trim())) ? null : (a.prompted && NOTHING.test(perceivedRaw.trim()) ? a.event : perceivedRaw);
   const fragments = a.memories.slice(0, 8).map((m, i) => ({ i, text: m.text, ...(m.age ? { age: m.age } : {}) }));
   const going = (a.going ?? []).slice(0, 4);
   // A QUIET BEAT (run 2, 2026-11-03: every quiet beat cost three cloud orders and a local choice, ~20 s, to think about a key ring).
@@ -279,8 +322,11 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   // THE REPLAY, again (run 2): recall surfaced the perception just stored ("Your phone chimes once") as a memory that woke. A fragment
   // with no age that reads like what just reached the being is the moment itself, not a memory.
   const isNow = (f: { text: string; age?: string }) => !f.age && !!perceived && (f.text.includes(perceived.slice(0, 40)) || perceived.includes(f.text.slice(0, 40)));
-  const wakes = (rec?.wakes ?? []).filter((w) => fragments[w.i] && !isNow(fragments[w.i])).slice(0, 3).map((w) => ({ text: fragments[w.i].text, ...(fragments[w.i].age ? { age: fragments[w.i].age } : {}), why: w.why }));
-  const candidates: Candidates = { near: [...a.held.map((h) => naturalName(h, true)), ...(a.near ?? []).map((n) => naturalName(n, false))].slice(0, 12), going, remember: wakes };
+  // Day 6 (2026-11-04, finding 23): a memory that woke in the being's last cards is a recent thought, not a wake (Rosemary on the
+  // porch steps, six cards of seven).
+  const recentWake = (f: { text: string }) => (a.recentWakes ?? []).some((w) => w.slice(0, 60) === f.text.slice(0, 60));
+  const wakes = (rec?.wakes ?? []).filter((w) => fragments[w.i] && !isNow(fragments[w.i]) && !recentWake(fragments[w.i])).slice(0, 3).map((w) => ({ text: fragments[w.i].text, ...(fragments[w.i].age ? { age: fragments[w.i].age } : {}), why: w.why }));
+  const candidates: Candidates = { near: [...a.held.map((h) => naturalName(h, true)), ...(a.near ?? []).map((n) => naturalName(n, false))].slice(0, 12), going, remember: wakes, acts: actsFor(going, a.held) };
   const tPieces = Date.now();
 
   let choice: Choice | null = null;

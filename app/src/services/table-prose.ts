@@ -1,3 +1,5 @@
+import { nearestRosterName } from './roster-match';
+
 /**
  * Table prose — the GM types normal tabletop prose and the system picks up
  * what's what (Mike 2026-09-26: "The system shouldn't need a tab switcher.
@@ -29,6 +31,9 @@ export interface ProseAction {
   text: string;
   actorId: string;
   actorLabel: string;
+  /** Day 6 (2026-11-04, finding 22): the sentence's subject is a thing of this character's ("Her phone rings again", "Kristopher's hand
+   * drops") — attributed to them for the record, but NOT their deed: no own-stimulus, no self-verdict; the world at the thing. */
+  owned?: boolean;
 }
 
 /**
@@ -223,7 +228,7 @@ export function splitDurationClause(sentence: string, actor: ProseRosterEntry): 
  * ("Kristopher knocks twice.") or a bare he/she that the table resolves. A
  * possessive opener ("Kristopher's door creaks") is not his act. Pure.
  */
-export function sentenceActor(sentence: string, roster: ProseRosterEntry[], recent: ProseRosterEntry[], opts: { ownedThings?: boolean } = {}): ProseRosterEntry | null {
+export function sentenceActor(sentence: string, roster: ProseRosterEntry[], recent: ProseRosterEntry[], opts: { ownedThings?: boolean; possessives?: boolean } = {}): ProseRosterEntry | null {
   const s = sentence.trim();
   for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
     const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -231,6 +236,16 @@ export function sentenceActor(sentence: string, roster: ProseRosterEntry[], rece
     if (new RegExp(`^${name}(?!['’]s\\b)(?=$|[^\\w])`, 'i').test(s)) return entry;
   }
   if (SUBJECT_PRONOUN_RE.test(s)) return pronounActor(s.split(/\s+/)[0]!, recent);
+  // A MISSPELLED NAME IS THAT PERSON (Day 6, 2026-11-04, finding 5: speech-to-text wrote "Christopher" for Kristopher and JEWL
+  // asked about a stranger). A capitalized head token near one roster name — and not that name's possessive — is that character.
+  const headTok = /^([A-Z][\w’']+)(?=$|[^\w])/.exec(s)?.[1];
+  if (headTok) {
+    const near = nearestRosterName(headTok, roster.map((r) => ({ id: r.id, name: r.name })));
+    // The name's own possessive ("Violets phone") is a thing of theirs, handled below — never the subject.
+    const tok = headTok.toLowerCase();
+    const isPossessiveOfNear = !!near && tok !== near.name.toLowerCase() && tok !== near.name.trim().split(/\s+/)[0].toLowerCase() && /s$/i.test(tok);
+    if (near && !isPossessiveOfNear) { const e = roster.find((r) => r.id === near.id); if (e) return e; }
+  }
   // "Then he knocks on Violet's door." / "Slowly, Kristopher turns.": the subject stands after an opener.
   const lead = pastOpener(s);
   if (lead !== s) {
@@ -254,15 +269,22 @@ export function sentenceActor(sentence: string, roster: ProseRosterEntry[], rece
   // "A tear falls from his eye." / "Kristopher's hand drops." — about a part or thing of his: his
   // card (HW3, Mike 2026-10-24: "didn't end up as proper cards"). Not for a speaker lookup
   // (ownedThings false): "Violet's door stays shut." puts no words in her mouth.
-  if (opts.ownedThings !== false) {
+  if (opts.ownedThings !== false && opts.possessives !== false) {
     for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
       const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      if (name && new RegExp(`\\b${name}['’]s\\b`, 'i').test(s)) return entry;
+      // "Violet's phone" and "Violets phone" (thumbs, speech-to-text) are both hers (Day 6, 2026-11-04).
+      if (name && new RegExp(`\\b${name}(?:['’]s|s)\\b`, 'i').test(s)) return entry;
     }
   }
+  if (opts.possessives === false) return null;
   const possessive = s.match(/\b(his|her)\b/i);
   if (possessive) return pronounActor(possessive[1], recent);
   return null;
+}
+
+/** True when the sentence is about a thing of the character's, not the character acting ("Her phone rings again"). Pure. */
+export function ownedThingSentence(sentence: string, roster: ProseRosterEntry[], recent: ProseRosterEntry[]): boolean {
+  return !!sentenceActor(sentence, roster, recent) && !sentenceActor(sentence, roster, recent, { possessives: false });
 }
 const SCRIPT_PREFIX_RE = /^\s*([A-Z][\w.'’-]*(?:\s+[A-Z][\w.'’-]*){0,3}):\s*(.+)$/;
 // Verbs that end the noun phrase introducing a speaker ("A lass behind the bar GIVES you a wink").
@@ -469,7 +491,11 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
       // A bare speech tag ("Ruth says,") is neither narration nor an act — the quote beside it is the record.
       if (!body) { lastKind = 'tag'; continue; }
       if (isThoughtBody(body)) { thoughts.push({ text: body, sentence, actorId: actor.id, actorLabel: actor.name }); lastKind = 'thought'; }
-      else { actions.push({ text: body, actorId: actor.id, actorLabel: actor.name }); lastKind = 'act'; }
+      else {
+        const owned = ownedThingSentence(sentence, roster, recent);
+        actions.push({ text: body, actorId: actor.id, actorLabel: actor.name, ...(owned ? { owned: true } : {}) });
+        lastKind = 'act';
+      }
     }
     const kept = rest.join(' ').trim();
     if (kept) { narrationParts.push(kept); noteActor(lastRosterName(kept, roster)); }

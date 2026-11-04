@@ -130,7 +130,7 @@ function declarationRows(e: TerminalEvent, p: GameEventPayload, roster: RosterNa
   const raw = p.raw ?? p.description;
   let narration: string | null;
   let speech: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
-  let actions: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
+  let actions: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string; owned?: boolean }>;
   let thoughts: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
   if (Array.isArray(p.speech)) {
     speech = p.speech;
@@ -151,13 +151,28 @@ function declarationRows(e: TerminalEvent, p: GameEventPayload, roster: RosterNa
   }
   // ONE card per character: its acts (Body red), thoughts (Soul blue) and words (Spirit purple) in the order the
   // Watcher wrote them (Mike 2026-10-25: "one Kristopher card that had his actions and thoughts all in one card").
+  // An OWNED action ("Her phone rings again") is attributed to a character but is not their deed: it reads as narration,
+  // in its place in the line, never in the card.
+  const owned = actions.filter((a) => a.owned);
+  if (owned.length) actions = actions.filter((a) => !a.owned);
+  const hay = p.description.toLowerCase();
+  const posOf = (s: string) => { const i = hay.indexOf(s.trim().toLowerCase().replace(/[.!?…"]+$/, '')); return i < 0 ? Number.POSITIVE_INFINITY : i; };
+  const placed: Array<{ pos: number; row: NarrationRowModel | CharacterRowModel }> = [];
+  owned.forEach((a, i) => {
+    const text = (a.sentence ?? a.text).trim();
+    if (text) placed.push({ pos: posOf(text), row: { type: 'narration', key: `${e.id}#o${i}`, timestamp: e.timestamp, cycle: p.cycle, text, raw: text, via, voicedBy: e.actorName || null } });
+  });
+  const ownedAt = rows.length;
   characterCards(p.description, { narration, speech, actions, thoughts }).forEach((card, i) => {
-    rows.push({
+    const cardRow: CharacterRowModel = {
       type: 'character', key: `${e.id}#c${i}`, timestamp: e.timestamp, cycle: p.cycle,
       characterId: card.id, name: card.label, segments: mergeAdjacent(card.segments.map((s): FeedSegment => ({ kind: s.kind, text: s.text, ...((s as { narrated?: string }).narrated ? { narrated: (s as { narrated?: string }).narrated } : {}) }))),
       raw, via, voice: 'Watcher', voicedBy: e.actorName || null, fromNarration: true,
-    });
+    };
+    placed.push({ pos: Math.min(...card.segments.map((s) => posOf((s as { source?: string }).source ?? s.text)), Number.POSITIVE_INFINITY), row: cardRow });
   });
+  placed.sort((a, b) => a.pos - b.pos);
+  rows.splice(ownedAt, 0, ...placed.map((x) => x.row));
   if (rows.length === 0 && p.description.trim()) {
     rows.push({ type: 'narration', key: e.id, timestamp: e.timestamp, cycle: p.cycle, text: p.description.trim(), raw, via, voicedBy: e.actorName || null });
   }

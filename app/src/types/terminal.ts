@@ -129,7 +129,7 @@ export interface GameEventPayload extends TableFeedFields {
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
   /** …and each `::action::` it wrote for a roster character (2026-10-23). The feed draws these as that character's own action rows.
    *  `sentence` = the seed sentence a built act derives from (scene-builder 2026-10-25). */
-  actions?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string }>;
+  actions?: Array<{ actorId: string; actorLabel: string; text: string; sentence?: string; owned?: boolean }>;
   /** The scene builder wrote the narration and the cards up from the Watcher's seed (`raw` holds the seed; `seedNarration` the seed's own narration). */
   built?: boolean;
   seedNarration?: string | null;

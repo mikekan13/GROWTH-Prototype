@@ -26,7 +26,7 @@ describe('table-test asserts', () => {
     expect(ok.pass).toBe(true); expect(ok.evidence).toEqual([]);
   });
   const ringing = { id: 'ph', name: 'phone', holderId: 'v', locationId: null, status: 'ok', signal: { text: 'ringing', since: T0, until: T0 + 60000, by: 'k' } };
-  const withPhone = (): Partial<RunTranscript> => ({ ledger: [{ lineIndex: 0, at: T0, items: [ringing], beings: [] }] });
+  const withPhone = (): Partial<RunTranscript> => ({ ledger: [{ lineIndex: 0, at: T0, cycle: T0 + 1000, items: [ringing], beings: [] }] });
   it('A2 stillGoing', () => {
     expect(stillGoing(make({ ...withPhone(), cards: [card({ text: 'It stopped ringing.' })] })).pass).toBe(false);
     expect(stillGoing(make({ ...withPhone(), cards: [card({ text: 'It keeps ringing.' })] })).pass).toBe(true);
@@ -58,9 +58,9 @@ describe('table-test asserts', () => {
   });
   it('A7 watcherLineStands', () => {
     const script = { name: 's', world: { snapshot: '', from: '' }, steps: [{ line: 'Kristopher hangs up.', waitS: 5 }] };
-    const live = { lineIndex: 0, at: T0, items: [ringing], beings: [{ characterId: 'k', name: 'Kristopher', locationId: 'car' }] };
+    const live = { lineIndex: 0, at: T0, cycle: T0 + 1000, items: [ringing], beings: [{ characterId: 'k', name: 'Kristopher', locationId: 'car' }] };
     expect(watcherLineStands(make({ script, ledger: [live] })).pass).toBe(false);
-    const gone = { ...live, items: [{ ...ringing, signal: { ...ringing.signal, until: T0 + 10000 } }] };
+    const gone = { ...live, cycle: T0 + 20000, items: [{ ...ringing, signal: { ...ringing.signal, until: T0 + 10000 } }] };
     expect(watcherLineStands(make({ script, ledger: [gone] })).pass).toBe(true);
   });
   it('A8 timing', () => {
@@ -97,7 +97,7 @@ describe('table-test asserts', () => {
   });
   it('runAsserts order and summarize', () => {
     const rs = runAsserts(make({ cards: [card({ text: 'The bill is still by the door.' })] }));
-    expect(rs.map((r) => r.id)).toEqual(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'A12']);
+    expect(rs.map((r) => r.id)).toEqual(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'A12', 'A14', 'A15', 'A18', 'A19', 'A20', 'A21']);
     const md = summarize(rs);
     expect(md).toContain('| A1 | absentThing | FAIL | 1 |');
     expect(md).toContain('**A1 absentThing**');
