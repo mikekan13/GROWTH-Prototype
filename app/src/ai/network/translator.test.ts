@@ -105,7 +105,7 @@ describe('a stray placeholder never reaches the page (session 2 live, 2026-11-03
 describe('a thing after a determiner follows the sentence on the way back (run 7, 2026-11-04)', () => {
   it('lowercases a label after "my"/"the", keeps a proper name inside, keeps people and sentence starts', () => {
     const map = newTranslationMap();
-    const names = [{ name: 'Personal phone', kind: 'item' as const }, { name: 'Chess Pizza polo', kind: 'item' as const }, { name: 'Violet', kind: 'person' as const }];
+    const names = [{ name: 'Personal phone', kind: 'thing' as const }, { name: 'Chess Pizza polo', kind: 'thing' as const }, { name: 'Violet', kind: 'person' as const }];
     const out = translateOut('Violet sees the Personal phone and my Chess Pizza polo. Personal phone rings.', names, map).text;
     expect(translateBack(out, map)).toBe('Violet sees the personal phone and my Chess Pizza polo. Personal phone rings.');
   });
