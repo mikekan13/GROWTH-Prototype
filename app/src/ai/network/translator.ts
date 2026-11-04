@@ -98,7 +98,15 @@ export function translateBack(text: string, map: TranslationMap): string {
     .sort((a, b) => b.length - a.length)
     .map(escapeRegex);
   const re = new RegExp(`(?<![A-Za-z0-9_-])(?:${alts.join('|')})(?![A-Za-z0-9_])`, 'g');
-  return text.replace(re, (ph) => map.toReal.get(ph) ?? ph);
+  // A THING IN THE BEING'S MOUTH (table test run 7, 2026-11-04: "I set my Personal phone down"): the ledger's label comes back in its
+  // own casing; after a lowercase determiner ("my", "the") a thing's first letter follows the sentence, unless a proper name sits
+  // inside the label ("my Chess Pizza polo"). People and places keep their capitals.
+  return text.replace(re, (ph: string, offset: number) => {
+    const real = map.toReal.get(ph) ?? ph;
+    if (!ph.startsWith('Thing-') || !/\b(?:my|the|her|his|their|a|an|that|this|your|our)\s$/i.test(text.slice(Math.max(0, offset - 8), offset))) return real;
+    if (/\s[A-Z][a-z]/.test(real)) return real;
+    return real.charAt(0).toLowerCase() + real.slice(1);
+  });
 }
 
 const COMMON_LEAD = /^(the|her|his|their|my|a|an)\s/i;
