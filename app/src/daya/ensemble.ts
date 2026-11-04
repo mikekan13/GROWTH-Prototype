@@ -1144,7 +1144,7 @@ export async function listenStimulus(
         memories: (recallResult.surfaced ?? []).filter((s) => !!s.content).map((s) => ({ text: s.content!, ...(s.age ? { age: s.age } : {}) })),
         // Run 2 (2026-11-03): the record's near things are NAMES ("Her phone"), not the described held lines ("The Her phone: Her phone - camera, map...").
         innerSoFar: innerState, recent: priorVoice.slice(0, 4), held: (heldRows ?? []).map((h) => h.name), near: ledger?.near ?? [], going: ledger?.going ?? [], facts: ground.lines.slice(0, 10), sinceOwn,
-        did: ctx.campaignId ? await ownRecentActs(ctx.campaignId, ctx.characterId) : [],
+        did: ctx.campaignId ? await liveVoiceBound(ctx.campaignId).then((b) => ownRecentActs(ctx.campaignId!, ctx.characterId, b.sessionId ?? null)).catch(() => [] as string[]) : [],
       }, overrides);
       if (beat) {
         composedFelt = beat.felt;
@@ -1738,9 +1738,11 @@ export async function answerAsk(
  * When a line is about this being alone, the whole line is its beat (the words of a text it wrote live there); when others act in
  * the same line, only its own sentences. Its own words are its knowledge of the moment - never a question to itself.
  */
-async function ownRecentActs(campaignId: string, characterId: string): Promise<string[]> {
+async function ownRecentActs(campaignId: string, characterId: string, sessionId: string | null): Promise<string[]> {
   try {
-    const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'game_event', sessionId: { not: null } }, orderBy: { createdAt: 'desc' }, take: 12, select: { payload: true } });
+    // Only the live session's lines (Day 6 round 3): another session's record is memory, not "what I just did".
+    if (!sessionId) return [];
+    const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'game_event', sessionId }, orderBy: { createdAt: 'desc' }, take: 12, select: { payload: true } });
     const out: string[] = [];
     for (const r of rows) {
       let p: any;

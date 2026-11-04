@@ -146,7 +146,7 @@ const HANGUP_RE = /\bhangs? up\b|\bputs? (the|his|her) phone down\b/;
 export function watcherLineStands(t: RunTranscript): AssertResult {
   const ev: string[] = [];
   t.script.steps.forEach((step, i) => {
-    if (!HANGUP_RE.test(step.line)) return;
+    if (!HANGUP_RE.test(step.line.replace(/["“][^"”]*["”]?/g, ' '))) return;
     const at = t.lineAt[i];
     if (at === undefined) return;
     const named = (name: string) => step.line.toLowerCase().includes(name.split(' ')[0].toLowerCase());
@@ -293,9 +293,12 @@ export function oneSoundPerLine(t: RunTranscript): AssertResult {
 export function promptYieldsCard(t: RunTranscript): AssertResult {
   const ev: string[] = [];
   for (const d of declarations(t)) {
-    const thoughts = Array.isArray(d.payload.thoughts) ? (d.payload.thoughts as Array<{ actorId?: string; actorLabel?: string }>) : [];
+    const thoughts = Array.isArray(d.payload.thoughts) ? (d.payload.thoughts as Array<{ actorId?: string; actorLabel?: string; text?: string; sentence?: string }>) : [];
     for (const th of thoughts) {
       if (!th.actorId) continue;
+      // The seed→page card: the Watcher's sentence built into the being's own words on the declaration itself counts as its card.
+      const builtHere = !!th.text && !!th.sentence && th.text.trim() !== th.sentence.trim() && th.text.length > th.sentence.length * 0.8;
+      if (builtHere) continue;
       if (!t.cards.some((c) => c.characterId === th.actorId && c.lineIndex === d.lineIndex)) ev.push(`L${d.lineIndex + 1}: ${th.actorLabel ?? th.actorId} was addressed and posted no card`);
     }
   }

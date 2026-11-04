@@ -76,6 +76,9 @@ Rules:
    cancels the call, stops knocking — with {"op":"stop"}; it ends every signal
    the actor set off. Waiting while it goes on is nothing: [].
    A sound the act causes at a thing ANOTHER being holds is {"op":"sound"}.
+   A sound the LINE narrates at a thing the actor holds ("Her phone rings
+   again") is {"op":"sound","at":<that thing>} too — even when the Facts say
+   it was answered: the table decides what the Watcher's line means.
    A call or message makes the CALLED person's carried device sound — name it
    from the "Within reach of a signal" list (never the caller's own phone, and
    never take/give/put a thing on that list).
