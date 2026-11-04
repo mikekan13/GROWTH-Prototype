@@ -475,18 +475,34 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           break;
         }
         case 'answer': {
-          const item = await findItemByName(campaignId, e.item, { holderId: actor.id });
-          if (!item) { report.refused.push(`answer "${e.item}": ${actor.name} is not holding it`); break; }
-          const row = await prisma.campaignItem.findUnique({ where: { id: item.id }, select: { data: true } });
           const { withoutSignal, withSignal, liveSignal, signalInState } = await import('./item-signal');
           const { clockNow } = await import('./table-clock');
           const { cycle } = await clockNow(campaignId);
+          let item = await findItemByName(campaignId, e.item, { holderId: actor.id });
+          // THE ANSWER TOLD FROM THE CALLER'S SIDE (finding 32, 2026-11-04: "hears the ring stop and someone breathing" left the call
+          // RINGING, so nothing crossed the line all run): a thing the ACTOR set ringing, in someone else's hand, is answered by its holder.
+          let answeredByHolder: { id: string; name: string } | null = null;
+          if (!item) {
+            const theirs = await findItemByName(campaignId, e.item, { holderId: { not: null } }).catch(() => null);
+            const row0 = theirs ? await prisma.campaignItem.findUnique({ where: { id: theirs.id }, select: { data: true, holderId: true } }) : null;
+            const sig0 = row0 ? liveSignal(parseData(row0.data ?? null), cycle) : null;
+            if (theirs && row0?.holderId && sig0?.by === actor.id && sig0.state !== 'received') {
+              const holder = await prisma.character.findUnique({ where: { id: row0.holderId }, select: { id: true, name: true } }).catch(() => null);
+              if (holder) { item = theirs; answeredByHolder = holder; }
+            }
+          }
+          if (!item) { report.refused.push(`answer "${e.item}": ${actor.name} is not holding it`); break; }
+          const row = await prisma.campaignItem.findUnique({ where: { id: item.id }, select: { data: true } });
           const d = parseData(row?.data ?? null);
           const sig = liveSignal(d, cycle);
           // Day 6 (2026-11-04): answering a RINGING call opens the line (connected: speech crosses both ways until someone hangs up);
           // answering a received message is reading it (the signal is done); answering a thing that is quiet clears whatever was there.
           if (sig && sig.state !== 'received' && sig.by) {
             await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withSignal(d, signalInState(sig, 'connected'))) } });
+            if (answeredByHolder) {
+              report.applied.push(`${answeredByHolder.name} answers "${item.name}" — on the line with ${actor.name}`);
+              break;
+            }
             const caller = await prisma.character.findUnique({ where: { id: sig.by }, select: { name: true } }).catch(() => null);
             report.applied.push(`${actor.name} answers "${item.name}" — on the line with ${caller?.name ?? 'the caller'}`);
           } else {

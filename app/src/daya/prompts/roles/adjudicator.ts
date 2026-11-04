@@ -75,6 +75,11 @@ Rules:
    goes on. The one who SET a signal off ends it from their side — hangs up,
    cancels the call, stops knocking — with {"op":"stop"}; it ends every signal
    the actor set off. Waiting while it goes on is nothing: [].
+   THE ANSWER TOLD FROM THE CALLER'S SIDE (finding 32, 2026-11-04): a line that
+   says the call the actor set off was picked up — "hears the ring stop and
+   someone breathing", "she answers", "the line opens", "a voice says hello" —
+   is {"op":"answer","item":<the CALLED person's ringing thing>} too: the
+   holder answers it, the line stands, the call is open both ways.
    A sound the act causes at a thing ANOTHER being holds is {"op":"sound"}.
    A sound the LINE narrates at a thing the actor holds ("Her phone rings
    again") is {"op":"sound","at":<that thing>} too — even when the Facts say
