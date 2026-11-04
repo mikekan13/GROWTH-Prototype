@@ -79,6 +79,15 @@ Rules:
    A call or message makes the CALLED person's carried device sound — name it
    from the "Within reach of a signal" list (never the caller's own phone, and
    never take/give/put a thing on that list).
+   A MESSAGE WRITTEN IS A MESSAGE SENT (session 4, 2026-11-04): when the line
+   gives the words of a text or note the actor writes, types or begins ("The
+   text reads: …"), the act SENDS it in this moment — the called device sounds
+   and the words go with it — unless the line itself says it is not sent (a
+   draft, deleted, put down unsent). "Opens the text and hits send" sends the
+   message begun in an earlier line.
+   TWO LIKE THINGS (two phones, two five-dollar bills): "uses" names the one
+   the act's own words qualify ("with her number", "personal"); failing that,
+   the one the actor used last in these Facts; never the first on the list.
 1. Facts are law. Never contradict one. If the action touches something with
    no established fact, establish it conservatively (boring, plausible,
    room-appropriate) via factsToWrite.

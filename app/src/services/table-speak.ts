@@ -1718,6 +1718,9 @@ async function withholdUnheld(
 }
 
 function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined, gm?: { userId: string; username: string }): void {
+  // ONE DEED, ONE SOUND (session 4, 2026-11-04, finding 13): "He dials her number… then he hits call" are two steps of one deed; each
+  // rang her phone, and the table heard two rings in the same second. The same sound at the same place from one line plays once.
+  const sounded = new Set<string>();
   for (const a of actions ?? []) {
     if (!a.actorId || !a.text.trim()) continue;
     // What the Watcher had it do settles what it meant to do (intentions, 2026-10-25).
@@ -1746,6 +1749,9 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
         // caller hears a ring beyond the door.
         for (const snd of r.effects?.sounds ?? []) {
           if (!gm) break;
+          const key = `${snd.locationId ?? snd.at}|${snd.text.trim().toLowerCase()}`;
+          if (sounded.has(key)) { console.log(`[table-speak] the world already sounded at ${snd.at} this line — once is enough: ${snd.text}`); continue; }
+          sounded.add(key);
           console.log(`[table-speak] the world sounds at ${snd.at}: ${snd.text}`);
           await narrateAtTable(campaignId, { userId: gm.userId, username: gm.username, role: 'WATCHER' } as TableActor, { message: snd.text, locationId: snd.locationId ?? null, worldEvent: true })
             .catch((err) => console.warn('[table-speak] the world\'s sound was not narrated (non-fatal):', err instanceof Error ? err.message : err));

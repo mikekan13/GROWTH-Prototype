@@ -1131,6 +1131,7 @@ export async function listenStimulus(
         memories: (recallResult.surfaced ?? []).filter((s) => !!s.content).map((s) => ({ text: s.content!, ...(s.age ? { age: s.age } : {}) })),
         // Run 2 (2026-11-03): the record's near things are NAMES ("Her phone"), not the described held lines ("The Her phone: Her phone - camera, map...").
         innerSoFar: innerState, recent: priorVoice.slice(0, 4), held: (heldRows ?? []).map((h) => h.name), near: ledger?.near ?? [], going: ledger?.going ?? [], facts: ground.lines.slice(0, 10), sinceOwn,
+        did: ctx.campaignId ? await ownRecentActs(ctx.campaignId, ctx.characterId) : [],
       }, overrides);
       if (beat) {
         composedFelt = beat.felt;
@@ -1714,4 +1715,36 @@ export async function answerAsk(
     timings: { waitMs, listen, ttftMs: call.ttftMs ?? null, firstWordMs: firstWordAt === null ? null : firstWordAt - t0, lineMs, tokensOut: call.tokensOut, retracted: streamed.retracted !== null, revoiced },
     after,
   };
+}
+
+/**
+ * WHAT IT JUST DID OR SAID (session 4, 2026-11-04, finding 17: "He doesn't even remember the text message he wrote just a beat
+ * before"). The being's own acts and words from the table's last lines in this session, latest first, as the table said them.
+ * When a line is about this being alone, the whole line is its beat (the words of a text it wrote live there); when others act in
+ * the same line, only its own sentences. Its own words are its knowledge of the moment - never a question to itself.
+ */
+async function ownRecentActs(campaignId: string, characterId: string): Promise<string[]> {
+  try {
+    const rows = await prisma.campaignEvent.findMany({ where: { campaignId, type: 'game_event', sessionId: { not: null } }, orderBy: { createdAt: 'desc' }, take: 12, select: { payload: true } });
+    const out: string[] = [];
+    for (const r of rows) {
+      let p: any;
+      try { p = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload; } catch { continue; }
+      if (p?.eventType !== 'declaration') continue;
+      const acts: Array<{ actorId?: string; text: string; sentence?: string }> = Array.isArray(p.actions) ? p.actions : [];
+      const speech: Array<{ actorId?: string; speakerId?: string; text: string }> = Array.isArray(p.speech) ? p.speech : [];
+      const who = (s: { actorId?: string; speakerId?: string }) => s.actorId ?? s.speakerId;
+      const mine = acts.filter((a) => a.actorId === characterId);
+      const said = speech.filter((s) => who(s) === characterId).map((s) => `"${s.text}"`);
+      if (!mine.length && !said.length) continue;
+      const others = acts.some((a) => a.actorId && a.actorId !== characterId) || speech.some((s) => who(s) && who(s) !== characterId);
+      const desc = typeof p.description === 'string' ? p.description.trim() : '';
+      const line = !others && desc ? desc : [...new Set(mine.map((a) => (a.sentence ?? a.text).trim()))].concat(said).join(' ');
+      if (line) out.push(line.length > 400 ? `${line.slice(0, 400)}…` : line);
+      if (out.length >= 4) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }

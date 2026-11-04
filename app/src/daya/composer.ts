@@ -36,6 +36,8 @@ export interface BeatRecord {
   remember: Array<{ text: string; age?: string; why: string }>;
   /** What the being is thinking about: entries of near / going / remember, as the composer chose them. */
   about: string[];
+  /** Its own acts and words from the table's last lines this session, latest first (finding 17, 2026-11-04): it knows these. */
+  did?: string[];
   /** A picture of what has not happened (ruling 2, 2026-11-03): allowed, marked, voiced as imagined. */
   imagine?: string;
   impulse: Impulse;
@@ -66,6 +68,8 @@ export interface ComposeArgs {
   /** Things in its room not in anyone's hands, and people in view. */
   near?: string[];
   going?: GoingRef[];
+  /** The being's own acts and words in this session, latest first, as the table said them (finding 17, 2026-11-04). */
+  did?: string[];
   facts: string[];
   sinceOwn?: string | null;
   /** Already perceived (the perception order was placed before the memory was stored): skip that order. */
@@ -161,7 +165,7 @@ export function candidateLines(c: Candidates): string[] {
 }
 
 /** The local composer's prompt: the being whole, the pieces, a choice by number. Pure. */
-export function chooserPrompt(a: { name: string; identity: string; desires: string; innerSoFar: string; sinceOwn?: string | null }, perceived: string | null, felt: string, c: Candidates): string {
+export function chooserPrompt(a: { name: string; identity: string; desires: string; innerSoFar: string; sinceOwn?: string | null; did?: string[] }, perceived: string | null, felt: string, c: Candidates): string {
   const lines = candidateLines(c);
   return [
     `You are the simulation, composing one moment of ${a.name}. Your agents have done the work below; you only CHOOSE what ${a.name} is thinking about now, from the list. You write nothing.`,
@@ -169,6 +173,8 @@ export function chooserPrompt(a: { name: string; identity: string; desires: stri
     `Who ${a.name} is: ${a.identity}`,
     `What ${a.name} wants these days: ${a.desires || '(nothing named)'}`,
     `What has been going through ${a.name}'s mind: ${a.innerSoFar || '(nothing yet)'}`,
+    // Finding 17 (2026-11-04): Kristopher did not know what he had just texted. Its own acts and words are its own knowledge.
+    a.did?.length ? `What ${a.name} just did or said, latest first (its own; it knows these words): ${a.did.join(' | ')}` : '',
     a.sinceOwn ? `It has been ${a.sinceOwn} since ${a.name} last said or did anything.` : '',
     '',
     `WHAT JUST REACHED ${a.name.toUpperCase()}: ${perceived ?? 'nothing new'}`,
@@ -291,6 +297,7 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   if (!choice) return null;
   const felt = (await moodP)?.felt?.trim() || a.feltBefore;
   const record = resolveRecord(choice, perceived, felt, candidates);
+  if (a.did?.length) record.did = a.did.slice(0, 4);
   const plan: BeatPlan = { gist: recordGist(record), impulse: record.impulse, ...(record.why ? { why: record.why } : {}) };
   const tPlan = Date.now();
   const wakesOut = record.remember.map((m) => ({ text: `${m.age ? `${m.age}: ` : ''}${m.text}`, why: m.why }));

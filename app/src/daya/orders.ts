@@ -54,6 +54,8 @@ export interface VoiceRecord {
   imagine?: string;
   impulse: 'speak' | 'act' | 'stay';
   why?: string;
+  /** Its own acts and words this session, latest first (finding 17, 2026-11-04). */
+  did?: string[];
 }
 export interface VoiceBrief {
   /** THE RECORD (GROUNDED-BEATS-PLAN-2026-11-03): what the being may think in - resolved references only. */
@@ -171,7 +173,7 @@ export function orderPrompt(order: Order): { system: string; user: string; maxTo
           'You give one being\'s thought its own voice, in a simulation. You are one part of a larger system: WHAT the being is thinking is decided below; you only put it in its voice.',
           'Write the thought as it goes through this being, first person, in its way of speaking: plain, particular, full sentences that run on like thought does.',
           // THE RECORD (GROUNDED-BEATS-PLAN-2026-11-03 section 3b): nothing outside it.
-          'Say only what the record gives. Nothing is here but what is HERE WITH IT. Nothing happens but what REACHED IT. What it REMEMBERS is then, with its age, never now. What it PICTURES is pictured - "I picture", "I imagine", "maybe", "probably" - never seen, heard or done (run 4: "I can see the screen lighting up" was a picture told as sight). Something STILL GOING is still going: never say it ended, was answered or was ignored. In a thought it does nothing and says nothing aloud. Nothing rings, chimes, knocks or sounds unless WHAT JUST REACHED IT or STILL GOING says so now.',
+          'Say only what the record gives. Nothing is here but what is HERE WITH IT. Nothing happens but what REACHED IT. What it REMEMBERS is then, with its age, never now. What it PICTURES is pictured - "I picture", "I imagine", "maybe", "probably" - never seen, heard or done (run 4: "I can see the screen lighting up" was a picture told as sight). Something STILL GOING is still going: never say it ended, was answered or was ignored. In a thought it does nothing and says nothing aloud. Nothing rings, chimes, knocks or sounds unless WHAT JUST REACHED IT or STILL GOING says so now. What IT JUST DID OR SAID is its own and done: it knows those words and may quote them; it never wonders what it said.',
           'Things are given as the being would say them ("my phone", "the five-dollar bill"); say them that way, never as a label.',
           'The way of speaking is a voice, not a formula: do not open sentences the same way twice, and do not lean on one stock phrase.',
           'No metaphors for silence, weight, breath, light or dark. Never repeat a sentence or an image from its recent thoughts. Under 60 words.',
@@ -204,6 +206,7 @@ export function recordLines(b: VoiceBrief): string[] {
   return ['THE RECORD:',
     `WHAT JUST REACHED IT: ${r.perceived ?? 'nothing new'}`,
     `HOW IT FEELS: ${r.felt}`,
+    r.did?.length ? `IT JUST DID OR SAID (its own, this session, latest first - it knows these words exactly and may quote them): ${r.did.join(' | ')}` : '',
     r.going.length ? `STILL GOING: ${r.going.map((g) => `${g.text}${g.mine ? ' (it set this off itself and knows it)' : ''}`).join('; ')}` : '',
     `HERE WITH IT (the only things it may place here): ${r.near.length ? r.near.join('; ') : 'nothing in particular'}`,
     r.remember.length ? 'IT REMEMBERS (then, not now):' : '',
