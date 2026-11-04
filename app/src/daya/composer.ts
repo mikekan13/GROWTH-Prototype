@@ -81,8 +81,10 @@ export interface ComposeArgs {
  */
 export function naturalName(name: string, mine: boolean): string {
   const bare = name.trim().replace(/^(?:the|her|his|their|a|an)\s+/i, '');
-  const proper = /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+$/.test(bare) && !/\s(?:phone|bill|wallet|key|cash|bag|box|receipt)s?$/i.test(bare);
-  const said = proper ? bare : bare.charAt(0).toLowerCase() + bare.slice(1);
+  // A capitalised word past the first is a proper name inside the label ("Chess Pizza polo"): the label stands as written.
+  // Otherwise only the label's first letter was the ledger's ("Personal phone" → "personal phone").
+  const properInside = /\s[A-Z][a-z]/.test(bare);
+  const said = properInside ? bare : bare.charAt(0).toLowerCase() + bare.slice(1);
   return mine ? `my ${said}` : `the ${said}`;
 }
 

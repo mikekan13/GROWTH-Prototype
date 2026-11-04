@@ -1447,6 +1447,9 @@ async function speakProseSplit(
 ): Promise<TableProseResult> {
   const rawMessage = input.message;
   let message = rawMessage;
+  // THE LINE'S OWN SECONDS (Day 5, 2026-11-03): each serial stage before any being is handed the line, logged as one table-timing row.
+  const lineT0 = Date.now(); const lineStages: Record<string, number> = {}; let lineLast = lineT0;
+  const stage = (name: string) => { const now = Date.now(); lineStages[name] = now - lineLast; lineLast = now; };
   if (!input.confirmTicketId && await saidJustNow(campaignId, rawMessage)) {
     throw new ValidationError('That exact line was said moments ago — nothing written twice. (A slow reply can make the page re-send; say something new.)');
   }
@@ -1466,6 +1469,7 @@ async function speakProseSplit(
     const speaker = soleActor(parsed) ?? proseCtx.lastVoiced?.id ?? null;
     const others = listeners.filter((l) => l.id !== speaker);
     const resolved = await resolveReferents(campaignId, message, speaker, others.length === 1 ? others[0].name : null);
+    stage('referents');
     if (resolved.kind !== 'none') {
       console.log(`[table-referents] ${resolved.kind}${resolved.value ? ` (${resolved.value})` : ''}: ${resolved.message.slice(0, 200)}`);
       message = resolved.message;
@@ -1478,6 +1482,7 @@ async function speakProseSplit(
   let plan = planFor(roster);
   // A THING THE ACTOR DOES NOT HAVE (2026-11-03): the line waits for the Watcher's answer; nothing below has run yet.
   if (!input.confirmTicketId) await withholdUnheld(campaignId, actor, parsed.actions, !!input.confirmUnheld, message);
+  stage('withhold');
 
   // 0. JEWL's read still comes BEFORE anything is written on this path (U2c-5 moves it beside the listening).
   //    A message with nothing in the world (only an ask, only ignored talk) has nothing for him to read.
@@ -1491,9 +1496,12 @@ async function speakProseSplit(
     const held = await readNarration(campaignId, actor, message, parsed, listeners);
     if (held) return { held, canonEventId: null, dialogue: [], narration: parsed.narration, responses: [] };
   }
+  stage('jewl');
 
   // 0b. TIME — the line costs the world what it states, else what it plausibly takes (table-clock).
   if (plan.world.length) await liveStatedTime(campaignId, actor, await advanceClockForLine(campaignId, 'gm-line', message), message);
+  stage('clock');
+  console.log(`[table-timing] ${JSON.stringify({ kind: 'line', totalBeforeBeatsMs: Date.now() - lineT0, stages: lineStages })}`);
 
   // 1. TRUTH — as speakProse writes it, minus what was not part of the world.
   const narration = canonNarration(parsed.full, plan);

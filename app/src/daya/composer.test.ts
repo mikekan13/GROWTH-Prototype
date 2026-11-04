@@ -82,6 +82,17 @@ describe('the composer chooses; it does not write (GROUNDED-BEATS-PLAN-2026-11-0
   });
 });
 
+import { naturalName } from './composer';
+describe('things as the being says them (run 3, 2026-11-03)', () => {
+  it('its own things are "my …", labels lose their capital, proper names inside stand', () => {
+    expect(naturalName('Personal phone', true)).toBe('my personal phone');
+    expect(naturalName('Her phone', true)).toBe('my phone');
+    expect(naturalName('Five-dollar bill with her number', true)).toBe('my five-dollar bill with her number');
+    expect(naturalName('Chess Pizza polo', true)).toBe('my Chess Pizza polo');
+    expect(naturalName('The cash in her wallet', false)).toBe('the cash in her wallet');
+  });
+});
+
 describe('a voice, not a formula (session 2 live, 2026-11-03)', () => {
   it('reads the opening of a thought', () => {
     expect(openingOf('I think I notice the room is doing something.')).toBe('i think i');
