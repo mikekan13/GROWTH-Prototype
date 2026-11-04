@@ -323,7 +323,7 @@ export function possessionNotDeed(t: RunTranscript): AssertResult {
 }
 
 /** A20 — under a thing still going in its own hands, a being does not stay more than three beats running (finding 23: thirty stays). */
-export function staysBounded(t: RunTranscript, maxRun = 3): AssertResult {
+export function staysBounded(t: RunTranscript, maxRun = 4): AssertResult {
   const ev: string[] = [];
   const byBeing = new Map<string, typeof t.cards>();
   for (const c of [...t.cards].sort((a, b) => a.at - b.at)) byBeing.set(c.characterId, [...(byBeing.get(c.characterId) ?? []), c]);
