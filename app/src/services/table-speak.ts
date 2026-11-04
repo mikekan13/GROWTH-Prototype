@@ -60,7 +60,7 @@ import {
 } from '@/services/canon';
 import { parseTableProse, splitSentences, closeUnclosedQuote, type ProseQuote, type ProseRosterEntry, type ProseThought } from '@/services/table-prose';
 import { ensureKeepalive } from '@/daya/l1-keepalive';
-import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, type ReconTicket } from '@/services/reconciliation';
+import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, dismissReconciliation, type ReconTicket } from '@/services/reconciliation';
 import { advanceClockForLine } from '@/services/table-clock';
 import type { ListenImpulse } from '@/daya/prompts/roles/spirit';
 import { recordBeingThought, attachBeingCard, type BeingThoughtRecord } from '@/services/being-thought';
@@ -996,7 +996,15 @@ async function runBeats(
           const standingHere = standingIds.delete(listenerId);
           cardDone();
           if (!repeat && !holding && sceneBuilderOn() && thought && !own && rowId) {
-            void buildBeingCard(campaignId, { id: listenerId, name }, carried.content, thought, await sceneFacts(campaignId, [listenerId])).catch(() => null).then(async (built) => {
+            // A COMPOSED THOUGHT NEEDS NO BUILDER (Day 5, 2026-11-04): the record bounded it and the voice wrote it whole. When the
+            // being stays, its card is that thought, one segment, no cloud call (the builder was 4-6.5 s of every card). An act or a
+            // word still goes through the builder, which splits the doing from the thinking.
+            const composedStay = !!outcome.listened?.pieces && outcome.listened?.impulse === 'stay';
+            if (composedStay) console.log(`[table-speak] ${name}: composed thought, stays — card attached without the builder`);
+            const buildP: Promise<Awaited<ReturnType<typeof buildBeingCard>>> = composedStay
+              ? Promise.resolve({ actorId: listenerId, actorLabel: name, scene: null, segments: [{ kind: 'thought' as const, text: thought! }] } as Awaited<ReturnType<typeof buildBeingCard>>)
+              : buildBeingCard(campaignId, { id: listenerId, name }, carried.content, thought, await sceneFacts(campaignId, [listenerId]));
+            void buildP.catch(() => null).then(async (built) => {
               let card = built;
               // THE REPLAY, on the card (HW8 run 6): a sentence the being's last three thoughts or cards already carried is dropped from
               // this one (the standing beat repeated one verbatim); a card with nothing left is not posted.
@@ -1481,7 +1489,17 @@ async function speakProseSplit(
   if (input.worldEvent) { parsed.actions = []; parsed.thoughts = []; }
   let plan = planFor(roster);
   // A THING THE ACTOR DOES NOT HAVE (2026-11-03): the line waits for the Watcher's answer; nothing below has run yet.
-  if (!input.confirmTicketId) await withholdUnheld(campaignId, actor, parsed.actions, !!input.confirmUnheld, message);
+  // Day 5 (2026-11-04): the dry run and JEWL's read are both reads of the line and run together (they were 7-13 s in series).
+  const withholdP = !input.confirmTicketId ? withholdUnheld(campaignId, actor, parsed.actions, !!input.confirmUnheld, message) : Promise.resolve();
+  const jewlP = !input.confirmTicketId && plan.world.length && !input.worldEvent ? readNarration(campaignId, actor, message, parsed, listeners) : Promise.resolve(null);
+  try {
+    await withholdP;
+  } catch (err) {
+    // The line is withheld: a question JEWL raised about the same line meanwhile is dismissed, so the Watcher answers one thing.
+    const held = await jewlP.catch(() => null);
+    if (held) await dismissReconciliation(campaignId, actor, held.id, 'The line was withheld at the table (a thing the actor does not have).').catch(() => undefined);
+    throw err;
+  }
   stage('withhold');
 
   // 0. JEWL's read still comes BEFORE anything is written on this path (U2c-5 moves it beside the listening).
@@ -1492,8 +1510,8 @@ async function speakProseSplit(
     roster = await npcRoster();
     parsed = parseTableProse(message, roster, proseCtx);
     plan = planFor(roster);
-  } else if (plan.world.length && !input.worldEvent) {
-    const held = await readNarration(campaignId, actor, message, parsed, listeners);
+  } else {
+    const held = await jewlP;
     if (held) return { held, canonEventId: null, dialogue: [], narration: parsed.narration, responses: [] };
   }
   stage('jewl');

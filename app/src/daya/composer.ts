@@ -265,11 +265,11 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
     const record: BeatRecord = { perceived: null, felt: a.feltBefore, going: [], near: a.held.map((h) => naturalName(h, true)), remember: [], about: [], impulse: 'stay' };
     return { beatKey, perceived: perceivedRaw, felt: a.feltBefore, wakes: [], plan: { gist: recordGist(record), impulse: 'stay' }, record, thought: '', empty: true };
   }
-  const [mood, rec] = await Promise.all([
-    placeOrder({ kind: 'mood', brief: { felt: a.feltBefore, perceived: perceived ?? 'Nothing new reaches you.', temperament: self } }, ctx, overrides),
-    recOnly ? Promise.resolve(recOnly) : fragments.length ? placeOrder({ kind: 'recall', brief: { cue: perceived ?? 'Nothing new; the moment goes on.', fragments, recent: a.recent } }, ctx, overrides) : Promise.resolve(null as Piece<'recall'> | null),
-  ]);
-  const felt = mood?.felt?.trim() || a.feltBefore;
+  // Day 5 (2026-11-04): the mood order runs BESIDE the local choice, not before it (~3 s a beat). The chooser reads how the being
+  // felt a moment ago; the voice gets the fresh mood, which is ready by then.
+  const moodP = placeOrder({ kind: 'mood', brief: { felt: a.feltBefore, perceived: perceived ?? 'Nothing new reaches you.', temperament: self } }, ctx, overrides);
+  const rec = recOnly ? recOnly : fragments.length ? await placeOrder({ kind: 'recall', brief: { cue: perceived ?? 'Nothing new; the moment goes on.', fragments, recent: a.recent } }, ctx, overrides) : null;
+  const feltBefore = a.feltBefore;
   // THE REPLAY, again (run 2): recall surfaced the perception just stored ("Your phone chimes once") as a memory that woke. A fragment
   // with no age that reads like what just reached the being is the moment itself, not a memory.
   const isNow = (f: { text: string; age?: string }) => !f.age && !!perceived && (f.text.includes(perceived.slice(0, 40)) || perceived.includes(f.text.slice(0, 40)));
@@ -279,16 +279,17 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
 
   let choice: Choice | null = null;
   try {
-    const prompt = chooserPrompt({ ...a, identity: self }, perceived, felt, candidates);
+    const prompt = chooserPrompt({ ...a, identity: self }, perceived, feltBefore, candidates);
     const raw = (await chat({ tier: 'L1', subsystem: 'composer', contentClass: 'fiction', entityId: a.entityId, campaignId: a.campaignId, messages: [{ role: 'system', content: prompt }], maxTokens: 160, temperature: 0.3 }, overrides)).text;
     choice = parseChoice(raw, candidates);
     if (!choice) console.warn(`[composer] ${a.name}: the local choice did not parse: ${raw.slice(0, 160)}`);
     // THE TRAINING LOG (2026-11-03): the chooser's pair — the one the local model will be taught on.
-    logTraining({ kind: 'choice', campaignId: a.campaignId, entityId: a.entityId, beatKey, by: 'L1', input: { prompt, perceived, felt, candidates }, output: { raw, choice }, ms: Date.now() - tPieces });
+    logTraining({ kind: 'choice', campaignId: a.campaignId, entityId: a.entityId, beatKey, by: 'L1', input: { prompt, perceived, felt: feltBefore, candidates }, output: { raw, choice }, ms: Date.now() - tPieces });
   } catch (err) {
     console.warn(`[composer] ${a.name}: local choice failed:`, err instanceof Error ? err.message : err);
   }
   if (!choice) return null;
+  const felt = (await moodP)?.felt?.trim() || a.feltBefore;
   const record = resolveRecord(choice, perceived, felt, candidates);
   const plan: BeatPlan = { gist: recordGist(record), impulse: record.impulse, ...(record.why ? { why: record.why } : {}) };
   const tPlan = Date.now();
