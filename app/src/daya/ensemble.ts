@@ -994,8 +994,11 @@ export async function listenStimulus(
   const soulPending = soulFresh || composing ? null : runSoul();
   const desiresPending = buildDesiresBlockForCharacter(characterId);
 
+  // Finding 17 (2026-11-04): an OWN line is remembered as the deed and the words, as told to the being — not as the perception
+  // agent's "Nothing new reaches you". What it wrote in a text a beat ago is in its memory, verbatim.
+  const memoryContent = own ? raw : content;
   const [ingest, desiresBlock] = await Promise.all([
-    ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: stimulus.source, content: unmarkAddressed(content), extraClassification: mirrorAudit }, overrides),
+    ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: stimulus.source, content: unmarkAddressed(memoryContent), extraClassification: mirrorAudit }, overrides),
     desiresPending,
   ]);
   const tIngested = Date.now();
@@ -1083,15 +1086,15 @@ export async function listenStimulus(
     // Day 6 (2026-11-04): the signal's end is a CYCLE; it was compared with Date.now() and every signal read as over — Violet's
     // phone rang thirty times with STILL GOING empty in her record. The ledger's clock judges, and the state rides along.
     const { liveSignal, signalTextFor } = await import('@/services/item-signal');
-    const going: Array<{ text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received'; other?: string; words?: string }> = [];
+    const going: Array<{ text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received'; other?: string; words?: string; thing?: string }> = [];
     for (const it of items) {
       let d: unknown = null;
       try { d = JSON.parse(it.data ?? '{}'); } catch { d = null; }
       const sig = liveSignal(d, ctx.cycle);
       if (!sig) continue;
       const state = sig.state ?? 'ringing';
-      if (it.holderId === characterId) going.push({ text: signalTextFor(sig, 'holder', sig.by ? nameOf(sig.by) : null), mine: false, holder: ctx.name, state, ...(sig.by ? { other: nameOf(sig.by) } : {}), ...(sig.words ? { words: sig.words } : {}) });
-      else if (sig.by === characterId) going.push({ text: signalTextFor(sig, 'caller', nameOf(it.holderId)), mine: true, holder: nameOf(it.holderId), state, other: nameOf(it.holderId), ...(sig.words ? { words: sig.words } : {}) });
+      if (it.holderId === characterId) going.push({ text: signalTextFor(sig, 'holder', sig.by ? nameOf(sig.by) : null), mine: false, holder: ctx.name, state, thing: it.name, ...(sig.by ? { other: nameOf(sig.by) } : {}), ...(sig.words ? { words: sig.words } : {}) });
+      else if (sig.by === characterId) going.push({ text: signalTextFor(sig, 'caller', nameOf(it.holderId)), mine: true, holder: nameOf(it.holderId), state, thing: it.name, other: nameOf(it.holderId), ...(sig.words ? { words: sig.words } : {}) });
     }
     const near = [
       ...items.filter((it) => !it.holderId && it.locationId && it.locationId === mine).map((it) => it.name),

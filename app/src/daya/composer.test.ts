@@ -3,7 +3,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('./model-client', () => ({ chat: vi.fn() }));
 vi.mock('@/ai/network/translator', async () => await vi.importActual('@/ai/network/translator'));
 import { orderPrompt, parsePiece } from './orders';
-import { chooserPrompt, parseChoice, resolveRecord, recordIsEmpty, recordGist, candidateLines, openingOf, actsFor, type Candidates } from './composer';
+import { chooserPrompt, parseChoice, resolveRecord, recordIsEmpty, recordGist, candidateLines, openingOf, actsFor, actPairsFor, type Candidates } from './composer';
 import { newTranslationMap, translateOut, translateBack } from '@/ai/network/translator';
 
 describe('orders — narrow, nameless pieces (SIMULATION-COMPOSER-DESIGN-2026-11-03)', () => {
@@ -102,19 +102,21 @@ describe('a voice, not a formula (session 2 live, 2026-11-03)', () => {
 
 describe('Day 6 (2026-11-04): acts on the list, the act in the choice', () => {
   it('a ringing thing in its hands offers answer / decline / silence; a connected line offers speak / hang up; always leaving be', () => {
-    const ringing = actsFor([{ text: 'Your phone rings.', mine: false, holder: 'Violet', state: 'ringing' }], ['Her phone']);
+    const ringing = actsFor([{ text: 'Your phone rings.', mine: false, holder: 'Violet', state: 'ringing', thing: 'Her phone' }], ['Her phone']);
     expect(ringing).toEqual(['answer it', 'decline it and let it go', 'silence it and leave it', 'put down what you are holding and go on with what you were doing']);
+    expect(actPairsFor([{ text: 'Your phone rings.', mine: false, holder: 'Violet', state: 'ringing', thing: 'Her phone' }], ['Her phone'])[0]).toEqual({ label: 'answer it', deed: 'answers the phone' });
     const line = actsFor([{ text: 'On the line.', mine: false, holder: 'Violet', state: 'connected', other: 'Kristopher' }], ['Her phone']);
-    expect(line[0]).toBe('say something to Kristopher on the line');
-    expect(line).toContain('hang up');
+    expect(line[0]).toBe('hang up');
     expect(actsFor([], [])).toEqual(['go on with what you were doing']);
   });
   it('the chooser may pick an A code; an "act" with no A code is a stay; the record carries the act', () => {
-    const c: Candidates = { near: ['my phone'], going: [{ text: 'Your phone rings.', mine: false, holder: 'Violet', state: 'ringing' }], remember: [], acts: actsFor([{ text: 'Your phone rings.', mine: false, holder: 'Violet', state: 'ringing' }], ['Her phone']) };
+    const g = [{ text: 'Your phone rings.', mine: false, holder: 'Violet', state: 'ringing' as const, thing: 'Her phone' }];
+    const pairs = actPairsFor(g, ['Her phone']);
+    const c: Candidates = { near: ['my phone'], going: g, remember: [], acts: pairs.map((p) => p.label), deeds: pairs.map((p) => p.deed) };
     expect(candidateLines(c)).toContain('A1: answer it');
     const choice = parseChoice('{"about":["G1"],"imagine":null,"impulse":"act","act":"A1","why":"enough"}', c);
     expect(choice).toMatchObject({ impulse: 'act', act: 'A1' });
-    expect(resolveRecord(choice!, 'Your phone rings.', 'tight', c).act).toBe('answer it');
+    expect(resolveRecord(choice!, 'Your phone rings.', 'tight', c).act).toBe('answers the phone');
     expect(parseChoice('{"about":["G1"],"imagine":null,"impulse":"act"}', c)).toMatchObject({ impulse: 'stay' });
     expect(parseChoice('{"about":["G1"],"imagine":null,"impulse":"act","act":"A9"}', c)).toMatchObject({ impulse: 'stay' });
   });

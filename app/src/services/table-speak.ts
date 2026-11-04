@@ -176,7 +176,8 @@ function preListenVoiced(
     // while the paper said NOT PAID): the text in his hand rides beside the stretch (not through the mirror), exactly as written.
     const reading = readings.get(id);
     // Exactly what hear() would hand it: its senses ride along only when the reach pass is on (then it is 'self' by rule).
-    const stim: PlannedStimulus = { source: s?.source ?? (words ? 'dialogue' : 'perception'), content, own: true, ...(reading ? { reads: reading } : {}), ...(perceptionReachOn() ? { via: ['self'] } : {}) };
+    // Day 6 (2026-11-04, finding 21): what the Watcher said goes THROUGH this being is a prompt — it owes a card.
+    const stim: PlannedStimulus = { source: s?.source ?? (words ? 'dialogue' : 'perception'), content, own: true, ...(thinking ? { prompted: true } : {}), ...(reading ? { reads: reading } : {}), ...(perceptionReachOn() ? { via: ['self'] } : {}) };
     out.set(id, listenToTable(id, actor.role, stim));
   }
   return out;

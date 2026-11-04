@@ -23,7 +23,7 @@ export type Impulse = 'speak' | 'act' | 'stay';
 
 /** Something still going that this being knows of: a signal it can hear, or one it set off itself. */
 /** Day 6 (2026-11-04): a going thing carries its state, the other party and any words, from the ledger. */
-export interface GoingRef { text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received'; other?: string; words?: string }
+export interface GoingRef { text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received'; other?: string; words?: string; /** the sounding thing's name, as the ledger has it */ thing?: string }
 
 /** THE BEAT RECORD — every field is a resolved reference; the voice may say nothing outside it. */
 export interface BeatRecord {
@@ -162,6 +162,8 @@ export interface Candidates {
   remember: Array<{ text: string; age?: string; why: string }>;
   /** Day 6 (2026-11-04, finding 23: 30 stays, 1 act): the acts the being COULD take now, derived from what is going and what it holds. */
   acts?: string[];
+  /** The same acts as deeds the table runs and cards ("answers the phone"), index for index. */
+  deeds?: string[];
 }
 
 /**
@@ -170,21 +172,29 @@ export interface Candidates {
  * answers; the one who set it off can end it; and there is always leaving things be. Pure.
  */
 export function actsFor(going: GoingRef[], held: string[]): string[] {
-  const out: string[] = [];
+  return actPairsFor(going, held).map((p) => p.label);
+}
+
+/** The acts with their deeds: `label` is what the chooser reads ("answer it"); `deed` is what the table runs and cards ("answers the phone"). Pure. */
+export function actPairsFor(going: GoingRef[], held: string[]): Array<{ label: string; deed: string }> {
+  const out: Array<{ label: string; deed: string }> = [];
+  const bare = (name?: string) => (name ?? 'phone').replace(/^(?:the|her|his|their|my|a|an)\s+/i, '').toLowerCase();
   for (const g of going) {
     const who = g.other ?? (g.mine ? g.holder : 'whoever it is');
+    const thing = bare(g.thing);
     if (!g.mine) {
-      if (g.state === 'connected') out.push(`say something to ${who} on the line`, 'hang up');
-      else if (g.state === 'received') out.push('read the message', `write back to ${who}`);
-      else out.push('answer it', 'decline it and let it go', 'silence it and leave it');
+      if (g.state === 'connected') out.push({ label: 'hang up', deed: `hangs up the ${thing}` });
+      else if (g.state === 'received') out.push({ label: 'read the message', deed: `reads the message on the ${thing}` }, { label: `write back to ${who}`, deed: `writes back to ${who} on the ${thing}` });
+      else out.push({ label: 'answer it', deed: `answers the ${thing}` }, { label: 'decline it and let it go', deed: `declines the call and lets the ${thing} go quiet` }, { label: 'silence it and leave it', deed: `silences the ${thing} and leaves it` });
     } else {
-      if (g.state === 'connected') out.push(`say something to ${who} on the line`, 'hang up');
-      else if (g.state === 'received') out.push(`write ${who} again`);
-      else out.push('hang up', 'keep waiting on the line');
+      if (g.state === 'connected') out.push({ label: 'hang up', deed: `hangs up on ${who}` });
+      else if (g.state === 'received') out.push({ label: `write ${who} again`, deed: `writes ${who} again` });
+      else out.push({ label: 'hang up', deed: `hangs up before ${who} answers` });
     }
   }
-  out.push(held.length ? 'put down what you are holding and go on with what you were doing' : 'go on with what you were doing');
-  return [...new Set(out)].slice(0, 6);
+  out.push(held.length ? { label: 'put down what you are holding and go on with what you were doing', deed: 'puts down what they are holding and goes on with what they were doing' } : { label: 'go on with what you were doing', deed: 'goes on with what they were doing' });
+  const seen = new Set<string>();
+  return out.filter((p) => (seen.has(p.label) ? false : (seen.add(p.label), true))).slice(0, 6);
 }
 
 /** The numbered lists the local model chooses from. Pure. */
@@ -266,7 +276,8 @@ export function resolveRecord(choice: Choice, perceived: string | null, felt: st
     return undefined;
   }).filter((x): x is string => !!x);
   const remember = choice.about.filter((x) => x.startsWith('M')).map((x) => c.remember[Number(x.slice(1)) - 1]).filter(Boolean);
-  const act = choice.act ? c.acts?.[Number(choice.act.slice(1)) - 1] : undefined;
+  const actIdx = choice.act ? Number(choice.act.slice(1)) - 1 : -1;
+  const act = actIdx >= 0 ? c.deeds?.[actIdx] ?? c.acts?.[actIdx] : undefined;
   return { perceived, felt, going: c.going, near: c.near, remember, about, ...(choice.imagine ? { imagine: choice.imagine } : {}), impulse: choice.impulse, ...(act ? { act } : {}), ...(choice.why ? { why: choice.why } : {}) };
 }
 
@@ -326,7 +337,8 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   // porch steps, six cards of seven).
   const recentWake = (f: { text: string }) => (a.recentWakes ?? []).some((w) => w.slice(0, 60) === f.text.slice(0, 60));
   const wakes = (rec?.wakes ?? []).filter((w) => fragments[w.i] && !isNow(fragments[w.i]) && !recentWake(fragments[w.i])).slice(0, 3).map((w) => ({ text: fragments[w.i].text, ...(fragments[w.i].age ? { age: fragments[w.i].age } : {}), why: w.why }));
-  const candidates: Candidates = { near: [...a.held.map((h) => naturalName(h, true)), ...(a.near ?? []).map((n) => naturalName(n, false))].slice(0, 12), going, remember: wakes, acts: actsFor(going, a.held) };
+  const pairs = actPairsFor(going, a.held);
+  const candidates: Candidates = { near: [...a.held.map((h) => naturalName(h, true)), ...(a.near ?? []).map((n) => naturalName(n, false))].slice(0, 12), going, remember: wakes, acts: pairs.map((p) => p.label), deeds: pairs.map((p) => p.deed) };
   const tPieces = Date.now();
 
   let choice: Choice | null = null;

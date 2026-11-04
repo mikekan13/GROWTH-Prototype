@@ -535,7 +535,7 @@ describe("the Watcher's line, per part: a thought is the thinker's alone, an own
       const byId = Object.fromEntries(w.listen.mock.calls.map((c) => [c[0], c[2]]));
       expect(byId.mara).toEqual({ source: 'perception', content: 'Tess knocks on the door.' });
       expect(byId.oren).toEqual({ source: 'perception', content: 'Tess knocks on the door.' });
-      expect(byId.tess).toEqual({ source: 'perception', content: 'I knock on the door.\nI think about leaving.', own: true });
+      expect(byId.tess).toEqual({ source: 'perception', content: 'I knock on the door.\nI think about leaving.', own: true, prompted: true });
       expect(w.feeds[0]).toMatchObject({ actions: [{ actorId: 'tess', text: 'Knocks on the door' }], thoughts: [{ actorId: 'tess', text: 'Thinks about leaving', sentence: 'Tess thinks about leaving.' }] });
     } finally {
       w.active.length = 0; w.active.push(...before);

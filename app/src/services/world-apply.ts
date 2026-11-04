@@ -459,7 +459,12 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
               const cause = signalCause({ holderId: where.holderId, actorId: actor.id, narrated: opts.narrated, existingBy: existing?.by });
               // Day 6 (2026-11-04): a call or a text is a THING with a state. A message lands as `received` with its words; a ring is
               // `ringing`; a sound narrated at a thing already answered (connected) leaves the open line as it is.
-              if (cause.record && existing?.state !== 'connected') {
+              if (existing?.state === 'connected' && opts.narrated && where.holderId === actor.id) {
+                // RULING 9 (Michael 2026-11-04: "Watcher has the rights to rewrite things"): the being had answered, and the Watcher's
+                // line rings it again — the line stands. The answer is undone (back to ringing, same caller) and the Watcher is told.
+                report.refused.push(`${actor.name} had answered the ${where.name.replace(/^(?:the|her|his|their)\s+/i, '')}; your line rings it again, so the line stands and the answer is undone (ruling 9).`);
+              }
+              if (cause.record && (existing?.state !== 'connected' || (opts.narrated && where.holderId === actor.id))) {
                 const kind = e.kind ?? (e.words ? 'text' : existing?.kind ?? 'call');
                 const state = e.words ? 'received' : 'ringing';
                 await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: soundText, since: cycle, until: cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}), kind, state, ...(e.words ? { words: e.words } : existing?.words ? { words: existing.words } : {}) })) } });

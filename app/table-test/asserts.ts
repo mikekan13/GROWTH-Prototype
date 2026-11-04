@@ -117,7 +117,9 @@ export function noDeed(t: RunTranscript): AssertResult {
         const stem = m[1].split(' ')[0].toLowerCase().slice(0, 4);
         const first = c.characterName.split(' ')[0].toLowerCase();
         const declared = t.events.some((e) => (e.type === 'game_event' || e.eventType === 'declaration')
-          && (e.characterId === c.characterId || fold(e.text).includes(first)) && fold(e.text).includes(stem));
+          && (e.characterId === c.characterId || fold(e.text).includes(first)) && fold(e.text).includes(stem))
+          // Day 6: a deed the being itself chose and carded (an action segment of its own earlier card) is declared too.
+          || t.cards.some((k) => k.characterId === c.characterId && k.at <= c.at && k.segments.some((sg) => sg.kind === 'action' && fold(sg.text).includes(stem)));
         if (!declared) ev.push(`${where(c)} thought states a deed nobody declared ("${m[1]}"): "${s}"`);
       }
     }
@@ -149,11 +151,13 @@ export function watcherLineStands(t: RunTranscript): AssertResult {
     if (at === undefined) return;
     const named = (name: string) => step.line.toLowerCase().includes(name.split(' ')[0].toLowerCase());
     const seen = new Set<string>();
-    for (const led of t.ledger.filter((l) => l.lineIndex >= i)) {
+    const after = ledgerFor(t, i);
+    for (const led of after ? [after] : []) {
       for (const it of led.items) {
         const sg = it.signal;
         const now = led.cycle ?? Number.POSITIVE_INFINITY;
         if (!sg || sg.since > now || (sg.until ?? Number.POSITIVE_INFINITY) <= now) continue;
+        if (sg.state === 'received') continue; // a delivered message is not ended by hanging up
         const setter = led.beings.find((b) => b.characterId === sg.by);
         const anyNamed = led.beings.some((b) => named(b.name));
         if (anyNamed && !(setter && named(setter.name))) continue;

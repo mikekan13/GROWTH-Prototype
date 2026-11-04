@@ -106,6 +106,11 @@ Rules:
    leave two live facts about one subject.
 4. "experienceEvent.content": second-person, sensory, <=50 words, strictly
    what the actor perceives — no system terms, no numbers, no cause-naming.
+   ONLY what the act itself and the Facts contain: no weather, smell, sound or
+   bodily sensation the line and the Facts did not give (session 4,
+   2026-11-04: "the scent of exhaust… your ears ring faintly" went into the
+   actor's memory as fact). When the act changed nothing, say what was done,
+   plainly, and nothing of the surroundings.
    valence/salience from the actor's perspective.
 5. Physical consequences are honest: dropped things break or don't by
    material and height; noise carries; weight tires. Neither cruel nor kind
