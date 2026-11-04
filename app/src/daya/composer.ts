@@ -17,6 +17,7 @@
 import { z } from 'zod';
 import { chat, type DayaClientOverrides } from './model-client';
 import { placeOrder, type Piece } from './orders';
+import { logTraining } from './training-log';
 
 export type Impulse = 'speak' | 'act' | 'stay';
 
@@ -69,9 +70,25 @@ export interface ComposeArgs {
   sinceOwn?: string | null;
   /** Already perceived (the perception order was placed before the memory was stored): skip that order. */
   perceived?: string;
+  /** A standing beat: the world as it stands, nothing new in it (run 3, 2026-11-03: the perception agent rewrote the standing beat as a scene, and it read as news). */
+  standing?: boolean;
+}
+
+/**
+ * A thing as the being would say it, not as the ledger labels it (run 3: "I can see Personal phone sitting dark"). Its own
+ * things are "my …" with a leading her/his dropped; a thing elsewhere keeps its name, lowercased unless it is a proper name.
+ * Derived from the name alone - no list of things. Pure.
+ */
+export function naturalName(name: string, mine: boolean): string {
+  const bare = name.trim().replace(/^(?:the|her|his|their|a|an)\s+/i, '');
+  const proper = /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+$/.test(bare) && !/\s(?:phone|bill|wallet|key|cash|bag|box|receipt)s?$/i.test(bare);
+  const said = proper ? bare : bare.charAt(0).toLowerCase() + bare.slice(1);
+  return mine ? `my ${said}` : `the ${said}`;
 }
 
 export interface ComposedBeat {
+  /** Joins this beat's orders and choice in the training log, and the card to the table test's verdict. */
+  beatKey: string;
   perceived: string;
   felt: string;
   wakes: Array<{ text: string; why: string }>;
@@ -161,7 +178,7 @@ export function chooserPrompt(a: { name: string; identity: string; desires: stri
     `- "about": the codes (up to 3) ${a.name} is thinking about now. Start from what just reached them, if anything did. Only codes from the list; nothing else exists for ${a.name} right now.`,
     // Table test run 2 (2026-11-03): with nothing new, Violet thought about her key ring and her shirts, card after card.
     `- When NOTHING reached ${a.name} and nothing is still going, the usual answer is nothing at all: "about": [] and no picture. A thing merely in their hands is not a thought. Choose something only when a memory or a picture truly presses on them in this quiet.`,
-    `- "imagine": a picture of what has NOT happened that ${a.name} holds right now, one short sentence, or null. Built only from what is on the list and what reached them; it is a picture, never a thing done, and it knows nothing the list does not.`,
+    `- "imagine": a picture ${a.name} holds right now of what they cannot see or know - what someone elsewhere may be doing, what may come next - one short sentence, or null. Built only from what is on the list and what reached them; it is a picture, never a thing seen or done, and it knows nothing the list does not.`,
     `- "impulse": "speak" if ${a.name} would say something now, "act" if they would do something now, "stay" if they let it sit.`,
     '- "why": when staying, what holds them, in a few words.',
     'Answer with JSON only: {"about": string[], "imagine": string|null, "impulse": "speak"|"act"|"stay", "why"?: string}',
@@ -229,11 +246,12 @@ export function recordGist(r: BeatRecord): string {
  * composer already has. `empty` is true when there is nothing to think: the caller posts no card.
  */
 export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides = {}): Promise<ComposedBeat | null> {
-  const ctx = { campaignId: a.campaignId, entityId: a.entityId };
   const t0 = Date.now();
+  const beatKey = `${a.entityId}:${t0}`;
+  const ctx = { campaignId: a.campaignId, entityId: a.entityId, beatKey };
   const self = await standingSelfOf(a.entityId, a.name, a.identity, overrides);
   const perceivedRaw = a.perceived ?? (await orderPerception({ envelope: a.envelope, event: a.event, senses: a.senses, own: a.own }, ctx, overrides));
-  const perceived = NOTHING.test(perceivedRaw.trim()) ? null : perceivedRaw;
+  const perceived = a.standing || NOTHING.test(perceivedRaw.trim()) ? null : perceivedRaw;
   const fragments = a.memories.slice(0, 8).map((m, i) => ({ i, text: m.text, ...(m.age ? { age: m.age } : {}) }));
   const going = (a.going ?? []).slice(0, 4);
   // A QUIET BEAT (run 2, 2026-11-03: every quiet beat cost three cloud orders and a local choice, ~20 s, to think about a key ring).
@@ -242,8 +260,8 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   const recOnly = quiet && fragments.length ? await placeOrder({ kind: 'recall', brief: { cue: 'Nothing new; the moment goes on in quiet.', fragments, recent: a.recent } }, ctx, overrides) : null;
   if (quiet && !(recOnly?.wakes ?? []).some((w) => fragments[w.i] && fragments[w.i].age)) {
     console.log(`[composer] ${a.name}: quiet beat, nothing woke — no beat (${Date.now() - t0}ms)`);
-    const record: BeatRecord = { perceived: null, felt: a.feltBefore, going: [], near: a.held, remember: [], about: [], impulse: 'stay' };
-    return { perceived: perceivedRaw, felt: a.feltBefore, wakes: [], plan: { gist: recordGist(record), impulse: 'stay' }, record, thought: '', empty: true };
+    const record: BeatRecord = { perceived: null, felt: a.feltBefore, going: [], near: a.held.map((h) => naturalName(h, true)), remember: [], about: [], impulse: 'stay' };
+    return { beatKey, perceived: perceivedRaw, felt: a.feltBefore, wakes: [], plan: { gist: recordGist(record), impulse: 'stay' }, record, thought: '', empty: true };
   }
   const [mood, rec] = await Promise.all([
     placeOrder({ kind: 'mood', brief: { felt: a.feltBefore, perceived: perceived ?? 'Nothing new reaches you.', temperament: self } }, ctx, overrides),
@@ -254,7 +272,7 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   // with no age that reads like what just reached the being is the moment itself, not a memory.
   const isNow = (f: { text: string; age?: string }) => !f.age && !!perceived && (f.text.includes(perceived.slice(0, 40)) || perceived.includes(f.text.slice(0, 40)));
   const wakes = (rec?.wakes ?? []).filter((w) => fragments[w.i] && !isNow(fragments[w.i])).slice(0, 3).map((w) => ({ text: fragments[w.i].text, ...(fragments[w.i].age ? { age: fragments[w.i].age } : {}), why: w.why }));
-  const candidates: Candidates = { near: [...a.held, ...(a.near ?? [])].slice(0, 12), going, remember: wakes };
+  const candidates: Candidates = { near: [...a.held.map((h) => naturalName(h, true)), ...(a.near ?? []).map((n) => naturalName(n, false))].slice(0, 12), going, remember: wakes };
   const tPieces = Date.now();
 
   let choice: Choice | null = null;
@@ -263,6 +281,8 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
     const raw = (await chat({ tier: 'L1', subsystem: 'composer', contentClass: 'fiction', entityId: a.entityId, campaignId: a.campaignId, messages: [{ role: 'system', content: prompt }], maxTokens: 160, temperature: 0.3 }, overrides)).text;
     choice = parseChoice(raw, candidates);
     if (!choice) console.warn(`[composer] ${a.name}: the local choice did not parse: ${raw.slice(0, 160)}`);
+    // THE TRAINING LOG (2026-11-03): the chooser's pair — the one the local model will be taught on.
+    logTraining({ kind: 'choice', campaignId: a.campaignId, entityId: a.entityId, beatKey, by: 'L1', input: { prompt, perceived, felt, candidates }, output: { raw, choice }, ms: Date.now() - tPieces });
   } catch (err) {
     console.warn(`[composer] ${a.name}: local choice failed:`, err instanceof Error ? err.message : err);
   }
@@ -274,7 +294,7 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
 
   if (recordIsEmpty(record)) {
     console.log(`[composer] ${a.name}: nothing reached, nothing going, nothing chosen — no beat (pieces ${tPieces - t0}ms · choice ${tPlan - tPieces}ms)`);
-    return { perceived: perceivedRaw, felt, wakes: wakesOut, plan, record, thought: '', empty: true };
+    return { beatKey, perceived: perceivedRaw, felt, wakes: wakesOut, plan, record, thought: '', empty: true };
   }
 
   // A VOICE, NOT A FORMULA (session 2 live, 2026-11-03: card after card of Violet's opened "I think I …").
@@ -290,7 +310,7 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   const cut = (s: string, n = 160) => s.replace(/\s+/g, ' ').slice(0, n);
   console.log(`[composer] ${a.name} pieces · perceived: ${cut(perceivedRaw)} · felt: ${cut(felt, 100)} · going: ${record.going.map((g) => cut(g.text, 60)).join(' | ') || '(none)'} · near: ${record.near.slice(0, 6).join(' | ') || '(none)'} · wakes: ${wakesOut.map((w) => cut(w.text, 60)).join(' | ') || '(none)'}`);
   console.log(`[composer] ${a.name} record · ${cut(plan.gist, 220)} · thought: ${cut(thought)}`);
-  return { perceived: perceivedRaw, felt, wakes: wakesOut, plan, record, thought, empty: false };
+  return { beatKey, perceived: perceivedRaw, felt, wakes: wakesOut, plan, record, thought, empty: false };
 }
 
 /**

@@ -45,6 +45,8 @@ export interface PlannedStimulus {
   own?: boolean;
   /** What is written on a thing the line has the listener read, exactly (HW8 run 6) — handed beside the stretch, never through the mirror. */
   reads?: string;
+  /** A standing beat: the world as it stands around the listener, nothing new in it (run 3, 2026-11-03: the composer treats it as quiet). */
+  standing?: boolean;
 }
 
 /** The out-of-character rules that are safe to act on when the words were spoken, not typed. */

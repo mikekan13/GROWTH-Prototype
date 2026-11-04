@@ -17,6 +17,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { prisma } from '../src/lib/db';
 import type { RunTranscript, TableScript, RunEvent, RunCard, LedgerAt, WallCall, BeatPieces } from './transcript';
 import { runAsserts, summarize } from './asserts';
+import { logVerdict } from '../src/daya/training-log';
 
 const C = 'cms5z4j6z0000zg48z5vzl2jn';
 const BASE = process.env.TABLE_TEST_BASE ?? 'http://localhost:3000';
@@ -201,6 +202,14 @@ async function main() {
     const transcript: RunTranscript = { script, sessionId, startedAt, endedAt, lineAt, lineResults, events, cards, ledger, memories, wall: parseWall(log, startedAt), log, roster };
 
     const results = runAsserts(transcript);
+    // THE VERDICT ON EACH BEAT (training log, 2026-11-03): which asserts named this card. Joined to its orders by beatKey.
+    for (const c of cards) {
+      const key = c.pieces?.beatKey;
+      if (!key) continue;
+      const iso = new Date(c.at).toISOString();
+      const failed = results.filter((r) => !r.pass && r.evidence.some((e) => e.includes(iso))).map((r) => r.id);
+      logVerdict(key, { pass: failed.length === 0, ...(failed.length ? { failed } : {}), source: 'table-test' });
+    }
     const ts = new Date(startedAt).toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const base = `${OUT}/${script.name}-${ts}`;
     writeFileSync(`${base}.json`, JSON.stringify(transcript, null, 1));

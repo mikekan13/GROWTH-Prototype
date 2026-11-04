@@ -354,6 +354,7 @@ export async function resolveIntent(
   }
 
   // DRY RUN (2026-11-03): report what the act uses that the actor lacks; nothing is written, the answer is kept.
+  if (input.dryRun) console.log(`[daya/adjudicator] dry run for "${input.intent.slice(0, 60)}": uses=[${(parsed.uses ?? []).join(', ')}] held=${heldRows.length}${cachedParsed ? ' (cached parse)' : ''}`);
   if (input.dryRun) {
     preflight.set(pfKey, { at: Date.now(), parsed });
     return {

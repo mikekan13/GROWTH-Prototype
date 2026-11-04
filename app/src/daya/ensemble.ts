@@ -896,6 +896,8 @@ export interface TableStimulus {
   reads?: string;
   /** ORDINARY COMPETENCE (2026-10-30): a routine step is due — handed to the listen as a fact about the being itself (services/routine-run). */
   routine?: { step: string; because: string[] };
+  /** A standing beat: the world as it stands, nothing new in it (run 3, 2026-11-03). */
+  standing?: boolean;
 }
 
 export interface ListenTimings {
@@ -927,7 +929,7 @@ export interface ListenResult {
   /** The survival-rung memory that rose this stretch (arousal ≥ 0.7, valence ≤ −0.3), strongest first — what a routine step would have to be done against. */
   resistance?: { content: string; arousal: number } | null;
   /** THE PIECES ON THE RECORD (table test, 2026-11-03): what the composer held when it made this thought; absent on the old single-monologue path. */
-  pieces?: { perceived: string; felt: string; wakes: Array<{ text: string; why: string }>; recent: string[]; gist: string; impulse: ListenImpulse; why?: string };
+  pieces?: { beatKey?: string; perceived: string; felt: string; wakes: Array<{ text: string; why: string }>; recent: string[]; gist: string; impulse: ListenImpulse; why?: string };
 }
 
 const FELT_FALLBACK = 'Right now, in your body and mood: steady, holding your own.';
@@ -1125,13 +1127,14 @@ export async function listenStimulus(
         voice: ctx.persona.voiceNotes ?? 'Plain, direct, a cadence of their own.',
         desires: desiresBlock, feltBefore: feltStateBrief, envelope: envelope ?? content, event: stimulus.content, senses: stimulus.via?.filter((v) => v !== 'self') ?? ['sight', 'hearing'], own,
         perceived: content,
+        standing: stimulus.standing === true,
         memories: (recallResult.surfaced ?? []).filter((s) => !!s.content).map((s) => ({ text: s.content!, ...(s.age ? { age: s.age } : {}) })),
         // Run 2 (2026-11-03): the record's near things are NAMES ("Her phone"), not the described held lines ("The Her phone: Her phone - camera, map...").
         innerSoFar: innerState, recent: priorVoice.slice(0, 4), held: (heldRows ?? []).map((h) => h.name), near: ledger?.near ?? [], going: ledger?.going ?? [], facts: ground.lines.slice(0, 10), sinceOwn,
       }, overrides);
       if (beat) {
         composedFelt = beat.felt;
-        composedPieces = { perceived: beat.perceived, felt: beat.felt, wakes: beat.wakes, recent: priorVoice.slice(0, 4), gist: beat.plan.gist, impulse: beat.plan.impulse, ...(beat.plan.why ? { why: beat.plan.why } : {}) };
+        composedPieces = { beatKey: beat.beatKey, perceived: beat.perceived, felt: beat.felt, wakes: beat.wakes, recent: priorVoice.slice(0, 4), gist: beat.plan.gist, impulse: beat.plan.impulse, ...(beat.plan.why ? { why: beat.plan.why } : {}) };
         // AN EMPTY RECORD IS NO BEAT (table test 2026-11-03: "Nothing new reaches you" became "the phone is still chiming in my hand").
         raw = beat.empty ? `\nImpulse: ${beat.plan.impulse}${beat.plan.why ? ` — ${beat.plan.why}` : ''}` : `${beat.thought}\nImpulse: ${beat.plan.impulse}${beat.plan.impulse === 'stay' && beat.plan.why ? ` — ${beat.plan.why}` : ''}`;
       } else {
@@ -1163,8 +1166,10 @@ export async function listenStimulus(
       // COMPOSED: never re-voice through the old single monologue (session 2 live, 2026-11-03: Violet's composed thought was
       // re-voiced by it into "I check my pockets again … the five-dollar bill is gone"). The competing sentence is dropped.
       if (bad?.c && composing) {
-        console.log(`[daya/ensemble] ${ctx.name} composed thought: "${bad.x.slice(0, 80)}" competes with memory - dropped`);
-        voiced.text = splitSentences(voiced.text).filter((x) => !competingSpecific(x, knowledge)).join(' ');
+        // THE RECORD, NOT THE NET (run 4, 2026-11-03): the specifics check dropped Kristopher's whole far-side card ("Twenty-five dollars
+        // and a phone that isn't ringing") against the very memories the record had chosen. A composed thought is bounded by its record
+        // and judged by the table test's asserts; the old check only reports here.
+        console.log(`[daya/ensemble] ${ctx.name} composed thought: "${bad.x.slice(0, 80)}" competes with memory - kept (the record bounds it; the table test judges)`);
       } else if (bad?.c) {
         console.warn(`[daya/ensemble] ${ctx.name} monologue: "${bad.x.slice(0, 80)}" competes with memory (${bad.c.claimed.join(',')} vs ${bad.c.known.join(',')}) - re-voicing once`);
         let again = '';

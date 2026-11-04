@@ -29,7 +29,7 @@ export interface BeingThoughtRecord {
   /** ORDINARY COMPETENCE (2026-10-30): the player behind the character's decision on a routine step, for the Watcher's eyes. */
   player?: { decision: 'follow' | 'hold' | 'break'; reason: string; step: string; routine: string; roll?: { rollId: string; success: boolean | null; total?: number; dr: number; via: 'ai' | 'popup' } };
   /** THE PIECES ON THE RECORD (table test, 2026-11-03): what the composer held when it made this thought - perceived, felt, what woke, the recent thoughts it was given, its plan. The novel is built from data; so is the test. */
-  pieces?: { perceived: string; felt: string; wakes: Array<{ text: string; why: string }>; recent: string[]; gist: string; impulse: string; why?: string; recentSessionId?: string | null };
+  pieces?: { beatKey?: string; perceived: string; felt: string; wakes: Array<{ text: string; why: string }>; recent: string[]; gist: string; impulse: string; why?: string; recentSessionId?: string | null };
 }
 
 const segs = (segments: BeingThoughtRecord['segments']) => segments?.length ? segments.map((s) => ({ kind: s.kind, text: s.text.slice(0, 1500), ...(s.narrated ? { narrated: s.narrated.slice(0, 1500) } : {}) })) : undefined;

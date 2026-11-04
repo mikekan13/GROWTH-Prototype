@@ -1,6 +1,6 @@
 /**
  * THE TABLE TEST ASSERTS (GROUNDED-BEATS-PLAN-2026-11-03 §4) — RULES over a replayed session, never golden prose.
- * Each assert is a pure function over a RunTranscript (transcript.ts); runAsserts runs all eleven in order.
+ * Each assert is a pure function over a RunTranscript (transcript.ts); runAsserts runs all twelve in order.
  */
 import { absentThingsFor } from '@/daya/absent-things';
 import { placesAbsentThing } from '@/daya/voice-filter';
@@ -226,8 +226,33 @@ export function knownPeopleOnly(t: RunTranscript): AssertResult {
   return result('A11', 'knownPeopleOnly', ev);
 }
 
+// Assert heuristic: wording that speaks a sound as happening now (past forms like "stopped", "rang", "was ringing" do not match).
+const SOUND_NOW_RE = /\b(?:is|are|keeps?|still)\s+(ringing|chiming|buzzing|knocking|vibrating|humming)\b|\b(rings|chimes|buzzes|knocks|vibrates)\b(?!\s+(?:ago|then|that night|two days))|\bthe (ringing|chiming|knocking|buzzing) (?:is|continues|goes on)\b/i;
+const SOUND_ROOTS: Array<[string, RegExp]> = [['ring', /^ring/], ['chim', /^chim/], ['buzz', /^buzz/], ['knock', /^knock/], ['vibrat', /^vibrat/], ['hum', /^hum/]];
+
+/** A12 — a thought speaks of a sound happening now only if the card's record references it. */
+export function soundReferenced(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  let without = 0;
+  for (const c of t.cards) {
+    if (!c.pieces) { without++; continue; }
+    const record = fold(`${c.pieces.perceived ?? ''} ${c.pieces.gist ?? ''}`);
+    for (const seg of c.segments) {
+      if (seg.kind !== 'thought') continue;
+      for (const s of splitSentences(seg.text)) {
+        const m = SOUND_NOW_RE.exec(s);
+        if (!m) continue;
+        const word = fold(m[1] ?? m[2] ?? m[3] ?? '');
+        const root = SOUND_ROOTS.find(([, re]) => re.test(word))?.[0];
+        if (root && !record.includes(root)) ev.push(`${where(c)} thought speaks a sound the record never references ("${root}"): "${s}"`);
+      }
+    }
+  }
+  return result('A12', 'soundReferenced', ev, { label: 'cards_without_pieces', value: without });
+}
+
 export function runAsserts(t: RunTranscript): AssertResult[] {
-  return [absentThing(t), stillGoing(t), sessionBound(t), noPlaceholder(t), noDeed(t), unheldUseWithheld(t), watcherLineStands(t), timing(t), cloudBudget(t), memoryNotEveryCard(t), knownPeopleOnly(t)];
+  return [absentThing(t), stillGoing(t), sessionBound(t), noPlaceholder(t), noDeed(t), unheldUseWithheld(t), watcherLineStands(t), timing(t), cloudBudget(t), memoryNotEveryCard(t), knownPeopleOnly(t), soundReferenced(t)];
 }
 
 /** A compact markdown report: one table, then each failing assert's evidence (12 lines at most each). */

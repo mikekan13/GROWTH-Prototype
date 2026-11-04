@@ -45,8 +45,11 @@ Rules:
    change the outcome makes to doors, hands and rooms; [] when none.
    "uses" lists the things the act USES or handles (smokes, pockets, reads,
    puts on, drinks from, opens with), each named as the Entity section names
-   it when it is there, or as the act names it when it is not — never
-   substitute something the entity does hold; [] when it uses nothing.
+   it when it is there, or as the act names it when it is not. A thing the
+   act names that the Entity does NOT hold goes in by the act's own words
+   ("weed vape"), so the table can ask about it — NEVER put a held thing in
+   its place (run 4, 2026-11-03: "takes a hit of his weed vape" came back as
+   uses: ["Work phone"]). [] only when the act handles nothing.
    MONEY changing hands is {"op":"pay"} with the AMOUNT the actor means to
    pay (what is due, or what the words say) — never a "give" of "the cash":
    the engine picks the bills out of what the actor carries and says what was

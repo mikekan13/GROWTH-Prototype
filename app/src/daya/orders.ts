@@ -13,6 +13,7 @@
  */
 import { z } from 'zod';
 import { chat, type DayaClientOverrides } from './model-client';
+import { logTraining } from './training-log';
 
 
 // ── The kinds ───────────────────────────────────────────────────────────────
@@ -170,7 +171,8 @@ export function orderPrompt(order: Order): { system: string; user: string; maxTo
           'You give one being\'s thought its own voice, in a simulation. You are one part of a larger system: WHAT the being is thinking is decided below; you only put it in its voice.',
           'Write the thought as it goes through this being, first person, in its way of speaking: plain, particular, full sentences that run on like thought does.',
           // THE RECORD (GROUNDED-BEATS-PLAN-2026-11-03 section 3b): nothing outside it.
-          'Say only what the record gives. Nothing is here but what is HERE WITH IT. Nothing happens but what REACHED IT. What it REMEMBERS is then, with its age, never now. What it PICTURES is pictured ("I can see her..."), never done. Something STILL GOING is still going: never say it ended, was answered or was ignored. In a thought it does nothing and says nothing aloud.',
+          'Say only what the record gives. Nothing is here but what is HERE WITH IT. Nothing happens but what REACHED IT. What it REMEMBERS is then, with its age, never now. What it PICTURES is pictured - "I picture", "I imagine", "maybe", "probably" - never seen, heard or done (run 4: "I can see the screen lighting up" was a picture told as sight). Something STILL GOING is still going: never say it ended, was answered or was ignored. In a thought it does nothing and says nothing aloud. Nothing rings, chimes, knocks or sounds unless WHAT JUST REACHED IT or STILL GOING says so now.',
+          'Things are given as the being would say them ("my phone", "the five-dollar bill"); say them that way, never as a label.',
           'The way of speaking is a voice, not a formula: do not open sentences the same way twice, and do not lean on one stock phrase.',
           'No metaphors for silence, weight, breath, light or dark. Never repeat a sentence or an image from its recent thoughts. Under 60 words.',
           names,
@@ -219,7 +221,7 @@ export function recordLines(b: VoiceBrief): string[] {
  */
 export async function placeOrder<O extends Order>(
   order: O,
-  ctx: { campaignId: string; entityId: string },
+  ctx: { campaignId: string; entityId: string; beatKey?: string },
   overrides: DayaClientOverrides = {},
 ): Promise<Piece<O['kind']> | null> {
   const t0 = Date.now();
@@ -228,6 +230,8 @@ export async function placeOrder<O extends Order>(
     const res = await chat({ tier: 'C', subsystem: `order_${order.kind}`, contentClass: 'fiction', campaignId: ctx.campaignId, entityId: ctx.entityId, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], maxTokens, temperature: order.kind === 'voice' ? 0.8 : 0.3 }, overrides);
     const piece = parsePiece(order.kind, res.text);
     if (!piece) console.warn(`[orders] ${order.kind}: the answer did not parse (${Date.now() - t0}ms)`);
+    // THE TRAINING LOG (2026-11-03): the brief and the piece, as a pair, with the real names (local only).
+    logTraining({ kind: `order_${order.kind}`, campaignId: ctx.campaignId, entityId: ctx.entityId, beatKey: ctx.beatKey ?? null, by: 'C', input: { system, user, brief: order.brief }, output: { raw: res.text, piece }, ms: Date.now() - t0 });
     return piece as Piece<O['kind']> | null;
   } catch (err) {
     console.warn(`[orders] ${order.kind} failed (${Date.now() - t0}ms):`, err instanceof Error ? err.message : err);

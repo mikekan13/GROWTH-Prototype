@@ -64,3 +64,6 @@ next-env.d.ts
 
 # ai/network fine-tune trace corpus (data, not code)
 /traces/
+
+# THE TRAINING LOG (2026-11-03): local pairs with real names, never committed
+data/training/

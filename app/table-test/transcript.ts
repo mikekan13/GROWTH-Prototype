@@ -37,6 +37,8 @@ export interface RunEvent {
 
 /** The pieces the composer held when it made a card (stored on the being_thought payload as `pieces`). */
 export interface BeatPieces {
+  /** Joins the card to its orders and choice in the training log. */
+  beatKey?: string;
   perceived: string;
   felt: string;
   wakes: Array<{ text: string; why: string }>;

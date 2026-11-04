@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
-import { absentThing, stillGoing, sessionBound, noPlaceholder, noDeed, unheldUseWithheld, watcherLineStands, timing, cloudBudget, memoryNotEveryCard, knownPeopleOnly, runAsserts, summarize } from './asserts';
+import { absentThing, stillGoing, sessionBound, noPlaceholder, noDeed, unheldUseWithheld, watcherLineStands, timing, cloudBudget, memoryNotEveryCard, knownPeopleOnly, soundReferenced, runAsserts, summarize } from './asserts';
 import type { RunCard, RunTranscript } from './transcript';
 
 const T0 = Date.UTC(2026, 10, 3, 20, 0, 0);
@@ -85,9 +85,19 @@ describe('table-test asserts', () => {
     expect(knownPeopleOnly(make({ cards: [card({ text: 'Ruth Hale would know.' })] })).pass).toBe(false);
     expect(knownPeopleOnly(make({ cards: [card({ text: 'Rosemary would know.' })] })).pass).toBe(true);
   });
+  it('A12 soundReferenced', () => {
+    const pieces = (perceived: string, gist: string) => ({ perceived, felt: '', wakes: [], recent: [], gist, impulse: 'stay' as const });
+    const text = 'The phone is still ringing.';
+    const bad = soundReferenced(make({ cards: [card({ text, pieces: pieces('Nothing new reaches you.', 'nothing new · about nothing in particular') }), card()] }));
+    expect(bad.pass).toBe(false); expect(bad.evidence[0]).toContain('ring');
+    expect(bad.measure).toEqual({ label: 'cards_without_pieces', value: 1 });
+    expect(soundReferenced(make({ cards: [card({ text, pieces: pieces('Your phone rings.', '') })] })).pass).toBe(true);
+    expect(soundReferenced(make({ cards: [card({ text, pieces: pieces('', 'going: phone ringing') })] })).pass).toBe(true);
+    expect(soundReferenced(make({ cards: [card({ text: 'It stopped. It rang twice.', pieces: pieces('', '') })] })).pass).toBe(true);
+  });
   it('runAsserts order and summarize', () => {
     const rs = runAsserts(make({ cards: [card({ text: 'The bill is still by the door.' })] }));
-    expect(rs.map((r) => r.id)).toEqual(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11']);
+    expect(rs.map((r) => r.id)).toEqual(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'A12']);
     const md = summarize(rs);
     expect(md).toContain('| A1 | absentThing | FAIL | 1 |');
     expect(md).toContain('**A1 absentThing**');

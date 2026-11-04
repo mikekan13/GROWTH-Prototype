@@ -1109,7 +1109,7 @@ async function runBeats(
       console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: ${content}`);
       standingIds.add(listenerId);
       // All her senses, none of them given anything (HW10 2026-10-29: via ['sight'] alone told her "this reached you by SIGHT only" of a beat in which nothing reached her).
-      hear(listenerId, { source: 'perception', content }, { verdict: { beingId: listenerId, reaches: true, via: ['sight', 'hearing'], noticed: true, salience: 0.3 }, source: 'stub' }, undefined, truthId);
+      hear(listenerId, { source: 'perception', content, standing: true }, { verdict: { beingId: listenerId, reaches: true, via: ['sight', 'hearing'], noticed: true, salience: 0.3 }, source: 'stub' }, undefined, truthId);
     } catch (err) { console.warn('[standing-beat] failed (non-fatal):', err instanceof Error ? err.message : err); }
   };
   const gatedHear = (utterances: TableUtterance[], ids: string[], askFor?: TableAsk, truthId: string | null = truth.primary, preset: Map<string, ReachVerdict> = new Map(), withOwnWords = false, judgeWith?: TableUtterance[]) => {
@@ -1658,11 +1658,13 @@ async function withholdUnheld(
   line: string,
 ): Promise<void> {
   const readable = (actions ?? []).filter((a) => a.actorId && a.text.trim() && !isRecall(a.text) && !detectActiveCheck(a.text));
+  console.log(`[table-speak] unheld check: ${readable.length} act(s) of ${(actions ?? []).length} readable${readable.length ? ' - ' + readable.map((a) => `${a.actorLabel}: ${a.text.slice(0, 60)}`).join(' | ') : ''}`);
   if (!readable.length) return;
   const cycle = (await feedCycle(campaignId).catch(() => null)) ?? 0;
   const read = await Promise.all(readable.map(async (a) => {
     try {
       const r = await resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: a.text, cycle, narrated: true, dryRun: true });
+      console.log(`[table-speak] unheld check ${a.actorLabel}: unheld=[${(r.unheldThings ?? []).join(', ')}]`);
       return { a, things: r.unheldThings ?? [] };
     } catch (err) {
       console.warn(`[table-speak] unheld-use read for ${a.actorLabel} failed (the line plays):`, err instanceof Error ? err.message : err);
