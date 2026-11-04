@@ -46,22 +46,45 @@ export interface CardReveal {
   reset(): void;
 }
 
-export function createCardReveal(): CardReveal {
-  const shown = new Set<string>();
+const MAX_STORED = 500;
+
+function readStored(key: string | undefined): string[] {
+  if (!key) return [];
+  try {
+    const raw = sessionStorage.getItem(key);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : [];
+  } catch { return []; }
+}
+
+function writeStored(key: string | undefined, ids: Set<string>): void {
+  if (!key) return;
+  try { sessionStorage.setItem(key, JSON.stringify([...ids].slice(-MAX_STORED))); } catch { /* memory only */ }
+}
+
+/** `storageKey` (e.g. per campaign) persists shown ids in sessionStorage so a reload does not re-type history. */
+export function createCardReveal(storageKey?: string): CardReveal {
+  let shown = new Set<string>(readStored(storageKey));
   const starts = new Map<string, number>();
   let seeded = false;
   return {
     observe(ids, now = Date.now()) {
       const fresh: string[] = [];
+      let changed = false;
       for (const id of ids) {
         if (shown.has(id)) continue;
         shown.add(id);
+        changed = true;
         if (seeded) { starts.set(id, now); fresh.push(id); }
       }
       seeded = true;
+      if (changed) {
+        if (shown.size > MAX_STORED * 2) shown = new Set([...shown].slice(-MAX_STORED));
+        writeStored(storageKey, shown);
+      }
       return fresh;
     },
     startOf: (id) => starts.get(id),
-    reset() { shown.clear(); starts.clear(); seeded = false; },
+    reset() { starts.clear(); seeded = false; shown = new Set(readStored(storageKey)); },
   };
 }

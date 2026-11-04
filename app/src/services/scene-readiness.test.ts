@@ -4,7 +4,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({ prisma: {} }));
 vi.mock('@/services/location', () => ({ updateLocationStatus: vi.fn() }));
 
-import { describeReadiness, SceneNotReadyError, type SceneReadiness } from './scene-readiness';
+import { pickSeated, describeReadiness, SceneNotReadyError, type SceneReadiness } from './scene-readiness';
 
 const base: SceneReadiness = { ready: false, places: [], characters: [], itemsInScene: 0, seats: [] };
 
@@ -26,5 +26,19 @@ describe('play only above the line (Mike 2026-10-17)', () => {
     expect(err.status).toBe(409);
     expect(err.readiness).toBe(r);
     expect(err.message).toContain('Landing');
+  });
+});
+
+describe('who is seated (Michael 2026-11-04)', () => {
+  const chars = [
+    { id: 'v', name: 'Violet', status: 'DRAFT', entityType: 'PLAYER_CHARACTER' },
+    { id: 'r', name: 'Rosemary Marsh', status: 'DRAFT', entityType: 'NPC' },
+    { id: 'k', name: 'Kristopher', status: 'ACTIVE', entityType: 'NPC' },
+    { id: 'a', name: 'Awake Draft', status: 'DRAFT', entityType: 'NPC' },
+    { id: 'n', name: 'Nobody', status: 'ACTIVE', entityType: 'NPC' },
+  ];
+  const beings = [{ characterId: 'r', status: 'DORMANT' }, { characterId: 'k', status: 'DORMANT' }, { characterId: 'a', status: 'ACTIVE' }];
+  it('a DRAFT NPC with a DORMANT being (Rosemary) does not gate the start', () => {
+    expect(pickSeated(chars, beings).map((c) => c.id)).toEqual(['v', 'k', 'a']);
   });
 });

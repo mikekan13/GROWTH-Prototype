@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseTableProse, introducedSubject, isDescriptive, isThoughtBody, splitDurationClause, characterCards, type ParsedProse } from './table-prose';
+import { parseTableProse, segmentOwned, introducedSubject, isDescriptive, isThoughtBody, splitDurationClause, characterCards, type ParsedProse } from './table-prose';
 import frozenJson from './table-prose.frozen.json';
 
 const frozen = frozenJson as Array<{ text: string; withRoster: boolean; parsed: ParsedProse }>;
@@ -473,6 +473,20 @@ describe('Day 6 (2026-11-04): a thing of theirs is not their deed; a misspelled 
   it('"Violets phone continues to ring." (no apostrophe) is Violet\'s thing, owned', () => {
     const p = parseTableProse('Violets phone continues to ring.', table, {});
     expect(p.actions?.[0]).toMatchObject({ actorId: 'vi', owned: true });
+  });
+  it('a thing\'s multi-word verb phrase and trailing clause stay owned (live miss 21:23Z)', () => {
+    for (const line of ['Violets phone continues to ring almost pleading with her.', 'Violet’s phone buzzes twice on the desk.', 'Her phone rings again.']) {
+      const p = parseTableProse(line, table, { recentActors: [table[0]] });
+      expect(p.actions?.[0], line).toMatchObject({ actorId: 'vi', owned: true });
+    }
+  });
+  it('the cloud page\'s rebuilt segment keeps owned (it rewrote "Her phone continues to ring." and dropped the flag)', () => {
+    const p = parseTableProse('Violets phone continues to ring almost pleading with her.', table, {});
+    const sentence = 'Violets phone continues to ring almost pleading with her.';
+    expect(segmentOwned(p.actions ?? [], 'vi', sentence, 'Her phone continues to ring.')).toBe(true);
+    expect(segmentOwned(p.actions ?? [], 'kris', sentence, 'Her phone continues to ring.')).toBe(false);
+    const deed = parseTableProse('She answers the phone.', table, { recentActors: [table[0]] });
+    expect(segmentOwned(deed.actions ?? [], 'vi', 'She answers the phone.', 'Answers the phone.')).toBe(false);
   });
   it('"She answers the phone." is her deed, not owned', () => {
     const p = parseTableProse('She answers the phone.', table, { recentActors: [table[0]] });

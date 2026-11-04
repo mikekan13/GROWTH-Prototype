@@ -1558,7 +1558,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   ];
 
   return (
-    <div className="h-dvh bg-[var(--surface-dark)] flex flex-col overflow-hidden">
+    <div className="h-dvh bg-[var(--surface-dark)] flex flex-col overflow-clip">
       {/* ── JEWL construction site — visible while he lays work down (F-2).
           The ⚒ badge names the last committed piece; page data refreshes
           progressively underneath so his builds materialize live.

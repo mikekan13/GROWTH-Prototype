@@ -70,6 +70,8 @@ import {
   GROUNDING_CHECK_MAX_TOKENS,
   readGroundingVerdict,
   guessHint,
+  isQuestionOrOffer,
+  shortAnswerToQuestion,
 } from './prompts/roles/spirit';
 import {
   ListenQueue,
@@ -900,6 +902,8 @@ export interface TableStimulus {
   standing?: boolean;
   /** Day 6 (2026-11-04, finding 21): the Watcher addressed this being's own moment; the quiet-beat rule does not apply. */
   prompted?: boolean;
+  /** Day 7 (2026-11-04): the far side of the being's own live signal (its call ringing / answered / its text delivered) — handed whole, remembered as a perception, never as "your own doing". */
+  farSide?: boolean;
 }
 
 export interface ListenTimings {
@@ -997,8 +1001,12 @@ export async function listenStimulus(
   // Finding 17 (2026-11-04): an OWN line is remembered as the deed and the words, as told to the being — not as the perception
   // agent's "Nothing new reaches you". What it wrote in a text a beat ago is in its memory, verbatim.
   const memoryContent = own ? raw : content;
+  // Day 7 (2026-11-04): a beat in which nothing reached the being leaves no memory row ("Nothing new reaches you." was stored 3× tonight).
+  const nothingNew = /^\s*nothing new reaches you\.?\s*$/i.test(memoryContent);
   const [ingest, desiresBlock] = await Promise.all([
-    ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: stimulus.source, content: unmarkAddressed(memoryContent), extraClassification: mirrorAudit }, overrides),
+    nothingNew
+      ? Promise.resolve({ persisted: false } as unknown as Awaited<ReturnType<typeof ingestStimulus>>)
+      : ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: stimulus.source, content: unmarkAddressed(memoryContent), extraClassification: mirrorAudit }, overrides),
     desiresPending,
   ]);
   const tIngested = Date.now();
@@ -1321,6 +1329,8 @@ export interface AnswerResult {
   utteranceId: string;
   action: { kind: GateKind; content?: string };
   timings: AnswerTimings;
+  /** Day 7 (2026-11-04, finding 29): what the table should tell the Watcher about this line — a place or thing the being named that the world does not hold yet. */
+  notes?: string[];
   /** Settles once the bookkeeping behind the line is done (memory rows, the act). Never rejects. */
   after: Promise<AnswerAfter>;
 }
@@ -1494,7 +1504,7 @@ export async function answerAsk(
     facts: factLines,
   });
   // The guess check reads a spoken line against the same knowledge. Never throws; unreadable = OK.
-  const checkGrounding = async (said: string): Promise<{ grounded: boolean; claim?: string }> => {
+  const checkGrounding = async (said: string): Promise<{ grounded: boolean; claim?: string; names?: string }> => {
     try {
       const r = await chat({
         tier: 'L1', subsystem: 'spirit_guess_check', contentClass: 'fiction', entityId: ctx.entityDaId,
@@ -1526,9 +1536,12 @@ export async function answerAsk(
   const heardTexts0 = [...heard, ...(ask.kind === 'spoken' ? [`${ask.by}: ${ask.text}`] : [])];
   const utteranceId = crypto.randomUUID();
   let firstWordAt: number | null = null;
+  // RULING 10 (2026-11-04): a composed line is shown ONCE, in its final words, after every check below — never growing, never
+  // withdrawn. Only the raw streamed path (composer off) still shows as it comes.
+  const showAsItComes = !(composerOn() && ctx.campaignId && ctx.persona.omniscient !== true);
   const gate = createSpeechGate((delta, whole) => {
     if (firstWordAt === null) firstWordAt = Date.now();
-    emit({ phase: 'partial', utteranceId, characterId, text: whole, delta });
+    if (showAsItComes) emit({ phase: 'partial', utteranceId, characterId, text: whole, delta });
   });
   emit({ phase: 'start', utteranceId, characterId, characterName: ctx.name });
 
@@ -1556,6 +1569,8 @@ export async function answerAsk(
     throw err;
   }
   const streamed = gate.end();
+  const shownToClient = showAsItComes && !!streamed.shown;
+  const notes: string[] = [];
   const fallback = `${ctx.name} pauses, unsure what to say, and lets the moment sit.`;
   const revoice = async () => (await answerCall({ hint: SPIRIT_REVOICE_HINT })).text;
 
@@ -1564,7 +1579,7 @@ export async function answerAsk(
   if (streamed.retracted) {
     // D1: the seal caught the line mid-stream. Withdraw what was shown, then today's path: one re-voice, else the template.
     console.warn(`[daya/ensemble] streamed line retracted for ${ctx.name}: rule=${streamed.retracted.rule} shown=${streamed.shown}`);
-    if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'seal', rule: streamed.retracted.rule });
+    if (shownToClient) emit({ phase: 'retract', utteranceId, characterId, reason: 'seal', rule: streamed.retracted.rule });
     const sealed = await enforceSeal(streamed.raw, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
     // The template is a narrator's sentence, not her words: she lets the moment pass rather than speak it.
     line = sealed.usedFallback ? { kind: 'rest', content: '' } : readLine(sealed.text);
@@ -1580,7 +1595,7 @@ export async function answerAsk(
   const heardTexts = [...heard, ...(ask.kind === 'spoken' ? [ask.text, `${ask.by}: ${ask.text}`] : [])];
   if (line.kind === 'speak' && isEcho(line.content, heardTexts)) {
     console.warn(`[daya/ensemble] echo for ${ctx.name} — revoicing: "${line.content.slice(0, 80)}"`);
-    if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'echo', rule: 'echo' });
+    if (shownToClient) emit({ phase: 'retract', utteranceId, characterId, reason: 'echo', rule: 'echo' });
     try {
       const sealed = await enforceSeal((await answerCall({ hint: SPIRIT_ECHO_HINT, stop: false })).text, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
       const second = sealed.usedFallback ? { kind: 'rest' as GateKind, content: '' } : readLine(sealed.text);
@@ -1599,7 +1614,7 @@ export async function answerAsk(
     const contra = claimVsFact(line.content, askGround.records, askContext);
     if (contra) {
       console.warn(`[daya/ensemble] claim vs fact for ${ctx.name} — revoicing: "${line.content.slice(0, 80)}" against ${contra.subjectKey}: ${contra.fact}`);
-      if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'guess', rule: 'claim-vs-fact' });
+      if (shownToClient) emit({ phase: 'retract', utteranceId, characterId, reason: 'guess', rule: 'claim-vs-fact' });
       try {
         const sealed = await enforceSeal((await answerCall({ hint: factHint(line.content, contra), stop: false })).text, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
         const second = sealed.usedFallback ? { kind: 'rest' as GateKind, content: '' } : readLine(sealed.text);
@@ -1617,11 +1632,19 @@ export async function answerAsk(
   // NEVER GUESS, CHECKED (HW5 2026-10-25: "I think I left it on the counter" with the cash on her; "I paid you,
   // didn't I?" with his voice in her memory saying she had not — the law was in the prompt and the line still
   // filled the gap). A guess is re-voiced once with the gap named; a second guess lets the moment sit.
-  if (line.kind === 'speak' && line.content.trim()) {
+  // Day 7 (2026-11-04, finding 29 — "Tea is fine. Thursday?", "That makes us even", "Tomorrow works." were all pulled): a question or an
+  // offer claims nothing; a short answer to a question is an answer. Neither is checked. A place she NAMES stands, and the Watcher is told.
+  const exemptFromGuess = line.kind === 'speak' && (isQuestionOrOffer(line.content) || shortAnswerToQuestion(line.content, heardTexts));
+  if (exemptFromGuess) console.log(`[daya/ensemble] ${ctx.name}: an offer or an answer, not checked for guessing — "${line.content.slice(0, 60)}"`);
+  if (line.kind === 'speak' && line.content.trim() && !exemptFromGuess) {
     const verdict = await checkGrounding(line.content);
+    if (verdict.grounded && verdict.names) {
+      console.log(`[watcher-note] ${ctx.name} named "${verdict.names}" — not yet in the world; the words stand`);
+      notes.push(`${ctx.name} named "${verdict.names}" — not a place or thing in the world yet. Make it one, or let it be.`);
+    }
     if (!verdict.grounded) {
       console.warn(`[daya/ensemble] guess for ${ctx.name} — revoicing: "${line.content.slice(0, 80)}"${verdict.claim ? ` (claim: ${verdict.claim})` : ''}`);
-      if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'guess', rule: 'never-guess' });
+      if (shownToClient) emit({ phase: 'retract', utteranceId, characterId, reason: 'guess', rule: 'never-guess' });
       try {
         const sealed = await enforceSeal((await answerCall({ hint: guessHint(line.content, verdict.claim), stop: false })).text, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
         const second = sealed.usedFallback ? { kind: 'rest' as GateKind, content: '' } : readLine(sealed.text);
@@ -1639,6 +1662,16 @@ export async function answerAsk(
       revoiced = true;
     }
   }
+  // Day 7 (2026-11-04, finding 26: "her thumb tracing the edge of the five-dollar bill in her pocket" — his bill): an ACT that uses a
+  // thing she does not hold and that is not here is a guess; an act with no real deed behind it is a stay, not prose.
+  if (line.kind === 'act' && line.content.trim() && ctx.persona.omniscient !== true) {
+    const verdict = await checkGrounding(line.content);
+    if (!verdict.grounded) {
+      console.warn(`[daya/ensemble] ${ctx.name}'s act uses what is not there — the moment sits: "${line.content.slice(0, 80)}"${verdict.claim ? ` (claim: ${verdict.claim})` : ''}`);
+      line = { kind: 'rest', content: '' };
+      revoiced = true;
+    }
+  }
   // THE VOICE FILTER (HW8 run 6) on what the being says or does: the table's words, stock images, counting, light with no light fact,
   // a sentence already thought — dropped, logged; nothing left means it lets the moment pass. An act only loses the table's words
   // ("knocks three times" is a doing, not a count).
@@ -1647,7 +1680,7 @@ export async function answerAsk(
     if (f.dropped.length) {
       const log = droppedLog(ctx.name, line.kind === 'speak' ? 'answer' : 'act', f.dropped);
       if (log) console.log(log);
-      if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'guess', rule: 'voice-filter' });
+      if (shownToClient) emit({ phase: 'retract', utteranceId, characterId, reason: 'guess', rule: 'voice-filter' });
       line = f.text ? { kind: line.kind, content: f.text } : { kind: 'rest', content: '' };
       revoiced = true;
     }
@@ -1658,7 +1691,7 @@ export async function answerAsk(
     const saidBefore = await recentSpokenOf(ctx.campaignId, characterId, 3);
     if (isSpokenRepeat(line.content, saidBefore)) {
       console.warn(`[daya/ensemble] ${ctx.name} repeated a line - re-voicing once: "${line.content.slice(0, 80)}"`);
-      if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'echo', rule: 'answer-replay' });
+      if (shownToClient) emit({ phase: 'retract', utteranceId, characterId, reason: 'echo', rule: 'answer-replay' });
       try {
         const sealed = await enforceSeal((await answerCall({ hint: SPIRIT_REPLAY_HINT, stop: false })).text, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
         const second = sealed.usedFallback ? { kind: 'rest' as GateKind, content: '' } : readLine(sealed.text);
@@ -1726,6 +1759,7 @@ export async function answerAsk(
 
   return {
     utteranceId,
+    ...(notes.length ? { notes } : {}),
     action: line.kind === 'rest' ? { kind: 'rest' } : { kind: line.kind, content: line.content },
     timings: { waitMs, listen, ttftMs: call.ttftMs ?? null, firstWordMs: firstWordAt === null ? null : firstWordAt - t0, lineMs, tokensOut: call.tokensOut, retracted: streamed.retracted !== null, revoiced },
     after,

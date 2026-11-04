@@ -286,6 +286,20 @@ export function sentenceActor(sentence: string, roster: ProseRosterEntry[], rece
 export function ownedThingSentence(sentence: string, roster: ProseRosterEntry[], recent: ProseRosterEntry[]): boolean {
   return !!sentenceActor(sentence, roster, recent) && !sentenceActor(sentence, roster, recent, { possessives: false });
 }
+/**
+ * The cloud page rebuilds the actions from its own segments ("Her phone continues to ring.") and used to drop `owned` on the way
+ * (Day 6 live miss, 2026-11-04: Violet's ringing phone went on her record as her deed). A built segment is owned when the seed
+ * had an owned action of the same actor whose words the segment's seed sentence (or built text) carries. Pure.
+ */
+export function segmentOwned(seedActions: ProseAction[], actorId: string, sentence: string, text = ''): boolean {
+  const norm = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+  const sent = norm(sentence), built = norm(text);
+  return seedActions.some((a) => {
+    if (!a.owned || a.actorId !== actorId) return false;
+    const t = norm(a.text);
+    return !!t && (sent.includes(t) || (!!sent && t.includes(sent)) || (!!built && (built.includes(t) || t.includes(built))));
+  });
+}
 const SCRIPT_PREFIX_RE = /^\s*([A-Z][\w.'’-]*(?:\s+[A-Z][\w.'’-]*){0,3}):\s*(.+)$/;
 // Verbs that end the noun phrase introducing a speaker ("A lass behind the bar GIVES you a wink").
 const INTRO_VERB_RE = /\s+(?:gives|give|says|say|asks|ask|looks|look|turns|turn|leans|lean|nods|nod|smiles|smile|winks|wink|shouts|shout|calls|call|whispers|whisper|grins|grin|laughs|laugh|steps|step|walks|walk|stands|stand|sits|sit|is|are|was|were|has|have|does|do|comes|come|glances|glance|raises|raise|slams|slam|pounds|pound|waves|wave|points|point|mutters|mutter|growls|growl|snaps|snap|sighs|sigh|frowns|frown|shrugs|shrug|beckons|beckon|watches|watch|stares|stare|eyes|reaches|reach|pushes|push|sets|set|puts|put|drops|drop|holds|hold|offers|offer|hands|hand|sneers|sneer|barks|bark|hisses|hiss|replies|reply|answers|answer|adds|add|continues|continue|pauses|pause|hesitates|hesitate|tries|try|starts|start|begins|begin|keeps|keep|moves|move|approaches|approach|enters|enter|appears|appear|emerges|emerge)\b/i;

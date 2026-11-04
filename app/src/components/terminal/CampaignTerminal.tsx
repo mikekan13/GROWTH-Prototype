@@ -434,7 +434,7 @@ export default function CampaignTerminal({
       timers.forEach(clearTimeout);
     };
   }, []);
-  const cardReveal = useRef(createCardReveal()).current;
+  const cardReveal = useRef(createCardReveal(`growth:cards-shown:${campaignId}`)).current;
   const revealView = useRef<string | null>(null);
   const freshCardsRef = useRef<string[]>([]);
 

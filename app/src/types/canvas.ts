@@ -33,6 +33,9 @@ export interface CanvasNode {
   holderId?: string | null;
   holderName?: string;
   locationName?: string;
+  /** ENTITIES INSIDE THINGS (ruling 12, 2026-11-04): what this being is inside of (a thing or another being); drawn at its point. */
+  insideId?: string;
+  insideName?: string;
   /** The map (2026-10-16): the item's located_at edge to its room, the room, and how many things it holds. */
   tokenEdgeId?: string;
   roomId?: string;

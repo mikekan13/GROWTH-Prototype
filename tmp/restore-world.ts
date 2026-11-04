@@ -26,6 +26,14 @@ async function main() {
   await prisma.campaignEvent.deleteMany({ where: { campaignId: C, type: 'being_thought', sessionId: null } });
   const mem = await p.dayaMemoryEntry.deleteMany({ where: { entityId: { in: entityIds }, realTime: win } });
   await p.dayaIntention.deleteMany({ where: { entityId: { in: entityIds }, createdAt: win } }).catch(() => undefined);
+  // Beings wrapped inside the rolled-back window (a session wrapped an NPC): the being goes with the session, or it seats that NPC at the table.
+  const newBeings = (await p.dayaEntity.findMany({ where: { createdAt: win, character: { campaignId: C } }, select: { id: true } })).map((e: any) => e.id);
+  if (newBeings.length) {
+    await p.dayaSpiritTie.deleteMany({ where: { OR: [{ parentEntityId: { in: newBeings } }, { childEntityId: { in: newBeings } }] } }).catch(() => undefined);
+    await p.dayaModelCall.updateMany({ where: { entityId: { in: newBeings } }, data: { entityId: null } }).catch(() => undefined);
+    await p.dayaEntity.deleteMany({ where: { id: { in: newBeings } } });
+  }
+  console.log(`[restore-world] removed ${newBeings.length} being(s) created since ${from.toISOString()}`);
   await p.historyEntry.deleteMany({ where: { campaignId: C, realTime: win } }).catch(() => undefined);
   const keep = new Set(s.factIds.map((f: any) => f.id));
   const now = await p.worldFact.findMany({ where: { campaignId: C }, select: { id: true } });

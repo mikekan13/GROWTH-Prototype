@@ -237,8 +237,12 @@ export function isEcho(line: string, heard: string[]): boolean {
   const l = line.trim().toLowerCase().replace(/[.!?…"“”]+$/g, '').trim();
   if (l.length < 6) return false;
   const lt = echoTokens(l);
+  // Day 7 (2026-11-04, finding 29): "Tomorrow works." after "Tomorrow works though?" is an ANSWER that takes the asker's word,
+  // not an echo — a short line answering a question is never an echo of that question.
+  const short = lt.size <= 4;
   for (const h of heard) {
     const hl = h.toLowerCase();
+    if (short && /\?\s*["”]?\s*$/.test(h.trim())) continue;
     if (hl.includes(l)) return true;
     if (lt.size >= 2) {
       const ht = echoTokens(hl);
@@ -341,20 +345,50 @@ ${args.facts?.length ? args.facts.join('\n') : '(nothing that bears on this)'}
 
 Her line: "${args.line}"
 
-A GUESS is a thing stated as so that nothing above supports, or that the above contradicts:
-where an object is, that something happened or was paid or given, what someone said, what
-she has or did. Feelings, wishes, intentions ("I was going to"), promises and plans of her own
-("give me a second", "I'll be right there", "hold on"), refusals, questions back, opinions, and
-anything the above supports are NOT guesses.
-Answer with exactly one line: OK — or — GUESS: <the unsupported claim, in a few words>`;
+A GUESS is a claim about the WORLD AS IT STANDS that nothing above supports, or that the
+above contradicts: where an object is, that something happened or was paid or given, what
+someone said, what she has on her or did, what the weather or the hour is. A doing that uses
+a thing she does not hold and that is not here is a guess too.
+NOT guesses: an offer or a proposal (a day, an hour, a place to meet — "Thursday?", "the
+coffee shop off Broadway", "tomorrow, if the rain lets us"), an answer that accepts or
+declines ("Tomorrow works.", "Yes.", "No."), an opinion or a judgement ("that makes us even"),
+a feeling, a wish, an intention ("I was going to"), a promise or a plan of her own ("give me
+a second", "hold on"), a refusal, a question back, a guess she MARKS as one ("I think",
+"maybe", "probably"), recognising or wondering about a sound, and anything the above supports.
+A place or a thing she NAMES as her suggestion, that the above does not hold, is not a guess:
+report it as NAMES.
+Answer with exactly one line: OK — or — GUESS: <the unsupported claim, in a few words> — or —
+NAMES: <the place or thing she brought up that the above does not hold>`;
 }
 
 /** Read the check's one line. Anything unreadable counts as OK: the check may never mute her by accident. Pure. */
-export function readGroundingVerdict(raw: string): { grounded: boolean; claim?: string } {
+export function readGroundingVerdict(raw: string): { grounded: boolean; claim?: string; names?: string } {
   const first = (raw ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? '';
   const guess = first.match(/^\W*guess\b\W*(.*)$/i);
   if (guess) return { grounded: false, ...(guess[1].trim() ? { claim: guess[1].trim().replace(/[.]+$/, '') } : {}) };
+  // Day 7 (2026-11-04, finding 29): a place or thing she brought up as her suggestion — the words stand, the Watcher is told.
+  const names = first.match(/^\W*names\b\W*(.*)$/i);
+  if (names) return { grounded: true, ...(names[1].trim() ? { names: names[1].trim().replace(/[.]+$/, '') } : {}) };
   return { grounded: true };
+}
+
+/** A line that asks or offers ("Thursday?", "Meet you at the coffee shop?") claims nothing about the world. Pure. */
+export function isQuestionOrOffer(line: string): boolean {
+  const l = line.trim();
+  if (!/\?\s*["”]?\s*$/.test(l)) return false;
+  // A TAG question claims and asks for agreement ("I paid you, didn't I?", "it's open, right?") — HW5's own case. Not exempt.
+  const lastSentence = l.split(/(?<=[.!?])\s+/).pop() ?? l;
+  const tag = lastSentence.match(/,\s*([^,?]{1,24})\?\s*["”]?$/);
+  if (tag && tag[1].trim().split(/\s+/).length <= 3) return false;
+  return true;
+}
+
+/** A short answer to a question that was put to her ("Tomorrow works.", "Yes.", "I'm here.") is an answer, not a claim. Pure. */
+export function shortAnswerToQuestion(line: string, heard: string[]): boolean {
+  const words = line.trim().split(/\s+/).filter(Boolean);
+  // Three words at most: "Tomorrow works.", "Yes.", "I'm here.", "Tea is fine." — long enough to answer, too short to narrate a claim.
+  if (!words.length || words.length > 3) return false;
+  return heard.some((h) => /\?\s*["”]?\s*$/.test(h.trim()));
 }
 
 /** The hint for a second take when the first line filled a gap with a guess. */

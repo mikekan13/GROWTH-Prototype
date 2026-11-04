@@ -62,6 +62,25 @@ export async function attachBeingCard(campaignId: string, eventId: string, card:
   } catch (err) { console.warn('[being-thought] card not attached (the thought stands):', err instanceof Error ? err.message : err); }
 }
 
+/**
+ * ONE BEING, ONE BEAT, ONE CARD (Michael, 2026-11-04, finding 31): a deed or words that follow the being's thought on the same
+ * line join its card as segments — never a second card. Appends (deduped by text), sets the impulse, re-pushes the row.
+ */
+export async function appendBeingCardSegments(campaignId: string, eventId: string, more: NonNullable<BeingThoughtRecord['segments']>, impulse?: ListenImpulse): Promise<void> {
+  const ev = await prisma.campaignEvent.findUnique({ where: { id: eventId } });
+  if (!ev) return;
+  let payload: Record<string, unknown> = {};
+  try { payload = JSON.parse(ev.payload ?? '{}') as Record<string, unknown>; } catch { /* fresh */ }
+  const have = Array.isArray(payload.segments) ? (payload.segments as NonNullable<BeingThoughtRecord['segments']>) : [];
+  const seen = new Set(have.map((x) => x.text.trim()));
+  const added = more.filter((x) => x.text.trim() && !seen.has(x.text.trim()));
+  if (!added.length) return;
+  const merged = segs([...have, ...added]) ?? [];
+  payload = { ...payload, segments: merged, ...(impulse ? { impulse } : {}) };
+  await prisma.campaignEvent.update({ where: { id: eventId }, data: { payload: JSON.stringify(payload) } });
+  pushRow(campaignId, ev, payload);
+}
+
 /** Never throws: a record that fails to write is logged, the table does not notice. Returns the row's id for the card to follow. */
 export async function recordBeingThought(campaignId: string, by: { userId: string; username: string }, r: BeingThoughtRecord): Promise<string | null> {
   try {

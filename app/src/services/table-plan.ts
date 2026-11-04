@@ -49,6 +49,8 @@ export interface PlannedStimulus {
   standing?: boolean;
   /** Day 6 (2026-11-04, finding 21): the Watcher addressed this being's own moment ("Violet realizes…", "Time to decide"): it owes a card. */
   prompted?: boolean;
+  /** Day 7 (2026-11-04): the far side of the listener's own live signal — handed whole (not reduced to sound), remembered as a perception, not its own doing. */
+  farSide?: boolean;
 }
 
 /** The out-of-character rules that are safe to act on when the words were spoken, not typed. */

@@ -4,6 +4,7 @@ import {
   SPIRIT_TENETS_BLOCK, LISTENING_MAX_TOKENS, ANSWERING_MAX_TOKENS, type DesireSourceItem,
   capSpeech, splitImpulse, NEVER_GUESS_BLOCK, isEcho,
   sensesNoteFor, buildGroundingCheckPrompt, readGroundingVerdict, guessHint,
+  isQuestionOrOffer, shortAnswerToQuestion,
 } from './spirit';
 import { sealLint, hasHardHit } from '../../seal';
 
@@ -275,5 +276,32 @@ describe('an echo is not an answer (HW3 2026-10-24)', () => {
     expect(isEcho("It's by the door. Give me a second.", heard)).toBe(false);
     expect(isEcho('Go away.', heard)).toBe(false);
     expect(isEcho('I paid. Check your bag.', heard)).toBe(false);
+  });
+});
+
+describe('Day 7 round 1: verdicts, questions, short answers', () => {
+  it('readGroundingVerdict reads NAMES, GUESS and anything else', () => {
+    expect(readGroundingVerdict('NAMES: the coffee shop.')).toEqual({ grounded: true, names: 'the coffee shop' });
+    expect(readGroundingVerdict('GUESS: he lives upstairs..')).toEqual({ grounded: false, claim: 'he lives upstairs' });
+    expect(readGroundingVerdict('OK')).toEqual({ grounded: true });
+    expect(readGroundingVerdict('')).toEqual({ grounded: true });
+  });
+  it('isQuestionOrOffer', () => {
+    expect(isQuestionOrOffer('Thursday?')).toBe(true);
+    expect(isQuestionOrOffer('He said "Thursday?"')).toBe(true);
+    expect(isQuestionOrOffer('Thursday.')).toBe(false);
+  });
+  it('shortAnswerToQuestion', () => {
+    expect(shortAnswerToQuestion('Tomorrow works.', ['Kristopher: Tomorrow works though?'])).toBe(true);
+    expect(shortAnswerToQuestion('Tomorrow works.', ['Kristopher: Tomorrow.'])).toBe(false);
+    expect(shortAnswerToQuestion('one two three four five six', ['Really?'])).toBe(false);
+    expect(shortAnswerToQuestion('', ['Really?'])).toBe(false);
+    expect(shortAnswerToQuestion('Yes.', ['Ok "Really?"'])).toBe(true);
+  });
+  it('isEcho spares short answers to questions only', () => {
+    expect(isEcho('Tomorrow works.', ['Kristopher: Tomorrow works though?'])).toBe(false);
+    expect(isEcho('Just pay the pizza.', ['Just pay the pizza.'])).toBe(true);
+    expect(isEcho('Tomorrow works.', ['Kristopher: Tomorrow works though.'])).toBe(true);
+    expect(isEcho('Just pay the pizza tonight and we are all done here friend', ['Just pay the pizza tonight and we are all done here friend?'])).toBe(true);
   });
 });

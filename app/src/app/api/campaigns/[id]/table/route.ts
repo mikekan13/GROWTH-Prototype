@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
@@ -71,7 +71,8 @@ export async function POST(
       ? await narrateAtTable(campaignId, actor, input)
       : 'npcCharacterId' in input
         ? await speakThroughNpc(campaignId, actor, input)
-        : await speakProse(campaignId, actor, input);
+        // The line is answered once it is RECORDED; the beings' beats run after the response (the cards come over the SSE stream).
+        : await speakProse(campaignId, actor, { ...input, beatsLater: (run) => after(() => run().catch((err) => console.warn('[table] beats after the ack failed:', err instanceof Error ? err.message : err))) });
     return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error);

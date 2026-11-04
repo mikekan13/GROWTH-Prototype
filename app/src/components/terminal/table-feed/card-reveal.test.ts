@@ -26,4 +26,32 @@ describe('card-reveal', () => {
     r.reset();
     expect(r.observe(['new1'], 9)).toEqual([]);
   });
+  it('persists shown ids so a reload does not re-type history', () => {
+    const store = new Map<string, string>();
+    const g = globalThis as unknown as { sessionStorage?: unknown };
+    const prev = g.sessionStorage;
+    g.sessionStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } };
+    try {
+      const a = createCardReveal('k');
+      a.observe(['c1'], 0);
+      expect(a.observe(['c1', 'c2'], 5)).toEqual(['c2']);
+      const b = createCardReveal('k'); // reload
+      expect(b.observe(['c1', 'c2'], 10)).toEqual([]);
+      expect(b.observe(['c1', 'c2', 'c3'], 20)).toEqual(['c3']);
+      b.reset();
+      expect(b.observe(['c1', 'c2', 'c3'], 30)).toEqual([]);
+      expect(b.observe(['c1', 'c2', 'c3', 'c4'], 40)).toEqual(['c4']);
+    } finally { g.sessionStorage = prev; }
+  });
+  it('falls back to memory when storage throws', () => {
+    const g = globalThis as unknown as { sessionStorage?: unknown };
+    const prev = g.sessionStorage;
+    const boom = () => { throw new Error('denied'); };
+    g.sessionStorage = { getItem: boom, setItem: boom };
+    try {
+      const r = createCardReveal('k');
+      r.observe(['a'], 0);
+      expect(r.observe(['a', 'b'], 1)).toEqual(['b']);
+    } finally { g.sessionStorage = prev; }
+  });
 });

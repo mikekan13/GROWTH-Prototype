@@ -159,7 +159,7 @@ export async function assembleCanvasModel(campaign: CanvasCampaign): Promise<Can
   const relationshipRows = await prisma.entityRelationship.findMany({
     where: {
       campaignId: campaign.id,
-      relationshipType: { in: ['owns', 'located_at'] },
+      relationshipType: { in: ['owns', 'located_at', 'inside'] },
     },
     orderBy: { createdAt: 'asc' }, // matches the possessions panel ordering
     select: { id: true, sourceId: true, targetId: true, relationshipType: true, strength: true, data: true },
@@ -252,6 +252,19 @@ export async function assembleCanvasModel(campaign: CanvasCampaign): Promise<Can
     }];
   });
 
+  // ENTITIES INSIDE THINGS (ruling 12, 2026-11-04): a being with an `inside` edge stands at its container's point — in the
+  // Fusion, not beside it — and the node says what it is inside of. The container may be a thing or another being.
+  const byId = new Map<string, { x: number; y: number; name: string }>();
+  for (const n of [...characterNodes, ...itemNodes]) byId.set(n.id, { x: n.x, y: n.y, name: n.name });
+  for (const r of relationshipRows) {
+    if (r.relationshipType !== 'inside') continue;
+    const host = byId.get(r.targetId);
+    const node = characterNodes.find((n) => n.id === r.sourceId);
+    if (!host || !node) continue;
+    node.x = host.x; node.y = host.y;
+    (node as { insideId?: string; insideName?: string }).insideId = r.targetId;
+    (node as { insideId?: string; insideName?: string }).insideName = host.name;
+  }
   const allNodes = [...characterNodes, ...locationNodes, ...itemNodes];
 
   // Build canvas connections from EntityRelationship rows. Only include edges
@@ -276,6 +289,7 @@ export async function assembleCanvasModel(campaign: CanvasCampaign): Promise<Can
   }
   const connections = relationshipRows
     .filter(r => {
+      if (r.relationshipType === 'inside') return false; // drawn by position, not as a tether (ruling 12)
       if (!nodeIdSet.has(r.sourceId)) return false;
       if (nodeIdSet.has(r.targetId)) return true;
       // Allow owns edges where the target is a parent-Location-turned-folder.

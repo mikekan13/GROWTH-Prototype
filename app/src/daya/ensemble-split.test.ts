@@ -220,9 +220,8 @@ describe('answerAsk — one short streamed call at the ask', () => {
     const result = await answerAsk('mara', { kind: 'turn' }, { onEvent, overrides: { fetchImpl: lane.fetchImpl } });
 
     // One call for the line; the guess check reads it afterwards (HW5 2026-10-25).
-    expect(lane.calls.map((c) => c.kind)).toEqual(['answer', 'check']);
+    expect(lane.calls.map((c) => c.kind)).toEqual(['answer']) // Day 7 (2026-11-04, finding 29): a question or a short answer to one is not guess-checked;
     expect(lane.calls[0]).toMatchObject({ kind: 'answer', stream: true, stop: ['\n'], hinted: false });
-    expect(lane.calls[1].prompt).toContain('Her line: "Who are you?"');
     expect(lane.calls[0].prompt).toContain('He looks like trouble. Keep the bar between us.');
     expect(lane.calls[0].prompt).toContain('[the room] The door bangs open.');
     expect(lane.calls[0].prompt).toContain('It is down to you now.');
@@ -237,7 +236,7 @@ describe('answerAsk — one short streamed call at the ask', () => {
     expect(result.timings.firstWordMs).not.toBeNull();
     expect(await result.after).toEqual({ spokenMemoryId: 'own-1' });
     expect(store.memories).toEqual([{ source: 'dialogue', content: 'Who are you?' }]);
-    expect(store.modelCalls.map((c) => c.subsystem)).toEqual(['spirit_answer', 'spirit_guess_check']);
+    expect(store.modelCalls.map((c) => c.subsystem)).toEqual(['spirit_answer']);
     expect(store.modelCalls[0].rationale ?? null).toBeNull();
     expect(getListening('mara')!.heard.at(-1)).toBe('You said: "Who are you?"');
   });
@@ -307,7 +306,7 @@ describe('answerAsk — one short streamed call at the ask', () => {
     const result = await answerAsk('mara', { kind: 'spoken', by: 'Oren', text: 'You the pilot?' }, { overrides: { fetchImpl: lane.fetchImpl } });
     expect(store.perceived.at(-1)).toEqual({ stimulus: 'Oren: You the pilot?', source: 'dialogue', standing: 'once', voice: false });
     expect(lane.calls[0].prompt).toContain('You are being spoken to, right now:\n[plain] Oren: You the pilot?');
-    expect(lane.calls.map((c) => c.kind)).toEqual(['answer', 'check']);
+    expect(lane.calls.map((c) => c.kind)).toEqual(['answer']) // Day 7 (2026-11-04, finding 29): a question or a short answer to one is not guess-checked;
     expect(await result.after).toEqual({ memoryEntryId: 'mem-2', spokenMemoryId: 'own-1' });
     expect(store.ingested.at(-1)).toEqual({ source: 'dialogue', content: '[plain] Oren: You the pilot?' });
     expect(getListening('mara')!.heard.slice(-2)).toEqual(['[plain] Oren: You the pilot?', 'You said: "Depends who asks."']);

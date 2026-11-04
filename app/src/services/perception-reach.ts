@@ -332,7 +332,7 @@ export async function judgeCanonReach(
         if (b.id === event.sourceId || !onTheLine(parties, event.sourceId, b.id)) continue;
         onLine.add(b.id);
         console.log(`[perception-reach] ${b.name}: on the line with ${event.sourceName ?? event.sourceId} — reached through the phone (hearing)`);
-        j.verdicts.set(b.id, { beingId: b.id, reaches: true, via: ['hearing'], noticed: true, salience: 0.9 });
+        j.verdicts.set(b.id, { beingId: b.id, reaches: true, via: ['hearing', 'line'], noticed: true, salience: 0.9 });
       }
     } catch (err) { console.warn('[perception-reach] line check failed (non-fatal):', err instanceof Error ? err.message : err); }
   }

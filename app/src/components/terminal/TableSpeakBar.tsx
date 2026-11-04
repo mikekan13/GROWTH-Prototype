@@ -24,6 +24,8 @@ interface ProseResponse {
   /** JEWL stopped the table — answer him (continue = improvising; take it back = mistake). */
   held?: JewlTicket;
   canonEventId: string | null;
+  /** The line is recorded; the beings' beats continue after this response and arrive over the stream. */
+  accepted?: boolean;
   /** Split loop (U2c-3): typed lines that were NOT recorded and NOT heard by
    *  beings — out-of-character asides, check calls. The GM must see these, or
    *  a dropped line looks like the table swallowed the narration. */
@@ -148,7 +150,7 @@ export default function TableSpeakBar({
       // A being that only LISTENED answers ok with detail 'listening' — that says
       // nothing about its core, so it must not flip the indicator to ready; the
       // first real ask then reports warming correctly.
-      setCoreStatus((prev) => (result.responses.some((r) => r.status === 'ok' && r.detail !== 'listening') ? 'ready' : prev));
+      if (!result.accepted) setCoreStatus((prev) => (result.responses.some((r) => r.status === 'ok' && r.detail !== 'listening') ? 'ready' : prev));
       if (result.ignored && result.ignored.length > 0) setIgnored(result.ignored.map((u) => u.text));
       const notes: string[] = [];
       const unattributed = result.dialogue.filter((d) => !d.speakerId);
