@@ -58,6 +58,8 @@ export interface VoiceRecord {
   did?: string[];
   /** Day 6 (2026-11-04): what it does now, when its impulse is act. */
   act?: string;
+  /** THE TRAITS LANE (2026-11-04): its Nectars, Thorns, Blossoms — standing truths that colour the voice, never announced. */
+  traits?: string[];
 }
 export interface VoiceBrief {
   /** THE RECORD (GROUNDED-BEATS-PLAN-2026-11-03): what the being may think in - resolved references only. */
@@ -215,6 +217,7 @@ export function recordLines(b: VoiceBrief): string[] {
     ...(r.remember.length ? [lines(remembered)] : []),
     r.imagine ? `IT PICTURES (has not happened): ${r.imagine}` : '',
     r.act ? `WHAT IT DOES NOW (its choice, this moment): ${r.act}` : '',
+    r.traits?.length ? `WHAT IT IS, ALWAYS (its Nectars and Thorns: they colour how it reads this moment and what it reaches for — never named, never news, never a thought about itself): ${r.traits.join(' | ')}` : '',
     `IT IS THINKING ABOUT: ${r.about.length ? r.about.join('; ') : 'what just reached it, and how it feels'}`,
   ].filter(Boolean);
 }

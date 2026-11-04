@@ -1,0 +1,55 @@
+{
+  "name": "the-date",
+  "world": {
+    "snapshot": "(the harness takes its own snapshot at the start and rolls back to it; this run starts from the world AFTER session 6: the first call made, the date agreed)",
+    "from": "(run start)"
+  },
+  "expectSignal": [0],
+  "expectHeard": [
+    { "line": 2, "by": "Violet" },
+    { "line": 4, "by": "Violet" },
+    { "line": 5, "by": "Violet" }
+  ],
+  "expectAnswer": [
+    { "line": 4, "by": "Violet" },
+    { "line": 5, "by": "Violet" },
+    { "line": 6, "by": "Violet" }
+  ],
+  "steps": [
+    {
+      "line": "Kristopher sits in his car in the lot behind the hotel, the five-dollar bill with Violet's number on the dash. He dials her number again.",
+      "waitS": 45,
+      "voice": "michael"
+    },
+    {
+      "line": "Violet's phone rings.",
+      "waitS": 40,
+      "voice": "michael"
+    },
+    {
+      "line": "Kristopher hears the ring stop and someone breathing on the other end. \"Hello? Violet? It's Kristopher. Sorry, I know I just called.\"",
+      "waitS": 45,
+      "voice": "michael"
+    },
+    {
+      "line": "He takes a breath. \"I forgot to ask what time tomorrow.\"",
+      "waitS": 45,
+      "voice": "michael"
+    },
+    {
+      "line": "Kristopher waits, the phone warm against his ear. \"Would four work? At the coffee shop on Broadway?\"",
+      "waitS": 50,
+      "voice": "michael"
+    },
+    {
+      "line": "He laughs at himself. \"Or any time. Tomorrow works, right?\"",
+      "waitS": 50,
+      "voice": "michael"
+    },
+    {
+      "line": "\"Okay. Four. I'll see you there, Violet.\" Kristopher hangs up and sets the phone face-down on the passenger seat.",
+      "waitS": 50,
+      "voice": "michael"
+    }
+  ]
+}

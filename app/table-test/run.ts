@@ -204,6 +204,8 @@ async function main() {
       const corpus = all.map((m: any) => m.content).join('\n');
       const known = new Set<string>();
       for (const n of allNames) if (n !== e.character.name && corpus.includes(n)) known.add(n);
+      // Day 7 (2026-11-04): a being that remembers "Rosemary" knows Rosemary Marsh — a roster FIRST name in its ledger counts (A11 flagged her own dead friend as a stranger).
+      for (const n of allNames) { const first = n.split(/\s+/)[0]; if (n !== e.character.name && first.length >= 4 && new RegExp(`\b${first}\b`).test(corpus)) known.add(n); }
       for (const m of corpus.matchAll(/\b([A-Z][a-z]+ [A-Z][a-z]+)\b/g)) known.add(m[1]);
       roster.push({ characterId: e.characterId, name: e.character.name, knownNames: [...known] });
     }

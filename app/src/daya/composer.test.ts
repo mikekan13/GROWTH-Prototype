@@ -46,6 +46,14 @@ describe('the composer chooses; it does not write (GROUNDED-BEATS-PLAN-2026-11-0
     expect(p).toMatch(/You write nothing/);
     expect(p).toMatch(/"impulse": "speak"\|"act"\|"stay"/);
   });
+  it('standing traits appear as an IS, always line only when given', () => {
+    const base = { name: 'Violet', identity: 'A writer.', desires: 'Quiet.', innerSoFar: '', sinceOwn: 'about a minute' };
+    const line = 'NECTAR Ageless Face (body): looks fifteen years younger.';
+    const withT = chooserPrompt({ ...base, traits: [line] }, 'My phone rings.', 'You are tense.', C);
+    expect(withT).toContain(line);
+    expect(withT).toContain('IS, always');
+    expect(chooserPrompt(base, 'My phone rings.', 'You are tense.', C)).not.toContain('IS, always');
+  });
   it('resolves codes against the list and drops the rest', () => {
     const ch = parseChoice('{"about":["G1","M1","Z9","n1"],"imagine":"He is in his car, waiting.","impulse":"stay","why":"not ready"}', C);
     expect(ch).toEqual({ about: ['G1', 'M1', 'N1'], imagine: 'He is in his car, waiting.', impulse: 'stay', why: 'not ready' });

@@ -97,7 +97,7 @@ describe('table-test asserts', () => {
   });
   it('runAsserts order and summarize', () => {
     const rs = runAsserts(make({ cards: [card({ text: 'The bill is still by the door.' })] }));
-    expect(rs.map((r) => r.id)).toEqual(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'A12', 'A14', 'A15', 'A18', 'A19', 'A20', 'A21']);
+    expect(rs.map((r) => r.id)).toEqual(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'A12', 'A14', 'A15', 'A18', 'A19', 'A20', 'A21', 'A22']);
     const md = summarize(rs);
     expect(md).toContain('| A1 | absentThing | FAIL | 1 |');
     expect(md).toContain('**A1 absentThing**');

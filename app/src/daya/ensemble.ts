@@ -40,6 +40,7 @@ import { absentThingsFor } from './absent-things';
 import { competingSpecific, specificsHint } from './specifics';
 import { presenceFacts, knowsLine } from './presence-facts';
 import { recentSpokenOf, recentVoiceOf, liveVoiceBound, recentWakesOf } from './voice-history';
+import { traitLinesOf } from './traits-lane';
 import { nameIsHers, unmarkAddressed } from './name-addressed';
 import { claimVsFact, factHint, type FactLine } from './claim-vs-fact';
 import { actorMap, whereOthersStand } from '@/services/world-apply';
@@ -1153,6 +1154,7 @@ export async function listenStimulus(
         // Run 2 (2026-11-03): the record's near things are NAMES ("Her phone"), not the described held lines ("The Her phone: Her phone - camera, map...").
         innerSoFar: innerState, recent: priorVoice.slice(0, 4), held: (heldRows ?? []).map((h) => h.name), near: ledger?.near ?? [], going: ledger?.going ?? [], facts: ground.lines.slice(0, 10), sinceOwn,
         did: ctx.campaignId ? await liveVoiceBound(ctx.campaignId).then((b) => ownRecentActs(ctx.campaignId!, ctx.characterId, b.sessionId ?? null)).catch(() => [] as string[]) : [],
+        traits: await traitLinesOf(ctx.characterId),
       }, overrides);
       if (beat) {
         composedFelt = beat.felt;

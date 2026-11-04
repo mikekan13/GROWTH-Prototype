@@ -259,7 +259,7 @@ export function soundReferenced(t: RunTranscript): AssertResult {
 
 // ── Day 6 (2026-11-04, sessions 3–5: "a hard fail on phones") ──────────────────────────────────────────────────────────────
 
-type ScriptExpect = { expectSignal?: number[]; expectHeard?: Array<{ line: number; by: string }> };
+type ScriptExpect = { expectSignal?: number[]; expectHeard?: Array<{ line: number; by: string }>; expectAnswer?: Array<{ line: number; by: string }> };
 const expectOf = (t: RunTranscript): ScriptExpect => (t.script as unknown as ScriptExpect);
 const lineOf = (t: RunTranscript, at: number): number => t.lineAt.reduce((acc, lt, idx) => (lt <= at ? idx : acc), -1);
 const declarations = (t: RunTranscript) => t.events.filter((e) => e.type === 'game_event' && e.eventType === 'declaration').map((e) => ({ ...e, lineIndex: lineOf(t, e.at) }));
@@ -351,9 +351,22 @@ export function lineCarries(t: RunTranscript): AssertResult {
   return result('A21', 'lineCarries', ev);
 }
 
+/** A22 — an answer LANDS (finding 29, 2026-11-04: Violet's replies were pulled off the screen by the never-guess check, again and again):
+ * after each line the script names, the named being posted a chat line before the next line. */
+export function answersLand(t: RunTranscript): AssertResult {
+  const ev: string[] = [];
+  for (const a of expectOf(t).expectAnswer ?? []) {
+    const from = t.lineAt[a.line] ?? 0;
+    const to = t.lineAt[a.line + 1] ?? t.endedAt;
+    const said = t.events.filter((e) => e.type === 'chat' && e.at >= from && e.at < to && (e.characterName ?? '').toLowerCase().startsWith(a.by.toLowerCase()) && e.text.trim());
+    if (!said.length) ev.push(`L${a.line + 1}: ${a.by} said nothing before the next line (an answer was expected)`);
+  }
+  return result('A22', 'answersLand', ev);
+}
+
 export function runAsserts(t: RunTranscript): AssertResult[] {
   return [absentThing(t), stillGoing(t), sessionBound(t), noPlaceholder(t), noDeed(t), unheldUseWithheld(t), watcherLineStands(t), timing(t), cloudBudget(t), memoryNotEveryCard(t), knownPeopleOnly(t), soundReferenced(t),
-    signalBound(t), oneSoundPerLine(t), promptYieldsCard(t), possessionNotDeed(t), staysBounded(t), lineCarries(t)];
+    signalBound(t), oneSoundPerLine(t), promptYieldsCard(t), possessionNotDeed(t), staysBounded(t), lineCarries(t), answersLand(t)];
 }
 
 /** A compact markdown report: one table, then each failing assert's evidence (12 lines at most each). */

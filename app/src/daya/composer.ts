@@ -41,6 +41,8 @@ export interface BeatRecord {
   did?: string[];
   /** Day 6 (2026-11-04, finding 23): what the being DOES now, chosen from the list of acts it could take — set only when impulse is act. */
   act?: string;
+  /** THE TRAITS LANE (2026-11-04): its Nectars, Thorns and Blossoms as standing truths — they colour the reading, they are never news. */
+  traits?: string[];
   /** A picture of what has not happened (ruling 2, 2026-11-03): allowed, marked, voiced as imagined. */
   imagine?: string;
   impulse: Impulse;
@@ -77,6 +79,8 @@ export interface ComposeArgs {
   prompted?: boolean;
   /** Day 6 (2026-11-04, finding 23): memories that woke in its last cards — recent thoughts, not wakes. */
   recentWakes?: string[];
+  /** THE TRAITS LANE (2026-11-04): the being's Nectars / Thorns / Blossoms as record lines (daya/traits-lane). */
+  traits?: string[];
   facts: string[];
   sinceOwn?: string | null;
   /** Already perceived (the perception order was placed before the memory was stored): skip that order. */
@@ -208,12 +212,14 @@ export function candidateLines(c: Candidates): string[] {
 }
 
 /** The local composer's prompt: the being whole, the pieces, a choice by number. Pure. */
-export function chooserPrompt(a: { name: string; identity: string; desires: string; innerSoFar: string; sinceOwn?: string | null; did?: string[] }, perceived: string | null, felt: string, c: Candidates): string {
+export function chooserPrompt(a: { name: string; identity: string; desires: string; innerSoFar: string; sinceOwn?: string | null; did?: string[]; traits?: string[] }, perceived: string | null, felt: string, c: Candidates): string {
   const lines = candidateLines(c);
   return [
     `You are the simulation, composing one moment of ${a.name}. Your agents have done the work below; you only CHOOSE what ${a.name} is thinking about now, from the list. You write nothing.`,
     '',
     `Who ${a.name} is: ${a.identity}`,
+    // THE TRAITS LANE (2026-11-04): what it IS, standing — a Thorn or a Nectar bends how a moment reads, and what it would do.
+    a.traits?.length ? `What ${a.name} IS, always (its Nectars and Thorns; they colour every reading, they are never news): ${a.traits.join(' | ')}` : '',
     `What ${a.name} wants these days: ${a.desires || '(nothing named)'}`,
     `What has been going through ${a.name}'s mind: ${a.innerSoFar || '(nothing yet)'}`,
     // Finding 17 (2026-11-04): Kristopher did not know what he had just texted. Its own acts and words are its own knowledge.
@@ -355,6 +361,7 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   if (!choice) return null;
   const felt = (await moodP)?.felt?.trim() || a.feltBefore;
   const record = resolveRecord(choice, perceived, felt, candidates);
+  if (a.traits?.length) record.traits = a.traits;
   if (a.did?.length) record.did = a.did.slice(0, 4);
   const plan: BeatPlan = { gist: recordGist(record), impulse: record.impulse, ...(record.why ? { why: record.why } : {}) };
   const tPlan = Date.now();
