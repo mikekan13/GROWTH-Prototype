@@ -40,7 +40,7 @@ import { absentThingsFor } from './absent-things';
 import { competingSpecific, specificsHint } from './specifics';
 import { presenceFacts, knowsLine } from './presence-facts';
 import { recentSpokenOf, recentVoiceOf, liveVoiceBound, recentWakesOf } from './voice-history';
-import { traitLinesOf } from './traits-lane';
+import { capabilitiesOf, capabilityLines } from './capabilities';
 import { nameIsHers, unmarkAddressed } from './name-addressed';
 import { claimVsFact, factHint, type FactLine } from './claim-vs-fact';
 import { actorMap, whereOthersStand } from '@/services/world-apply';
@@ -1109,7 +1109,9 @@ export async function listenStimulus(
       ...items.filter((it) => !it.holderId && it.locationId && it.locationId === mine).map((it) => it.name),
       ...roomMates.map((id) => nameOf(id)),
     ];
-    return { absentThings: absentThingsFor(items, { characterId, locationId: mine, roomMates }), near, going };
+    // RULING 13 (2026-11-05): what SHOWS of the others in view — their body-pillar traits (Ageless Face reads on his face; a Thorn of the soul does not show).
+    const others = await Promise.all(roomMates.map(async (id) => ({ name: nameOf(id), outward: capabilityLines(await capabilitiesOf(id).catch(() => []), 'is').filter((l) => /\((?:body)\)/i.test(l)) })));
+    return { absentThings: absentThingsFor(items, { characterId, locationId: mine, roomMates }), near, going, others };
   }).catch(() => null);
   const absentThings = ledger?.absentThings ?? [];
   try {
@@ -1154,7 +1156,12 @@ export async function listenStimulus(
         // Run 2 (2026-11-03): the record's near things are NAMES ("Her phone"), not the described held lines ("The Her phone: Her phone - camera, map...").
         innerSoFar: innerState, recent: priorVoice.slice(0, 4), held: (heldRows ?? []).map((h) => h.name), near: ledger?.near ?? [], going: ledger?.going ?? [], facts: ground.lines.slice(0, 10), sinceOwn,
         did: ctx.campaignId ? await liveVoiceBound(ctx.campaignId).then((b) => ownRecentActs(ctx.campaignId!, ctx.characterId, b.sessionId ?? null)).catch(() => [] as string[]) : [],
-        traits: await traitLinesOf(ctx.characterId),
+        // RULING 13 (2026-11-05): the whole sheet — what it IS and CAN DO, as far as it knows (hidden traits act on it from the adjudicator's side).
+        ...(await capabilitiesOf(ctx.characterId).then((caps) => ({
+          traits: capabilityLines(caps.filter((x) => x.aware), 'is'),
+          canDo: caps.filter((x) => x.aware && x.face === 'can').map((x) => ({ name: x.name, ...(x.via ? { via: x.via } : {}) })),
+        })).catch(() => ({ traits: [] as string[], canDo: [] as Array<{ name: string; via?: string }> }))),
+        others: ledger?.others ?? [],
       }, overrides);
       if (beat) {
         composedFelt = beat.felt;

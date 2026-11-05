@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseTableProse, segmentOwned, introducedSubject, isDescriptive, isThoughtBody, splitDurationClause, characterCards, type ParsedProse } from './table-prose';
+import { segmentIsDeed, parseTableProse, segmentOwned, introducedSubject, isDescriptive, isThoughtBody, splitDurationClause, characterCards, type ParsedProse } from './table-prose';
 import frozenJson from './table-prose.frozen.json';
 
 const frozen = frozenJson as Array<{ text: string; withRoster: boolean; parsed: ParsedProse }>;
@@ -500,5 +500,54 @@ describe('Day 6 (2026-11-04): a thing of theirs is not their deed; a misspelled 
     const p = parseTableProse('Daniel sits in his car.', table, {});
     expect(p.actions).toBeUndefined();
     expect(p.narration).toBe('Daniel sits in his car.');
+  });
+});
+
+describe('Day 8 (2026-11-05): owned state-verb things with a full-name roster; time is not a deed', () => {
+  const full: ProseRosterEntry[] = [{ id: 'vi', name: 'Violet Marsh', sex: 'female' }, { id: 'kris', name: 'Kristopher Vance', sex: 'male' }];
+  const first: ProseRosterEntry[] = [{ id: 'vi', name: 'Violet', sex: 'female' }, { id: 'kris', name: 'Kristopher', sex: 'male' }];
+  const tail = 'sits on the desk beside the laptop, its screen still lit with the new message.';
+  for (const [label, roster] of [['first names', first], ['full names', full]] as const) {
+    it(`"Violet's phone sits..." is owned (${label})`, () => {
+      const p = parseTableProse(`Violet's phone ${tail}`, [...roster], { recentActors: [roster[1]] });
+      expect(p.actions).toHaveLength(1);
+      expect(p.actions?.[0]).toMatchObject({ actorId: 'vi', owned: true });
+    });
+    it(`"Her phone sits..." is owned (${label})`, () => {
+      const p = parseTableProse(`Her phone ${tail}`, [...roster], { recentActors: [roster[0]] });
+      expect(p.actions).toHaveLength(1);
+      expect(p.actions?.[0]).toMatchObject({ actorId: 'vi', owned: true });
+    });
+    it(`"A minute passes in the dark car." is exposition, not Kristopher's act (${label})`, () => {
+      const p = parseTableProse('Kristopher sets the phone on his knee, screen up, and watches it. A minute passes in the dark car.', [...roster], { recentActors: [roster[1]] });
+      expect(p.actions).toHaveLength(1);
+      expect(p.actions?.[0].actorId).toBe('kris');
+      expect(p.narration).toBe('A minute passes in the dark car.');
+    });
+    it(`control: "Kristopher watches the phone. He sets it on his knee." stays his (${label})`, () => {
+      const p = parseTableProse('Kristopher watches the phone. He sets it on his knee.', [...roster], {});
+      expect(p.actions).toHaveLength(2);
+      expect(p.actions?.every((a) => a.actorId === 'kris' && !a.owned)).toBe(true);
+    });
+  }
+});
+
+describe('segmentIsDeed — the page may not invent a deed (GM scene 1, 2026-11-05)', () => {
+  const seed = [
+    { actorId: 'k', actorLabel: 'Kristopher', text: 'He sets the phone on his knee, screen up, and watches it.', sentence: 'Kristopher sets the phone on his knee, screen up, and watches it.' },
+    { actorId: 'v', actorLabel: 'Violet', text: 'Her phone sits on the desk beside the laptop, its screen still lit with the new message.', owned: true },
+  ] as any;
+  it("a built segment the seed had as the actor's action is a deed", () => {
+    expect(segmentIsDeed(seed, 'k', 'Kristopher sets the phone on his knee, screen up, and watches it.', 'He sets the phone on his knee, screen up, and watches it.')).toBe(true);
+  });
+  it('a reworded segment still counts when most of its words are in the seed action', () => {
+    expect(segmentIsDeed(seed, 'k', '', 'He sets the phone on his knee and watches the screen.')).toBe(true);
+  });
+  it('a time sentence the seed never gave the actor is not his deed', () => {
+    expect(segmentIsDeed(seed, 'k', 'A minute passes in the dark car.', 'A minute passes in the dark car.')).toBe(false);
+  });
+  it("an owned seed action is a (owned) deed segment for its owner, and nobody else's", () => {
+    expect(segmentIsDeed(seed, 'v', 'Her phone sits on the desk beside the laptop, its screen still lit with the new message.')).toBe(true);
+    expect(segmentIsDeed(seed, 'k', 'Her phone sits on the desk beside the laptop, its screen still lit with the new message.')).toBe(false);
   });
 });

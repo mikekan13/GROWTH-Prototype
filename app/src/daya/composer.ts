@@ -79,8 +79,12 @@ export interface ComposeArgs {
   prompted?: boolean;
   /** Day 6 (2026-11-04, finding 23): memories that woke in its last cards — recent thoughts, not wakes. */
   recentWakes?: string[];
-  /** THE TRAITS LANE (2026-11-04): the being's Nectars / Thorns / Blossoms as record lines (daya/traits-lane). */
+  /** THE SHEET (ruling 13, 2026-11-05): what the being IS and CAN DO, as lines it is aware of — traits, its things' abilities, its spells (daya/capabilities). */
   traits?: string[];
+  /** RULING 13: capabilities it could USE now (from its things, the thing it is in, its spells) — each becomes an act on its list. */
+  canDo?: Array<{ name: string; via?: string }>;
+  /** RULING 13: beings in view and what SHOWS of them (their outward traits — Ageless Face is what others see). */
+  others?: Array<{ name: string; outward: string[] }>;
   facts: string[];
   sinceOwn?: string | null;
   /** Already perceived (the perception order was placed before the memory was stored): skip that order. */
@@ -119,9 +123,9 @@ export interface ComposedBeat {
 const NOTHING = /^nothing (new )?reach/i;
 
 /** The perception order: what reaches the being, plain; the world's event itself when the order fails. */
-export async function orderPerception(a: { envelope: string; event: string; senses: string[]; own: boolean }, ctx: { campaignId: string; entityId: string }, overrides: DayaClientOverrides = {}): Promise<string> {
+export async function orderPerception(a: { envelope: string; event: string; senses: string[]; own: boolean; others?: Array<{ name: string; outward: string[] }> }, ctx: { campaignId: string; entityId: string }, overrides: DayaClientOverrides = {}): Promise<string> {
   const surroundings = a.envelope.split(/\n+/).map((l) => l.trim()).filter(Boolean).slice(0, 14);
-  const per = await placeOrder({ kind: 'perception', brief: { senses: a.senses, surroundings, event: a.event, own: a.own } }, ctx, overrides);
+  const per = await placeOrder({ kind: 'perception', brief: { senses: a.senses, surroundings, event: a.event, own: a.own, ...(a.others?.length ? { others: a.others } : {}) } }, ctx, overrides);
   if (per?.nothing) return 'Nothing new reaches you.';
   return per?.reaches?.trim() || a.event;
 }
@@ -343,7 +347,10 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   // porch steps, six cards of seven).
   const recentWake = (f: { text: string }) => (a.recentWakes ?? []).some((w) => w.slice(0, 60) === f.text.slice(0, 60));
   const wakes = (rec?.wakes ?? []).filter((w) => fragments[w.i] && !isNow(fragments[w.i]) && !recentWake(fragments[w.i])).slice(0, 3).map((w) => ({ text: fragments[w.i].text, ...(fragments[w.i].age ? { age: fragments[w.i].age } : {}), why: w.why }));
-  const pairs = actPairsFor(going, a.held);
+  // RULING 13 (2026-11-05): what the being CAN DO with its things, the thing it is in, its spells — on the list beside the signal acts.
+  const bareVia = (v?: string) => (v ?? '').replace(/^(?:the|her|his|their|my|a|an)\s+/i, '').toLowerCase();
+  const capPairs = (a.canDo ?? []).slice(0, 6).map((cd) => ({ label: `use ${cd.name}${cd.via ? ` (${bareVia(cd.via)})` : ''}`, deed: `uses ${cd.name}${cd.via ? ` with the ${bareVia(cd.via)}` : ''}` }));
+  const pairs = [...actPairsFor(going, a.held), ...capPairs];
   const candidates: Candidates = { near: [...a.held.map((h) => naturalName(h, true)), ...(a.near ?? []).map((n) => naturalName(n, false))].slice(0, 12), going, remember: wakes, acts: pairs.map((p) => p.label), deeds: pairs.map((p) => p.deed) };
   const tPieces = Date.now();
 

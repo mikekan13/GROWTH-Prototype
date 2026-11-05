@@ -195,6 +195,7 @@ function resolveFateDie(character: Partial<GrowthCharacter> | null): FateDie {
  */
 import { statesHandOver, HAND_OVER_NUDGE, statesPayment, PAYMENT_NUDGE } from './hand-over';
 import { signalLines } from '@/services/item-signal';
+import { capabilitiesOf, capabilityLines, type Capability } from './capabilities';
 
 function safeJson(raw: string | null): unknown {
   try { return raw ? JSON.parse(raw) : null; } catch { return null; }
@@ -246,6 +247,12 @@ export async function resolveIntent(
   const lv = await placesOnLevels(campaignId, entityCharacterId);
   const facts = factsForActor(allFacts, { actorName: character.name, otherNames: others.map((o) => o.name), intent, elsewhere: lv.away, here: lv.here });
   const held = splitHeld(heldRows);
+  // RULING 13 (2026-11-05): the actor's whole sheet is in the adjudicator's hands — what it can do (traits, its things' abilities,
+  // its spells) and what acts on it whether it knows or not (hidden traits, conditions). The rules are applied here, never remembered by the voice.
+  const caps: Capability[] = await capabilitiesOf(entityCharacterId).catch(() => [] as Capability[]);
+  const canDo = capabilityLines(caps.filter((x) => x.aware), 'can');
+  const isLines = capabilityLines(caps.filter((x) => x.aware), 'is');
+  const actsOn = capabilityLines(caps, 'actsOn');
   // Who is where (HW4 2026-10-24): the doors alone let a bill pass through a locked one.
   const standRows = await whereOthersStand(campaignId, entityCharacterId, map);
   const whereabouts = whereaboutsLines(map?.roomName ?? null, standRows);
@@ -288,6 +295,9 @@ export async function resolveIntent(
     `Wearing: ${held.wearing.length ? held.wearing.join(', ') : 'nothing beyond underwear'}`,
     `Carrying: ${held.carrying.length ? held.carrying.join(', ') : 'nothing'}`,
     `(The entity has ONLY what is listed. No jacket, pocket, bag or tool exists for it unless named here or in the facts.)`,
+    ...(isLines.length ? [`What the entity IS (its Nectars, Thorns, Blossoms — permanent exploits that bend the base rules): ${isLines.join(' | ')}`] : []),
+    ...(canDo.length ? [`What the entity CAN DO beyond a baseline human (its things' abilities, the thing it is in, its spells): ${canDo.join(' | ')}`] : []),
+    ...(actsOn.length ? [`What ACTS ON the entity now, whether it knows or not (apply it to the outcome; never put it in its own mouth): ${actsOn.join(' | ')}`] : []),
     ...signalLines(heldRows.map((r) => ({ name: r.name, holderId: entityCharacterId, data: safeJson(r.data) })), entityCharacterId, cycle),
     ...setOff,
     '',

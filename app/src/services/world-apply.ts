@@ -328,6 +328,8 @@ export interface ApplyReport {
   /** Sounds the act caused elsewhere, each placed: the table narrates them so whoever is there perceives them (HW9).
    *  A sound at a DOOR (a knock, stretch 2026-10-31) names the rooms on both sides in `rooms`. */
   sounds?: Array<{ text: string; at: string; locationId: string | null; rooms?: string[] }>;
+  /** Finding 33 (2026-11-05): a message READ by the act — the words are handed to the reader as what they read, never narrated to the room. */
+  read?: Array<{ by: string; item: string; words: string; from?: string }>;
 }
 
 /**
@@ -466,8 +468,13 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
               }
               if (cause.record && (existing?.state !== 'connected' || (opts.narrated && where.holderId === actor.id))) {
                 const kind = e.kind ?? (e.words ? 'text' : existing?.kind ?? 'call');
-                const state = e.words ? 'received' : 'ringing';
-                await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: soundText, since: cycle, until: cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}), kind, state, ...(e.words ? { words: e.words } : existing?.words ? { words: existing.words } : {}) })) } });
+                // Finding 33 (GM scene 1, 2026-11-05): a TEXT with no words came in as `ringing`, and "reads the message" then opened a phone
+                // line. The KIND decides the state; a text's words fall back to what the actor's line quoted; a received message waits
+                // (no end of its own) until it is read.
+                const quoted = (actText ?? '').match(/["“]([^"”]{2,600})["”]/)?.[1]?.trim();
+                const words = e.words ?? (kind === 'text' ? quoted : undefined);
+                const state = kind === 'text' ? 'received' : 'ringing';
+                await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: soundText, since: cycle, until: state === 'received' ? Number.POSITIVE_INFINITY : cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}), kind, state, ...(words ? { words } : existing?.words ? { words: existing.words } : {}) })) } });
               }
             } catch (err) { console.warn('[world-apply] signal not recorded (non-fatal):', err); }
           }
@@ -505,6 +512,12 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             }
             const caller = await prisma.character.findUnique({ where: { id: sig.by }, select: { name: true } }).catch(() => null);
             report.applied.push(`${actor.name} answers "${item.name}" — on the line with ${caller?.name ?? 'the caller'}`);
+          } else if (sig && sig.state === 'received') {
+            // Reading a message (finding 33): the signal is done, and the WORDS are what the reader now has — handed as what was read.
+            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
+            const sender = sig.by ? await prisma.character.findUnique({ where: { id: sig.by }, select: { name: true } }).catch(() => null) : null;
+            report.applied.push(`${actor.name} reads the message on "${item.name}"${sender?.name ? ` from ${sender.name}` : ''}${sig.words ? `: "${sig.words}"` : ''}`);
+            if (sig.words) (report.read ??= []).push({ by: actor.id, item: item.name, words: sig.words, ...(sender?.name ? { from: sender.name } : {}) });
           } else {
             await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
             report.applied.push(`${actor.name} answers "${item.name}"`);

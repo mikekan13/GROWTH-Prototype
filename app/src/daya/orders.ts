@@ -27,6 +27,8 @@ export interface PerceptionBrief {
   event: string;
   /** The event is the being's own doing (voiced for it): it knows it as its own act. */
   own: boolean;
+  /** RULING 13 (2026-11-05): beings in view and what SHOWS of them — their outward traits (a face that reads fifteen years younger). */
+  others?: Array<{ name: string; outward: string[] }>;
 }
 export interface RecallBrief {
   /** What the being just took in. */
@@ -125,7 +127,7 @@ export function orderPrompt(order: Order): { system: string; user: string; maxTo
           names,
           `${JSON_ONLY} {"reaches": string, "nothing"?: boolean}`,
         ].filter(Boolean).join('\n'),
-        user: [`Senses working: ${b.senses.join(', ') || 'none'}`, 'Surroundings:', lines(b.surroundings), '', `What just happened: ${b.event}`].join('\n'),
+        user: [`Senses working: ${b.senses.join(', ') || 'none'}`, 'Surroundings:', lines(b.surroundings), ...(b.others?.some((o) => o.outward.length) ? ['', 'Others in view, and what SHOWS of them (true of them; what the being takes in of it is yours to write):', ...b.others.filter((o) => o.outward.length).map((o) => `- ${o.name}: ${o.outward.join('; ')}`)] : []), '', `What just happened: ${b.event}`].join('\n'),
       };
     }
     case 'recall': {

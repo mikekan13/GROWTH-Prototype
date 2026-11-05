@@ -58,7 +58,7 @@ import {
   recordUnattributedDialogueCanon,
   rewriteDeclarationFeed,
 } from '@/services/canon';
-import { parseTableProse, segmentOwned, splitSentences, closeUnclosedQuote, type ProseQuote, type ProseRosterEntry, type ProseThought } from '@/services/table-prose';
+import { parseTableProse, segmentOwned, segmentIsDeed, splitSentences, closeUnclosedQuote, type ProseQuote, type ProseRosterEntry, type ProseThought } from '@/services/table-prose';
 import { ensureKeepalive } from '@/daya/l1-keepalive';
 import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, dismissReconciliation, type ReconTicket } from '@/services/reconciliation';
 import { emitBeingListening, emitBeingDone } from '@/services/being-presence';
@@ -1599,7 +1599,8 @@ async function speakProseSplit(
             via: 'typed', raw: rawMessage,
             narration: built.scene,
             speech: parsed.quotes,
-            actions: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'action').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence, ...(segmentOwned(seed.actions, c.actorId, s.sentence, s.text) ? { owned: true } : {}) }))),
+            // The page may not invent a deed (2026-11-05): only segments the seed had as this actor's action are deeds; owned stays owned.
+            actions: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'action' && segmentIsDeed(seed.actions, c.actorId, s.sentence, s.text)).map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence, ...(segmentOwned(seed.actions, c.actorId, s.sentence, s.text) ? { owned: true } : {}) }))),
             thoughts: built.cards.flatMap((c) => c.segments.filter((s) => s.kind === 'thought').map((s) => ({ actorId: c.actorId, actorLabel: c.actorLabel, text: s.text, sentence: s.sentence, ...(s.narrated ? { narrated: s.narrated } : {}) }))),
             built: true,
             seedNarration: narrated ? parsed.narration : null,
@@ -1805,6 +1806,19 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
         // call"): a sound the act caused elsewhere is narrated to the table by the world itself, as its own stretch — the
         // reach judge places it at the thing (sim/senses/named-things), so the one holding the phone hears her phone and the
         // caller hears a ring beyond the door.
+        // A MESSAGE READ (finding 33, 2026-11-05): the words are the reader's now — a world line in the reader's own room, so only
+        // whoever is there perceives it (the text's words, not a phone call opening).
+        for (const rd of r.effects?.read ?? []) {
+          if (!gm) break;
+          try {
+            const { roomIdOf } = await import('@/services/spatial-world');
+            const roomId = await roomIdOf(rd.by);
+            const who = (await prisma.character.findUnique({ where: { id: rd.by }, select: { name: true } }))?.name ?? a.actorLabel;
+            const line = `${who} reads the message${rd.from ? ` from ${rd.from}` : ''} on the ${rd.item.replace(/^(?:the|her|his|their)\s+/i, '')}: "${rd.words}"`;
+            console.log(`[table-speak] the words read: ${line}`);
+            await narrateAtTable(campaignId, { userId: gm.userId, username: gm.username, role: 'WATCHER' } as TableActor, { message: line, locationId: roomId ?? null, worldEvent: true });
+          } catch (err) { console.warn('[table-speak] the read words were not handed over (non-fatal):', err instanceof Error ? err.message : err); }
+        }
         for (const snd of r.effects?.sounds ?? []) {
           if (!gm) break;
           const key = `${snd.locationId ?? snd.at}|${snd.text.trim().toLowerCase()}`;

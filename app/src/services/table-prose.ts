@@ -139,12 +139,31 @@ const ADVERB_SUBJECT_RE = /^(\w+ly),?\s+(?=(?:he|she)\b)/i;
 export function pastOpener(sentence: string): string {
   return sentence.trim().replace(OPENER_RE, '').replace(ADVERB_SUBJECT_RE, '');
 }
-const BARE_TAG_RE = /^(?:says|asks|shouts|whispers|yells|replies|calls out|mutters|growls|snaps|said|asked)\s*[,:]?\s*$/i;
+/**
+ * A roster name as a regex alternation: the full name AND its first word ("Violet Marsh" is "Violet" at the table), longest first.
+ * The Watcher writes first names; the roster holds full ones (live 2026-11-05: "Violet's phone sits..." found no owner).
+ */
+function nameAlt(entry: ProseRosterEntry): string {
+  const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const full = entry.name.trim();
+  const first = full.split(/\s+/)[0] ?? '';
+  return first && first.length >= 3 && first !== full ? `(?:${esc(full)}|${esc(first)})` : esc(full);
+}
+// A sentence whose SUBJECT is time or the scene ("A minute passes in the dark car.", "The rain falls.") has no actor: it is
+// exposition, never the recent actor's deed. One place: a short set of heads + the verbs of passing.
+const TIME_SCENE_HEAD = 'seconds?|minutes?|moments?|hours?|while|beats?|heartbeats?|night|day|evening|morning|afternoon|silence|quiet|stillness|rain|wind|snow|dark(?:ness)?|time';
+const TIME_SCENE_VERB = 'passes|pass|goes by|go by|drags|stretches|settles|falls|fall|ticks|slips by|crawls|creeps|deepens|drifts|moves on|wears on|lingers';
+const TIME_SCENE_SUBJECT_RE = new RegExp(`^(?:(?:a|an|one|the|another|two|three|few|several|some|\\d+)\\s+)?(?:(?:long|short|few|more|quiet|slow|cold|heavy|dark|whole|full)\\s+)*(?:${TIME_SCENE_HEAD})\\s+(?:${TIME_SCENE_VERB})\\b`, 'i');
+/** "A minute passes in the dark car." → true: the subject is time or the scene, not anyone. Pure. */
+export function isTimeSceneSentence(sentence: string): boolean {
+  return TIME_SCENE_SUBJECT_RE.test(pastOpener(sentence));
+}
+const BARE_TAG_RE =/^(?:says|asks|shouts|whispers|yells|replies|calls out|mutters|growls|snaps|said|asked)\s*[,:]?\s*$/i;
 
 /** "Kristopher knocks twice." → "Knocks twice"; "Ruth says," → null (a bare speech tag). Pure. */
 export function actionBody(sentence: string, actor: ProseRosterEntry): string | null {
   let s = sentence.trim().replace(/[.]+$/, '').trim();
-  const name = actor.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const name = nameAlt(actor);
   // "And he says the prayer in his head" → the card does not open with "And".
   s = s.replace(OPENER_RE, '');
   // "Slowly, he knocks" → "Slowly knocks": the adverb stays, the pronoun goes.
@@ -175,7 +194,7 @@ const BODY_WORDS = 3;
 /** "His face looks tired and his eyes are red." / "She is gorgeous but a bit weird." → true; "He looks at the door." → false. Pure. */
 export function isDescriptive(sentence: string, actor: ProseRosterEntry): boolean {
   const s = pastOpener(sentence).replace(/[.!?]+$/, '');
-  const name = actor.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const name = nameAlt(actor);
   const subject = s.match(new RegExp(`^(?:${name}|he|she)\\s+(.+)$`, 'i'));
   if (subject) return STATIVE_START_RE.test(subject[1]) || POSTURE_PLACE_RE.test(subject[1]);
   const owned = s.match(new RegExp(`^(?:${name}['’]s|his|her)\\s+(.+)$`, 'i'));
@@ -201,7 +220,7 @@ export function leadingSpan(sentence: string): { wait: string; rest: string } | 
   const s = sentence.trim();
   const end = s.match(/[.!?…]+$/)?.[0] ?? '.';
   const lead = s.replace(/[.!?…]+$/, '').match(LEADING_SPAN_RE);
-  if (!lead || /^(?:and|then|but)\b/i.test(lead[2])) return null;
+  if (!lead || isTimeSceneSentence(s) || /^(?:and|then|but)\b/i.test(lead[2])) return null;
   return { wait: `${lead[1].charAt(0).toUpperCase()}${lead[1].slice(1)}.`, rest: `${lead[2]}${end}` };
 }
 
@@ -212,7 +231,7 @@ export function splitDurationClause(sentence: string, actor: ProseRosterEntry): 
   const body = s.replace(/[.!?…]+$/, '');
   const lead = leadingSpan(s);
   if (lead) return lead;
-  const name = actor.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const name = nameAlt(actor);
   const subject = body.match(new RegExp(`^((?:${name}|he|she)\\b,?)\\s+(.+)$`, 'i'));
   if (!subject) return null;
   const clauses = subject[2].split(/\s*,?\s*\b(?:and then|then|and|before)\s+/i).map((c) => c.trim()).filter(Boolean);
@@ -230,8 +249,9 @@ export function splitDurationClause(sentence: string, actor: ProseRosterEntry): 
  */
 export function sentenceActor(sentence: string, roster: ProseRosterEntry[], recent: ProseRosterEntry[], opts: { ownedThings?: boolean; possessives?: boolean } = {}): ProseRosterEntry | null {
   const s = sentence.trim();
+  if (isTimeSceneSentence(s)) return null;
   for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
-    const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const name = nameAlt(entry);
     if (!name) continue;
     if (new RegExp(`^${name}(?!['’]s\\b)(?=$|[^\\w])`, 'i').test(s)) return entry;
   }
@@ -250,7 +270,7 @@ export function sentenceActor(sentence: string, roster: ProseRosterEntry[], rece
   const lead = pastOpener(s);
   if (lead !== s) {
     for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
-      const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const name = nameAlt(entry);
       if (name && new RegExp(`^${name}(?!['’]s\\b)(?=$|[^\\w])`, 'i').test(lead)) return entry;
     }
     if (SUBJECT_PRONOUN_RE.test(lead)) { const by = pronounActor(lead.split(/\s+/)[0]!, recent); if (by) return by; }
@@ -260,7 +280,7 @@ export function sentenceActor(sentence: string, roster: ProseRosterEntry[], rece
   if (subj) {
     let firstOwned = -1;
     for (const entry of roster) {
-      const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const name = nameAlt(entry);
       const m = name ? new RegExp(`\\b${name}['’]s\\b`, 'i').exec(lead) : null;
       if (m && (firstOwned < 0 || m.index < firstOwned)) firstOwned = m.index;
     }
@@ -271,7 +291,7 @@ export function sentenceActor(sentence: string, roster: ProseRosterEntry[], rece
   // (ownedThings false): "Violet's door stays shut." puts no words in her mouth.
   if (opts.ownedThings !== false && opts.possessives !== false) {
     for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
-      const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const name = nameAlt(entry);
       // "Violet's phone" and "Violets phone" (thumbs, speech-to-text) are both hers (Day 6, 2026-11-04).
       if (name && new RegExp(`\\b${name}(?:['’]s|s)\\b`, 'i').test(s)) return entry;
     }
@@ -291,6 +311,27 @@ export function ownedThingSentence(sentence: string, roster: ProseRosterEntry[],
  * (Day 6 live miss, 2026-11-04: Violet's ringing phone went on her record as her deed). A built segment is owned when the seed
  * had an owned action of the same actor whose words the segment's seed sentence (or built text) carries. Pure.
  */
+/**
+ * THE PAGE MAY NOT INVENT A DEED (GM scene 1, 2026-11-05: "A minute passes in the dark car." and "Her phone sits on the desk… lit"
+ * came back from the cloud rebuild as the being's acts). A built action segment is a deed of its actor only when the SEED had an
+ * action for that actor whose words the segment carries (owned or not); otherwise it is the page's prose, not a doing. Pure.
+ */
+export function segmentIsDeed(seedActions: ProseAction[], actorId: string, sentence: string, text = ''): boolean {
+  const norm = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+  const sent = norm(sentence), built = norm(text);
+  const words = (t: string) => new Set(t.split(' ').filter((w) => w.length > 3));
+  return seedActions.some((a) => {
+    if (a.actorId !== actorId) return false;
+    const t = norm(a.text), src = norm((a as { sentence?: string }).sentence ?? '');
+    if (!t && !src) return false;
+    if ((sent && (sent.includes(t) || t.includes(sent) || (src && (sent.includes(src) || src.includes(sent))))) || (built && (built.includes(t) || t.includes(built)))) return true;
+    // Loose: most of the segment's content words are in the seed action (the page reworded it).
+    const sw = words(sent || built); if (sw.size < 2) return false;
+    const aw = words(`${t} ${src}`); let hit = 0; for (const w of sw) if (aw.has(w)) hit++;
+    return hit / sw.size >= 0.6;
+  });
+}
+
 export function segmentOwned(seedActions: ProseAction[], actorId: string, sentence: string, text = ''): boolean {
   const norm = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
   const sent = norm(sentence), built = norm(text);
