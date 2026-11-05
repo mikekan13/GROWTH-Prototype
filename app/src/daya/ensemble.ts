@@ -1012,8 +1012,14 @@ export async function listenStimulus(
   ]);
   const tIngested = Date.now();
   if (!ingest.persisted) {
-    const soul = soulPending ? await soulPending : null;
-    return { status: 'not_lived', innerUpdated: false, impulse: 'stay', timings: { perceiveMs: tPerceived - t0, ingestMs: tIngested - tPerceived, recallMs: 0, soulMs: soul?.ms ?? null, spiritMs: 0, totalMs: Date.now() - t0, standing } };
+    // Finding 54 (2026-11-05): a standing beat with something of the being's OWN still going (a message read and unanswered, a ringing
+    // phone, an open line) is LIVED — the chooser runs so it can act at last (write back) — even when nothing new reached it.
+    const ownGoing = ctx.campaignId ? await hasOwnGoing(ctx.campaignId, characterId, ctx.cycle).catch(() => false) : false;
+    if (!ownGoing) {
+      const soul = soulPending ? await soulPending : null;
+      return { status: 'not_lived', innerUpdated: false, impulse: 'stay', timings: { perceiveMs: tPerceived - t0, ingestMs: tIngested - tPerceived, recallMs: 0, soulMs: soul?.ms ?? null, spiritMs: 0, totalMs: Date.now() - t0, standing } };
+    }
+    console.log(`[composer] ${ctx.name}: nothing new reached it, but something of its own is still going — the beat is lived`);
   }
 
   // Thorns and recall react to what was PERCEIVED, exactly as in the serial pipeline.
@@ -1790,6 +1796,18 @@ export async function answerAsk(
  * When a line is about this being alone, the whole line is its beat (the words of a text it wrote live there); when others act in
  * the same line, only its own sentences. Its own words are its knowledge of the moment - never a question to itself.
  */
+/** Finding 54 (2026-11-05): does the being hold a thing with a live signal, or has it set one off (a call ringing, a message read and unanswered, an open line)? */
+async function hasOwnGoing(campaignId: string, characterId: string, cycle: number): Promise<boolean> {
+  const { liveSignal } = await import('@/services/item-signal');
+  const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null }, data: { contains: '"signal"' } }, select: { holderId: true, data: true } });
+  for (const r of rows) {
+    let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; }
+    const sig = liveSignal(d, cycle);
+    if (sig && (r.holderId === characterId || sig.by === characterId)) return true;
+  }
+  return false;
+}
+
 async function ownRecentActs(campaignId: string, characterId: string, sessionId: string | null): Promise<string[]> {
   try {
     // Only the live session's lines (Day 6 round 3): another session's record is memory, not "what I just did".
