@@ -47,3 +47,27 @@ describe("the sim's own estimate when nothing is stated", () => {
     expect(lineDuration('being-speech', 'Two hours pass, I swear.').source).toBe('plausible');
   });
 });
+
+describe('clock times and day words (finding 57)', () => {
+  const live = 'At 2:32 pm the sky was dark and heavy and rain began to fall. Kristopher was waiting in his car.';
+  it('the live opening line is the next 2:32 pm', () => {
+    expect(lineDuration('gm-line', live, { localHour: 22 })).toEqual({ seconds: 59520, source: 'stated' });
+  });
+  it('a day word with a clock time lands on that time tomorrow', () => {
+    expect(lineDuration('gm-line', 'The next afternoon, at 2:32 pm, rain began to fall.', { localHour: 22 })).toEqual({ seconds: 59520, source: 'stated' });
+  });
+  it('"the next afternoon" alone is 14:00 tomorrow; "tomorrow" alone 09:00', () => {
+    expect(statedDurationSeconds('The next afternoon, rain.', { localHour: 22 })).toBe(16 * 3600);
+    expect(statedDurationSeconds('Tomorrow, then.', { localHour: 22 })).toBe(11 * 3600);
+  });
+  it('9 am from 14:00 is 19 hours', () => {
+    expect(lineDuration('gm-line', 'At 9 am the bell rings.', { localHour: 14 })).toEqual({ seconds: 68400, source: 'stated' });
+  });
+  it('already that time is no jump', () => {
+    expect(lineDuration('gm-line', "It's 10:31 pm.", { localHour: 22, localMinute: 31 }).source).toBe('plausible');
+  });
+  it('spans and plain actions are unchanged', () => {
+    expect(lineDuration('gm-line', 'Two hours pass.')).toEqual({ seconds: 7200, source: 'stated' });
+    expect(lineDuration('gm-line', 'He knocks on the door again.', { localHour: 22 }).source).toBe('plausible');
+  });
+});

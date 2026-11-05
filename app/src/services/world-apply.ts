@@ -452,8 +452,18 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             try {
               const { clockNow } = await import('./table-clock');
               const { secondsToCycles } = await import('@/types/time');
-              const { withSignal, signalCause, liveSignal, withoutSignal } = await import('./item-signal');
+              const { withSignal, signalCause, liveSignal, withoutSignal, actorWordsFromIntent } = await import('./item-signal');
               const { cycle, ts } = await clockNow(campaignId);
+              // Finding 60 (2026-11-05): a reply lands on the phone the message came from (fromItem), when the receiver still holds it.
+              if (where.holderId !== actor.id) {
+                const { replyTargetItem } = await import('./item-signal');
+                const mineAll = await prisma.campaignItem.findMany({ where: { campaignId, holderId: actor.id, status: 'ACTIVE' }, select: { data: true } });
+                const target = replyTargetItem(mineAll.map((m) => ({ data: parseData(m.data ?? null) })), where.holderId, cycle);
+                if (target && target !== where.itemId) {
+                  const t = await prisma.campaignItem.findUnique({ where: { id: target }, select: { id: true, name: true, holderId: true, status: true } });
+                  if (t && t.holderId === where.holderId && t.status === 'ACTIVE') { where.itemId = t.id; where.name = t.name; }
+                }
+              }
               const row = await prisma.campaignItem.findUnique({ where: { id: where.itemId }, select: { data: true } });
               const rowData = parseData(row?.data ?? null);
               // Who caused it: the actor when it sounds at another's thing; a call already going keeps its caller when the sound is narrated at the actor's own.
@@ -471,11 +481,16 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
                 // Finding 33 (GM scene 1, 2026-11-05): a TEXT with no words came in as `ringing`, and "reads the message" then opened a phone
                 // line. The KIND decides the state; a text's words fall back to what the actor's line quoted; a received message waits
                 // (no end of its own) until it is read.
-                const quoted = (actText ?? '').match(/["“]([^"”]{2,600})["”]/)?.[1]?.trim();
+                // Finding 62 (2026-11-05): only the ACTOR's own words fill a text — never another speaker's quote on the line.
+                const quoted = actorWordsFromIntent(actText);
                 // "…" is not the message (GM scene 2: the model wrote an ellipsis as the words): words must carry a letter or a digit.
                 const words = e.words && /[\p{L}\p{N}]/u.test(e.words) ? e.words : (kind === 'text' ? quoted : undefined);
                 const state = kind === 'text' ? 'received' : 'ringing';
-                await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: soundText, since: cycle, until: state === 'received' ? Number.POSITIVE_INFINITY : cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}), kind, state, ...(words ? { words } : existing?.words ? { words: existing.words } : {}) })) } });
+                if (kind === 'text' && !words) { report.refused.push(`a text needs the sender's words (${actor.name} wrote none) - nothing was sent`); break; }
+                // Finding 60: the sender's own thing, when it is plain which (exactly one thing in their hands carries the line).
+                const mineHeld = await prisma.campaignItem.findMany({ where: { campaignId, holderId: actor.id, status: 'ACTIVE' }, select: { id: true } });
+                const fromItem = mineHeld.length === 1 ? mineHeld[0].id : undefined;
+                await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: soundText, since: cycle, until: state === 'received' ? Number.POSITIVE_INFINITY : cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}), kind, state, ...(words ? { words } : existing?.words ? { words: existing.words } : {}), ...(fromItem ? { fromItem } : {}) })) } });
               }
               // A REPLY ANSWERS THE MESSAGE (finding 51, 2026-11-05): the actor's own thing that carried the other's unanswered message is settled.
               if (where.holderId) {

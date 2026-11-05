@@ -1090,7 +1090,9 @@ async function runBeats(
               narratedActs(campaignId, [{ actorId: listenerId, actorLabel: actorName, text: `${chosenAct}: "${words}"` }], { userId: actor.userId, username: actor.username }, { narrated: false, quotes: [quote] });
               return;
             }
-            console.log(`[table-speak] ${actorName}: meant to write back but found no words — the deed stands without a message`);
+            // Finding 62 (2026-11-05): no words, no deed at the world — it sounded a phone and borrowed another speaker's quote.
+            console.log(`[table-speak] ${actorName}: meant to write back but found no words — nothing is sent; the card stands`);
+            return;
           }
           narratedActs(campaignId, [{ actorId: listenerId, actorLabel: actorName, text: chosenAct }], { userId: actor.userId, username: actor.username }, { narrated: false });
           return;

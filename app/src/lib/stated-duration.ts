@@ -45,6 +45,8 @@ function num(word: string): number | null {
 export interface StatedDurationContext {
   /** Local hour of day (0–23) on the campaign calendar, for "the next morning" / "that evening". */
   localHour?: number;
+  /** Minute within the local hour (0–59); default 0. */
+  localMinute?: number;
 }
 
 /** Seconds the GM's words say passed, or null when they state no span. Pure. */
@@ -54,6 +56,30 @@ export function statedDurationSeconds(text: string, ctx: StatedDurationContext =
   const hour = ctx.localHour ?? 12;
   const untilHour = (target: number) => ((target - hour + 24) % 24 || 24) * 3600;
 
+  // A clock time is absolute (finding 57): seconds to its NEXT occurrence, or tomorrow's when a day word moves the day.
+  const nowSec = Math.round(hour * 3600 + (ctx.localMinute ?? 0) * 60);
+  const dayWord = /\btomorrow\b|\bthe next (day|morning|afternoon|evening|night)\b|\bthe following (day|morning|afternoon|evening)\b/i.test(t);
+  let clockSec: number | null = null;
+  const cm = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/i);
+  const oc = t.match(/\b(\d{1,2})\s*o'?clock(?:\s+(?:in the\s+)?(morning|afternoon|evening|at night|night))?/i);
+  if (cm && Number(cm[1]) >= 1 && Number(cm[1]) <= 12) {
+    const pm = cm[3].toLowerCase().startsWith('p');
+    clockSec = ((Number(cm[1]) % 12) + (pm ? 12 : 0)) * 3600 + Number(cm[2] ?? 0) * 60;
+  } else if (oc && Number(oc[1]) >= 1 && Number(oc[1]) <= 12) {
+    const part = (oc[2] ?? '').toLowerCase();
+    const pm = /afternoon|evening|night/.test(part);
+    clockSec = ((Number(oc[1]) % 12) + (pm ? 12 : 0)) * 3600;
+  } else if (/\b(at|by|around) (high )?noon\b/i.test(t)) clockSec = 12 * 3600;
+  else if (/\b(at|by|around) midnight\b/i.test(t)) clockSec = 0;
+  if (clockSec !== null) {
+    let diff = clockSec - nowSec;
+    if (dayWord) diff = clockSec + 86400 - nowSec;
+    else if (diff > -60 && diff < 60) return null; // already that time: no jump, the plausible estimate stands
+    else if (diff < 0) diff += 86400;
+    return diff;
+  }
+  if (dayWord && /\b(the )?next afternoon\b/i.test(t)) return clockSec === null ? 86400 - nowSec + 14 * 3600 : null;
+  if (dayWord && /\btomorrow\b/i.test(t) && !/\bnext (morning|day)\b/i.test(t)) return 86400 - nowSec + 9 * 3600;
   if (/\b(the )?next (morning|day)\b|\bcome morning\b|\bby morning\b|\bat dawn\b|\bthe following morning\b/i.test(t)) return untilHour(7);
   if (/\b(the )?next (evening|night)\b/i.test(t)) return untilHour(19) + (hour >= 19 ? 0 : 0) + (hour < 19 ? 0 : 24 * 3600 - 0) * 0 + 24 * 3600 * (hour < 19 ? 0 : 0) + (hour >= 19 ? 24 * 3600 : 0) * 0 + 0;
   if (/\blater that (night|evening)\b|\bthat (evening|night)\b|\bby nightfall\b|\bby evening\b|\bcome evening\b/i.test(t)) return hour < 19 ? untilHour(19) : 2 * 3600;

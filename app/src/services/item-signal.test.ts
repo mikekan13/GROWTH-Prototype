@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { liveSignal, withSignal, withoutSignal, signalLines, signalInState, connectedParties, onTheLine, signalTextFor } from './item-signal';
+import { liveSignal, withSignal, withoutSignal, signalLines, signalInState, connectedParties, onTheLine, signalTextFor, actorWordsFromIntent, replyTargetItem } from './item-signal';
 
 const sig = { text: "Violet's phone rings wherever she has it.", since: 100, until: 200, by: 'kris' };
 
@@ -81,5 +81,18 @@ describe('Day 8 (2026-11-05): a message READ is a signal state of its own', () =
     const bare = { ...base, state: 'read' as const };
     expect(signalTextFor(bare, 'holder', 'Kristopher')).toBe("Kristopher's message, read. You have not written back.");
     expect(signalTextFor(bare, 'caller', 'Violet')).toBe('Violet read your message. Nothing has come back yet.');
+  });
+});
+
+describe('findings 60/62 (2026-11-05): the sender\'s words, the phone it came from', () => {
+  it('a text takes words only from the actor\'s own marker, never another speaker\'s quote', () => {
+    expect(actorWordsFromIntent('writes back to Violet. Violet said "I\'ll be there."')).toBeUndefined();
+    expect(actorWordsFromIntent('texts her\nThe words Kristopher put into it, exactly: "On my way."')).toBe('On my way.');
+  });
+  it('a reply targets fromItem of the message being answered', () => {
+    const d = withSignal({}, { text: 't', since: 0, until: Number.POSITIVE_INFINITY, by: 'v', kind: 'text', state: 'received', words: 'hi', fromItem: 'phone-b' });
+    expect(liveSignal(d, 1)?.fromItem).toBe('phone-b');
+    expect(replyTargetItem([{ data: {} }, { data: d }], 'v', 1)).toBe('phone-b');
+    expect(replyTargetItem([{ data: d }], 'someone-else', 1)).toBeNull();
   });
 });

@@ -27,6 +27,8 @@ export interface ItemSignal {
   state?: SignalState;
   /** The words a message carries, exactly as written. */
   words?: string;
+  /** Finding 60 (2026-11-05): the id of the SENDER's own thing this came from, so a reply goes back to that phone, not the first match. */
+  fromItem?: string;
 }
 
 type Data = Record<string, unknown>;
@@ -48,6 +50,7 @@ export function liveSignal(data: unknown, nowCycle: number): ItemSignal | null {
     ...(typeof r.by === 'string' && r.by ? { by: r.by } : {}),
     ...(kind ? { kind } : {}), ...(state ? { state } : {}),
     ...(typeof r.words === 'string' && r.words.trim() ? { words: r.words.trim().slice(0, 600) } : {}),
+    ...(typeof r.fromItem === 'string' && r.fromItem ? { fromItem: r.fromItem } : {}),
   };
 }
 
@@ -93,8 +96,18 @@ export function withSignal(data: unknown, signal: ItemSignal): Data {
     text: signal.text.slice(0, 240), since: signal.since, until: Number.isFinite(signal.until) ? signal.until : null,
     ...(signal.by ? { by: signal.by } : {}), ...(signal.kind ? { kind: signal.kind } : {}), ...(signal.state ? { state: signal.state } : {}),
     ...(signal.words ? { words: signal.words.slice(0, 600) } : {}),
+    ...(signal.fromItem ? { fromItem: signal.fromItem } : {}),
   };
   return base;
+}
+
+/**
+ * Finding 62 (2026-11-05): a text's words are the SENDER's. An intent carries them after "The words X put into it, exactly:" (only the
+ * actor's own quotes travel there); any other quote on the line is someone else's speech and never fills a text. Pure.
+ */
+export function actorWordsFromIntent(intent: string | undefined): string | undefined {
+  const m = /put into it, exactly:\s*["“]([^"”]{2,600})["”]/i.exec(intent ?? '');
+  return m?.[1]?.trim() || undefined;
 }
 
 /** The item's data with its signal gone. Does not mutate. */
@@ -142,4 +155,16 @@ export function signalLines(items: SignalItem[], viewerId: string, nowCycle: num
     }
   }
   return out;
+}
+
+/**
+ * Finding 60 (2026-11-05): a REPLY goes back to the phone the message came from. Of the replier's own things, the one carrying a live
+ * received/read message from `receiverId` that names a `fromItem` gives that item id; null when none (fall back to the first match). Pure.
+ */
+export function replyTargetItem(mine: Array<{ data: unknown }>, receiverId: string, nowCycle: number): string | null {
+  for (const it of mine) {
+    const sig = liveSignal(it.data, nowCycle);
+    if (sig && sig.by === receiverId && (sig.state === 'received' || sig.state === 'read') && sig.fromItem) return sig.fromItem;
+  }
+  return null;
 }
