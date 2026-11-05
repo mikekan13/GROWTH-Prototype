@@ -1173,7 +1173,8 @@ export async function listenStimulus(
           ? await liveVoiceBound(ctx.campaignId).then((b) => lastCardGistOf(ctx.campaignId!, characterId, b)).catch(() => null) : null;
         // Compare what REACHED it and what is GOING only (finding 52: the gist's "about"/"pictures" parts vary every beat, so the same far side carded again).
         const stripGist = (g: string) => g.split(' · ').filter((part) => !/^(?:about|pictures)/.test(part)).join(' · ');
-        const unchanged = !!lastGist && stripGist(lastGist) === stripGist(beat.plan.gist.trim());
+        // Only a STAY is suppressed: a being that chooses to act or speak on an unchanged record (writing back at last) keeps its beat.
+        const unchanged = beat.plan.impulse === 'stay' && !!lastGist && stripGist(lastGist) === stripGist(beat.plan.gist.trim());
         if (unchanged) console.log(`[composer] ${ctx.name}: record unchanged since its last card — no beat`);
         // AN EMPTY RECORD IS NO BEAT (table test 2026-11-03: "Nothing new reaches you" became "the phone is still chiming in my hand").
         raw = (beat.empty || unchanged) ? `\nImpulse: ${beat.plan.impulse}${beat.plan.why ? ` — ${beat.plan.why}` : ''}` : `${beat.thought}\nImpulse: ${beat.plan.impulse}${beat.plan.impulse === 'stay' && beat.plan.why ? ` — ${beat.plan.why}` : ''}`;

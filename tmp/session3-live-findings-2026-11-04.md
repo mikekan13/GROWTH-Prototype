@@ -155,3 +155,9 @@ WORKING, end to end: text with words → Violet reads on her own (one card) → 
 
 52. **THE UNCHANGED-RECORD RULE MISSED** — the gist's "about" and "pictures" parts vary every beat (a different memory chosen, a different picture), so Kristopher's far side carded three times with the same reached/going. FIXED: compare what REACHED it and what is GOING only.
 53. **A VOICED BEING'S CHOSEN ACT DOES NOT RUN.** "Violet looks at the message again, thumb over the keyboard, and decides." voiced her, so her monologue went into the page and "the monologue's doings stay thoughts" (the HW rule) — her composed act (impulse act: "I'm already typing it") never ran, and the write-back path was never reached. Rule to decide (Michael): when the Watcher voices a being but leaves the decision to it, does its own chosen act run after the Watcher's? Today: no. The write-back path is only reached when she acts on an UNVOICED beat.
+
+## GM SCENE 7 (01:47Z→ 11-05, round 6 build, :3001, rolled back)
+
+WORKING: text → read on her own (one card) → read line → his far side "read, nothing back yet" → her record "You have not written back" and her thought "Four works and I haven't said so yet".
+
+54. **SHE NEVER GETS THE BEAT TO WRITE BACK.** On Kristopher's next line her standing beat came back `not_lived` (spiritMs 0): a standing beat with nothing new is not lived, so the chooser never runs — the read-and-unanswered message in her hand never gets a decision on another's line. The write-back path (#51b) is only reachable when something reaches her or the Watcher prompts her — and a prompted (voiced) line keeps her doings as thoughts (#53). RULE: a standing beat is LIVED when the being has something of its own still going (a message read and unanswered, a ringing phone, an open line) — the chooser runs; a stay on an unchanged record posts no card (#43), an act does.
