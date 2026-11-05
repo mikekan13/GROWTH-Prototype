@@ -87,3 +87,11 @@ Canon (Repository/02_CHARACTER_CREATION/Nectars_and_Thorns_System.md, #needs-val
 - **Client:** partials never render; a retract of a shown line is a warning, never an edit; later segments only append; a full-size THINKING CARD per being while it works, replaced by the final card once.
 
 **Still open:** the adjudicator turning "leaves for X" into a move op is prompted but not seen live; the stretch places arrival at the window start, not the exact time; `composer` shows one write-back target per thing even with two unread texts; thinking cards have no pillar tint until events carry it; rolls UI (brief only); voice + audio (not started); the Nectar questions; Bounded Potential's text; Michael's trait ideas 2–6.
+
+**STATE AT ~13:40Z 11-06 (Michael asleep):** the production BUILD of the night's code was killed by the system for LOW MEMORY during "Running TypeScript" (worker exit 3221225794); `.next/BUILD_ID` is gone, so :3001 is DOWN and cannot start until a build succeeds. Per the standing rule I did not restart the killed build on my own. To bring it back:
+```
+cd C:\Projects\GRO.WTH\app
+$env:NODE_OPTIONS='--max-old-space-size=4096'; npx next build --webpack
+Start-Process -WindowStyle Hidden cmd.exe -ArgumentList '/c npx next start -p 3001 1>> ..\logs\prod-server.out.log 2>> ..\logs\prod-server.err.log'
+```
+Then the replay: `node --env-file=.env --env-file=.env.local --import tsx ../tmp/gm.ts start` and the lines in the scratchpad plan (replay-coffee-date.md: the time line first, "It is 2:22 pm the following afternoon…"). Code is committed and pushed (ca509c0); world rolled back to post-session-6 + coffee shop (ACTIVE, with a door) + lot gate + Dialed to Eleven on his sheet; pod OFF.
