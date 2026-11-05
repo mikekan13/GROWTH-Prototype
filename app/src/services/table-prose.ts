@@ -456,6 +456,14 @@ export function hasOwnSubject(clause: string, roster: ProseRosterEntry[], plain 
   return false;
 }
 const FRONTED_PREP_JOIN_RE = /,?\s+and\s+(?=(?:on|in|by|at|across|under|beside|near|over|behind|from|through|along|against|inside|outside|beneath|above|below|between)\s+(?:the|a|an|her|his|their|its|this|that))/i;
+/** The clause begins with a roster name (full or first) or a personal pronoun: it is somebody's deed, not the scene's. Pure. */
+function actorHeaded(clause: string, roster: ProseRosterEntry[]): boolean {
+  const t = clause.trim();
+  if (/^(?:he|she|they)\b/i.test(t)) return true;
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return roster.some((r) => { const first = r.name.split(/\s+/)[0]; return new RegExp(`^(?:${esc(r.name)}|${esc(first)})\\b`, 'i').test(t); });
+}
+
 export function splitScenePhraseClauses(sentences: string[], roster: ProseRosterEntry[] = []): string[] {
   const out: string[] = [];
   const cap = (t: string) => `${t.charAt(0).toUpperCase()}${t.slice(1)}`;
@@ -473,6 +481,10 @@ export function splitScenePhraseClauses(sentences: string[], roster: ProseRoster
       const rest = body.slice(at + m[0].length);
       const plain = /^\s+and\s+$/i.test(m[0]);
       if (left.trim().split(/\s+/).length < (plain ? 3 : 2) || !hasOwnSubject(rest, roster, plain)) continue;
+      // A bare "and" splits only when the LEFT clause is a being's deed (a name or a pronoun head): "The door opens and Ruth stands in
+      // it." is one narration sentence, kept as the Watcher wrote it (visible-form cache, 2026-11-05); "He turns the key and the engine
+      // catches" is his deed and the world's clause.
+      if (plain && !actorHeaded(left, roster)) continue;
       pieces.push(left);
       start = at + m[0].length;
     }

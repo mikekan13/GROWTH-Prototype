@@ -588,8 +588,8 @@ describe('beat splitting: a clause with its own subject is attributed on its own
       ['kris', 'Turns the key', undefined],
       ['kris', 'Leaves it idling and looks at the phone on his knee', undefined],
     ]);
-    expect(p.narration).toContain("The Fusion's engine catches.");
-    expect(p.narration).toContain('The dash lights come up.');
+    // The car's two clauses stay ONE narration sentence, as the Watcher wrote it (a bare "and" splits only an actor-headed clause).
+    expect(p.narration).toContain("The Fusion's engine catches and the dash lights come up.");
   });
   it('"he leaves it idling and looks at the phone" stays one deed (shared subject)', () => {
     const p = parseTableProse('He leaves it idling and looks at the phone.', [...roster], { recentActors: [roster[0]] });
