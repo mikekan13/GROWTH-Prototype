@@ -115,3 +115,10 @@ Then the replay: `node --env-file=.env --env-file=.env.local --import tsx ../tmp
 - 1–6 bare times read as afternoon (assumed, still open). Stretch arrival at window start (assumed, still open).
 
 **Recovery (if :3001 is down):** `cd C:\Projects\GRO.WTH\app; $env:NODE_OPTIONS='--max-old-space-size=4096'; npx next build --webpack` with nothing else running, then `Start-Process -WindowStyle Hidden cmd.exe -ArgumentList '/c npx next start -p 3001 1>> ..\logs\prod-server.out.log 2>> ..\logs\prod-server.err.log'`. Probe `http://localhost:3001/hub` (200).
+
+**Day 10, part 2 — GM REPLAY 11 on the fixed build (22:58Z→23:27Z, 4 lines + 1 re-issue, rolled back, pod OFF)**
+- Verified live: 75 (clock ~14:25), 76 (she says "sixteen hours ago"), 77 (act in the day record), 78 (thoughts are memories), 79; no invented text landed; the drive with the full place name.
+- Regressions from the fourth-attempt batch: 97 (a partial place name "the coffee shop" no longer resolved — fixed in ebbbf1b), 98 (he did not get out of the car when the destination failed to resolve), 99 ("a table by the window" names nothing). 98/99 → sonnet agent, movement path.
+- New small ones: 92 (first-person act glued to the name in the day record), 93 (adverb in a resolve), 94 (a reflective sentence became a plan — thoughts now bind only when they resolve), 95 (a raw id reached the record — stripped at the scene-builder's parse), 96 (places have aliases now: Location data.aliases, "Extra Space Coffee" added by tmp/add-coffee-shop-alias.ts; the resolver, the move branch and the wall's roster read them). All in ebbbf1b.
+- Not exercised: 80's 'message' ask (she never chose the write-back in this run — she stayed with "both boots are right here", "I think I'm becoming certain"), 82/85/89 (no voiced-being line given).
+- TOOLING PITFALL (memory saved): doubled backslashes inside a Bash-tool command collapse — four regex edits lost their escapes; fixed by splicing exact lines from a quoted heredoc file. Grep what you wrote.

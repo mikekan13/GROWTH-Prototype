@@ -74,6 +74,46 @@ export interface MoveReport {
 const norm = (s: string) => s.trim().toLowerCase().replace(/^(the|a|an)\s+/, '');
 const DOOR_WORD = /\b(door|doorway|threshold|entrance|entry)\b/i;
 
+const FUNCTION_WORDS = new Set(['a', 'an', 'the', 'by', 'at', 'in', 'on', 'of', 'to', 'near', 'next', 'beside', 'with', 'and', 'into', 'onto', 'up', 'down', 'over', 'under', 'from', 'for', 'her', 'his', 'their', 'its', 'one', 'some', 'there', 'that', 'this']);
+const words = (s: string): string[] => s.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && !FUNCTION_WORDS.has(w));
+const stem = (w: string): string => w.replace(/(es|s|e)$/, '');
+
+/**
+ * FINDING 99 (2026-11-05): "a table by the window" names none of the shop's things ("the window bench", "the first table"). Score the
+ * things by word overlap with the request (a stem match counts: table/tables). A word that names a feature on the map (an opening kind,
+ * another thing in the room) is the "by the ..." of the request: it is not scored, it picks, among the tied best, the thing whose point
+ * lies nearest that feature. Null only when no content word overlaps any thing. Pure; the words and names come from the data.
+ */
+export function rankThingsByWords(
+  request: string,
+  things: Array<{ id: string; name: string; point?: Point | null }>,
+  features: Array<{ words: string[]; point: Point }> = [],
+): string | null {
+  const reqWords = words(request);
+  if (!reqWords.length) return null;
+  const featureStems = (f: { words: string[] }) => f.words.flatMap(words).map(stem);
+  const active = features.filter((f) => featureStems(f).some((fw) => reqWords.some((w) => stem(w) === fw)));
+  const featureWordSet = new Set(active.flatMap(featureStems));
+  const scoreWith = (rw: string[]) => things.map((t) => {
+    const tw = words(t.name).map(stem);
+    const hit = new Set(rw.map(stem).filter((w) => tw.includes(w))).size;
+    return { t, hit, extra: tw.length - hit };
+  }).filter((x) => x.hit > 0);
+  const lone = reqWords.filter((w) => !featureWordSet.has(stem(w)));
+  let scored = lone.length ? scoreWith(lone) : [];
+  if (!scored.length) scored = scoreWith(reqWords);
+  if (!scored.length) return null;
+  const best = Math.max(...scored.map((x) => x.hit));
+  let tied = scored.filter((x) => x.hit === best);
+  if (tied.length > 1 && active.length) {
+    const d = (x: { t: { point?: Point | null } }) => x.t.point ? Math.min(...active.map((f) => Math.hypot(x.t.point!.x - f.point.x, x.t.point!.y - f.point.y))) : Infinity;
+    const nearest = Math.min(...tied.map(d));
+    tied = tied.filter((x) => d(x) === nearest);
+  }
+  const fewest = Math.min(...tied.map((x) => x.extra));
+  return tied.find((x) => x.extra === fewest)!.t.id;
+}
+
 /**
  * What a move's `to` names, in this order: a door/opening of the actor's room
  * (by name, or "the door" when one door touches the room), a person, a thing
@@ -108,6 +148,17 @@ export async function resolveMoveRef(campaignId: string, ref: string, actorChara
   if (thing) return { target: { kind: 'thing', itemId: thing.id }, label: thing.name };
   const room = roomByName(map, r) ?? map.rooms.find((x) => r.includes(norm(x.name)) || norm(x.name).includes(r)) ?? null;
   if (room) return { target: { kind: 'room', roomId: room.id }, label: room.name };
+  // FINDING 99 (2026-11-05): last resort, data-derived - the things in the actor's room scored by the request's words, nearest the named feature.
+  if (nearby.length) {
+    const standings = await Promise.all(nearby.map(async (t) => ({ id: t.id, name: t.name, point: (await thingStanding(map, t.id))?.point ?? null })));
+    const features = [
+      ...roomPortals.map((p) => ({ words: [p.kind, p.name], point: { x: (p.a.x + p.b.x) / 2, y: (p.a.y + p.b.y) / 2 } })),
+      ...standings.filter((x) => x.point).map((x) => ({ words: [x.name], point: x.point as Point })),
+    ];
+    const id = rankThingsByWords(r, standings, features);
+    const hit = id ? nearby.find((t) => t.id === id) : null;
+    if (hit) return { target: { kind: 'thing', itemId: hit.id }, label: hit.name };
+  }
   return null;
 }
 

@@ -97,3 +97,26 @@ describe('stepping in from the doorstep', () => {
     expect(stepIntoRoom({ rooms: [room], walls: [], portals: [], obstacles: [], bounds: { x: 0, y: 0, width: 100, height: 100 } } as never, room, P(50, 50))).toBeNull();
   });
 });
+
+import { rankThingsByWords } from './being-movement';
+
+describe('rankThingsByWords (finding 99)', () => {
+  const things = [
+    { id: 'bench', name: 'the window bench', point: { x: 100, y: 0 } },
+    { id: 'counter', name: 'the counter', point: { x: 900, y: 500 } },
+    { id: 't1', name: 'the first table', point: { x: 500, y: 400 } },
+    { id: 't2', name: 'the second table', point: { x: 150, y: 50 } },
+  ];
+  const features = [{ words: ['window', 'the front window'], point: { x: 100, y: 0 } }, { words: ['counter'], point: { x: 900, y: 500 } }];
+  it('"a table by the window" is a table, the one nearest the window', () => {
+    expect(rankThingsByWords('a table by the window', things, features)).toBe('t2');
+  });
+  it('names resolve to themselves', () => {
+    expect(rankThingsByWords('the counter', things, features)).toBe('counter');
+    expect(rankThingsByWords('the bench', things, features)).toBe('bench');
+    expect(rankThingsByWords('tables', things)).not.toBeNull();
+  });
+  it('nothing overlapping is null', () => {
+    expect(rankThingsByWords('the moon', things, features)).toBeNull();
+  });
+});

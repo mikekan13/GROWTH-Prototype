@@ -717,7 +717,12 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
               ?? locs.find((l) => namesOf(l).some((n) => n === want))
               ?? locs.find((l) => namesOf(l).some((n) => want.includes(n)))
               ?? (want.length >= 4 ? locs.find((l) => namesOf(l).some((n) => n.includes(want))) : undefined);
-            if (!to) { report.refused.push(`move: nothing called "${e.to}" on the map`); break; }
+            if (!to) {
+              // Finding 98 (2026-11-05): "gets out" is its own deed - the rider climbs out even when the destination names nothing.
+              const rideOut = await ridingOf(actor.id);
+              if (rideOut) { await seatBeingIn(campaignId, actor.id, null, 'sim'); report.applied.push(`${actor.name} gets out of the ${rideOut.containerName}`); }
+              report.refused.push(`move: nothing called "${e.to}" on the map`); break;
+            }
             if (map && to.id === map.roomId) { report.applied.push(`already in ${to.name}`); break; }
             const toLevel = await levelOfLocation(to.id);
             // DRIVING = THE VEHICLE TRAVELS (finding 68 / #41 vehicle travel, 2026-11-05): a being inside a vehicle that goes to another
