@@ -514,11 +514,16 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             const caller = await prisma.character.findUnique({ where: { id: sig.by }, select: { name: true } }).catch(() => null);
             report.applied.push(`${actor.name} answers "${item.name}" — on the line with ${caller?.name ?? 'the caller'}`);
           } else if (sig && sig.state === 'received') {
-            // Reading a message (finding 33): the signal is done, and the WORDS are what the reader now has — handed as what was read.
-            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
+            // Reading a message (finding 33): the WORDS are what the reader now has — handed as what was read. The message stays on the
+            // thing as `read` (Day 8, 2026-11-05): a human player would write back or let it be; "write back" stays on the list until then.
+            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withSignal(d, signalInState(sig, 'read'))) } });
             const sender = sig.by ? await prisma.character.findUnique({ where: { id: sig.by }, select: { name: true } }).catch(() => null) : null;
             report.applied.push(`${actor.name} reads the message on "${item.name}"${sender?.name ? ` from ${sender.name}` : ''}${sig.words ? `: "${sig.words}"` : ''}`);
             if (sig.words) (report.read ??= []).push({ by: actor.id, item: item.name, words: sig.words, ...(sender?.name ? { from: sender.name } : {}) });
+          } else if (sig && sig.state === 'read') {
+            // Letting a read message be (or writing back, which the sound op records on the other's thing): it is done.
+            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
+            report.applied.push(`${actor.name} puts the message on "${item.name}" to rest`);
           } else {
             await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
             report.applied.push(`${actor.name} answers "${item.name}"`);

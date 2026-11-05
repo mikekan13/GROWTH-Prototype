@@ -1139,6 +1139,8 @@ async function runBeats(
           ? `${holder ?? 'They'} answered${holder ? ` ${holder}'s ${thing}` : ''}. You are on the line with ${holder ?? 'them'} now: what you say reaches them, and what they say reaches you.`
           : going.state === 'received'
             ? `Your message reached${holder ? ` ${holder}'s ${thing}` : ' them'}.${going.words ? ` It said: "${going.words}".` : ''} Nothing has come back yet.`
+          : going.state === 'read'
+            ? `${holder ?? 'They'} read your message.${going.words ? ` It said: "${going.words}".` : ''} Nothing has come back yet.`
             : `${FAR_SIDE_HEAD} ${going.text}${holder ? ` It is ${holder}'s ${thing}, going now because of what you did.` : ''} Nobody has answered it yet.`;
         console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: the far side of their own signal — ${content}`);
         standingIds.add(listenerId);
@@ -1821,7 +1823,8 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
             const { roomIdOf } = await import('@/services/spatial-world');
             const roomId = await roomIdOf(rd.by);
             const who = (await prisma.character.findUnique({ where: { id: rd.by }, select: { name: true } }))?.name ?? a.actorLabel;
-            const line = `${who} reads the message${rd.from ? ` from ${rd.from}` : ''} on the ${rd.item.replace(/^(?:the|her|his|their)\s+/i, '')}: "${rd.words}"`;
+            // No quote marks (finding 44, GM scene 3): quoted words on a line are SPEECH, and the table had her saying his text aloud.
+            const line = `${who} reads the message${rd.from ? ` from ${rd.from}` : ''} on the ${rd.item.replace(/^(?:the|her|his|their)\s+/i, '')}. It says: ${rd.words.replace(/["“”]/g, '')}`;
             console.log(`[table-speak] the words read: ${line}`);
             await narrateAtTable(campaignId, { userId: gm.userId, username: gm.username, role: 'WATCHER' } as TableActor, { message: line, locationId: roomId ?? null, worldEvent: true });
           } catch (err) { console.warn('[table-speak] the read words were not handed over (non-fatal):', err instanceof Error ? err.message : err); }

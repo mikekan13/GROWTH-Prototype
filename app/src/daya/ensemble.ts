@@ -1095,7 +1095,7 @@ export async function listenStimulus(
     // Day 6 (2026-11-04): the signal's end is a CYCLE; it was compared with Date.now() and every signal read as over — Violet's
     // phone rang thirty times with STILL GOING empty in her record. The ledger's clock judges, and the state rides along.
     const { liveSignal, signalTextFor } = await import('@/services/item-signal');
-    const going: Array<{ text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received'; other?: string; words?: string; thing?: string }> = [];
+    const going: Array<{ text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received' | 'read'; other?: string; words?: string; thing?: string }> = [];
     for (const it of items) {
       let d: unknown = null;
       try { d = JSON.parse(it.data ?? '{}'); } catch { d = null; }

@@ -11,7 +11,8 @@
 
 export type SignalKind = 'call' | 'text' | 'other';
 /** ringing: going, unanswered · connected: answered, a line open both ways · received: a message landed, unread until answered. */
-export type SignalState = 'ringing' | 'connected' | 'received';
+export type SignalState = 'ringing' | 'connected' | 'received' | 'read';
+/** read: the message was opened (Day 8, 2026-11-05) — its words are the reader's, and it waits for an answer until they write back or let it be. */
 
 export interface ItemSignal {
   text: string;
@@ -52,7 +53,7 @@ export function liveSignal(data: unknown, nowCycle: number): ItemSignal | null {
 
 /** The same signal in another state (answered: connected, no end of its own). Does not mutate. */
 export function signalInState(sig: ItemSignal, state: SignalState): ItemSignal {
-  return { ...sig, state, ...(state === 'connected' ? { until: Number.POSITIVE_INFINITY } : {}) };
+  return { ...sig, state, ...(state === 'connected' || state === 'read' ? { until: Number.POSITIVE_INFINITY } : {}) };
 }
 
 /**
@@ -81,6 +82,7 @@ export function signalTextFor(sig: ItemSignal, side: 'holder' | 'caller', other?
   const who = other ?? (side === 'holder' ? 'someone' : 'them');
   if (sig.state === 'connected') return side === 'holder' ? `You are on the line with ${who}: the call is answered and open.` : `${who} answered: you are on the line with ${who}.`;
   if (sig.state === 'received') return side === 'holder' ? `${sig.text} It reads: "${sig.words ?? '…'}"` : `Your message reached ${who}.${sig.words ? ` It said: "${sig.words}"` : ''} Nothing has come back yet.`;
+  if (sig.state === 'read') return side === 'holder' ? `${who}'s message, read${sig.words ? `: "${sig.words}"` : ''}. You have not written back.` : `${who} read your message.${sig.words ? ` It said: "${sig.words}"` : ''} Nothing has come back yet.`;
   return side === 'holder' ? `${sig.text} It is ringing now and not answered.` : `${sig.text} It is still going; nobody has answered it.`;
 }
 

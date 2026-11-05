@@ -23,7 +23,7 @@ export type Impulse = 'speak' | 'act' | 'stay';
 
 /** Something still going that this being knows of: a signal it can hear, or one it set off itself. */
 /** Day 6 (2026-11-04): a going thing carries its state, the other party and any words, from the ledger. */
-export interface GoingRef { text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received'; other?: string; words?: string; /** the sounding thing's name, as the ledger has it */ thing?: string }
+export interface GoingRef { text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received' | 'read'; other?: string; words?: string; /** the sounding thing's name, as the ledger has it */ thing?: string }
 
 /** THE BEAT RECORD — every field is a resolved reference; the voice may say nothing outside it. */
 export interface BeatRecord {
@@ -193,10 +193,11 @@ export function actPairsFor(going: GoingRef[], held: string[]): Array<{ label: s
     if (!g.mine) {
       if (g.state === 'connected') out.push({ label: 'hang up', deed: `hangs up the ${thing}` });
       else if (g.state === 'received') out.push({ label: 'read the message', deed: `reads the message on the ${thing}` }, { label: `write back to ${who}`, deed: `writes back to ${who} on the ${thing}` });
+      else if (g.state === 'read') out.push({ label: `write back to ${who}`, deed: `writes back to ${who} on the ${thing}` }, { label: 'leave the message unanswered for now', deed: `puts the ${thing} down without answering` });
       else out.push({ label: 'answer it', deed: `answers the ${thing}` }, { label: 'decline it and let it go', deed: `declines the call and lets the ${thing} go quiet` }, { label: 'silence it and leave it', deed: `silences the ${thing} and leaves it` });
     } else {
       if (g.state === 'connected') out.push({ label: 'hang up', deed: `hangs up on ${who}` });
-      else if (g.state === 'received') out.push({ label: `write ${who} again`, deed: `writes ${who} again` });
+      else if (g.state === 'received' || g.state === 'read') out.push({ label: `write ${who} again`, deed: `writes ${who} again` });
       else out.push({ label: 'hang up', deed: `hangs up before ${who} answers` });
     }
   }
@@ -323,7 +324,10 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   const perceivedRaw = a.perceived ?? (await orderPerception({ envelope: a.envelope, event: a.event, senses: a.senses, own: a.own }, ctx, overrides));
   // Day 6 (2026-11-04, finding 21): a Watcher line about the being's own moment ("Violet realizes… Time to decide") is a prompt —
   // what reached it is the Watcher's words, never "nothing new"; it owes a card.
-  const perceived = a.standing || (!a.prompted && NOTHING.test(perceivedRaw.trim())) ? null : (a.prompted && NOTHING.test(perceivedRaw.trim()) ? a.event : perceivedRaw);
+  // A WATCHER LINE THROUGH THE BEING IS A BEAT (finding 45, 2026-11-05: "Violet looks at the message a moment longer" → "quiet beat, nothing
+  // woke — no beat"): its own doing, as told to it, is what reached it — never a quiet beat.
+  const moved = a.prompted || a.own;
+  const perceived = a.standing || (!moved && NOTHING.test(perceivedRaw.trim())) ? null : (moved && NOTHING.test(perceivedRaw.trim()) ? a.event : perceivedRaw);
   const fragments = a.memories.slice(0, 8).map((m, i) => ({ i, text: m.text, ...(m.age ? { age: m.age } : {}) }));
   const going = (a.going ?? []).slice(0, 4);
   // A QUIET BEAT (run 2, 2026-11-03: every quiet beat cost three cloud orders and a local choice, ~20 s, to think about a key ring).
