@@ -150,7 +150,7 @@ export function threadTextFor(thread: ItemSignal[], side: 'holder' | 'caller', o
     const who = other ?? (side === 'holder' ? 'someone' : 'them');
     if (g.length === 1) {
       const t = signalTextFor(g[0], side, other);
-      parts.push(on && g[0].state === 'read' ? t.replace(/message, read/, `message${on}, read`) : on && g[0].state === 'received' ? `${t.replace(/\s*It reads:/, `${on}. It reads:`)}` : t);
+      parts.push(on && g[0].state === 'read' ? t.replace(/message, read/, `message${on}, read`) : on && g[0].state === 'received' ? `${t.replace(/\.?\s*It reads:/, `${on}. It reads:`)}` : t);
       continue;
     }
     const newest = g[g.length - 1];
@@ -237,11 +237,11 @@ export function markRead(data: unknown, nowCycle: number, readUntil: number, opt
   return { data: writeThread(base, next), read: targets };
 }
 
-/** A REPLY to `senderId`: every read/received message from them settles. Returns how many. Does not mutate. */
+/** A REPLY to `senderId`: every READ message from them settles. Finding 84 (2026-11-05): a being cannot answer what it has not read, so `received` ones stay. Returns how many. Does not mutate. */
 export function settleFrom(data: unknown, senderId: string, nowCycle: number): { data: Data; settled: number } {
   const base = baseOf(data);
   const all = threadEntries(base, null);
-  const gone = all.filter((e) => e.by === senderId && (e.state === 'read' || e.state === 'received') && nowCycle >= e.since && nowCycle < e.until);
+  const gone = all.filter((e) => e.by === senderId && e.state === 'read' && nowCycle >= e.since && nowCycle < e.until);
   if (!gone.length) return { data: base, settled: 0 };
   return { data: writeThread(base, all.filter((e) => !gone.includes(e))), settled: gone.length };
 }

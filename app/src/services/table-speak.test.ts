@@ -86,7 +86,7 @@ vi.mock('@/services/reconciliation', () => ({
   cementCheck: vi.fn(async () => {}),
 }));
 
-import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom, reachEventOf, withoutThoughts, withoutRepeats, waitsFor, orderBeats, cardWithoutRepeats, awaitCard, CARD_WAIT_MS, readingsFor } from './table-speak';
+import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop, actionToTableLine, lastVoicedFrom, reachEventOf, withoutThoughts, withoutRepeats, waitsFor, orderBeats, cardWithoutRepeats, awaitCard, voicedBeatsToPost, CARD_WAIT_MS, readingsFor } from './table-speak';
 
 describe("reachEventOf — the Watcher's prose act is its actor's own event (HW5 2026-10-25)", () => {
   const narr = (text: string) => ({ text, kind: 'narration' as const, to: null, speaker: null, expectsReply: false, ambiguous: false, rule: 'x' });
@@ -749,5 +749,15 @@ describe('a line that uses a thing the actor does not have is WITHHELD until ans
     await speakProse('camp', actor, { message: line });
     expect(w.makeItem).not.toHaveBeenCalled();
     expect(w.canon.some((c) => c.kind === 'narration')).toBe(true);
+  });
+});
+
+// Finding 89 (2026-11-05)
+describe("voicedBeatsToPost", () => {
+  const cards = [{ actorId: "k", segments: [{ kind: "thought" }] }, { actorId: "v", segments: [{ kind: "action" }] }];
+  it("a voiced being whose page card has no thought, or no monologue, still gets its own row", () => {
+    expect(voicedBeatsToPost(["k", "v"], new Map([["k", "m"], ["v", "m"]]), cards)).toEqual(["v"]);
+    expect(voicedBeatsToPost(["k"], new Map(), cards)).toEqual(["k"]);
+    expect(voicedBeatsToPost(["k"], new Map([["k", "m"]]), cards)).toEqual([]);
   });
 });

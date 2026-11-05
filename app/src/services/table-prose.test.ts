@@ -543,6 +543,12 @@ describe('segmentIsDeed — the page may not invent a deed (GM scene 1, 2026-11-
   it('a reworded segment still counts when most of its words are in the seed action', () => {
     expect(segmentIsDeed(seed, 'k', '', 'He sets the phone on his knee and watches the screen.')).toBe(true);
   });
+  it("Finding 82: a being's own thought furniture pinned to the Watcher's sentence is not a deed on the line", () => {
+    const seed82 = [{ actorId: 'k', actorLabel: 'Kristopher', text: 'Gets out and goes in and sits at a table by the window', sentence: 'Kristopher gets out and goes in and sits at a table by the window.' }] as any;
+    const pinned = 'Kristopher gets out and goes in and sits at a table by the window.';
+    expect(segmentIsDeed(seed82, 'k', pinned, 'He gets out and goes in and sits at a table by the window.')).toBe(true);
+    expect(segmentIsDeed(seed82, 'k', pinned, 'He sets Personal phone face-down in front of him.')).toBe(false);
+  });
   it('a time sentence the seed never gave the actor is not his deed', () => {
     expect(segmentIsDeed(seed, 'k', 'A minute passes in the dark car.', 'A minute passes in the dark car.')).toBe(false);
   });

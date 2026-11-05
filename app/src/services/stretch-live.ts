@@ -495,7 +495,9 @@ async function giveAccount(campaignId: string, by: Gm, b: Being, w: StretchWindo
   if (res) {
     const after = await res.after;
     if (res.action.kind === 'act' && res.action.content) {
-      const did = after.outcome ?? res.action.content;
+      // Finding 77 (2026-11-05): the OUTCOME (once a world-sim "you cannot perceive her" paragraph) was written as the ACT. The act is what
+      // the being did; the outcome stays on the record for the report.
+      const did = res.action.content;
       rec.acts.push(did);
       rec.outcome = after.outcome;
       for (const c of after.worldChanges ?? []) if (/refused/i.test(c)) rec.refused.push(`${b.name}: ${c}`);

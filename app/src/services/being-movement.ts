@@ -67,6 +67,8 @@ export interface MoveReport {
   gotOutOf?: string;
   /** Finding 68 / #41: the vehicle the walk ended in (walked to a vehicle in the same room = got into it). */
   boarded?: string;
+  /** Finding 81 (2026-11-05): a move to the room the walker is already in is no act, never a refusal; the rest of the act carries on. */
+  already?: boolean;
 }
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/^(the|a|an)\s+/, '');
@@ -99,8 +101,10 @@ export async function resolveMoveRef(campaignId: string, ref: string, actorChara
   const people = await prisma.character.findMany({ where: { campaignId, id: { not: actorCharacterId }, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { id: true, name: true } });
   const person = people.find((p) => norm(p.name) === r) ?? people.find((p) => r.includes(norm(p.name)) || norm(p.name).includes(r));
   if (person) return { target: { kind: 'being', characterId: person.id }, label: person.name };
-  const things = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { id: true, name: true } });
-  const thing = things.find((t) => norm(t.name) === r) ?? things.find((t) => r.includes(norm(t.name)));
+  const things = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { id: true, name: true, locationId: true } });
+  // FINDING 73 (2026-11-05): a THING in the room the actor stands in answers first ("the counter" is the shop's counter, not another place's).
+  const nearby = here ? things.filter((t) => t.locationId === here.id) : [];
+  const thing = [nearby, things].flatMap((pool) => [pool.find((t) => norm(t.name) === r) ?? pool.find((t) => r.includes(norm(t.name)))]).find(Boolean);
   if (thing) return { target: { kind: 'thing', itemId: thing.id }, label: thing.name };
   const room = roomByName(map, r) ?? map.rooms.find((x) => r.includes(norm(x.name)) || norm(x.name).includes(r)) ?? null;
   if (room) return { target: { kind: 'room', roomId: room.id }, label: room.name };
@@ -182,6 +186,16 @@ export function reachableSpotNear(map: LevelMap, walkMap: LevelMap, anchor: Poin
   return null;
 }
 
+/** One square (5 ft) from `p` toward the room's centre, on a walkable square; null when nowhere answers. Pure. */
+export function stepIntoRoom(map: LevelMap, room: RoomPoly, p: Point): Point | null {
+  const n = room.points.length || 1;
+  const c = { x: room.points.reduce((a, q) => a + q.x, 0) / n, y: room.points.reduce((a, q) => a + q.y, 0) / n };
+  const L = Math.hypot(c.x - p.x, c.y - p.y);
+  if (L < 1) return null;
+  const step = Math.min(100, L);
+  return nearestWalkable(map, { x: p.x + ((c.x - p.x) / L) * step, y: p.y + ((c.y - p.y) / L) * step }, 3);
+}
+
 function walkedRoom(map: LevelMap, p: Point): RoomPoly | null { return roomAt(map, p); }
 
 /**
@@ -229,18 +243,44 @@ export async function moveBeing(
   // Other beings on the level are stepped around when there is room (soft, never a wall).
   const avoid = await othersStanding(campaignId, characterId, map);
   let path = findPath(walkMap, from, dest.point, { avoid });
+  // FINDING 81 / 73 (2026-11-05): a walker set down at a way in (out of a car parked at the street door) stands ON the wall line; a
+  // shut door there walls the start cell off from the whole room. Step one square into the room, then walk; the doorstep door opens.
+  const inner = fromRoom ? stepIntoRoom(map, fromRoom, from) : null;
+  const viaInner = (to: Point): NonNullable<ReturnType<typeof findPath>> | null => {
+    if (!inner) return null;
+    const p2 = findPath(walkMap, inner, to, { avoid });
+    return p2 ? { ...p2, points: [from, ...p2.points], feet: p2.feet + Math.hypot(inner.x - from.x, inner.y - from.y) } : null;
+  };
+  let usedInner = false;
+  if (!path) { path = viaInner(dest.point); usedInner = !!path; }
   // FINDING 73 (live 2026-11-05: "goes to the counter" → "no way from the coffee shop on Broadway to the counter"): a thing drawn as an
   // obstacle (the counter, a table) has no standable square of its own; the spot "beside" it can sit behind it or in a pocket. Try the
   // squares around it, nearest first, and stand at the first one the walker can actually reach.
   if (!path && (target.kind === 'thing' || target.kind === 'being')) {
     const around = await anchorOf(map, target);
-    const spot = around ? reachableSpotNear(map, walkMap, around, from, avoid) : null;
+    let spot = around ? reachableSpotNear(map, walkMap, around, from, avoid) : null;
+    if (!spot && around && inner) {
+      const s2 = reachableSpotNear(map, walkMap, around, inner, avoid);
+      if (s2) { spot = { point: s2.point, path: { ...s2.path, points: [from, ...s2.path.points], feet: s2.path.feet + Math.hypot(inner.x - from.x, inner.y - from.y) } }; usedInner = true; }
+    }
     if (spot) { path = spot.path; dest.point = spot.point; }
+  }
+  // FINDING 81 (2026-11-05): "goes in" to the room the walker already stands in is a no-op, never a refusal; the act's other ops go on.
+  if (!path && target.kind === 'room' && fromRoom && target.roomId === fromRoom.id) {
+    return { ok: true, ...base, to: from, feet: 0, seconds: 0, toRoom: fromRoom.name, opened: [], path: [], already: true };
   }
   if (!path) return { ...empty(dest.label, `no way from ${fromRoom?.name ?? 'here'} to ${dest.label}`), ...base };
 
   // Doors the walker passes: a closed one is opened on the way (the one writer tells the facts and the canvases).
   const opened: string[] = [];
+  if (usedInner && fromRoom) {
+    for (const p of portalsOfRoom(map, fromRoom)) {
+      const mid = { x: (p.a.x + p.b.x) / 2, y: (p.a.y + p.b.y) / 2 };
+      if (Math.hypot(mid.x - from.x, mid.y - from.y) <= 100 && portalPassability(p).opens && !path.portals.some((q) => q.id === p.id && q.homeId === p.homeId)) {
+        if (await writeDoorState(campaignId, p.homeId, p.id, 'open').catch(() => false)) opened.push(p.name);
+      }
+    }
+  }
   for (const p of path.portals) {
     const unlocked = mine.some((m) => m.id === p.id && m.homeId === p.homeId);
     const pass = unlocked ? { opens: true } : portalPassability(p);
@@ -446,6 +486,7 @@ export async function driveVehicle(campaignId: string, vehicle: { id: string; na
   } catch { /* the drive does not wait on the origin's map */ }
 
   let roomId = to.id, roomName = to.name;
+  let parkedAt: { exit: string; room: string } | null = null;
   let park: Point | null = null, frac: { x: number; y: number } | null = null, via: string | undefined;
   if (toLevel !== null) {
     const { map } = await loadWorldLevel(campaignId, toLevel);
@@ -456,12 +497,16 @@ export async function driveVehicle(campaignId: string, vehicle: { id: string; na
     const box = footprintBounds(room.points);
     frac = worldToFraction(parkSpotOutside(map, exit, room), box);
     park = fractionToWorld(frac, box); // what is stored is what the canvases and the riders see
+    parkedAt = { exit: exit.name, room: room.name };
   }
   const positionAt = Date.now();
   await prisma.entityRelationship.deleteMany({ where: { sourceId: vehicle.id, sourceType: 'CAMPAIGN_ITEM', relationshipType: 'located_at', targetType: 'LOCATION' } });
   await prisma.entityRelationship.create({ data: { campaignId, sourceId: vehicle.id, sourceType: 'CAMPAIGN_ITEM', targetId: roomId, targetType: 'LOCATION', relationshipType: 'located_at', strength: 5, ...(frac ? { data: JSON.stringify({ position: frac, positionAt }) } : {}) } });
   await prisma.campaignItem.update({ where: { id: vehicle.id }, data: { locationId: roomId, holderId: null } });
   if (park) { try { broadcastEvent(campaignId, { kind: 'token_moved', entityId: vehicle.id, entityType: 'item', x: park.x, y: park.y, placedAt: positionAt, roomId, roomName, cause: 'sim' } as never); } catch { /* canvases re-read */ } }
+  // FINDING 81 (2026-11-05): a token position is a 0..1 fraction of the room's footprint, so the spot outside the door is stored clamped to
+  // the wall line at the door; the exterior side is said in the placement fact instead (the car is OUTSIDE the way in, not in the room).
+  if (parkedAt) { const { thingParkedOutside } = await import('@/services/thing-facts'); await thingParkedOutside(campaignId, vehicle, parkedAt.exit, to.name); }
   const riders = await ridersOf(vehicle.id);
   for (const r of riders) {
     await seatBeingIn(campaignId, r.id, { id: vehicle.id, type: 'CAMPAIGN_ITEM' }, 'sim');

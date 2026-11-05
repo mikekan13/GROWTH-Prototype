@@ -131,13 +131,19 @@ describe('finding 69 (2026-11-05): a thing holds a THREAD of signals', () => {
     expect(all.read.map((s) => s.words)).toEqual(['Coffee?', 'Hello?? 2pm']);
     expect(liveSignals(all.data, 4).every((s) => s.state === 'read')).toBe(true);
   });
-  it('a reply settles ALL of that sender texts; others stay', () => {
-    const mixed = withSignal(two, text('From T', 3, 'T'));
+  it('Finding 84: a reply settles only READ texts from the sender; unread ones stay', () => {
+    const r = settleFrom(withSignal(two, { ...text('Old', 1, 'K'), state: 'read' }), 'K', 4);
+    expect(r.settled).toBe(1);
+    expect(liveSignals(r.data, 4).every((x) => x.state === 'received')).toBe(true);
+  });
+  it('a reply settles ALL of that sender READ texts; others stay', () => {
+    const readTwo = markRead(two, 3, 100, { all: true }).data;
+    const mixed = withSignal(readTwo, text('From T', 3, 'T'));
     const s = settleFrom(mixed, 'K', 4);
     expect(s.settled).toBe(2);
     expect(liveSignals(s.data, 4).map((x) => x.by)).toEqual(['T']);
-    expect(liveSignal(settleFrom(two, 'K', 4).data, 4)).toBeNull();
-    expect('signal' in settleFrom(two, 'K', 4).data).toBe(false);
+    expect(liveSignal(settleFrom(readTwo, 'K', 4).data, 4)).toBeNull();
+    expect('signal' in settleFrom(readTwo, 'K', 4).data).toBe(false);
   });
   it('reads a legacy single data.signal as a thread of one', () => {
     const legacy = { signal: { text: 'rings', since: 0, until: null, state: 'ringing' } };
@@ -151,6 +157,10 @@ describe('finding 69 (2026-11-05): a thing holds a THREAD of signals', () => {
     const t = withSignal(two, { text: 'rings', since: 3, until: 50, by: 'M', kind: 'call', state: 'ringing' });
     expect(liveSignals(withoutOneSignal(t, liveSignal(t, 4)!), 4)).toHaveLength(2);
     expect(liveSignals(withoutSignalsBy(t, 'K'), 4).map((s) => s.by)).toEqual(['M']);
+  });
+  it('Finding 79: the going piece strips the sentence full stop before " on the <thing>"', () => {
+    const one = withSignal({}, { ...text('Coffee?', 1), text: 'The phone chimes with a text message.' });
+    expect(threadTextFor(liveSignals(one, 2), 'holder', 'Kristopher', { thing: 'Personal phone' })).toBe('The phone chimes with a text message on the Personal phone. It reads: "Coffee?"');
   });
   it('the holder is told the thread, the sender is told how many were read', () => {
     const read1 = withSignal(withSignal({}, { ...text('Coffee?', 1), state: 'read' }), text('Hello?? 2pm', 2));

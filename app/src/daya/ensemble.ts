@@ -100,6 +100,7 @@ import {
 import { careScalarFrom } from './mechanics/effort';
 import { resolveEffortCheck, maybeAdvanceVine, restAndRecover } from './mechanics/resolve';
 import { detectAndFireThorns, loadActiveThornBlocks, isRuminationLockActive } from './mechanics/thorns';
+import { withoutQuotedRuns } from './quoted-words';
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
@@ -1185,7 +1186,9 @@ export async function listenStimulus(
         })).catch(() => ({ traits: [] as string[], canDo: [] as Array<{ name: string; via?: string }> }))),
         others: ledger?.others ?? [],
         // FINDING 63 (2026-11-05): a due meeting is the first act on the list.
-        leave: await dueIntentionsFor(ctx.entityDaId, content, ctx.cycle).then((d) => leaveForLine(d, ctx.cycle)).catch(() => null),
+        // FINDING 86 (2026-11-05): with no plan due, a live thread that says where the other is still offers "leave for <that place>".
+        leave: (await dueIntentionsFor(ctx.entityDaId, content, ctx.cycle).then((d) => leaveForLine(d, ctx.cycle)).catch(() => null))
+          ?? (await import('@/services/thread-place').then((m) => m.threadPlaceFor(ctx.campaignId!, characterId, ctx.cycle)).catch(() => null).then((p) => p ? { label: `leave for ${p}`, deed: `leaves for ${p}` } : null)),
       }, overrides);
       if (beat) {
         composedFelt = beat.felt;
@@ -1259,6 +1262,21 @@ export async function listenStimulus(
   if (innerUpdated && !omniscient && !ctx.soulState.godlike) {
     await refreshFamiliarityByThought({ perceiverId: ctx.entityDaId, texts: [innerState], refs: { memoryId: ingest.memoryEntryId ?? null } })
       .catch((err) => console.warn('[daya/ensemble] familiarity refresh by thought failed (non-fatal):', err));
+  }
+  // FINDING 78 (2026-11-05): the composed thought is not a memory, so "I should write back before that becomes cruelty" never became a plan and no
+  // beat was owed. The final thought of a composed beat is written ONCE as a reasoning memory; writeMemoryEntry notes its intentions
+  // (a first-person resolve is PENDING and due now, so hasDuePlan gives the next beat). Never throws outward.
+  if (composedPieces && innerUpdated && innerState.trim() && !omniscient) {
+    await writeMemoryEntry({
+      entityId: ctx.entityDaId,
+      narrativeCycle: ctx.cycle,
+      source: 'reasoning',
+      content: innerState.trim(),
+      valence: 0,
+      arousal: 0.1,
+      salience: 0.15,
+      classification: { contentCategory: 'reasoning', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'composed thought' },
+    }).catch((err) => console.warn('[daya/ensemble] composed thought not kept as a memory (non-fatal):', err instanceof Error ? err.message : err));
   }
   const tDone = Date.now();
 
@@ -1351,7 +1369,9 @@ export async function listenAtTable(
 /** What turned the moment to the being: the GM handing over the turn, or someone speaking to it. */
 export type TableAsk =
   | { kind: 'turn' }
-  | { kind: 'spoken'; by: string; text: string };
+  | { kind: 'spoken'; by: string; text: string }
+  // Finding 80 (2026-11-05): the being is typing a text to `to` on its `thing`; the answer is the words it sends.
+  | { kind: 'message'; to: string; thing: string };
 
 export interface AnswerTimings {
   /** Time spent waiting on a listen still in flight (at most ANSWER_LISTEN_CAP_MS). */
@@ -1489,6 +1509,8 @@ export async function answerAsk(
     const named = nameIsHers(ask.text, ctx.name) ? `${ask.by} says your name — "${ask.text}"` : `${ask.by}: ${ask.text}`;
     spoken = { source: 'dialogue', ...(await unvoiced({ source: 'dialogue', content: named })) };
     askArg = { kind: 'spoken', heard: spoken.prose || 'Someone is speaking to you, but you cannot make out the words.' };
+  } else if (ask.kind === 'message') {
+    askArg = { kind: 'message', to: ask.to, thing: ask.thing };
   }
   const spokenHeard = spoken?.prose || null;
 
@@ -1539,7 +1561,7 @@ export async function answerAsk(
     feltStateBrief: state.feltStateBrief || FELT_FALLBACK,
     standingScene: state.standingScene || 'Nothing beyond what is right in front of you.',
     innerState: state.innerState,
-    impulse: state.impulse ?? null,
+    impulse: ask.kind === 'message' ? null : state.impulse ?? null,
     heard,
     ask: askArg,
     sinceOwn: ctx.campaignId ? await sinceOwnInWords(ctx.campaignId, ctx.entityDaId, state.lastOwnCycle ?? null).catch(() => null) : null,
@@ -1678,10 +1700,12 @@ export async function answerAsk(
   // filled the gap). A guess is re-voiced once with the gap named; a second guess lets the moment sit.
   // Day 7 (2026-11-04, finding 29 — "Tea is fine. Thursday?", "That makes us even", "Tomorrow works." were all pulled): a question or an
   // offer claims nothing; a short answer to a question is an answer. Neither is checked. A place she NAMES stands, and the Watcher is told.
-  const exemptFromGuess = line.kind === 'speak' && (isQuestionOrOffer(line.content) || shortAnswerToQuestion(line.content, heardTexts));
+  // Finding 80 (2026-11-05): the words of a typed message, and any quoted run, are never a world claim — the check judges the text without them.
+  const forGrounding = (t: string) => withoutQuotedRuns(t);
+  const exemptFromGuess = line.kind === 'speak' && (ask.kind === 'message' || isQuestionOrOffer(line.content) || shortAnswerToQuestion(line.content, heardTexts));
   if (exemptFromGuess) console.log(`[daya/ensemble] ${ctx.name}: an offer or an answer, not checked for guessing — "${line.content.slice(0, 60)}"`);
   if (line.kind === 'speak' && line.content.trim() && !exemptFromGuess) {
-    const verdict = await checkGrounding(line.content);
+    const verdict = await checkGrounding(forGrounding(line.content));
     if (verdict.grounded && verdict.names) {
       console.log(`[watcher-note] ${ctx.name} named "${verdict.names}" — not yet in the world; the words stand`);
       notes.push(`${ctx.name} named "${verdict.names}" — not a place or thing in the world yet. Make it one, or let it be.`);
@@ -1693,7 +1717,7 @@ export async function answerAsk(
         const sealed = await enforceSeal((await answerCall({ hint: guessHint(line.content, verdict.claim), stop: false })).text, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
         const second = sealed.usedFallback ? { kind: 'rest' as GateKind, content: '' } : readLine(sealed.text);
         if (second.kind === 'speak' && second.content.trim()) {
-          const again = await checkGrounding(second.content);
+          const again = await checkGrounding(forGrounding(second.content));
           if (!again.grounded) console.warn(`[daya/ensemble] second guess for ${ctx.name}; the moment sits: "${second.content.slice(0, 80)}"`);
           line = again.grounded ? second : { kind: 'rest', content: '' };
         } else {
@@ -1708,8 +1732,8 @@ export async function answerAsk(
   }
   // Day 7 (2026-11-04, finding 26: "her thumb tracing the edge of the five-dollar bill in her pocket" — his bill): an ACT that uses a
   // thing she does not hold and that is not here is a guess; an act with no real deed behind it is a stay, not prose.
-  if (line.kind === 'act' && line.content.trim() && ctx.persona.omniscient !== true) {
-    const verdict = await checkGrounding(line.content);
+  if (line.kind === 'act' && line.content.trim() && ctx.persona.omniscient !== true && ask.kind !== 'message' && forGrounding(line.content)) {
+    const verdict = await checkGrounding(forGrounding(line.content));
     if (!verdict.grounded) {
       console.warn(`[daya/ensemble] ${ctx.name}'s act uses what is not there — the moment sits: "${line.content.slice(0, 80)}"${verdict.claim ? ` (claim: ${verdict.claim})` : ''}`);
       line = { kind: 'rest', content: '' };

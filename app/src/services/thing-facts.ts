@@ -223,3 +223,14 @@ export async function beingPlaced(campaignId: string, being: { id: string; name:
     else if (cur[0].fact !== sentence) await supersede(cur[0].id, { fact: sentence, cycle });
   } catch (err) { console.warn('[thing-facts] position fact not written', err instanceof Error ? err.message : err); }
 }
+
+/** FINDING 81 (2026-11-05): a vehicle that came to a place rests OUTSIDE its way in; one fact says so, replacing the thing's placement sentence. Never throws. */
+export async function thingParkedOutside(campaignId: string, thing: { id: string; name: string }, exitName: string, placeName: string): Promise<void> {
+  try {
+    const sentence = `${thing.name} is parked outside ${exitName}, at ${placeName}.`;
+    const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
+    const current = (await currentFacts(campaignId)).filter((f) => speaksForThing(f.subjectKey, f.fact, thing.name));
+    if (!current.length) { await establishFact(campaignId, `${slug(placeName)}.${slug(thing.name.replace(/^thes+/i, ''))}`, sentence, cycle); return; }
+    for (const f of current) { const text = rewritePlacement(f.fact, sentence); if (text !== f.fact) await supersede(f.id, { fact: text, cycle }); }
+  } catch (err) { console.warn('[thing-facts] parked fact not written', err instanceof Error ? err.message : err); }
+}

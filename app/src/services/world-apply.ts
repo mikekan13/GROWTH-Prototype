@@ -331,6 +331,8 @@ export interface ApplyReport {
   sounds?: Array<{ text: string; at: string; locationId: string | null; rooms?: string[] }>;
   /** Finding 33 (2026-11-05): a message READ by the act — the words are handed to the reader as what they read, never narrated to the room. */
   read?: Array<{ by: string; item: string; words: string; from?: string }>;
+  /** Finding 86 (2026-11-05): the act changed the actor's ROOM — from where to where (names as the map has them). Data, not prose. */
+  moved?: { from: string | null; to: string };
 }
 
 /**
@@ -488,7 +490,9 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
                 // Finding 65 (2026-11-05): the Watcher typed "...Meet me at Extra Space Coffee?" and the ledger kept "...Extra Space Coffee shop worker 1?" —
                 // the words that came BACK through the cloud (name swap) were stored. A text's words are the sender's RAW quote when the line has
                 // one (actText is the local intent, never the cloud's answer); the model's `e.words` serves only when the line quoted nothing.
-                const words = kind === 'text' && quoted ? quoted : e.words && /[\p{L}\p{N}]/u.test(e.words) ? e.words : undefined;
+                // Finding 83 (2026-11-05): the model's `e.words` invented a message ("Yes. Extra Space. Twenty minutes.") and stored it as hers —
+                // a TEXT's words come ONLY from the sender's own quote; no quote, nothing is sent.
+                const words = kind === 'text' ? quoted : e.words && /[\p{L}\p{N}]/u.test(e.words) ? e.words : undefined;
                 const state = kind === 'text' ? 'received' : 'ringing';
                 if (kind === 'text' && !words) { report.refused.push(`a text needs the sender's words (${actor.name} wrote none) - nothing was sent`); break; }
                 // Finding 60: the sender's own thing, when it is plain which (exactly one thing in their hands carries the line).
@@ -741,7 +745,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             if (!here) {
               const arrived = await arriveOnMap(campaignId, actor.id, locationPointOn(lvl, to.id), { level: toLevel });
               if (!arrived.ok) { report.refused.push(`move to ${to.name}: ${arrived.reason}`); break; }
-              report.applied.push(`${actor.name} arrives by the ${arrived.via} at ${arrived.room}`);
+              report.applied.push(`${actor.name} arrives by the ${arrived.via} at ${arrived.room}`); if (arrived.room) report.moved = { from: null, to: arrived.room };
               map = await actorMap(actorCharacterId);
             }
             const under = await prisma.entityRelationship.findMany({ where: { targetId: to.id, relationshipType: REL, sourceType: 'LOCATION' }, select: { sourceId: true } });
@@ -750,7 +754,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             const door = lvl.portals.find((p) => p.homeId === to.id && p.kind === 'door' && p.between.some((b) => !homeRooms.has(b.toLowerCase())));
             if (door) {
               const walk = await moveBeing(campaignId, actor.id, { kind: 'portal', portalId: door.id, homeId: door.homeId }, { cause: 'sim' });
-              if (walk.ok && (walk.feet > 0 || walk.opened.length)) report.applied.push(describeMove(actor.name, walk));
+              if (walk.ok && (walk.feet > 0 || walk.opened.length)) { report.applied.push(describeMove(actor.name, walk)); if (walk.toRoom && walk.toRoom !== walk.fromRoom) report.moved = { from: walk.fromRoom, to: walk.toRoom }; }
               else if (!walk.ok) report.refused.push(`move to ${to.name}: ${walk.reason ?? 'no way'}`);
               map = await actorMap(actorCharacterId);
               break;
@@ -759,7 +763,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             const between = map?.doors.find((d) => d.between.some((b) => b.toLowerCase() === to.name.toLowerCase()));
             if (between && between.state === 'locked') { report.refused.push(`move to ${to.name}: the ${between.name} is locked`); break; }
             await moveCharacterToLocation(gmId, 'WATCHER', { characterId: actor.id, locationId: to.id, snapCanvas: true });
-            report.applied.push(`${actor.name} → ${to.name}`);
+            report.applied.push(`${actor.name} → ${to.name}`); report.moved = { from: null, to: to.name };
             map = await actorMap(actorCharacterId);
             break;
           }
@@ -768,13 +772,13 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             // Coming from elsewhere: appear at the way onto the level nearest the target, then walk the rest.
             const arrived = await arriveOnMap(campaignId, actor.id, await targetPoint(campaignId, resolved.target));
             if (arrived.ok) {
-              report.applied.push(`${actor.name} arrives by the ${arrived.via} at ${arrived.room}`);
+              report.applied.push(`${actor.name} arrives by the ${arrived.via} at ${arrived.room}`); if (arrived.room) report.moved = { from: null, to: arrived.room };
               walk = await moveBeing(campaignId, actor.id, resolved.target, { cause: 'sim' });
             } else report.refused.push(`move to ${resolved.label}: ${arrived.reason}`);
           }
           // A walk of no feet that opened nothing is no act (HW12 2026-10-31: "Kristopher is already at Entry door" narrated three times).
           if (walk.ok && walk.feet <= 0 && !walk.opened.length && !walk.gotOutOf && !walk.boarded) console.log(`[world-apply] ${actor.name}: already at ${resolved.label} — nothing to apply`);
-          else if (walk.ok) report.applied.push(describeMove(actor.name, walk));
+          else if (walk.ok) { report.applied.push(describeMove(actor.name, walk)); if (walk.toRoom && walk.toRoom !== walk.fromRoom) report.moved = { from: walk.fromRoom, to: walk.toRoom }; }
           else if (!/stands nowhere on the map/.test(walk.reason ?? '')) report.refused.push(`move to ${resolved.label}: ${walk.reason ?? 'no way'}`);
           map = await actorMap(actorCharacterId);
           break;

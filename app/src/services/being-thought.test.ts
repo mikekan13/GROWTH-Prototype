@@ -38,4 +38,11 @@ describe('appendBeingCardSegments', () => {
     expect(update).not.toHaveBeenCalled();
     expect(broadcastEvent).not.toHaveBeenCalled();
   });
+
+  it('Finding 85: the final impulse is written even when the act segment was already on the card', async () => {
+    findUnique.mockResolvedValue(row({ impulse: 'stay', segments: [{ kind: 'action', text: 'unlocks the door' }] }));
+    await appendBeingCardSegments('camp', 'e1', [{ kind: 'action', text: 'unlocks the door' }], 'act');
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(update.mock.calls[0][0].data.payload).impulse).toBe('act');
+  });
 });

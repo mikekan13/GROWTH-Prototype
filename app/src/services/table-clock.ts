@@ -61,8 +61,9 @@ export async function advanceClockForLine(campaignId: string, kind: ActKind, tex
     if (await liveEncounter(campaignId)) return fallback('encounter');
     const ts = (await ensureDefaultTimescale(campaignId)) as Timescale;
     const now = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
-    const localHour = cycleToLocalDate(now, ts).hour ?? 12;
-    const d = lineDuration(kind, text, { localHour });
+    // Finding 75 (2026-11-05): 22:27 → "2:22 pm the following afternoon" was measured from 22:00 and landed 27 minutes late — the minute counts.
+    const local = cycleToLocalDate(now, ts);
+    const d = lineDuration(kind, text, { localHour: local.hour ?? 12, localMinute: local.minute ?? 0 });
     if (d.seconds <= 0) return fallback('nothing');
     if (d.source === 'stated') console.log(`[table-clock] ${kind}: the line states ${d.seconds}s — the clock moves by it`);
     const r = await advanceClockBySim(campaignId, d.seconds, `table:${kind}${d.source === 'stated' ? ':stated' : ''}`);
@@ -107,7 +108,17 @@ export async function sinceOwnInWords(campaignId: string, entityDaId: string, la
     if (last === null || last === undefined) return null;
     const seconds = cyclesToSeconds(cycle - last, ts);
     if (seconds < 5) return null;
-    return spanInWords(seconds);
+    // Finding 76 (2026-11-05): "three hours since you last moved" after a night and a day — the being had no word that a night had
+    // passed and treated yesterday's call as this afternoon's. The span carries the day break and the sleep the record holds.
+    const then = cycleToLocalDate(last, ts);
+    const now = cycleToLocalDate(cycle, ts);
+    const dayChanged = then.year !== now.year || then.monthIndex !== now.monthIndex || then.day !== now.day;
+    const slept = await prisma.dayaMemoryEntry.findFirst({ where: { entityId: entityDaId, source: 'dream', narrativeCycle: { gt: last, lte: cycle } }, select: { id: true } }).then((r) => !!r).catch(() => false);
+    if (!dayChanged && !slept) return spanInWords(seconds);
+    const intoToday = (now.hour ?? 0) * 3600 + (now.minute ?? 0) * 60;
+    const nights = dayChanged ? Math.max(1, Math.ceil((seconds - intoToday) / 86400)) : 0;
+    const when = nights === 1 ? `yesterday, ${hourInWords(then.hour ?? 12)}` : nights > 1 ? `${nights} days ago` : 'earlier today';
+    return `${spanInWords(seconds)} (since ${when}${slept ? '; you have slept since then' : ''})`;
   } catch {
     return null;
   }

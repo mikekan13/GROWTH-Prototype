@@ -84,6 +84,7 @@ export interface LocalDate {
   day: number;           // 1-based
   dayName?: string;      // from dayNames cycle, if defined
   hour?: number;         // 0..hoursPerDay-1
+  minute?: number;       // 0..59 within the hour (finding 75, 2026-11-05: a stated clock time is measured from the minute, not the hour)
   /** "13th of Bramblefall, Year 2354 AC" */
   formatted: string;
   /** Holidays falling on this date. */
@@ -144,7 +145,9 @@ export function cycleToLocalDate(
   const dayOfYearFloat = yearFrac * totalDays;
   let dayOfYear = Math.floor(dayOfYearFloat); // 0-based
   const hoursPerDay = cal.hoursPerDay ?? 24;
-  const hour = Math.floor((dayOfYearFloat - dayOfYear) * hoursPerDay);
+  const hourFloat = (dayOfYearFloat - dayOfYear) * hoursPerDay;
+  const hour = Math.floor(hourFloat);
+  const minute = Math.max(0, Math.min(59, Math.floor((hourFloat - hour) * 60)));
 
   let monthIndex = 0;
   for (const m of cal.months) {
@@ -169,7 +172,7 @@ export function cycleToLocalDate(
   const ord = ordinal(day);
   const formatted = `${ord} of ${cal.months[monthIndex].name}, Year ${year}${cal.epochLabel ? ` ${cal.epochLabel}` : ''}`;
 
-  return { year, monthIndex, monthName: cal.months[monthIndex].name, day, dayName, hour, formatted, holidays };
+  return { year, monthIndex, monthName: cal.months[monthIndex].name, day, dayName, hour, minute, formatted, holidays };
 }
 
 /** Convert an amount of local units (years/days/hours) to meta cycles. */

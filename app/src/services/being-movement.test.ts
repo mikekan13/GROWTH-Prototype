@@ -68,3 +68,32 @@ describe('where a vehicle parks at a way in', () => {
     expect(parkSpotOutside(map, door({ x: 400, y: 100 }, { x: 400, y: 200 }), null, 10)).toEqual({ x: 600, y: 150 });
   });
 });
+
+// Finding 81 / 73 (2026-11-05): out of a car parked at the street door, then "goes in" / "walks to the counter"
+describe('stepping in from the doorstep', () => {
+  it('a one-room shop with a closed street door: one square in from the door line, and the counter is reachable from there', async () => {
+    const { stepIntoRoom, reachableSpotNear } = await import('./being-movement');
+    const { buildLevelMap, roomAt, findPath } = await import('@/lib/spatial');
+    const { P } = await import('@/lib/spatial/test-fixture');
+    const fp = { points: [P(0, 600), P(550, 600), P(550, 1500), P(0, 1500)], scale: 0.05, level: 30 };
+    const map = buildLevelMap({
+      level: 30,
+      items: [{ id: 'counter', name: 'the counter', centre: P(60, 1000), mapShapeFt: { points: [P(-2, -8), P(2, -8), P(2, 8), P(-2, 8)] } }],
+      locations: [{ id: 'shop', name: 'the shop', data: { footprint: fp, openings: [{ id: 'op-1', kind: 'door', name: 'the street door', a: P(160, 600), b: P(260, 600), between: ['the shop', 'outside'], state: 'closed' }] } }],
+    });
+    const door = P(210, 600);
+    const inner = stepIntoRoom(map, map.rooms[0], door);
+    expect(inner).not.toBeNull();
+    expect(roomAt(map, inner!)?.name).toBe('the shop');
+    expect(inner!.y).toBeGreaterThan(600);
+    // (c) from just inside, "goes in" has somewhere to go: the window bench near the front, and a spot beside the counter.
+    expect(findPath(map, inner!, P(330, 680))).not.toBeNull();
+    expect(reachableSpotNear(map, map, P(60, 1000), inner!)).not.toBeNull();
+  });
+  it('no step when already at the room centre', async () => {
+    const { stepIntoRoom } = await import('./being-movement');
+    const { P } = await import('@/lib/spatial/test-fixture');
+    const room = { id: 'r', name: 'r', level: 0, area: 1, points: [P(0, 0), P(100, 0), P(100, 100), P(0, 100)] };
+    expect(stepIntoRoom({ rooms: [room], walls: [], portals: [], obstacles: [], bounds: { x: 0, y: 0, width: 100, height: 100 } } as never, room, P(50, 50))).toBeNull();
+  });
+});

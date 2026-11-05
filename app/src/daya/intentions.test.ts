@@ -8,7 +8,7 @@ describe('the words alone close a doing only when they carry nearly all of it (H
     expect(actCompletes("Tonight, when he knocks, I'm going to give it to him as the tip.", 'She gives it to him as the tip.')).toBe(true);
   });
 });
-import { extractIntentions, dueReason, hasLapsed, intentionLine, DAY_CYCLES } from './intentions';
+import { extractIntentions, dueReason, hasLapsed, intentionLine, DAY_CYCLES, placeFromThread, beAtPlaceIntention } from './intentions';
 
 // Violet's own words (genesis memories, 2026-10-12/16) — the test Mike called "a wonderful test of a being".
 const LINGERS = "Kristopher always lingers. Every other driver hands over the box and leaves. He stands there an extra few seconds. I noticed the first time. The second time I thought: he's just slow. The third time I thought: he's not slow. By the sixth time I had started putting my hair up before he arrived, which I noticed and found embarrassing and did anyway. I wrote my phone number on a five-dollar bill. It's folded on the shelf by the door. Tonight, when he knocks, I'm going to give it to him as the tip. If he calls, something new begins. If he doesn't, I go to the shelter on Fifth Street and adopt the cat, and I stop pretending I'm waiting for anything. Those are the terms.";
@@ -253,5 +253,35 @@ describe('leaving for the meeting (finding 63, 2026-11-05)', () => {
     expect(leaveForLine([], T0)).toBeNull();
     expect(leaveForLine([mk("I'm going to call my sister tonight.", T0)], T0)).toBeNull();
     expect(leaveForLine([mk('be at the coffee shop in ten minutes', T0)], T0 + 200 * MIN)).toBeNull();
+  });
+});
+
+describe('finding 78 — a resolve in a thought is a plan held now', () => {
+  it('"I should write back" is one PENDING draft due now', () => {
+    const got = extractIntentions('I should write back before that becomes cruelty.', AT);
+    expect(got).toHaveLength(1);
+    expect(got[0].dueCycle).toBe(AT);
+    expect(got[0].dueUntil).toBeGreaterThan(AT);
+    expect(dueReason(got[0], '', AT)).toBe('time');
+  });
+  it('past or reported thoughts are not intentions', () => {
+    expect(extractIntentions('I thought I should write back before that became cruelty.', AT)).toHaveLength(0);
+    expect(extractIntentions('I should have written back.', AT)).toHaveLength(0);
+  });
+});
+
+describe('finding 86 — the place a thread names', () => {
+  const names = ['Violet\'s Apartment', 'Fourth-floor landing', 'Coffee Shop on Broadway', 'Broadway'];
+  it('matches the longest Location name the other\'s messages mention', () => {
+    expect(placeFromThread(['I\'m already here at the coffee shop on Broadway. Take your time.'], names)).toBe('Coffee Shop on Broadway');
+  });
+  it('matches nothing when no Location name is in the thread, and never the own place', () => {
+    expect(placeFromThread(['Extra Space? Thursday?'], names)).toBeNull();
+    expect(placeFromThread(['come to Broadway'], names, ['Broadway'])).toBeNull();
+  });
+  it('writes the travelling intention due now', () => {
+    const i = beAtPlaceIntention('Coffee Shop on Broadway', AT);
+    expect(i.description).toBe('be at Coffee Shop on Broadway');
+    expect(i.dueCycle).toBe(AT);
   });
 });

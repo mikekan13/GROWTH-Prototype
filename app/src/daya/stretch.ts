@@ -315,7 +315,8 @@ export function dayParagraph(name: string, rec: DayRecord): string {
   if (prose) parts.push(prose);
   if (rec.said.length) parts.push(rec.said.join(' '));
   if (rec.account) parts.push(`In ${possessive(name)} own words: ${rec.account}`);
-  if (rec.outcome && rec.outcome !== rec.account) parts.push(rec.outcome);
+  // Finding 77 (2026-11-05): the record says what the being DID and what it said of it; an adjudication outcome is for the report, not
+  // the record (a perception denial is not a thing that happened).
   if (rec.dreamed) parts.push(`${name} slept.`);
   if (!parts.length) return `${name}: nothing of note.`;
   return parts.join(' ');

@@ -346,9 +346,13 @@ export function segmentIsDeed(seedActions: ProseAction[], actorId: string, sente
     if (a.actorId !== actorId) return false;
     const t = norm(a.text), src = norm((a as { sentence?: string }).sentence ?? '');
     if (!t && !src) return false;
-    if ((sent && (sent.includes(t) || t.includes(sent) || (src && (sent.includes(src) || src.includes(sent))))) || (built && (built.includes(t) || t.includes(built)))) return true;
+    // Finding 82 (2026-11-05): when the page gave a TEXT, the text must itself be the seed's deed - the sentence it CLAIMS to come from
+    // (the pin) is not proof: a thought's furniture ("He sets Personal phone face-down…") pinned to the Watcher's sentence was a deed on the line.
+    if (built) {
+      if (built.includes(t) || t.includes(built) || (src && (built.includes(src) || src.includes(built)))) return true;
+    } else if (sent && (sent.includes(t) || t.includes(sent) || (src && (sent.includes(src) || src.includes(sent))))) return true;
     // Loose: most of the segment's content words are in the seed action (the page reworded it).
-    const sw = words(sent || built); if (sw.size < 2) return false;
+    const sw = words(built || sent); if (sw.size < 2) return false;
     const aw = words(`${t} ${src}`); let hit = 0; for (const w of sw) if (aw.has(w)) hit++;
     return hit / sw.size >= 0.6;
   });

@@ -74,7 +74,8 @@ export async function appendBeingCardSegments(campaignId: string, eventId: strin
   const have = Array.isArray(payload.segments) ? (payload.segments as NonNullable<BeingThoughtRecord['segments']>) : [];
   const seen = new Set(have.map((x) => x.text.trim()));
   const added = more.filter((x) => x.text.trim() && !seen.has(x.text.trim()));
-  if (!added.length) return;
+  // Finding 85 (2026-11-05): the card's impulse is the beat's FINAL one, even when every segment was already on the card.
+  if (!added.length && !(impulse && payload.impulse && payload.impulse !== impulse)) return;
   const merged = segs([...have, ...added]) ?? [];
   payload = { ...payload, segments: merged, ...(impulse ? { impulse } : {}) };
   await prisma.campaignEvent.update({ where: { id: eventId }, data: { payload: JSON.stringify(payload) } });

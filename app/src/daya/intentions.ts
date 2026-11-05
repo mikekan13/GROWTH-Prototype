@@ -65,6 +65,8 @@ export interface DueIntention {
 
 const PROSPECTIVE_RE = /\bI(?:'m| am) going to\b|\bI will\b|\bI'll\b|\bI plan to\b|\bI mean to\b|\bI intend to\b|\bI(?:'m| am) supposed to\b|\bI have to\b|\bI(?:'ve| have) decided to\b|\bI promised to\b|\bI(?:'m| am) meant to\b/i;
 /** "If he doesn't, I go to the shelter" — a conditional present counts as a plan. */
+/** Finding 78 (2026-11-05): a first-person present resolve in a thought — "I should write back", "I need to answer" — is held now, not someday. */
+const RESOLVE_RE = /^(?:(?:and|but|so|then|now|okay|ok|no|yes),?\s+)?I (?:should|need to|ought to)\s+(?!be\b|have\b|not\b)[a-z]+/i;
 const CONDITIONAL_PLAN_RE = /^(?:and |but |then )?if\s+([^,]+),\s*I\s+(?!was\b|had\b|did\b|would\b|could\b|thought\b|think\b|knew\b|know\b|might\b|should\b|am\b|'m\b)\w+/i;
 /** A habit needs its marker AND the being doing something in the present: "I lock the door every time". */
 const ROUTINE_RE = /\b(every (?:day|night|morning|evening|afternoon|week|time)|each (?:day|night|morning|evening|time)|always|daily|nightly|most (?:days|nights|mornings|evenings))\b/i;
@@ -123,7 +125,8 @@ export function extractIntentions(content: string, atCycle: number): IntentionDr
   for (const raw of content.split(SENTENCE_SPLIT_RE)) {
     const sentence = raw.trim();
     if (sentence.length < 8 || !SELF_RE.test(sentence) || PAST_RE.test(sentence)) continue;
-    const prospective = PROSPECTIVE_RE.test(sentence) || CONDITIONAL_PLAN_RE.test(sentence);
+    const resolve = RESOLVE_RE.test(sentence);
+    const prospective = PROSPECTIVE_RE.test(sentence) || CONDITIONAL_PLAN_RE.test(sentence) || resolve;
     const cadence = cadenceOf(sentence);
     if (!prospective && !cadence) continue;
     // "I'll be there." has no doing of its own — a promise is not a plan (finding 63, 2026-11-05); promiseFromReply is the path.
@@ -132,11 +135,13 @@ export function extractIntentions(content: string, atCycle: number): IntentionDr
     if (seen.has(key)) continue;
     seen.add(key);
     const window = prospective ? timeWindow(sentence) : null;
+    // A resolve with no stated time is due NOW: the current cycle, a short window (finding 78).
+    const nowWin = resolve && !window && !triggerOf(sentence) ? (relativeWindow(sentence, atCycle) ?? { dueCycle: atCycle, dueUntil: atCycle + 10 * MIN_CYCLES }) : null;
     out.push({
       description: sentence,
       trigger: triggerOf(sentence),
-      dueCycle: window ? dayStart + (window.dayOffset + window.from) * DAY_CYCLES : null,
-      dueUntil: window ? dayStart + (window.dayOffset + window.to) * DAY_CYCLES : null,
+      dueCycle: window ? dayStart + (window.dayOffset + window.from) * DAY_CYCLES : nowWin ? nowWin.dueCycle : null,
+      dueUntil: window ? dayStart + (window.dayOffset + window.to) * DAY_CYCLES : nowWin ? nowWin.dueUntil : null,
       cadence: prospective ? cadence : cadence,
     });
   }
@@ -521,4 +526,27 @@ export function leaveForLine(due: DueIntention[], nowCycle: number): { label: st
   const place = meetingPlace(meetings[0].description);
   if (!place) return null;
   return { label: `leave for ${place}`, deed: `leaves for ${place}` };
+}
+
+/**
+ * FINDING 86 (2026-11-05): the place a thread says the other is at — the longest Location NAME of the campaign that the other's
+ * messages mention ("I'm already here" plus "the coffee shop on Broadway" in the thread). Data-driven: only names from `locationNames`
+ * match, never a keyword list; `exclude` (the being's own place) never matches. Returns the name as the Location has it, or null. Pure.
+ */
+export function placeFromThread(texts: string[], locationNames: string[], exclude: string[] = []): string | null {
+  const flat = (t: string) => ` ${t.toLowerCase().replace(/[‘’]/g, "'").replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim()} `;
+  const hay = texts.map(flat).join(' | ');
+  const skip = new Set(exclude.map((x) => flat(x).trim()));
+  let best: string | null = null;
+  for (const name of locationNames) {
+    const bare = flat(name).trim().replace(/^the /, '');
+    if (bare.length < 3 || skip.has(flat(name).trim()) || skip.has(bare)) continue;
+    if (hay.includes(` ${bare} `) && (!best || bare.length > best.replace(/^the /i, '').length)) best = name;
+  }
+  return best;
+}
+
+/** The travelling intention for a place: "be at <place>", due now with a window of an hour (a stretch carries the rest — keepAppointments). Pure. */
+export function beAtPlaceIntention(place: string, atCycle: number): { description: string; dueCycle: number; dueUntil: number } {
+  return { description: `be at ${place}`, dueCycle: atCycle, dueUntil: atCycle + 60 * MIN_CYCLES };
 }

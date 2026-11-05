@@ -91,6 +91,25 @@ export function planTableTalk(utterances: TableUtterance[], mode: 'typed' | 'spo
   return { beats, ignored, world };
 }
 
+/**
+ * Finding 90 (2026-11-05): "Kristopher stands up from the table and says," + "Kristopher: You came." doubled the speaker. When the narration
+ * right before a line ends in a comma/colon and already names the speaker, the line's own words follow in quotes, label off. Pure.
+ */
+export function namedInLeadIn(prev: TableUtterance | undefined, u: TableUtterance): boolean {
+  const label = u.speaker?.label;
+  return !!(u.kind === 'dialogue' && label && prev && prev.kind !== 'dialogue' && /[,:]s*$/.test(prev.text) && prev.text.toLowerCase().includes(label.toLowerCase()));
+}
+
+/** A run of utterances as one heard text: speech is `Speaker: words`, except after a lead-in that already names the speaker (`says, "words"`). Pure. */
+export function heardText(us: TableUtterance[], sep: string): string {
+  let out = '';
+  us.forEach((u, i) => {
+    const piece = u.kind !== 'dialogue' ? u.text : namedInLeadIn(us[i - 1], u) ? `"${u.text}"` : spokenLine(u);
+    out += i === 0 ? piece : (namedInLeadIn(us[i - 1], u) ? ' ' : sep) + piece;
+  });
+  return out;
+}
+
 function spokenLine(utterance: TableUtterance): string {
   return `${utterance.speaker?.label ?? 'someone present'}: ${utterance.text}`;
 }
@@ -108,7 +127,7 @@ export function stimulusFor(run: TableUtterance[], listenerId: string, opts: { o
   if (!mine.length) return null;
   return {
     source: mine.some((u) => u.kind !== 'dialogue') ? 'perception' : 'dialogue',
-    content: mine.map((u) => (u.kind === 'dialogue' ? spokenLine(u) : u.text)).join('\n'),
+    content: heardText(mine, '\n'),
   };
 }
 

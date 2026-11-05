@@ -42,6 +42,7 @@ import { settleIntentionsByAct, promiseFromReply, setIntention } from '@/daya/in
 import { judgeIntentionsDone } from '@/daya/intention-judge';
 import { isDayaEnabled } from '@/daya/events';
 import { asWriteBack, leavesForPlace } from '@/daya/composer';
+import { firstQuotedWords } from '@/daya/quoted-words';
 import type { TableAsk, ListenTimings, AnswerTimings } from '@/daya/ensemble';
 import { readTableTalk, type TableTalkState, type TableUtterance } from '@/services/table-talk';
 import { learnIntroductions, groupRows } from '@/services/introductions';
@@ -49,7 +50,7 @@ import { perceptionReachOn, judgeCanonReach, stampPerception, storeUnnoticedAtTa
 import { REACH_TUNING, cuesFromText, type ReachEvent, type ReachJudgement, type ReachVerdict } from '@/sim/senses/reach';
 import { ownVoice, type OwnVoiceActor } from '@/services/own-voice';
 import { audibleOnly } from '@/services/senses-filter';
-import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, narrationSentences, type PlannedStimulus, type TableBeat, type TablePlan } from '@/services/table-plan';
+import { planTableTalk, heardText, stimulusFor, answerers, overhearers, canonNarration, narrationSentences, type PlannedStimulus, type TableBeat, type TablePlan } from '@/services/table-plan';
 import type { TerminalEvent, TerminalActor, TerminalPayload, TableFeedFields } from '@/types/terminal';
 import {
   attachTruthToMemory,
@@ -80,6 +81,7 @@ import { cueCoverage } from '@/daya/ladder';
 import { routineStepFor, runRoutineStep, type DueRoutine } from '@/services/routine-run';
 import { resolveDayaEntityId } from '@/daya/entity';
 import type { FactLine } from '@/daya/claim-vs-fact';
+import { roomOpensOutward } from '@/services/thread-place';
 
 export interface TableActor {
   userId: string;
@@ -278,6 +280,11 @@ export const STANDING_BEAT_TAIL = 'Nothing from beyond the room has reached you 
 /** How long a being's line waits for its own thought card to be on the page first — the cloud build alone is allowed 30 s (HW8 run 6: 8 s let "It's open." go up 7 s before her card). */
 export const CARD_WAIT_MS = 45_000;
 /** Wait for a card (bounded, non-fatal): the line that follows goes up after it. */
+/** Finding 89 (2026-11-05): the voiced beings whose beat needs its own record row - no monologue made the page, or the page's card for them carries no thought. Pure. */
+export function voicedBeatsToPost(voicedHere: string[], monologues: Map<string, string>, cards: Array<{ actorId: string; segments: Array<{ kind: string }> }>): string[] {
+  return voicedHere.filter((id) => !monologues.has(id) || !cards.some((c) => c.actorId === id && c.segments.some((s) => s.kind === 'thought')));
+}
+
 export async function awaitCard(card: Promise<void> | undefined, ms = CARD_WAIT_MS): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try { await Promise.race([card ?? Promise.resolve(), new Promise<void>((r) => { timer = setTimeout(r, ms); })]); } catch { /* non-fatal */ } finally { clearTimeout(timer); }
@@ -398,12 +405,12 @@ async function postActCard(
   by: { userId: string; username: string },
   being: { id: string; name: string; sex?: string | null },
   content: string,
-  extra: { player?: BeingThoughtRecord['player'] } = {},
+  extra: { player?: BeingThoughtRecord['player']; heard?: string } = {},
 ): Promise<string | null> {
   const text = actInThirdPerson(being.name, being.sex, content);
   if (!text) return null;
   await recordBeingThought(campaignId, by, {
-    characterId: being.id, characterName: being.name, heard: '', thought: text, impulse: 'act', canonEventId: null,
+    characterId: being.id, characterName: being.name, heard: extra.heard ?? '', thought: text, impulse: 'act', canonEventId: null,
     segments: [{ kind: 'action', text }],
     ...(extra.player ? { player: extra.player } : {}),
   });
@@ -855,7 +862,7 @@ export function reachEventOf(utterances: TableUtterance[], truthId: string | nul
   return {
     id: truthId,
     kind: speech ? 'speech' : 'narration',
-    text: utterances.map((u) => (u.kind === 'dialogue' && u.speaker ? `${u.speaker.label}: ${u.text}` : u.text)).join(' '),
+    text: heardText(utterances, ' '),
     // Narration the Watcher wrote for one roster character is that character's own doing: the judge sees it as
     // 'self' for him (HW5 2026-10-25: Kristopher "reached via hearing" his own knock).
     sourceId: oneSpeaker ?? actorId ?? null,
@@ -941,6 +948,8 @@ async function runBeats(
   }
   // CARD ORDER: a being's line is not posted before its own thought card — answer() waits (bounded) on this.
   const cardPosted = new Map<string, Promise<void>>();
+  // Finding 85 (2026-11-05): ONE card per being per beat - the card row a hear posted, so a chosen act from ANOTHER hear of the same beat joins it.
+  const beatCards = new Map<string, { rowId: string; truthId: string | null; heard: string; attached: Promise<unknown> }>();
   const hear = (listenerId: string, stimulus: PlannedStimulus | null, reached?: { verdict: ReachVerdict; source: ReachJudgement['source'] }, askFor?: TableAsk, truthId: string | null = truth.primary) => {
     if (!stimulus) return;
     // What the senses carried, and whether it was the being's own doing, travel with the stretch (HW5 2026-10-25).
@@ -968,7 +977,9 @@ async function runBeats(
     const pre = truth.preListened?.get(listenerId);
     if (pre) truth.preListened!.delete(listenerId);
     let cardDone: () => void = () => {};
-    cardPosted.set(listenerId, new Promise<void>((r) => { cardDone = r; }));
+    // Finding 85 (2026-11-05): several hears of one being in a beat chain their waits - a chosen act waits for ALL of this being's cards.
+    const earlierCard = cardPosted.get(listenerId);
+    cardPosted.set(listenerId, Promise.all([earlierCard, new Promise<void>((r) => { cardDone = r; })]).then(() => undefined));
     // THE THINKING CARD (ruling 10, 2026-11-04): the table is told this being is listening; a card or a fade follows, once.
     emitBeingListening(campaignId, { characterId: listenerId, characterName: listeners.find((l) => l.id === listenerId)?.name ?? listenerId, lineId: truthId });
     // ORDINARY COMPETENCE (2026-10-30): before the being listens, is a routine of its called up by what reached it, or
@@ -1033,6 +1044,7 @@ async function runBeats(
           emitBeingDone(campaignId, { characterId: listenerId, lineId: truthId, posted: !!rowId });
           cardDone();
           cardRowId = rowId;
+          if (rowId) beatCards.set(listenerId, { rowId, truthId, heard: carried.content, attached: Promise.resolve() });
           if (!repeat && !holding && sceneBuilderOn() && thought && !own && rowId) {
             // A COMPOSED THOUGHT NEEDS NO BUILDER (Day 5, 2026-11-04): the record bounded it and the voice wrote it whole. When the
             // being stays, its card is that thought, one segment, no cloud call (the builder was 4-6.5 s of every card). An act or a
@@ -1055,6 +1067,8 @@ async function runBeats(
               }
               if (card) await attachBeingCard(campaignId, rowId, { scene: card.scene, segments: card.segments });
             });
+            const bc = beatCards.get(listenerId);
+            if (bc && bc.rowId === rowId) bc.attached = cardAttached;
           }
         } else { emitBeingDone(campaignId, { characterId: listenerId, lineId: truthId, posted: false }); cardDone(); }
         // null = an answer took this stretch over; that answer stores it and points it at the truth.
@@ -1097,9 +1111,12 @@ async function runBeats(
           console.log(`[table-speak] ${actorName}: acts on its own record — ${chosenAct}`);
           await awaitCard(cardPosted.get(listenerId));
           await cardAttached.catch(() => undefined);
+          const sibling = cardRowId ? null : beatCards.get(listenerId);
+          const joinRowId = cardRowId ?? (sibling && sibling.truthId === truthId ? sibling.rowId : null);
+          await sibling?.attached.catch(() => undefined);
           const actText = actInThirdPerson(actorName, truth.actors?.[listenerId]?.sex, chosenAct);
-          if (cardRowId && actText) await appendBeingCardSegments(campaignId, cardRowId, [{ kind: 'action', text: actText }], 'act').catch((err) => console.warn('[table-speak] act not joined to the card (non-fatal):', err instanceof Error ? err.message : err));
-          else await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listenerId, name: actorName, sex: truth.actors?.[listenerId]?.sex }, chosenAct).catch((err) => console.warn('[table-speak] act card not posted (non-fatal):', err instanceof Error ? err.message : err));
+          if (joinRowId && actText) await appendBeingCardSegments(campaignId, joinRowId, [{ kind: 'action', text: actText }], 'act').catch((err) => console.warn('[table-speak] act not joined to the card (non-fatal):', err instanceof Error ? err.message : err));
+          else await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listenerId, name: actorName, sex: truth.actors?.[listenerId]?.sex }, chosenAct, { heard: carried.content }).catch((err) => console.warn('[table-speak] act card not posted (non-fatal):', err instanceof Error ? err.message : err));
           // A WRITE-BACK NEEDS WORDS (finding 51, 2026-11-05): the deed "writes back to Kristopher on the phone" reached the world with no
           // message. The being composes its text (its own answer, as if its turn), the words go on the record as its text, and the deed
           // carries them to the other's thing as a received message.
@@ -1109,9 +1126,13 @@ async function runBeats(
             // Words the act carried are sent as they are; the being composes only when it carried none.
             let words: string | null = outcome.listened?.actWords?.trim() || writeBack.words?.trim() || null;
             if (!words) try {
-              const o = await answerAtTable(listenerId, actor.role, { kind: 'turn' }, { onEvent: (event) => broadcastEvent(campaignId, { ...event, kind: 'being_speaking' }) });
+              // FINDING 80 (2026-11-05): ask for the MESSAGE (not a bare turn); the words are a speak OR a quote inside an act answer.
+              const o = await answerAtTable(listenerId, actor.role, { kind: 'message', to: writeBack.to, thing: writeBack.thing || 'phone' }, { onEvent: (event) => broadcastEvent(campaignId, { ...event, kind: 'being_speaking' }) });
               const a = o.answer?.action;
-              words = o.status === 'ok' && a?.kind === 'speak' && a.content?.trim() ? a.content.trim() : null;
+              words = o.status !== 'ok' || !a ? null
+                : a.kind === 'speak' && a.content?.trim() ? a.content.trim()
+                : a.kind === 'act' ? firstQuotedWords(a.content) ?? null
+                : null;
             } catch (err) { console.warn('[table-speak] the text had no words (non-fatal):', err instanceof Error ? err.message : err); }
             if (words) {
               const to = writeBack.to;
@@ -1199,13 +1220,16 @@ async function runBeats(
         const manyText = sentMsgs.length > 1 && (going.state === 'received' || going.state === 'read')
           ? (await import('@/services/item-signal')).threadTextFor(sentMsgs, 'caller', holder, { thing: `${holder ? `${holder}'s ` : ''}${thing}` })
           : null;
-        const content = manyText ? manyText : going.state === 'connected'
+        const content0 = manyText ? manyText : going.state === 'connected'
           ? `${holder ?? 'They'} answered${holder ? ` ${holder}'s ${thing}` : ''}. You are on the line with ${holder ?? 'them'} now: what you say reaches them, and what they say reaches you.`
           : going.state === 'received'
             ? `Your message reached${holder ? ` ${holder}'s ${thing}` : ' them'}.${going.words ? ` It said: "${going.words}".` : ''} Nothing has come back yet.`
           : going.state === 'read'
             ? `${holder ?? 'They'} read your message.${going.words ? ` It said: "${going.words}".` : ''} Nothing has come back yet.`
             : `${FAR_SIDE_HEAD} ${going.text}${holder ? ` It is ${holder}'s ${thing}, going now because of what you did.` : ''} Nobody has answered it yet.`;
+        // Finding 84 (2026-11-05): a message waiting unread on a thing the being HOLDS is part of its moment too - derived from the thread (state 'received'), appended after the far-side sentence; its words stay unread.
+        const unreadHeld = rows.filter((r) => r.holderId === listenerId).map((r) => { let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; } return { r, unread: liveSignals(d, cycle).filter((x) => x.state === 'received' && x.by !== listenerId) }; }).filter((x) => x.unread.length);
+        const content = unreadHeld.length ? `${content0} ${unreadHeld.map((x) => `Your ${x.r.name.replace(/^(?:the|her|his|their|my|your)s+/i, '')} has ${x.unread.length > 1 ? `${x.unread.length} messages` : 'a message'} you have not read.`).join(' ')}` : content0;
         console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: the far side of their own signal — ${content}`);
         standingIds.add(listenerId);
         // Day 7 (2026-11-04): the far side is a perception of its own thing, not "your own doing" (it was stored 4× as his deed tonight).
@@ -1674,7 +1698,8 @@ async function speakProseSplit(
             monologues: [...monologues].map(([actorId, text]) => ({ actorId, text })),
           });
           // A voiced being whose monologue missed the page still gets its beat on the record.
-          for (const id of voicedHere) if (!monologues.has(id)) await postVoicedBeat(id);
+          // Finding 89 (2026-11-05): ...and one whose page card carries no thought of hers has no perception on the record either.
+          for (const id of voicedBeatsToPost(voicedHere, monologues, built.cards)) await postVoicedBeat(id);
         } else {
           for (const id of voicedHere) await postVoicedBeat(id);
         }
@@ -1910,6 +1935,30 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
         // WHAT THE ACT LACKED (2026-11-03): the Watcher is told, on a Watcher-only line; the act still happened.
         for (const text of refused) broadcastEvent(campaignId, { kind: 'table_note', text, actorId: a.actorId });
         // FINDING 63 (2026-11-05): "leaves for X" — the move branch walked (or drove) the being there; arriving keeps the plan (actSettles).
+        // FINDING 86 (2026-11-05): an act that LEAVES the being's place with no far destination ("steps out", "unlocks the door and leaves") while a
+        // live thread says where the other is: go there in one go (the same leaves-for path) and write the travelling intention, so a stretch carries the rest.
+        // The signal is DATA, not a verb list: the act changed the being's room (r.effects.moved) with no far destination named, and the room
+
+        // it stepped into has a way out of the building on the map (an opening to "outside" or "stairs down" — the map's own vocabulary, as
+
+        // openingSides reads it). A step into the kitchenette is not a departure; a step onto the landing or into the lot is.
+
+        const moved = r.effects?.moved ?? null;
+
+        if (!leavesForPlace(a.text) && moved && applied.length && !refused.length && (await roomOpensOutward(campaignId, moved.to).catch(() => false))) {
+          try {
+            const { threadPlaceFor } = await import('@/services/thread-place');
+            const { setIntention, beAtPlaceIntention } = await import('@/daya/intentions');
+            const nowC = (await feedCycle(campaignId)) ?? 0;
+            const place = await threadPlaceFor(campaignId, a.actorId, nowC);
+            if (place && place.toLowerCase() !== moved.to.toLowerCase()) {
+              console.log(`[table-speak] ${a.actorLabel} left with no far destination — the thread says ${place}: going there`);
+              await setIntention(a.actorId, { ...beAtPlaceIntention(place, nowC), authority: 'self' }, nowC);
+              const trip = await resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: `leaves for ${place}`, cycle: nowC, narrated: opts.narrated ?? true });
+              if (trip.effects?.applied.length && !(trip.effects.refused ?? []).some((t) => /^(?:move|drive)/i.test(t))) settleByAct(campaignId, a.actorId, `${a.actorLabel} arrives at ${place}`);
+            }
+          } catch (err) { console.warn('[table-speak] the trip to the thread place was not made (non-fatal):', err instanceof Error ? err.message : err); }
+        }
         const goingTo = leavesForPlace(a.text);
         if (goingTo && applied.length && !refused.some((t) => /^(?:move|drive)/i.test(t))) {
           console.log(`[table-speak] ${a.actorLabel} left for ${goingTo} — arrived: the plan is read against the arrival`);

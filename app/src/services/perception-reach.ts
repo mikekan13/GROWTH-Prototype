@@ -310,10 +310,29 @@ export async function judgeCanonReach(
     const phase = await awaitLaneForReach();
     if (phase !== 'ready' && phase !== 'disabled') console.warn(`[perception-reach] lane ${phase} after the warm-up wait; judging anyway`);
   }
-  let j = await judgeReach(event, beings, { model });
+  // Finding 88 (2026-11-05): a deed four floors up and across town "reached" him via sight+hearing+touch — the judge was asked at
+  // all. A being in another room that no opening of the source's room joins to is not reached, deterministically, before any model
+  // sees the line (a call on an open line is restored below; fog of war is perception by any sense, but every sense needs a path).
+  const far = new Set<string>();
+  if (!opts.atScene && event.sourceId && event.locationId) {
+    const there = (event.locationName ?? '').toLowerCase();
+    for (const b of beings) {
+      if (b.id === event.sourceId || !b.locationId || b.locationId === event.locationId) continue;
+      const here = (b.locationName ?? '').toLowerCase();
+      const joined = !!here && !!there && walls.some((d) => { const rooms = d.between.map((r) => r.toLowerCase()); return rooms.includes(here) && rooms.includes(there); });
+      if (!joined) far.add(b.id);
+    }
+  }
+  let j = await judgeReach(event, beings.filter((b) => !far.has(b.id)), { model });
+  for (const id of far) {
+    const b = beings.find((x) => x.id === id);
+    console.log(`[perception-reach] ${b?.name ?? id}: elsewhere (${b?.locationName ?? 'another place'}; nothing joins it to ${event.locationName ?? 'the place'}) — not reached, not asked`);
+    j.verdicts.set(id, { beingId: id, reaches: false, via: [], noticed: false, salience: 0 });
+  }
   if (j.source === 'fallback' && model && /timed out/.test(j.error ?? '')) {
     console.warn(`[perception-reach] judge timed out after ${j.ms}ms — once more, slower`);
-    j = await judgeReach(event, beings, { model, timeoutMs: REACH_TUNING.timeoutMs * 3 });
+    j = await judgeReach(event, beings.filter((b) => !far.has(b.id)), { model, timeoutMs: REACH_TUNING.timeoutMs * 3 });
+    for (const id of far) j.verdicts.set(id, { beingId: id, reaches: false, via: [], noticed: false, salience: 0 });
   }
   if (j.source === 'fallback') console.warn(`[perception-reach] world-sim fell back to the stub after ${j.ms}ms: ${j.error}`);
   // A CONNECTED CALL IS A CHANNEL (session 5, 2026-11-04: Violet answered, said "Hello", and it reached nobody — the judge and the

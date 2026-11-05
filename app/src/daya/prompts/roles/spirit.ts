@@ -194,7 +194,9 @@ Impulse: stay — <what holds you, in a few words>   (you let it sit; say why)`;
 /** What turned the moment to the being: the table waiting on it, or someone speaking to it. */
 export type SpiritAsk =
   | { kind: 'turn' }
-  | { kind: 'spoken'; heard: string };
+  | { kind: 'spoken'; heard: string }
+  // Finding 80 (2026-11-05): typing a text to `to` on `thing`; the answer is only the words sent.
+  | { kind: 'message'; to: string; thing: string };
 
 export interface SpiritAnsweringArgs {
   name: string;
@@ -266,6 +268,8 @@ it is written, do not guess at it.`;
 export function buildSpiritAnsweringPrompt(args: SpiritAnsweringArgs): string {
   const turn = args.ask.kind === 'spoken'
     ? `You are being spoken to, right now:\n${args.ask.heard}`
+    : args.ask.kind === 'message'
+    ? `You are typing a text to ${args.ask.to} on your ${args.ask.thing}, right now. Answer with Say: followed by only the words you send, exactly as you type them. No description of typing, no Do:.`
     : 'It is down to you now. The others are waiting to see what you do.';
   return `You are ${args.name}. Not playing ${args.name} — you are this person, from the inside.
 

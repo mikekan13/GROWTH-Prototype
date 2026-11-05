@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readTableTalk } from './table-talk';
+import type { TableUtterance } from './table-talk';
 import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, narrationSentences, type TableBeat } from './table-plan';
 
 const listeners = [{ id: 'mara', name: 'Mara' }, { id: 'oren', name: 'Oren' }];
@@ -67,6 +68,13 @@ describe('stimulusFor — what one listener is handed for a run', () => {
       source: 'perception',
       content: 'Tess sets down the tray.\nTess: Eat.\nThe fire pops.',
     });
+  });
+  it('Finding 90: a lead-in that names the speaker takes the words in quotes, label off', () => {
+    const us: TableUtterance[] = [
+      { kind: 'narration', text: 'Kristopher stands up from the table and says,' } as TableUtterance,
+      { kind: 'dialogue', text: 'You came.', speaker: { id: 'kris', label: 'Kristopher' } } as TableUtterance,
+    ];
+    expect(stimulusFor(us, 'violet')?.content).toBe('Kristopher stands up from the table and says, "You came."');
   });
   it('speech alone is dialogue', () => {
     expect(stimulusFor(run('Tess: "Eat."'), 'mara')).toEqual({ source: 'dialogue', content: 'Tess: Eat.' });
