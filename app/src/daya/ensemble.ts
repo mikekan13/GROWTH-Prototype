@@ -1171,7 +1171,9 @@ export async function listenStimulus(
         // back yet." on every line): nothing new reached it, nothing woke, and the same gist as its last card — it has said this; no card.
         const lastGist = ctx.campaignId && !beat.empty && beat.perceived === null && !beat.wakes.length
           ? await liveVoiceBound(ctx.campaignId).then((b) => lastCardGistOf(ctx.campaignId!, characterId, b)).catch(() => null) : null;
-        const unchanged = !!lastGist && lastGist === beat.plan.gist.trim();
+        // Compare what REACHED it and what is GOING only (finding 52: the gist's "about"/"pictures" parts vary every beat, so the same far side carded again).
+        const stripGist = (g: string) => g.split(' · ').filter((part) => !/^(?:about|pictures)/.test(part)).join(' · ');
+        const unchanged = !!lastGist && stripGist(lastGist) === stripGist(beat.plan.gist.trim());
         if (unchanged) console.log(`[composer] ${ctx.name}: record unchanged since its last card — no beat`);
         // AN EMPTY RECORD IS NO BEAT (table test 2026-11-03: "Nothing new reaches you" became "the phone is still chiming in my hand").
         raw = (beat.empty || unchanged) ? `\nImpulse: ${beat.plan.impulse}${beat.plan.why ? ` — ${beat.plan.why}` : ''}` : `${beat.thought}\nImpulse: ${beat.plan.impulse}${beat.plan.impulse === 'stay' && beat.plan.why ? ` — ${beat.plan.why}` : ''}`;

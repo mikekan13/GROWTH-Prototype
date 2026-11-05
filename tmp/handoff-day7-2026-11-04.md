@@ -58,3 +58,13 @@ Canon (Repository/02_CHARACTER_CREATION/Nectars_and_Thorns_System.md, #needs-val
 **For your third test (unchanged):** opening line sets day + hour; the stretch runs; watch her answers land and the one-card beats. If you text before the date, you will now see the words arrive and her read them.
 
 **Scenes 3–4 (Day 8 rounds 2–4):** the text now lands with its words; Violet reads it on her own and her next thought is about the actual message; a READ message stays on her phone as "read, not answered" with "write back" on her list (finding 46); the sender's far side says "read, nothing back yet". Fixed on the way: the read line was parsed as her speech (#44), the read state was dropped on load (#47), his own far side read as "says your name" (#48). Watch for: "I saved the screenshot" — an invented past deed inside a thought (#49).
+
+**Scene 5 + the write-back (Day 8 rounds 5–6):** a second look at a read text had opened a phone line (#50, fixed: only a RINGING call connects); a being's write-back now has WORDS (#51b): she composes her text as her own answer, it goes on the record as "texts Kristopher: …", joins her card as speech, and lands on his phone as a received message with the words; her read message is settled by the reply. Still to measure: whether she CHOOSES to write back within a beat or two (#51a, the stay bias at a reply decision).
+
+## Day 9 list
+- Driving: a vehicle moves with its riders between places (a travel op; a street as a place; the lot's gate drawn as an opening) — finding 41.
+- A Nectar FIRING as a rule (your five answers), and a trait card in the terminal when a trait bears on a beat.
+- The stay bias at a reply decision (#51a): a message read and unanswered should pull an answer within a beat or two, like a human player.
+- A terminal row for `table_note`; the stretch's cost on prod; perception THROUGH a container; enter/leave a container as ops.
+- The crystallized-or-not pass; dream ticks during a live session; "listen capped" cutting a reply into an act (#30c); an invented past deed inside a thought (#49).
+- The card review with you.
