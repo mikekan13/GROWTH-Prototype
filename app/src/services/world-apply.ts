@@ -31,7 +31,8 @@ import { moveCharacterToLocation } from '@/services/character-location';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { syncDoorFact } from '@/services/door-facts';
 import { writeDoorState } from '@/services/door-state';
-import { resolveMoveRef, moveBeing, describeMove, leaveMap, arriveOnMap, locationPointOn, type MoveTarget } from '@/services/being-movement';
+import { resolveMoveRef, moveBeing, describeMove, leaveMap, arriveOnMap, locationPointOn, driveVehicle, type MoveTarget } from '@/services/being-movement';
+import { ridingOf, decideRide, seatBeingIn } from '@/services/being-inside';
 import { loadWorldLevel, levelOfLocation, thingStanding, beingStanding, clearBeingPoint } from '@/services/spatial-world';
 import { perceiveMapChange } from '@/services/spatial-perception';
 import { placesOnLevels } from '@/services/elsewhere-world';
@@ -452,7 +453,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             try {
               const { clockNow } = await import('./table-clock');
               const { secondsToCycles } = await import('@/types/time');
-              const { withSignal, signalCause, liveSignal, withoutSignal, actorWordsFromIntent } = await import('./item-signal');
+              const { withSignal, signalCause, liveSignal, actorWordsFromIntent } = await import('./item-signal');
               const { cycle, ts } = await clockNow(campaignId);
               // Finding 60 (2026-11-05): a reply lands on the phone the message came from (fromItem), when the receiver still holds it.
               if (where.holderId !== actor.id) {
@@ -484,20 +485,27 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
                 // Finding 62 (2026-11-05): only the ACTOR's own words fill a text — never another speaker's quote on the line.
                 const quoted = actorWordsFromIntent(actText);
                 // "…" is not the message (GM scene 2: the model wrote an ellipsis as the words): words must carry a letter or a digit.
-                const words = e.words && /[\p{L}\p{N}]/u.test(e.words) ? e.words : (kind === 'text' ? quoted : undefined);
+                // Finding 65 (2026-11-05): the Watcher typed "...Meet me at Extra Space Coffee?" and the ledger kept "...Extra Space Coffee shop worker 1?" —
+                // the words that came BACK through the cloud (name swap) were stored. A text's words are the sender's RAW quote when the line has
+                // one (actText is the local intent, never the cloud's answer); the model's `e.words` serves only when the line quoted nothing.
+                const words = kind === 'text' && quoted ? quoted : e.words && /[\p{L}\p{N}]/u.test(e.words) ? e.words : undefined;
                 const state = kind === 'text' ? 'received' : 'ringing';
                 if (kind === 'text' && !words) { report.refused.push(`a text needs the sender's words (${actor.name} wrote none) - nothing was sent`); break; }
                 // Finding 60: the sender's own thing, when it is plain which (exactly one thing in their hands carries the line).
-                const mineHeld = await prisma.campaignItem.findMany({ where: { campaignId, holderId: actor.id, status: 'ACTIVE' }, select: { id: true } });
-                const fromItem = mineHeld.length === 1 ? mineHeld[0].id : undefined;
+                // Finding 60 (live): named by the act, else the thing last used with the receiver, else the only one with history, else the only one held.
+                const mineHeld = await prisma.campaignItem.findMany({ where: { campaignId, holderId: actor.id, status: 'ACTIVE' }, select: { id: true, name: true, data: true } });
+                const { pickFromItem } = await import('./item-signal');
+                const fromItem = pickFromItem(mineHeld.map((m) => ({ id: m.id, name: m.name, data: parseData(m.data ?? null) })), where.holderId, actText);
                 await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: soundText, since: cycle, until: state === 'received' ? Number.POSITIVE_INFINITY : cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}), kind, state, ...(words ? { words } : existing?.words ? { words: existing.words } : {}), ...(fromItem ? { fromItem } : {}) })) } });
               }
               // A REPLY ANSWERS THE MESSAGE (finding 51, 2026-11-05): the actor's own thing that carried the other's unanswered message is settled.
               if (where.holderId) {
+                // Finding 69: a reply settles ALL of that sender's read/received messages on the replier's things.
+                const { settleFrom } = await import('./item-signal');
                 const mine = await prisma.campaignItem.findMany({ where: { campaignId, holderId: actor.id, status: 'ACTIVE' }, select: { id: true, data: true } });
                 for (const m of mine) {
-                  const md = parseData(m.data ?? null); const ms = liveSignal(md, cycle);
-                  if (ms && ms.by === where.holderId && (ms.state === 'read' || ms.state === 'received')) await prisma.campaignItem.update({ where: { id: m.id }, data: { data: JSON.stringify(withoutSignal(md)) } });
+                  const settled = settleFrom(parseData(m.data ?? null), where.holderId, cycle);
+                  if (settled.settled) await prisma.campaignItem.update({ where: { id: m.id }, data: { data: JSON.stringify(settled.data) } });
                 }
               }
             } catch (err) { console.warn('[world-apply] signal not recorded (non-fatal):', err); }
@@ -506,7 +514,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           break;
         }
         case 'answer': {
-          const { withoutSignal, withSignal, liveSignal, signalInState } = await import('./item-signal');
+          const { withoutOneSignal, withSignal, liveSignal, signalInState, markRead } = await import('./item-signal');
           const { clockNow } = await import('./table-clock');
           const { cycle } = await clockNow(campaignId);
           let item = await findItemByName(campaignId, e.item, { holderId: actor.id });
@@ -524,8 +532,19 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           }
           if (!item) { report.refused.push(`answer "${e.item}": ${actor.name} is not holding it`); break; }
           const row = await prisma.campaignItem.findUnique({ where: { id: item.id }, select: { data: true } });
-          const d = parseData(row?.data ?? null);
-          const sig = liveSignal(d, cycle);
+          let d = parseData(row?.data ?? null);
+          let sig = liveSignal(d, cycle);
+          // FINDING 72 (live 2026-11-05: "Looks at the message", two phones held, neither with a signal → 'answers "Personal phone"'):
+          // an answer needs a LIVE signal. The named thing has none: answer the other thing the actor holds that does; none carries
+          // one → refuse quietly, never narrate an answer.
+          if (!sig) {
+            const held = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: actor.id, id: { not: item.id } }, select: { id: true, name: true, data: true } });
+            const alt = pickLiveHeld(held, cycle, liveSignal);
+            if (!alt) { report.refused.push(`answer: nothing on the ${item.name} to answer`); break; }
+            report.applied.push(`nothing on the ${item.name}; ${actor.name} answers the ${alt.item.name} instead`);
+            item = { ...item, id: alt.item.id, name: alt.item.name } as typeof item;
+            d = alt.data; sig = alt.sig;
+          }
           // Day 6 (2026-11-04): answering a RINGING call opens the line (connected: speech crosses both ways until someone hangs up);
           // answering a received message is reading it (the signal is done); answering a thing that is quiet clears whatever was there.
           // Only a RINGING call opens a line (GM scene 5: answering a READ text connected a phone call).
@@ -540,33 +559,40 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           } else if (sig && sig.state === 'received') {
             // Reading a message (finding 33): the WORDS are what the reader now has — handed as what was read. The message stays on the
             // thing as `read` (Day 8, 2026-11-05): a human player would write back or let it be; "write back" stays on the list until then.
+            // Finding 69: a thing holds a thread - the NEWEST unread text is read, or every unread one from that sender when the act says
+            // "reads the messages".
             const { secondsToCycles } = await import('@/types/time');
             const { ts } = await clockNow(campaignId);
             // A read message waits for an answer for a while (two hours of world time), then it is simply a message that was read.
-            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withSignal(d, { ...signalInState(sig, 'read'), until: cycle + secondsToCycles(7200, ts) })) } });
-            const sender = sig.by ? await prisma.character.findUnique({ where: { id: sig.by }, select: { name: true } }).catch(() => null) : null;
-            report.applied.push(`${actor.name} reads the message on "${item.name}"${sender?.name ? ` from ${sender.name}` : ''}${sig.words ? `: "${sig.words}"` : ''}`);
-            if (sig.words) (report.read ??= []).push({ by: actor.id, item: item.name, words: sig.words, ...(sender?.name ? { from: sender.name } : {}) });
+            const all = /(?:messages|texts)/i.test(actText ?? '');
+            const res = markRead(d, cycle, cycle + secondsToCycles(7200, ts), { all });
+            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(res.data) } });
+            const readMsgs = res.read.length ? res.read : [sig];
+            for (const m of readMsgs) {
+              const sender = m.by ? await prisma.character.findUnique({ where: { id: m.by }, select: { name: true } }).catch(() => null) : null;
+              report.applied.push(`${actor.name} reads the message on "${item.name}"${sender?.name ? ` from ${sender.name}` : ''}${m.words ? `: "${m.words}"` : ''}`);
+              if (m.words) (report.read ??= []).push({ by: actor.id, item: item.name, words: m.words, ...(sender?.name ? { from: sender.name } : {}) });
+            }
           } else if (sig && sig.state === 'read') {
             // Looking at a read message again changes nothing: it stays read, still unanswered (writing back is a sound op on the other's thing).
             report.applied.push(`${actor.name} looks at the message on "${item.name}" again; it stays read, unanswered`);
           } else {
-            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
+            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(sig ? withoutOneSignal(d, sig) : d) } });
             report.applied.push(`${actor.name} answers "${item.name}"`);
           }
           break;
         }
         case 'stop': {
           const { clockNow } = await import('./table-clock');
-          const { liveSignal, withoutSignal } = await import('./item-signal');
+          const { liveSignals, withoutSignalsBy } = await import('./item-signal');
           const { cycle } = await clockNow(campaignId);
           const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { id: true, name: true, data: true, holderId: true } });
           const ended: string[] = [];
           for (const r of rows) {
             const d = parseData(r.data ?? null);
-            const was = liveSignal(d, cycle);
-            if (was?.by !== actor.id) continue;
-            await prisma.campaignItem.update({ where: { id: r.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
+            const was = liveSignals(d, cycle).filter((x) => x.by === actor.id).pop();
+            if (!was) continue;
+            await prisma.campaignItem.update({ where: { id: r.id }, data: { data: JSON.stringify(withoutSignalsBy(d, actor.id)) } });
             ended.push(r.name);
             // THE HOLDER HEARS IT END (session 2, 2026-11-02): the ringing stopping is something that happens at the holder's place.
             // Day 6 (2026-11-04): and what it was — a call that rang out is a missed call; an open line that ends has gone dead.
@@ -682,6 +708,21 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             if (!to) { report.refused.push(`move: nothing called "${e.to}" on the map`); break; }
             if (map && to.id === map.roomId) { report.applied.push(`already in ${to.name}`); break; }
             const toLevel = await levelOfLocation(to.id);
+            // DRIVING = THE VEHICLE TRAVELS (finding 68 / #41 vehicle travel, 2026-11-05): a being inside a vehicle that goes to another
+            // place does not walk there - the vehicle goes, with everyone inside it. Inside anything else, the being climbs out first.
+            const ride = await ridingOf(actor.id);
+            if (ride) {
+              if (decideRide({ inside: ride, targetKind: 'location' }) === 'drive') {
+                const drove = await driveVehicle(campaignId, { id: ride.containerId, name: ride.containerName }, to, toLevel);
+                if (!drove.ok) { report.refused.push(`drive to ${to.name}: ${drove.reason}`); break; }
+                const others = drove.riders.filter((n) => n !== actor.name);
+                report.applied.push(`${actor.name} drives the ${ride.containerName} to ${to.name}${others.length ? ` with ${others.join(' and ')}` : ''}`);
+                map = await actorMap(actorCharacterId);
+                break;
+              }
+              await seatBeingIn(campaignId, actor.id, null, 'sim');
+              report.applied.push(`${actor.name} gets out of the ${ride.containerName}`);
+            }
             if (toLevel === null) {
               // ELSEWHERE (stretch 2026-10-31): a place that exists as facts, not as a drawn room. Walk to the nearest way off
               // the map, then be filed there; the token leaves the level.
@@ -732,7 +773,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             } else report.refused.push(`move to ${resolved.label}: ${arrived.reason}`);
           }
           // A walk of no feet that opened nothing is no act (HW12 2026-10-31: "Kristopher is already at Entry door" narrated three times).
-          if (walk.ok && walk.feet <= 0 && !walk.opened.length) console.log(`[world-apply] ${actor.name}: already at ${resolved.label} — nothing to apply`);
+          if (walk.ok && walk.feet <= 0 && !walk.opened.length && !walk.gotOutOf && !walk.boarded) console.log(`[world-apply] ${actor.name}: already at ${resolved.label} — nothing to apply`);
           else if (walk.ok) report.applied.push(describeMove(actor.name, walk));
           else if (!/stands nowhere on the map/.test(walk.reason ?? '')) report.refused.push(`move to ${resolved.label}: ${walk.reason ?? 'no way'}`);
           map = await actorMap(actorCharacterId);
@@ -749,6 +790,16 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
     try { broadcastEvent(campaignId, { kind: 'character_update', characterId: actor.id, characterName: actor.name, fields: ['world'] }); } catch { /* canvases re-read on their own */ }
   }
   return report;
+}
+
+/** FINDING 72: the first held thing that carries a live signal (its parsed data and signal), else null. Pure given `live`. */
+export function pickLiveHeld<S>(held: Array<{ id: string; name: string; data: string | null }>, cycle: number, live: (d: Record<string, unknown>, cycle: number) => S | null): { item: { id: string; name: string }; data: Record<string, unknown>; sig: S } | null {
+  for (const h of held) {
+    const data = parseData(h.data ?? null);
+    const sig = live(data, cycle);
+    if (sig) return { item: { id: h.id, name: h.name }, data, sig };
+  }
+  return null;
 }
 
 /** Where a move target sits on its level, for "the nearest way onto the map"; null when unknown. */

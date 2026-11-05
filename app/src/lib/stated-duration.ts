@@ -62,6 +62,11 @@ export function statedDurationSeconds(text: string, ctx: StatedDurationContext =
   let clockSec: number | null = null;
   const cm = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/i);
   const oc = t.match(/\b(\d{1,2})\s*o'?clock(?:\s+(?:in the\s+)?(morning|afternoon|evening|at night|night))?/i);
+  // A BARE time ("at exactly 2:22", "tomorrow at 7") counts only with a day word (finding 66); alone it is too ambiguous.
+  const bm = dayWord ? t.match(/\b(?:at|by|around|about)\s+(?:exactly\s+|about\s+|around\s+)?(\d{1,2})(?::(\d{2}))?\b(?!\s*(?:a\.?m|p\.?m|o'?clock|seconds?|minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\b)(?![.:]\d)/i) : null;
+  const dayPart = /\b(?:tomorrow|(?:the )?(?:next|following))\s+(morning|afternoon|evening|night)\b/i.exec(t)?.[1]?.toLowerCase();
+  const bh = bm ? Number(bm[1]) : -1;
+  const bmin = bm ? Number(bm[2] ?? 0) : 0;
   if (cm && Number(cm[1]) >= 1 && Number(cm[1]) <= 12) {
     const pm = cm[3].toLowerCase().startsWith('p');
     clockSec = ((Number(cm[1]) % 12) + (pm ? 12 : 0)) * 3600 + Number(cm[2] ?? 0) * 60;
@@ -69,6 +74,14 @@ export function statedDurationSeconds(text: string, ctx: StatedDurationContext =
     const part = (oc[2] ?? '').toLowerCase();
     const pm = /afternoon|evening|night/.test(part);
     clockSec = ((Number(oc[1]) % 12) + (pm ? 12 : 0)) * 3600;
+  } else if (bm && bh >= 0 && bh <= 23 && bmin <= 59) {
+    // assumed 2026-11-05 (Michael has not ruled it): hours 1-6 read as pm, 7-11 as am, 12 noon; a named part of day wins.
+    let h24 = bh;
+    if (bh >= 1 && bh <= 12) {
+      if (dayPart) h24 = (bh % 12) + (dayPart === 'morning' ? 0 : 12);
+      else h24 = bh <= 6 ? bh + 12 : bh;
+    }
+    clockSec = h24 * 3600 + bmin * 60;
   } else if (/\b(at|by|around) (high )?noon\b/i.test(t)) clockSec = 12 * 3600;
   else if (/\b(at|by|around) midnight\b/i.test(t)) clockSec = 0;
   if (clockSec !== null) {

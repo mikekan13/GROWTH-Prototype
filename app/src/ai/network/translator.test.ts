@@ -110,3 +110,41 @@ describe('a thing after a determiner follows the sentence on the way back (run 7
     expect(translateBack(out, map)).toBe('Violet sees the personal phone and my Chess Pizza polo. Personal phone rings.');
   });
 });
+
+describe('translateBack restores the exact text that went out (finding 65, 2026-11-05)', () => {
+  const sentence = 'Meet me at Extra Space Coffee? If you still want to.';
+  const roundTrip = (names: NameEntry[], text = sentence) => {
+    const { text: out, map } = translateOut(text, names);
+    return { out, back: translateBack(out, map), map };
+  };
+  it('alias of a longer entry comes back byte-identical', () => {
+    const r = roundTrip([{ name: 'Extra Space Coffee shop worker 1', kind: 'person', aliases: ['Extra Space Coffee'] }]);
+    expect(r.out).not.toContain('Extra');
+    expect(r.back).toBe(sentence);
+  });
+  it('two entries sharing an alias round-trip too', () => {
+    const r = roundTrip([
+      { name: 'Extra Space Coffee shop worker 1', kind: 'person', aliases: ['Extra Space Coffee'] },
+      { name: 'the coffee shop on Broadway', kind: 'place', aliases: ['Extra Space Coffee'] },
+    ]);
+    expect(r.back).toBe(sentence);
+  });
+  it('a short alias does not match inside a longer different name', () => {
+    const { text: out } = translateOut('Coffee shop worker 1 waved.', [{ name: 'Extra Space Coffee shop worker 1', kind: 'person', aliases: ['Coffee'] }]);
+    expect(out).toContain('Person-A');
+    const r = translateOut('Extra Space Coffee shop worker 1 waved.', [
+      { name: 'Extra Space Coffee shop worker 1', kind: 'person' },
+      { name: 'Extra Space Coffee', kind: 'place' },
+    ]);
+    expect(r.text).toBe('Person-A waved.');
+  });
+  it('possessive and lowercase occurrences round-trip', () => {
+    const names: NameEntry[] = [{ name: 'Violet Hale', kind: 'person', aliases: ['Violet'] }];
+    for (const t of ["Violet's door was open.", 'then violet said nothing.', 'Violet Hale knew.']) expect(roundTrip(names, t).back).toBe(t);
+  });
+  it('a placeholder the cloud introduced falls back to the canonical name', () => {
+    const { map } = translateOut('Violet here', [{ name: 'Violet Hale', kind: 'person', aliases: ['Violet'] }]);
+    map.toReal.set('Person-B', 'Ada Stone');
+    expect(translateBack('Person-B and Person-A', map)).toBe('Ada Stone and Violet');
+  });
+});

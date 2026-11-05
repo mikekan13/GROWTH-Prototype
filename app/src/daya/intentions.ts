@@ -56,6 +56,9 @@ export interface DueIntention {
   why: 'trigger' | 'time';
   /** Whose word it is: the being's own, the Trailblazer's stated plan, or the Watcher's override (stretch 2026-10-31). */
   authority: IntentionAuthority;
+  /** The window, when the row has one (finding 63, 2026-11-05: a meeting leaves early, so the chooser needs the clock). */
+  dueCycle?: number | null;
+  dueUntil?: number | null;
 }
 
 // ── Grammar of a prospective sentence (first person, future-leaning) ─────────
@@ -123,6 +126,8 @@ export function extractIntentions(content: string, atCycle: number): IntentionDr
     const prospective = PROSPECTIVE_RE.test(sentence) || CONDITIONAL_PLAN_RE.test(sentence);
     const cadence = cadenceOf(sentence);
     if (!prospective && !cadence) continue;
+    // "I'll be there." has no doing of its own — a promise is not a plan (finding 63, 2026-11-05); promiseFromReply is the path.
+    if (prospective && !cadence && isBareAssent(sentence)) continue;
     const key = sentence.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -139,9 +144,10 @@ export function extractIntentions(content: string, atCycle: number): IntentionDr
 }
 
 /** Why a pending intention is due now, or null. Pure. */
-export function dueReason(i: Pick<IntentionDraft, 'trigger' | 'dueCycle' | 'dueUntil'>, cue: string, nowCycle: number): 'trigger' | 'time' | null {
+export function dueReason(i: Pick<IntentionDraft, 'trigger' | 'dueCycle' | 'dueUntil'>, cue: string, nowCycle: number, lead = 0): 'trigger' | 'time' | null {
   if (i.trigger && cue && cueCoverage(i.trigger, cue) >= 0.5) return 'trigger';
-  if (i.dueCycle !== null && i.dueUntil !== null && nowCycle >= i.dueCycle && nowCycle <= i.dueUntil) return 'time';
+  // `lead` (finding 63, 2026-11-05): a meeting is due from dueCycle − the time it takes to get there.
+  if (i.dueCycle !== null && i.dueUntil !== null && nowCycle >= i.dueCycle - lead &&nowCycle <= i.dueUntil) return 'time';
   return null;
 }
 
@@ -200,8 +206,8 @@ export async function dueIntentionsFor(entityId: string, cue: string, nowCycle: 
     const due: DueIntention[] = [];
     for (const r of rows) {
       if (staleIds.has(r.id)) continue;
-      const why = dueReason({ trigger: r.trigger, dueCycle: r.dueCycle, dueUntil: r.dueUntil }, cue, nowCycle);
-      if (why) due.push({ id: r.id, description: r.description, trigger: r.trigger, sourceMemoryId: r.sourceMemoryId, goalId: r.goalId, why, authority: authorityOf(r.authority) });
+      const why = dueReason({ trigger: r.trigger, dueCycle: r.dueCycle, dueUntil: r.dueUntil }, cue, nowCycle, isMeeting(r.description) ? travelLeadCycles(r.description) : 0);
+      if (why) due.push({ id: r.id, description: r.description, trigger: r.trigger, sourceMemoryId: r.sourceMemoryId, goalId: r.goalId, why, authority: authorityOf(r.authority), dueCycle: r.dueCycle, dueUntil: r.dueUntil });
     }
     return due;
   } catch (err) {
@@ -292,7 +298,7 @@ export async function settleIntentionsByAct(
     if (!entity || !act.trim()) return [];
     const pending = await prisma.dayaIntention.findMany({ where: { entityId: entity.id, status: 'PENDING', cadence: null }, select: { id: true, description: true } });
     if (!pending.length) return [];
-    const done = new Set(pending.filter((p) => actCompletes(p.description, act)).map((p) => p.id));
+    const done = new Set(pending.filter((p) => actSettles(p.description, act)).map((p) => p.id));
     const rest = pending.filter((p) => !done.has(p.id));
     if (judge && rest.length) {
       try { for (const id of await judge(rest, act)) if (rest.some((p) => p.id === id)) done.add(id); }
@@ -307,4 +313,212 @@ export async function settleIntentionsByAct(
     console.warn('[daya/intentions] settling by act failed (non-fatal):', err instanceof Error ? err.message : err);
     return [];
   }
+}
+
+// ── Promises, meetings and the clock (finding 63, 2026-11-05) ────────────────────
+//
+// Kristopher texted "Meet me at the coffee shop in 15 minutes or so?"; Violet wrote back "I'll be there." The engine
+// stored "I'll be there." and marked it DONE at once — her own text carried the same words. No pending intention with
+// a due time existed, so she never went. A promise is not a plan: the reply becomes a meeting intention with a clock
+// (promiseFromReply), and speaking it never keeps it (actKeepsPromise) — only arriving does.
+
+const MIN_CYCLES = DAY_CYCLES / 1440;
+const NUM_WORDS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+  fifteen: 15, twenty: 20, thirty: 30, 'forty five': 45,
+};
+const NUM_ALT = '\\d{1,2}|forty[- ]five|fifteen|twelve|eleven|twenty|thirty|three|seven|eight|four|five|nine|one|two|six|ten';
+const NUM = `(${NUM_ALT})`;
+
+function numValue(tok: string): number {
+  const t = tok.toLowerCase().replace('-', ' ');
+  return /^\d+$/.test(t) ? parseInt(t, 10) : NUM_WORDS[t] ?? NaN;
+}
+
+export interface RelativeWindow {
+  dueCycle: number;
+  dueUntil: number;
+  /** The time words as a being would carry them: "in ten minutes", "tomorrow at four", "tonight". */
+  words: string;
+  /** A point time (the moment itself) when the words name one; the window is [point − 5 min, point + 60 min]. */
+  pointCycle?: number;
+}
+
+function pointWindow(point: number, words: string): RelativeWindow {
+  return { dueCycle: point - 5 * MIN_CYCLES, dueUntil: point + 60 * MIN_CYCLES, words, pointCycle: point };
+}
+
+function inMinutes(s: string): { minutes: number; words: string } | null {
+  let m: RegExpMatchArray | null;
+  if (/\bin\s+half an hour\b/i.test(s)) return { minutes: 30, words: 'in half an hour' };
+  if ((m = s.match(/\bin\s+(?:an|one|a)\s+(hour|minute)\b/i))) {
+    const hour = /^h/i.test(m[1]);
+    return { minutes: hour ? 60 : 1, words: hour ? 'in an hour' : 'in a minute' };
+  }
+  if ((m = s.match(/\bin\s+(?:a\s+)?couple\s+(?:of\s+)?(hours?|minutes?)\b/i))) return { minutes: 2 * (/^h/i.test(m[1]) ? 60 : 1), words: `in a couple of ${m[1].toLowerCase()}` };
+  if ((m = s.match(/\bin\s+a\s+few\s+(hours?|minutes?)\b/i))) return { minutes: 3 * (/^h/i.test(m[1]) ? 60 : 1), words: `in a few ${m[1].toLowerCase()}` };
+  m = s.match(new RegExp(`\\bin\\s+(?:about\\s+|around\\s+)?${NUM}(?:\\s*-?\\s*(minutes?|mins?|hours?|hrs?))?(?:-?ish)?(?![\\w])`, 'i'));
+  if (!m || m.index === undefined) return null;
+  const n = numValue(m[1]);
+  if (!Number.isFinite(n)) return null;
+  const unit = m[2];
+  if (!unit) {
+    // "in ten" = minutes; but "in two days" / "in one piece" is not a clock.
+    if (/^\s+(?!or so\b)[a-z]/i.test(s.slice(m.index + m[0].length)) || n > 60) return null;
+    return { minutes: n, words: `in ${m[1].toLowerCase()} minutes` };
+  }
+  const hours = /^h/i.test(unit);
+  if (hours && n > 12) return null;
+  return { minutes: n * (hours ? 60 : 1), words: `in ${m[1].toLowerCase()} ${hours ? (n === 1 ? 'hour' : 'hours') : 'minutes'}` };
+}
+
+const CLOCK_AT_RE = new RegExp(`\\b(?:(tomorrow|tonight|today|this (?:morning|afternoon|evening))\\s+)?at\\s+(?:about\\s+|around\\s+)?${NUM}(?::(\\d\\d))?(?:\\s*o'?clock)?(?:\\s*([ap])\\.?m\\b\\.?)?(?![\\w])(?:\\s+(tomorrow|tonight|today))?`, 'i');
+const CLOCK_BARE_RE = new RegExp(`\\b${NUM}(?::(\\d\\d))?\\s+(tomorrow|tonight)\\b|\\bdoes\\s+${NUM}(?::(\\d\\d))?\\s+work\\b`, 'i');
+
+function clockWindow(s: string, atCycle: number): RelativeWindow | null {
+  let day: string | undefined, tok: string, mm: string | undefined, ap: string | undefined;
+  let m = s.match(CLOCK_AT_RE);
+  if (m) { day = (m[1] ?? m[5])?.toLowerCase(); tok = m[2]; mm = m[3]; ap = m[4]?.toLowerCase(); }
+  else {
+    m = s.match(CLOCK_BARE_RE);
+    if (!m) return null;
+    if (m[1]) { tok = m[1]; mm = m[2]; day = m[3].toLowerCase(); } else { tok = m[4]; mm = m[5]; }
+  }
+  const h = numValue(tok);
+  if (!Number.isFinite(h) || h > 23 || (h > 12 && !/^\d+$/.test(tok))) return null;
+  let hour = h;
+  if (ap) hour = (h % 12) + (ap === 'p' ? 12 : 0);
+  else if (h >= 1 && h <= 6) hour = h + 12; // bare 1–6 reads as afternoon — assumed 2026-11-05
+  else if (h >= 7 && h <= 11 && day && /tonight|evening/.test(day)) hour = h + 12;
+  const dayStart = Math.floor(atCycle / DAY_CYCLES) * DAY_CYCLES;
+  const minutes = mm ? parseInt(mm, 10) : 0;
+  let point = dayStart + ((hour + minutes / 60) / 24) * DAY_CYCLES;
+  if (day === 'tomorrow') point += DAY_CYCLES;
+  else if (!day && point < atCycle) point += DAY_CYCLES; // the next occurrence of that hour
+  const spoken = `${mm ? `${tok}:${mm}` : tok}${ap ? ` ${ap}m` : ''}`;
+  return pointWindow(point, `${day && day !== 'today' ? `${day} ` : ''}at ${spoken}`.trim());
+}
+
+const SPAN_WORD_RE = /tomorrow (?:night|evening|morning)|tomorrow|tonight|this evening|this afternoon|this morning|today/i;
+
+/**
+ * The window RELATIVE time words name, from `atCycle` (the moment the words were said). Null when there are none.
+ * A point time ("in 15 minutes or so", "at four") is [point − 5 min, point + 60 min] with `pointCycle` = the point; a
+ * span word ("this afternoon") keeps the day-fraction windows; "later" / "soon" / "now" are loose windows. Pure.
+ * (finding 63, 2026-11-05)
+ */
+export function relativeWindow(sentence: string, atCycle: number): RelativeWindow | null {
+  const inm = inMinutes(sentence);
+  if (inm) return pointWindow(atCycle + inm.minutes * MIN_CYCLES, inm.words);
+  const clock = clockWindow(sentence, atCycle);
+  if (clock) return clock;
+  const tw = timeWindow(sentence);
+  if (tw) {
+    const dayStart = Math.floor(atCycle / DAY_CYCLES) * DAY_CYCLES;
+    return { dueCycle: dayStart + (tw.dayOffset + tw.from) * DAY_CYCLES, dueUntil: dayStart + (tw.dayOffset + tw.to) * DAY_CYCLES, words: sentence.match(SPAN_WORD_RE)?.[0].toLowerCase() ?? 'today' };
+  }
+  if (/\bnow\b/i.test(sentence)) return { dueCycle: atCycle, dueUntil: atCycle + 10 * MIN_CYCLES, words: /\bright now\b/i.test(sentence) ? 'right now' : 'now' };
+  if (/\bsoon\b/i.test(sentence)) return { dueCycle: atCycle + 30 * MIN_CYCLES, dueUntil: atCycle + 90 * MIN_CYCLES, words: 'soon' };
+  if (/\blater\b/i.test(sentence)) return { dueCycle: atCycle + 30 * MIN_CYCLES, dueUntil: atCycle + 180 * MIN_CYCLES, words: 'later' };
+  return null;
+}
+
+const TIME_ISH_RE = new RegExp(`^(?:\\d|${NUM_ALT}|tomorrow|tonight|today|morning|afternoon|evening|night|a (?:bit|while|minute|moment|few|couple)|an? hour|half|the (?:morning|afternoon|evening|night|meantime)|about|around|soon|later|now)\\b`, 'i');
+const PLACE_CUT_RE = /\s+(?:in|at|tomorrow|tonight|today|this|around|about|or so|if|when|now|later|soon|so|because|and|but|before|after)\b|\s+(?=\d)/i;
+
+/** The place a message names: the phrase after at / to / in, up to a time word or punctuation ("the coffee shop on Broadway"). Pure. */
+export function placeOf(text: string): string | null {
+  for (const m of text.matchAll(/\b(at|to|in)\s+([^.,?!;:()\n]+)/gi)) {
+    const prep = m[1].toLowerCase();
+    const before = text.slice(0, m.index ?? 0);
+    if (prep === 'to' && !/\b(?:come|go|head|walk|over|down|up|back|meet me)\s+$/i.test(before)) continue;
+    const cand = m[2].trim().split(PLACE_CUT_RE)[0].trim();
+    if (!cand || TIME_ISH_RE.test(cand)) continue;
+    if (prep === 'in' && !/^(?:the|a|an|[A-Z])/.test(cand)) continue;
+    return cand;
+  }
+  return null;
+}
+
+const MEET_CUE_RE = /\b(?:meet|come|coffee|lunch|dinner|drinks?|see you|hang out|grab|get together|join|work for you|does .{1,30} work|free)\b/i;
+const DECLINE_RE = /\b(?:can't|cant|cannot|can not|won't|not tonight|not today|not now|no|nope|nah|rain check|another time|some other time|sorry|i'm busy|maybe not|pass)\b/i;
+const ASSENT_RE = /\b(?:yes|yeah|yep|yup|ok|okay|sure|deal|sounds (?:good|great)|see you(?: there| then| soon)?|on my way|omw|i(?:'ll| will) (?:be there|come|meet you|see you|be right there|be on my way|be)|i(?:'m| am) coming|i can be there|works for me|that works|perfect|absolutely|of course|definitely|alright)\b/i;
+
+const norm = (t: string) => t.replace(/[‘’]/g, "'").trim();
+
+/** "I'll be there." / "I'll come." / "See you there." — a promise with no doing of its own. Pure. */
+export function isBareAssent(sentence: string): boolean {
+  const doing = doingOf(norm(sentence)).toLowerCase();
+  return /^(?:be (?:right )?there|come|come over|be on my way|see you(?: there| then)?|meet you(?: there)?)(?:\s+(?:soon|then|tonight|tomorrow|later|in .+|at .+))?$/.test(doing);
+}
+
+/** The meeting intention a reply makes, when it assents to a proposal of one in `asked`. Null otherwise. Pure. */
+export function promiseFromReply(reply: string, asked: string, atCycle: number): IntentionDraft | null {
+  const r = norm(reply), a = norm(asked);
+  if (!r || !a || r.includes('?')) return null;
+  if (DECLINE_RE.test(r.replace(/\bno problem\b/i, ''))) return null;
+  const replyWin = relativeWindow(r, atCycle);
+  const askedWin = relativeWindow(a, atCycle);
+  const place = placeOf(a);
+  if (!MEET_CUE_RE.test(a) || (!place && !askedWin)) return null;
+  const wordCount = r.split(/\s+/).length;
+  const assent = wordCount <= 14 && ASSENT_RE.test(r);
+  const counterTimeAlone = !assent && !!replyWin && wordCount <= 6;
+  if (!assent && !counterTimeAlone) return null;
+  // A counter-time ("In ten.") wins; a vague reply ("soon") never overrides a clock the proposal named.
+  const win = replyWin?.pointCycle !== undefined ? replyWin : askedWin ?? replyWin;
+  const where = place ?? 'the meeting';
+  if (!win) return { description: `be at ${where}`, trigger: null, dueCycle: atCycle + 15 * MIN_CYCLES, dueUntil: atCycle + 180 * MIN_CYCLES, cadence: null };
+  return { description: `be at ${where} ${win.words}`, trigger: null, dueCycle: win.dueCycle, dueUntil: win.dueUntil, cadence: null };
+}
+
+/** A meeting intention: its doing is a place ("be at …"). Pure. */
+export function isMeeting(description: string): boolean {
+  return /^be at\b/i.test(doingOf(description));
+}
+
+/** The place of a meeting description, without the time words. Pure. */
+function meetingPlace(description: string): string {
+  const rest = doingOf(description).replace(/^be at\s+/i, '');
+  const words = relativeWindow(rest, 0)?.words;
+  const i = words ? rest.toLowerCase().indexOf(words.toLowerCase()) : -1;
+  return (i > 0 ? rest.slice(0, i) : rest).trim();
+}
+
+const SPEECH_START_RE = /^\s*(?:she |he |they )?(?:says?|said|tells?|told|texts?|texted|writes?|wrote|replies|replied|answers?|calls?|messages?|whispers?|types?)\b/i;
+const ARRIVE_RE = /\b(?:arrives?|arrived|walks? (?:into|in)|enters?|steps? (?:into|in)|sits? down|reaches|gets? to|pushes? (?:open )?the door|is (?:at|in))\b/i;
+
+/**
+ * Does this act KEEP a promise? Speaking it does not — a text or a line of speech never settles "be at …"; only a move
+ * or an arrival at that place does. A non-meeting intention is not gated here (actCompletes judges it). Pure.
+ * (finding 63, 2026-11-05)
+ */
+export function actKeepsPromise(description: string, act: string): boolean {
+  if (!isMeeting(description)) return true;
+  if (SPEECH_START_RE.test(act)) return false;
+  const outside = act.replace(/["“][^"”]*["”]/g, ' ');
+  if (!ARRIVE_RE.test(outside)) return false;
+  const place = meetingPlace(description);
+  return !place || cueCoverage(place, outside) >= 0.5;
+}
+
+/** Does the act settle the intention: a meeting by arrival, anything else by the words. Pure. */
+export function actSettles(description: string, act: string): boolean {
+  return isMeeting(description) ? actKeepsPromise(description, act) : actCompletes(description, act);
+}
+
+/** How early to leave for a meeting: ten minutes before it is due, by default. Pure. */
+export function travelLeadCycles(_description?: string): number {
+  return 10 * MIN_CYCLES;
+}
+
+/** The chooser-facing pair for the earliest due meeting ("leave for the coffee shop on Broadway"), or null. Pure. */
+export function leaveForLine(due: DueIntention[], nowCycle: number): { label: string; deed: string } | null {
+  const meetings = due
+    .filter((d) => isMeeting(d.description) && (d.dueUntil == null || nowCycle <= d.dueUntil))
+    .sort((x, y) => (x.dueCycle ?? Infinity) - (y.dueCycle ?? Infinity));
+  if (!meetings.length) return null;
+  const place = meetingPlace(meetings[0].description);
+  if (!place) return null;
+  return { label: `leave for ${place}`, deed: `leaves for ${place}` };
 }

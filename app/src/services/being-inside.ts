@@ -83,3 +83,57 @@ export async function seatBeingIn(
   }
   return { containerId: container.id, containerType: container.type, containerName: exists.name };
 }
+
+// ── VEHICLES (finding 68 / #41 vehicle travel, 2026-11-05) ───────────────────
+// A thing that carries people travels with them in it: "drives to the coffee shop" moves the CAR (and everyone inside),
+// never the driver alone. A vehicle is DATA: the tag 'vehicle', or an ability that says it carries people / cargo.
+
+const CARRIES = /\bcarr(?:y|ies|ying)\b[^.]*\b(?:people|persons?|passengers?|riders?|cargo)\b/i;
+
+/** Is this item data a vehicle? The tag wins; else an itemAbility whose description says it carries people or cargo. Pure. */
+export function isVehicle(itemData: unknown): boolean {
+  if (!itemData || typeof itemData !== 'object') return false;
+  const d = itemData as { tags?: unknown; itemAbilities?: unknown };
+  if (Array.isArray(d.tags) && d.tags.some((t) => typeof t === 'string' && t.trim().toLowerCase() === 'vehicle')) return true;
+  if (Array.isArray(d.itemAbilities)) {
+    for (const a of d.itemAbilities) {
+      const text = typeof a === 'string' ? a : a && typeof a === 'object' ? String((a as { description?: unknown }).description ?? '') : '';
+      if (CARRIES.test(text)) return true;
+    }
+  }
+  return false;
+}
+
+export type RideDecision = 'walk' | 'drive' | 'get-out' | 'stay';
+
+/**
+ * What a move means for a being that may be inside something. Pure.
+ *  - not inside anything: a plain walk;
+ *  - inside a vehicle, target is another LOCATION/level: the vehicle DRIVES (the being stays in);
+ *  - inside anything else (or a vehicle and a walk within the level): GET OUT, then walk;
+ *  - the target IS the thing the being is inside: stay.
+ */
+export function decideRide(o: { inside: { isVehicle: boolean } | null; targetKind: 'location' | 'room' | 'thing' | 'portal' | 'being' | 'point'; targetIsContainer?: boolean }): RideDecision {
+  if (!o.inside) return 'walk';
+  if (o.targetKind === 'thing' && o.targetIsContainer) return 'stay';
+  if (o.inside.isVehicle && o.targetKind === 'location') return 'drive';
+  return 'get-out';
+}
+
+/** What a being is inside of, with whether that thing is a vehicle (items only; a being carrying a being is never a vehicle). */
+export async function ridingOf(characterId: string): Promise<(InsideEdge & { isVehicle: boolean }) | null> {
+  const e = await insideOf(characterId);
+  if (!e) return null;
+  if (e.containerType !== 'CAMPAIGN_ITEM') return { ...e, isVehicle: false };
+  const item = await prisma.campaignItem.findUnique({ where: { id: e.containerId }, select: { data: true } });
+  let data: unknown = null;
+  try { data = JSON.parse(item?.data ?? '{}'); } catch { /* none */ }
+  return { ...e, isVehicle: isVehicle(data) };
+}
+
+/** Every being that is inside this container right now. */
+export async function ridersOf(containerId: string): Promise<Array<{ id: string; name: string }>> {
+  const edges = await prisma.entityRelationship.findMany({ where: { targetId: containerId, relationshipType: INSIDE_REL, sourceType: 'CHARACTER' }, select: { sourceId: true } });
+  if (!edges.length) return [];
+  return prisma.character.findMany({ where: { id: { in: edges.map((x) => x.sourceId) } }, select: { id: true, name: true } });
+}

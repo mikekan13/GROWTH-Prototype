@@ -34,6 +34,17 @@ async function main() {
     await p.dayaEntity.deleteMany({ where: { id: { in: newBeings } } });
   }
   console.log(`[restore-world] removed ${newBeings.length} being(s) created since ${from.toISOString()}`);
+  // 2026-11-05: CHARACTERS made in the window (JEWL's "Coffee shop worker 1/2" from a narrated line) go too — they survived a rollback
+  // and their first-name alias "Coffee" garbled a text through the translator (finding 65).
+  const newChars = (await prisma.character.findMany({ where: { campaignId: C, createdAt: win }, select: { id: true, name: true } }));
+  if (newChars.length) {
+    const ids = newChars.map((c) => c.id);
+    await p.entityRelationship.deleteMany({ where: { OR: [{ sourceId: { in: ids } }, { targetId: { in: ids } }] } }).catch(() => undefined);
+    await p.dayaEntity.deleteMany({ where: { characterId: { in: ids } } }).catch(() => undefined);
+    await prisma.campaignItem.updateMany({ where: { holderId: { in: ids } }, data: { holderId: null } }).catch(() => undefined);
+    await prisma.character.deleteMany({ where: { id: { in: ids } } });
+    console.log(`[restore-world] removed ${newChars.length} character(s) made in the window: ${newChars.map((c) => c.name).join(', ')}`);
+  }
   await p.historyEntry.deleteMany({ where: { campaignId: C, realTime: win } }).catch(() => undefined);
   const keep = new Set(s.factIds.map((f: any) => f.id));
   const now = await p.worldFact.findMany({ where: { campaignId: C }, select: { id: true } });

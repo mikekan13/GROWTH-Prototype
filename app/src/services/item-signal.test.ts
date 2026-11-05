@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { liveSignal, withSignal, withoutSignal, signalLines, signalInState, connectedParties, onTheLine, signalTextFor, actorWordsFromIntent, replyTargetItem } from './item-signal';
+import { liveSignal, withSignal, withoutSignal, signalLines, signalInState, connectedParties, onTheLine, signalTextFor, actorWordsFromIntent, replyTargetItem, liveSignals, mirrorOf, threadTextFor, markRead, settleFrom, pickFromItem, withoutOneSignal, withoutSignalsBy } from './item-signal';
 
 const sig = { text: "Violet's phone rings wherever she has it.", since: 100, until: 200, by: 'kris' };
 
@@ -94,5 +94,97 @@ describe('findings 60/62 (2026-11-05): the sender\'s words, the phone it came fr
     expect(liveSignal(d, 1)?.fromItem).toBe('phone-b');
     expect(replyTargetItem([{ data: {} }, { data: d }], 'v', 1)).toBe('phone-b');
     expect(replyTargetItem([{ data: d }], 'someone-else', 1)).toBeNull();
+  });
+});
+
+describe('finding 69 (2026-11-05): a thing holds a THREAD of signals', () => {
+  const text = (words: string, since: number, by = 'K'): Parameters<typeof withSignal>[1] => ({ text: 'A message came in.', since, until: Number.POSITIVE_INFINITY, by, kind: 'text', state: 'received', words });
+  const two = withSignal(withSignal({}, text('Coffee?', 1)), text('Hello?? 2pm', 2));
+
+  it('a second text APPENDS; both are on the phone, the mirror is the newest unread', () => {
+    expect(liveSignals(two, 3).map((s) => s.words)).toEqual(['Coffee?', 'Hello?? 2pm']);
+    expect(liveSignal(two, 3)?.words).toBe('Hello?? 2pm');
+    expect((two.signal as { words: string }).words).toBe('Hello?? 2pm');
+  });
+  it('mirror order: a ringing call > an unread text > the newest read text', () => {
+    const read = markRead(two, 3, 100, { all: true }).data;
+    expect(liveSignal(read, 4)?.state).toBe('read');
+    expect(liveSignal(read, 4)?.words).toBe('Hello?? 2pm');
+    const withUnread = withSignal(read, text('Third', 5));
+    expect(liveSignal(withUnread, 6)?.words).toBe('Third');
+    const ringing = withSignal(withUnread, { text: 'It rings.', since: 6, until: 50, by: 'K', kind: 'call', state: 'ringing' });
+    expect(liveSignal(ringing, 7)?.state).toBe('ringing');
+    expect(liveSignals(ringing, 7)).toHaveLength(4);
+  });
+  it('a ringing call replaces only an earlier ringing call from the same caller', () => {
+    const r1 = withSignal({}, { text: 'rings', since: 1, until: 50, by: 'K', kind: 'call', state: 'ringing' });
+    const r2 = withSignal(r1, { text: 'rings', since: 3, until: 50, by: 'K', kind: 'call', state: 'ringing' });
+    expect(liveSignals(r2, 4)).toHaveLength(1);
+    const r3 = withSignal(r2, { text: 'rings', since: 4, until: 50, by: 'M', kind: 'call', state: 'ringing' });
+    expect(liveSignals(r3, 5)).toHaveLength(2);
+  });
+  it('read applies to the newest unread text, or all unread from that sender', () => {
+    const one = markRead(two, 3, 100);
+    expect(one.read.map((s) => s.words)).toEqual(['Hello?? 2pm']);
+    expect(liveSignals(one.data, 4).map((s) => s.state)).toEqual(['received', 'read']);
+    const all = markRead(two, 3, 100, { all: true });
+    expect(all.read.map((s) => s.words)).toEqual(['Coffee?', 'Hello?? 2pm']);
+    expect(liveSignals(all.data, 4).every((s) => s.state === 'read')).toBe(true);
+  });
+  it('a reply settles ALL of that sender texts; others stay', () => {
+    const mixed = withSignal(two, text('From T', 3, 'T'));
+    const s = settleFrom(mixed, 'K', 4);
+    expect(s.settled).toBe(2);
+    expect(liveSignals(s.data, 4).map((x) => x.by)).toEqual(['T']);
+    expect(liveSignal(settleFrom(two, 'K', 4).data, 4)).toBeNull();
+    expect('signal' in settleFrom(two, 'K', 4).data).toBe(false);
+  });
+  it('reads a legacy single data.signal as a thread of one', () => {
+    const legacy = { signal: { text: 'rings', since: 0, until: null, state: 'ringing' } };
+    expect(liveSignals(legacy, 1)).toHaveLength(1);
+  });
+  it('expires only by until', () => {
+    const t = withSignal(withSignal({}, { ...text('old', 1), until: 5 }), text('new', 2));
+    expect(liveSignals(t, 6).map((s) => s.words)).toEqual(['new']);
+  });
+  it('withoutOneSignal / withoutSignalsBy keep the rest', () => {
+    const t = withSignal(two, { text: 'rings', since: 3, until: 50, by: 'M', kind: 'call', state: 'ringing' });
+    expect(liveSignals(withoutOneSignal(t, liveSignal(t, 4)!), 4)).toHaveLength(2);
+    expect(liveSignals(withoutSignalsBy(t, 'K'), 4).map((s) => s.by)).toEqual(['M']);
+  });
+  it('the holder is told the thread, the sender is told how many were read', () => {
+    const read1 = withSignal(withSignal({}, { ...text('Coffee?', 1), state: 'read' }), text('Hello?? 2pm', 2));
+    expect(threadTextFor(liveSignals(read1, 3), 'holder', 'Kristopher', { thing: 'Personal phone' }))
+      .toBe('Two messages from Kristopher on the Personal phone, the newest unread: "Hello?? 2pm" — the earlier one, read: "Coffee?", not written back.');
+    const sent = threadTextFor(liveSignals(read1, 3), 'caller', 'Violet', { thing: "Violet's phone" });
+    expect(sent).toContain("Your 2 messages reached Violet's phone: 1 read, 1 not yet read");
+    expect(sent).toContain('"Hello?? 2pm"');
+  });
+});
+
+describe('finding 60 (2026-11-05): which of the senders things a text went out from', () => {
+  const quiet = (id: string, name: string) => ({ id, name, data: {} });
+  const personal = quiet('p', 'Personal phone');
+  const work = quiet('w', 'Work phone');
+  it('named by the act, the longest name wins', () => {
+    expect(pickFromItem([personal, work], 'V', 'texts her from his work phone')).toBe('w');
+    expect(pickFromItem([personal, work], 'V', 'texts her on the personal phone')).toBe('p');
+    expect(pickFromItem([quiet('a', 'phone'), quiet('b', 'Work phone')], 'V', 'sends it from the work phone')).toBe('b');
+  });
+  it('else the thing last used with the receiver', () => {
+    const used = { id: 'w', name: 'Work phone', data: withSignal({}, { text: 'x', since: 4, until: 99, by: 'V', kind: 'text', state: 'read', words: 'hi' }) };
+    const older = { id: 'p', name: 'Personal phone', data: withSignal({}, { text: 'x', since: 1, until: 99, by: 'V', kind: 'text', state: 'read', words: 'yo' }) };
+    expect(pickFromItem([older, used], 'V', 'texts her')).toBe('w');
+  });
+  it('else the only thing with any history, else the only thing held, else undefined', () => {
+    const hist = { id: 'w', name: 'Work phone', data: withSignal({}, { text: 'x', since: 4, until: 99, by: 'Z', kind: 'text', state: 'read', words: 'hi' }) };
+    expect(pickFromItem([personal, hist], 'V', 'texts her')).toBe('w');
+    expect(pickFromItem([personal], 'V', 'texts her')).toBe('p');
+    expect(pickFromItem([personal, work], 'V', 'texts her')).toBeUndefined();
+  });
+  it('a reply targets the newest messages fromItem', () => {
+    const a = withSignal({}, { text: 'm', since: 1, until: 99, by: 'K', kind: 'text', state: 'received', words: 'a', fromItem: 'ph1' });
+    const b = withSignal({}, { text: 'm', since: 2, until: 99, by: 'K', kind: 'text', state: 'received', words: 'b', fromItem: 'ph2' });
+    expect(replyTargetItem([{ data: a }, { data: b }], 'K', 3)).toBe('ph2');
   });
 });

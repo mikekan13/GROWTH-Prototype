@@ -4,7 +4,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('./model-client', () => ({ chat: vi.fn() }));
 vi.mock('@/ai/network/translator', async () => await vi.importActual('@/ai/network/translator'));
 import { orderPrompt, parsePiece } from './orders';
-import { chooserPrompt, parseChoice, resolveRecord, recordIsEmpty, recordGist, candidateLines, composeBeat, openingOf, actsFor, actPairsFor, type Candidates } from './composer';
+import { chooserPrompt, parseChoice, resolveRecord, recordIsEmpty, recordGist, candidateLines, composeBeat, openingOf, actsFor, actPairsFor, asWriteBack, withDuePair, leavesForPlace, type Candidates } from './composer';
 import { newTranslationMap, translateOut, translateBack } from '@/ai/network/translator';
 
 describe('orders — narrow, nameless pieces (SIMULATION-COMPOSER-DESIGN-2026-11-03)', () => {
@@ -160,5 +160,50 @@ describe('Day 8 (2026-11-05): an own line is never a quiet beat', () => {
     const beat = await composeBeat(args({ own: false }) as never);
     expect(beat!.record.perceived).toBeNull();
     expect(beat!.empty).toBe(true);
+  });
+});
+
+describe('Finding 70 (2026-11-05): a free act on a read message is the write-back', () => {
+  const read = [{ text: 'x', mine: false, holder: 'Violet', state: 'read' as const, other: 'Kristopher', thing: 'Her work phone' }];
+  it('normalises Violet\'s typed-and-sent act and carries the quoted words', () => {
+    const wb = asWriteBack('Type "Extra Space. In ten." and hit send before she can second-guess the number.', read);
+    expect(wb).toEqual({ to: 'Kristopher', thing: 'work phone', deed: 'writes back to Kristopher on the work phone', words: 'Extra Space. In ten.' });
+  });
+  it('takes the words from the thought when the act has none but the thought types them', () => {
+    expect(asWriteBack('uses Texting with the phone', read, 'She types "See you there." and sends it.')?.words).toBe('See you there.');
+  });
+  it('an offered write-back deed passes through, composing only when no words were quoted', () => {
+    const wb = asWriteBack('writes back to Kristopher on the work phone', read);
+    expect(wb).toMatchObject({ to: 'Kristopher', thing: 'work phone', deed: 'writes back to Kristopher on the work phone' });
+    expect(wb?.words).toBeUndefined();
+  });
+  it('leaves deliberate non-write-backs and non-messages alone', () => {
+    expect(asWriteBack('puts the phone down without answering', read)).toBeNull();
+    expect(asWriteBack('reads the message on the phone', read)).toBeNull();
+    expect(asWriteBack('Type "hi"', [{ text: 'x', mine: false, holder: 'Violet', state: 'ringing', thing: 'Her phone' }])).toBeNull();
+    expect(asWriteBack('Type "hi"', [{ text: 'x', mine: true, holder: 'Kristopher', state: 'read', other: 'Violet' }])).toBeNull();
+    expect(asWriteBack('uses Camera with the phone', read, 'He once said "no".')).toBeNull();
+  });
+});
+
+describe('a due plan is on the list (finding 63, 2026-11-05)', () => {
+  const leave = { label: 'leave for the coffee shop on Broadway', deed: 'leaves for the coffee shop on Broadway' };
+  it('puts the leave pair first, once, and leaves the rest alone', () => {
+    const base = actPairsFor([], []);
+    const out = withDuePair([...base, leave], leave);
+    expect(out[0]).toEqual(leave);
+    expect(out.filter((p) => p.label === leave.label)).toHaveLength(1);
+    expect(out).toHaveLength(base.length + 1);
+    expect(withDuePair(base, null)).toEqual(base);
+  });
+  it('reads the place out of a chosen "leaves for X" deed', () => {
+    expect(leavesForPlace('leaves for the coffee shop on Broadway')).toBe('the coffee shop on Broadway');
+    expect(leavesForPlace('Leaves for Extra Space ')).toBe('Extra Space');
+    expect(leavesForPlace('writes back to Kristopher on the phone')).toBeNull();
+    expect(leavesForPlace(null)).toBeNull();
+  });
+  it('a leave deed is never mistaken for a write-back', () => {
+    const read = [{ text: 'x', mine: false, holder: 'Violet', state: 'read' as const, other: 'Kristopher', thing: 'Her phone' }];
+    expect(asWriteBack('leaves for the coffee shop', read, 'She types "on my way" and sends it.')).toBeNull();
   });
 });

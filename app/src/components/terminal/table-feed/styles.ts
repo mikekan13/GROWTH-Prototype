@@ -101,6 +101,9 @@ export const TABLE_FEED_CSS = `
 .tf .fading{animation:tf-fade 2s ease-out forwards}
 @keyframes tf-fade{0%{opacity:1}100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.tf .fading{animation:none}}
+.tf .tf-appear{animation:tf-appear 600ms ease-out both}
+@keyframes tf-appear{0%{opacity:0}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.tf .tf-appear{animation:none}}
 
 /* folded beat: [...REDACTED...] (pp 131/136) — a button */
 .tf .foldbtn{display:block;min-height:36px;margin:0;padding:0;border:0;background:none;text-align:left;cursor:pointer;font:700 13px/1.62 var(--font-terminal)}

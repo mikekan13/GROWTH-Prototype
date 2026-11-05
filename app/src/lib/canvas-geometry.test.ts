@@ -176,6 +176,11 @@ describe('grid snapping + walls (2026-10-17)', () => {
     expect(snapped.from.x).toBe(5);
     expect(snapped.to.x).toBe(5);
   });
+  it("a door on the only room's wall leads OUTSIDE even with no home footprint given (finding 58, the coffee shop)", async () => {
+    const { openingSides } = await import('./canvas-geometry');
+    const shop = { owner: 'the coffee shop on Broadway', points: [{ x: 0, y: 0 }, { x: 28, y: 0 }, { x: 28, y: 44 }, { x: 0, y: 44 }] };
+    expect(openingSides({ x: 9, y: 0 }, { x: 12, y: 0 }, [shop], null)).toEqual(['the coffee shop on Broadway', 'outside']);
+  });
 });
 
 describe('openings sized to the grid (2026-10-17)', () => {

@@ -83,6 +83,8 @@ export interface ComposeArgs {
   traits?: string[];
   /** RULING 13: capabilities it could USE now (from its things, the thing it is in, its spells) — each becomes an act on its list. */
   canDo?: Array<{ name: string; via?: string }>;
+  /** Finding 63 (2026-11-05): the pair for a DUE meeting (leaveForLine) — first on the list, it is what presses on the being. */
+  leave?: { label: string; deed: string } | null;
   /** RULING 13: beings in view and what SHOWS of them (their outward traits — Ageless Face is what others see). */
   others?: Array<{ name: string; outward: string[] }>;
   facts: string[];
@@ -118,6 +120,8 @@ export interface ComposedBeat {
   thought: string;
   /** Nothing reached the being, nothing is going, and it chose nothing to think about: post no card. */
   empty: boolean;
+  /** FINDING 70: the words the being's own act carried (a quoted text) — the write-back sends THESE instead of composing new ones. */
+  actWords?: string;
 }
 
 const NOTHING = /^nothing (new )?reach/i;
@@ -183,6 +187,17 @@ export function actsFor(going: GoingRef[], held: string[]): string[] {
   return actPairsFor(going, held).map((p) => p.label);
 }
 
+/** Finding 63 (2026-11-05): a due plan's pair goes FIRST on the acts (the thing pressing on them), never twice. Pure. */
+export function withDuePair(pairs: Array<{ label: string; deed: string }>, leave?: { label: string; deed: string } | null): Array<{ label: string; deed: string }> {
+  return leave ? [leave, ...pairs.filter((p) => p.label !== leave.label)] : pairs;
+}
+
+/** Finding 63 (2026-11-05): the place a chosen "leaves for X" deed goes to, or null. Pure. */
+export function leavesForPlace(act: string | undefined | null): string | null {
+  const m = /^leaves for (.+?)s*$/i.exec((act ?? '').trim());
+  return m ? m[1].trim() : null;
+}
+
 /** The acts with their deeds: `label` is what the chooser reads ("answer it"); `deed` is what the table runs and cards ("answers the phone"). Pure. */
 export function actPairsFor(going: GoingRef[], held: string[]): Array<{ label: string; deed: string }> {
   const out: Array<{ label: string; deed: string }> = [];
@@ -204,6 +219,39 @@ export function actPairsFor(going: GoingRef[], held: string[]): Array<{ label: s
   out.push(held.length ? { label: 'put down what you are holding and go on with what you were doing', deed: 'puts down what they are holding and goes on with what they were doing' } : { label: 'go on with what you were doing', deed: 'goes on with what they were doing' });
   const seen = new Set<string>();
   return out.filter((p) => (seen.has(p.label) ? false : (seen.add(p.label), true))).slice(0, 6);
+}
+
+/**
+ * FINDING 70 (2026-11-05, third table test): Violet chose to ACT and her card said `Type "Extra Space. In ten." and hit send before she can
+ * second-guess the number.` — no offered deed matched the write-back, so no words path ran, nothing was sent, and her read message stayed
+ * unanswered while the card showed a text the world never recorded. When a message is live for the being (read / received, not its own)
+ * and the act (or the thought the voice wrote for it) carries a QUOTED string or the verbs type/send/text/reply/write, it IS the write-back:
+ * the deed becomes the offered one and the quoted words travel with it. Pure; null when it is not a write-back.
+ */
+export function asWriteBack(actText: string | undefined | null, going: GoingRef[], thought?: string | null): { to: string; thing: string; deed: string; words?: string } | null {
+  const target = going.find((g) => !g.mine && (g.state === 'read' || g.state === 'received'));
+  const bare = (name?: string) => (name ?? 'phone').replace(/^(?:the|her|his|their|my|a|an)\s+/i, '').toLowerCase();
+  const quoted = (s?: string | null): string | undefined => {
+    const m = s ? /["“]([^"“”]{2,280})["”]/.exec(s) : null;
+    return m?.[1].trim() || undefined;
+  };
+  const verbs = /\b(?:type[sd]?|typing|send(?:s|ing)?|text(?:s|ing)?|repl(?:y|ies|ying)|writ(?:e|es|ing)|tap(?:s|ping)?\s+out)\b/i;
+  const act = (actText ?? '').trim();
+  const offered = /^writes?\s+(?:back\s+to\s+)?(.+?)(?:\s+again|\s+on\s+the\s+.+)?\s*$/i.exec(act);
+  if (offered) {
+    const to = offered[1].trim();
+    const thing = /\bon the (.+?)\s*$/i.exec(act)?.[1] ?? bare(target?.thing);
+    const w = quoted(act) ?? (verbs.test(thought ?? '') ? quoted(thought) : undefined);
+    return { to, thing, deed: act, ...(w ? { words: w } : {}) };
+  }
+  if (!target || !act) return null;
+  // The offered signal deeds that are NOT a write-back stay what they are (a deliberate "put it down without answering").
+  if (/^(?:reads the message|puts the .+ down without answering|hangs up|answers|declines|silences|puts down what|goes on with|leaves for)/i.test(act)) return null;
+  const words = quoted(act) ?? (verbs.test(thought ?? '') || verbs.test(act) ? quoted(thought) : undefined);
+  if (!quoted(act) && !verbs.test(act) && !(verbs.test(thought ?? '') && quoted(thought))) return null;
+  const to = target.other ?? 'whoever it is';
+  const thing = bare(target.thing);
+  return { to, thing, deed: `writes back to ${to} on the ${thing}`, ...(words ? { words } : {}) };
 }
 
 /** The numbered lists the local model chooses from. Pure. */
@@ -241,7 +289,7 @@ export function chooserPrompt(a: { name: string; identity: string; desires: stri
     // Table test run 2 (2026-11-03): with nothing new, Violet thought about her key ring and her shirts, card after card.
     `- When NOTHING reached ${a.name} and nothing is still going, the usual answer is nothing at all: "about": [] and no picture. A thing merely in their hands is not a thought. Choose something only when a memory or a picture truly presses on them in this quiet.`,
     `- "imagine": a picture ${a.name} holds right now of what they cannot see or know - what someone elsewhere may be doing, what may come next - one short sentence, or null. Built only from what is on the list and what reached them; it is a picture, never a thing seen or done, and it knows nothing the list does not.`,
-    `- "impulse": "speak" if ${a.name} would say something now, "act" if they would do something now, "stay" if they let it sit. Something still going in their own hands asks for an answer sooner or later: a person who lets it go on and on is choosing that, and says why. A message they have READ and not answered, from someone they know, asks for an answer NOW: a player at the table writes back or decides not to — staying is choosing to leave the other waiting, and says why.`,
+    `- "impulse": "speak" if ${a.name} would say something now, "act" if they would do something now, "stay" if they let it sit. Something still going in their own hands asks for an answer sooner or later: a person who lets it go on and on is choosing that, and says why. A message they have READ and not answered, from someone they know, asks for an answer NOW: a player at the table writes back or decides not to — staying is choosing to leave the other waiting, and says why. A plan of theirs is DUE (a place they said they would be): a player at the table gets up and goes, or decides not to — staying is choosing to be late, and says why.`,
     `- "act": when the impulse is "act", the A code of what ${a.name} does now (required then; only codes from the list).`,
     '- "why": what holds them when they stay, or what moves them when they act, in a few words.',
     'Answer with JSON only: {"about": string[], "imagine": string|null, "impulse": "speak"|"act"|"stay", "act"?: string, "why"?: string}',
@@ -332,7 +380,7 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   const going = (a.going ?? []).slice(0, 4);
   // A QUIET BEAT (run 2, 2026-11-03: every quiet beat cost three cloud orders and a local choice, ~20 s, to think about a key ring).
   // Nothing reached the being and nothing is going: only recall is asked. If no memory wakes, the beat is empty and nothing else is called.
-  const quiet = perceived === null && going.length === 0;
+  const quiet = perceived === null && going.length === 0 && !a.leave;
   const recOnly = quiet && fragments.length ? await placeOrder({ kind: 'recall', brief: { cue: 'Nothing new; the moment goes on in quiet.', fragments, recent: a.recent } }, ctx, overrides) : null;
   if (quiet && !(recOnly?.wakes ?? []).some((w) => fragments[w.i] && fragments[w.i].age)) {
     console.log(`[composer] ${a.name}: quiet beat, nothing woke — no beat (${Date.now() - t0}ms)`);
@@ -354,7 +402,7 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   // RULING 13 (2026-11-05): what the being CAN DO with its things, the thing it is in, its spells — on the list beside the signal acts.
   const bareVia = (v?: string) => (v ?? '').replace(/^(?:the|her|his|their|my|a|an)\s+/i, '').toLowerCase();
   const capPairs = (a.canDo ?? []).slice(0, 6).map((cd) => ({ label: `use ${cd.name}${cd.via ? ` (${bareVia(cd.via)})` : ''}`, deed: `uses ${cd.name}${cd.via ? ` with the ${bareVia(cd.via)}` : ''}` }));
-  const pairs = [...actPairsFor(going, a.held), ...capPairs];
+  const pairs = withDuePair([...actPairsFor(going, a.held), ...capPairs], a.leave);
   const candidates: Candidates = { near: [...a.held.map((h) => naturalName(h, true)), ...(a.near ?? []).map((n) => naturalName(n, false))].slice(0, 12), going, remember: wakes, acts: pairs.map((p) => p.label), deeds: pairs.map((p) => p.deed) };
   const tPieces = Date.now();
 
@@ -391,12 +439,22 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
     voiced = (await placeOrder({ kind: 'voice', brief: { record, voice: a.voice, recent: a.recent, avoidOpenings: [...avoidOpenings, openingOf(voiced.thought)] } }, ctx, overrides)) ?? voiced;
   }
   const thought = voiced?.thought?.trim() || '';
+  // FINDING 70: a free act on a live read/received message is the write-back; its quoted words ride along (the table composes only when there are none).
+  let actWords: string | undefined;
+  if (record.impulse === 'act') {
+    const wb = asWriteBack(record.act, going, thought);
+    if (wb) {
+      if (wb.deed !== record.act) console.log(`[composer] ${a.name}: act "${(record.act ?? '').slice(0, 80)}" is the write-back — normalised to "${wb.deed}"${wb.words ? ' with its own words' : ''}`);
+      record.act = wb.deed;
+      actWords = wb.words;
+    }
+  }
   console.log(`[composer] ${a.name}: pieces ${tPieces - t0}ms · choice ${tPlan - tPieces}ms · voice ${Date.now() - tPlan}ms · impulse ${record.impulse}`);
   // THE PIECES ON THE RECORD (table test, 2026-11-03): each piece, cut short, so a run can be read from the log alone.
   const cut = (s: string, n = 160) => s.replace(/\s+/g, ' ').slice(0, n);
   console.log(`[composer] ${a.name} pieces · perceived: ${cut(perceivedRaw)} · felt: ${cut(felt, 100)} · going: ${record.going.map((g) => cut(g.text, 60)).join(' | ') || '(none)'} · near: ${record.near.slice(0, 6).join(' | ') || '(none)'} · wakes: ${wakesOut.map((w) => cut(w.text, 60)).join(' | ') || '(none)'}`);
   console.log(`[composer] ${a.name} record · ${cut(plan.gist, 220)} · thought: ${cut(thought)}`);
-  return { beatKey, perceived: perceivedRaw, felt, wakes: wakesOut, plan, record, thought, empty: false };
+  return { beatKey, perceived: perceivedRaw, felt, wakes: wakesOut, plan, record, thought, empty: false, ...(actWords ? { actWords } : {}) };
 }
 
 /**

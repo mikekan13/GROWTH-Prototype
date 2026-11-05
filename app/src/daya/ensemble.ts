@@ -25,11 +25,12 @@ import type { GrowthCharacter } from '@/types/growth';
 import { resolveDayaEntityId } from './entity';
 import { chat, proseTier, type DayaChatMessage, type DayaClientOverrides } from './model-client';
 import { composeBeat, composerOn, orderPerception } from './composer';
+import { scrubOthersCardText } from './perception-input';
 import { placeOrder } from './orders';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { registerHandler, wake, type DayaTrigger, type HandlerResult } from './events';
 import { ingestStimulus, writeMemoryEntry } from './memory';
-import { intentionLine } from './intentions';
+import { intentionLine, dueIntentionsFor, leaveForLine } from './intentions';
 import { recall, stemmedJaccard } from './recall';
 import { render, type Observer, type BiasProfile, type VoiceParams, type AffectVector } from './renderer';
 import { currentFacts, type WorldFactRecord } from './world-ledger';
@@ -939,6 +940,8 @@ export interface ListenResult {
   pieces?: { beatKey?: string; perceived: string; felt: string; wakes: Array<{ text: string; why: string }>; recent: string[]; gist: string; impulse: ListenImpulse; why?: string };
   /** Day 6 (2026-11-04, finding 23): the act the being CHOSE from its record's list when its impulse was act — the table runs it. */
   act?: string;
+  /** FINDING 70 (2026-11-05): words the chosen act already carried (a quoted text) — a write-back sends these, no second compose. */
+  actWords?: string;
 }
 
 const FELT_FALLBACK = 'Right now, in your body and mood: steady, holding your own.';
@@ -979,8 +982,11 @@ export async function listenStimulus(
     try {
       const p = await perceive(characterId, ctx.campaignId!, raw, stimulus.source, overrides, { standing: 'once', ...(composing ? { voice: false } : {}) });
       if (composing) {
-        envelope = p.prose;
-        p.prose = await orderPerception({ envelope: p.prose, event: raw, senses: stimulus.via?.filter((v) => v !== 'self') ?? ['sight', 'hearing'], own }, { campaignId: ctx.campaignId!, entityId: ctx.entityDaId }, overrides);
+        // FINDING 71: another being's card is the table's page, not the world — scrub it from what the perception agent is given.
+        const cardBound = await liveVoiceBound(ctx.campaignId!).catch(() => ({} as { sessionId?: string | null; since?: Date }));
+        const scrubbed = scrubOthersCardText(p.prose.split('\n'), raw, await othersCardTexts(ctx.campaignId!, characterId, cardBound)).join('\n');
+        envelope = scrubbed;
+        p.prose = await orderPerception({ envelope: scrubbed, event: raw, senses: stimulus.via?.filter((v) => v !== 'self') ?? ['sight', 'hearing'], own }, { campaignId: ctx.campaignId!, entityId: ctx.entityDaId }, overrides);
       }
       content = p.prose;
       standing = p.standing;
@@ -1015,11 +1021,13 @@ export async function listenStimulus(
     // Finding 54 (2026-11-05): a standing beat with something of the being's OWN still going (a message read and unanswered, a ringing
     // phone, an open line) is LIVED — the chooser runs so it can act at last (write back) — even when nothing new reached it.
     const ownGoing = ctx.campaignId ? await hasOwnGoing(ctx.campaignId, characterId, ctx.cycle).catch(() => false) : false;
-    if (!ownGoing) {
+    // Finding 63 (2026-11-05): a plan that is DUE (a place they said they would be) lives the beat too.
+    const duePlan = ownGoing ? false : await hasDuePlan(ctx.entityDaId, ctx.cycle).catch(() => false);
+    if (!ownGoing && !duePlan) {
       const soul = soulPending ? await soulPending : null;
       return { status: 'not_lived', innerUpdated: false, impulse: 'stay', timings: { perceiveMs: tPerceived - t0, ingestMs: tIngested - tPerceived, recallMs: 0, soulMs: soul?.ms ?? null, spiritMs: 0, totalMs: Date.now() - t0, standing } };
     }
-    console.log(`[composer] ${ctx.name}: nothing new reached it, but something of its own is still going — the beat is lived`);
+    console.log(`[composer] ${ctx.name}: nothing new reached it, but something of its own ${ownGoing ? 'is still going' : 'is due'} — the beat is lived`);
   }
 
   // Thorns and recall react to what was PERCEIVED, exactly as in the serial pipeline.
@@ -1070,6 +1078,7 @@ export async function listenStimulus(
   let stayReason: string | null = null;
   let composedFelt: string | null = null;
   let composedAct: string | null = null;
+  let composedActWords: string | null = null;
   let composedPieces: ListenResult['pieces'] | null = null;
   // What rose against doing: the strongest survival-rung memory this stretch surfaced (the dice decide a routine step against it).
   const resistance = (recallResult.surfaced ?? [])
@@ -1100,16 +1109,23 @@ export async function listenStimulus(
     const nameOf = (id: string | null) => chars.find((c) => c.id === id)?.name ?? 'someone';
     // Day 6 (2026-11-04): the signal's end is a CYCLE; it was compared with Date.now() and every signal read as over — Violet's
     // phone rang thirty times with STILL GOING empty in her record. The ledger's clock judges, and the state rides along.
-    const { liveSignal, signalTextFor } = await import('@/services/item-signal');
+    const { liveSignals, mirrorOf, threadTextFor } = await import('@/services/item-signal');
+    const heldCount = items.filter((x) => x.holderId === characterId).length;
     const going: Array<{ text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received' | 'read'; other?: string; words?: string; thing?: string }> = [];
     for (const it of items) {
       let d: unknown = null;
       try { d = JSON.parse(it.data ?? '{}'); } catch { d = null; }
-      const sig = liveSignal(d, ctx.cycle);
+      // Finding 69/60 (2026-11-05): a thing holds a THREAD; the line is told from the thread, and names the thing when the holder has several.
+      const thread = liveSignals(d, ctx.cycle);
+      const sig = mirrorOf(thread);
       if (!sig) continue;
       const state = sig.state ?? 'ringing';
-      if (it.holderId === characterId) going.push({ text: signalTextFor(sig, 'holder', sig.by ? nameOf(sig.by) : null), mine: false, holder: ctx.name, state, thing: it.name, ...(sig.by ? { other: nameOf(sig.by) } : {}), ...(sig.words ? { words: sig.words } : {}) });
-      else if (sig.by === characterId) going.push({ text: signalTextFor(sig, 'caller', nameOf(it.holderId)), mine: true, holder: nameOf(it.holderId), state, thing: it.name, other: nameOf(it.holderId), ...(sig.words ? { words: sig.words } : {}) });
+      if (it.holderId === characterId) going.push({ text: threadTextFor(thread, 'holder', sig.by ? nameOf(sig.by) : null, heldCount > 1 ? { thing: it.name } : undefined), mine: false, holder: ctx.name, state, thing: it.name, ...(sig.by ? { other: nameOf(sig.by) } : {}), ...(sig.words ? { words: sig.words } : {}) });
+      else {
+        const sent = thread.filter((x) => x.by === characterId);
+        const msig = mirrorOf(sent);
+        if (msig) going.push({ text: threadTextFor(sent, 'caller', nameOf(it.holderId)), mine: true, holder: nameOf(it.holderId), state: msig.state ?? 'ringing', thing: it.name, other: nameOf(it.holderId), ...(msig.words ? { words: msig.words } : {}) });
+      }
     }
     const near = [
       ...items.filter((it) => !it.holderId && it.locationId && it.locationId === mine).map((it) => it.name),
@@ -1168,10 +1184,13 @@ export async function listenStimulus(
           canDo: caps.filter((x) => x.aware && x.face === 'can').map((x) => ({ name: x.name, ...(x.via ? { via: x.via } : {}) })),
         })).catch(() => ({ traits: [] as string[], canDo: [] as Array<{ name: string; via?: string }> }))),
         others: ledger?.others ?? [],
+        // FINDING 63 (2026-11-05): a due meeting is the first act on the list.
+        leave: await dueIntentionsFor(ctx.entityDaId, content, ctx.cycle).then((d) => leaveForLine(d, ctx.cycle)).catch(() => null),
       }, overrides);
       if (beat) {
         composedFelt = beat.felt;
         composedAct = beat.record.act ?? null;
+        composedActWords = beat.actWords ?? null;
         composedPieces = { beatKey: beat.beatKey, perceived: beat.perceived, felt: beat.felt, wakes: beat.wakes, recent: priorVoice.slice(0, 4), gist: beat.plan.gist, impulse: beat.plan.impulse, ...(beat.plan.why ? { why: beat.plan.why } : {}) };
         // AN UNCHANGED RECORD IS NO BEAT (finding 43, 2026-11-05: Kristopher carded "Your message reached Violet's phone. Nothing has come
         // back yet." on every line): nothing new reached it, nothing woke, and the same gist as its last card — it has said this; no card.
@@ -1251,6 +1270,7 @@ export async function listenStimulus(
     status: 'listened',
     ...(composedPieces ? { pieces: composedPieces } : {}),
     ...(composedAct ? { act: composedAct } : {}),
+    ...(composedActWords ? { actWords: composedActWords } : {}),
     memoryEntryId: ingest.memoryEntryId,
     innerUpdated,
     impulse,
@@ -1796,6 +1816,11 @@ export async function answerAsk(
  * When a line is about this being alone, the whole line is its beat (the words of a text it wrote live there); when others act in
  * the same line, only its own sentences. Its own words are its knowledge of the moment - never a question to itself.
  */
+/** Finding 63 (2026-11-05): is a plan of the being's due now (a meeting inside its window, with its ten-minute lead)? */
+async function hasDuePlan(entityId: string, cycle: number): Promise<boolean> {
+  return (await dueIntentionsFor(entityId, '', cycle)).length > 0;
+}
+
 /** Finding 54 (2026-11-05): does the being hold a thing with a live signal, or has it set one off (a call ringing, a message read and unanswered, an open line)? */
 async function hasOwnGoing(campaignId: string, characterId: string, cycle: number): Promise<boolean> {
   const { liveSignal } = await import('@/services/item-signal');
@@ -1806,6 +1831,35 @@ async function hasOwnGoing(campaignId: string, characterId: string, cycle: numbe
     if (sig && (r.holderId === characterId || sig.by === characterId)) return true;
   }
   return false;
+}
+
+/**
+ * FINDING 71: the card text (thought / action / scene segments, and chat rows a being posted as its own card) of every OTHER
+ * being in the live session — the text a perception order's input must never carry unless a sense brought it. Never throws.
+ */
+async function othersCardTexts(campaignId: string, characterId: string, bound: { sessionId?: string | null; since?: Date }): Promise<string[]> {
+  try {
+    const where: Record<string, unknown> = { campaignId, characterId: { not: characterId } };
+    if (bound.sessionId) where.sessionId = bound.sessionId;
+    if (bound.since) where.createdAt = { gte: bound.since };
+    const [thoughts, chats] = await Promise.all([
+      prisma.campaignEvent.findMany({ where: { ...where, type: 'being_thought' }, orderBy: { createdAt: 'desc' }, take: 12, select: { payload: true } }),
+      prisma.campaignEvent.findMany({ where: { ...where, type: 'chat', actor: 'ai_copilot', payload: { contains: '"via":"being"' } }, orderBy: { createdAt: 'desc' }, take: 12, select: { payload: true } }),
+    ]);
+    const out: string[] = [];
+    for (const r of thoughts ?? []) {
+      try {
+        const p = JSON.parse(r.payload) as { scene?: string; thought?: string; segments?: Array<{ kind?: string; text?: string }> };
+        if (p.scene) out.push(p.scene);
+        if (p.thought) out.push(p.thought);
+        for (const s of p.segments ?? []) if (s.text && s.kind !== 'speech') out.push(s.text);
+      } catch { /* skip */ }
+    }
+    for (const r of chats ?? []) {
+      try { const m = (JSON.parse(r.payload) as { message?: string; raw?: string }); if (m.message) out.push(m.message); if (m.raw) out.push(m.raw); } catch { /* skip */ }
+    }
+    return out;
+  } catch { return []; }
 }
 
 async function ownRecentActs(campaignId: string, characterId: string, sessionId: string | null): Promise<string[]> {

@@ -70,3 +70,20 @@ Canon (Repository/02_CHARACTER_CREATION/Nectars_and_Thorns_System.md, #needs-val
 - The card review with you.
 
 **Scenes 8–9 (close):** the lived decision beat is in — on Kristopher's lines Violet now gets her beat with the read message in her hand; she chose to stay twice, with reasons, rather than write back (#56). Your call whether that is her or a bias (#51a): the chooser's instruction already says a read, unanswered message asks for an answer now. If you text her before the date in the third test, expect her to read it on her own and either write back (her words will land on his phone) or sit on it with a reason in her card.
+
+---
+## Day 9 (night of 11-05 → 11-06, Michael asleep) — what was built after the two called attempts
+
+**Rulings taken tonight (Michael, before bed):** any non-Trailblazer may act on its own unless the Watcher's CURRENT line already said what it does (per line; "Watcher-voiced" is not a thing); rolls must be graphical (brief: `tmp/rolls-ux-brief-2026-11-05.md`); replay the coffee date and go deep; aim toward voice + audio; much larger thinking cards and NO rewrites on screen (composing happens off screen; the final card prints once).
+
+**Built (all unit-tested; see commits of 11-06):**
+- **Clock:** a stated time on ANY Watcher line moves the clock (not only pure narration); bare clock times beside a day word ("the following day at exactly 2:22" → 14:22 tomorrow; 1–6 read as afternoon — ASSUMED, [QUESTION]).
+- **Places:** an opening on a single room's wall leads outside (the coffee shop's door bug at the source); the lot has a gate; the coffee shop is ACTIVE; the two stray "Coffee shop worker" drafts are gone and the rollback now drops characters made in the window.
+- **Texts:** a thing holds a THREAD of messages (`data.signals`, mirror in `data.signal`); a reply settles all of a sender's messages; `fromItem` chosen by the act's words / last-used / only thing; the words of a text come from the Watcher's RAW quote; a write-back with no words sends nothing; a being's freely phrased "type X and send" IS a write-back with X (`asWriteBack`); the translator restores the exact matched text (no more "Extra Space Coffee shop worker 1").
+- **Beings:** inner narration is not a deed (`isInnerNarration`); another being's card text never enters a being's perception input (guard); the answer op needs a live message on THAT thing; walking to a thing in the room is a point move with a reachable spot beside it.
+- **Travel (#41/68):** a being inside a VEHICLE that moves to another place DRIVES it — the car moves, every rider moves with it, parked outside the way in; a rider who walks gets out first; walking to a vehicle boards it.
+- **A promise is a plan (#63):** a reply that assents to a proposed meeting becomes a PENDING intention "be at <place> <time>" with a due window (counter-times win; "Yes." to "four tomorrow" → tomorrow 16:00); speaking the promise does not keep it (only arrival settles it); a due plan puts "leave for <place>" FIRST on the chooser's list and makes a standing beat lived; "leaves for X" runs the move (vehicle/unseat handled); the stretch keeps appointments (simple version: at the window's start).
+- **Traits:** negative-KV item abilities (Dead Battery) ACT ON the bearer.
+- **Client:** partials never render; a retract of a shown line is a warning, never an edit; later segments only append; a full-size THINKING CARD per being while it works, replaced by the final card once.
+
+**Still open:** the adjudicator turning "leaves for X" into a move op is prompted but not seen live; the stretch places arrival at the window start, not the exact time; `composer` shows one write-back target per thing even with two unread texts; thinking cards have no pillar tint until events carry it; rolls UI (brief only); voice + audio (not started); the Nectar questions; Bounded Potential's text; Michael's trait ideas 2–6.

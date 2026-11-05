@@ -21,11 +21,13 @@ import { canEditCharacter } from '@/lib/permissions';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import type { Point } from '@/lib/canvas-geometry';
 import { walkFtPerSFromCelerity } from '@/lib/spatial/pathfinding';
-import { findPath, pathSeconds, portalPassability, roomAt, roomByName, portalsOfRoom, spotInRoom, spotAtPortal, spotBeside, nearestWalkable, crossesBlocking, wayOutDoor, lockedFromMySide, type LevelMap, type Portal, type RoomPoly, type Pace } from '@/lib/spatial';
+import { findPath, insideOrOn, pathSeconds, portalPassability, roomAt, roomByName, portalsOfRoom, spotInRoom, spotAtPortal, spotBeside, nearestWalkable, crossesBlocking, wayOutDoor, lockedFromMySide, type LevelMap, type Portal, type RoomPoly, type Pace } from '@/lib/spatial';
 import { loadWorldLevel, beingStanding, thingStanding, stampBeingPoint, roomIdOf, levelOfBeing, exitPortals } from '@/services/spatial-world';
 import { moveCharacterToLocation } from '@/services/character-location';
 import { writeDoorState } from '@/services/door-state';
 import { perceiveMapChange } from '@/services/spatial-perception';
+import { insideOf, seatBeingIn, isVehicle, ridersOf } from '@/services/being-inside';
+import { footprintBounds, fractionToWorld, worldToFraction } from '@/lib/canvas-geometry';
 
 /** Where every other being of the campaign stands on this level (for the walker to step around). Never throws. */
 async function othersStanding(campaignId: string, exceptId: string, map: LevelMap): Promise<Point[]> {
@@ -61,6 +63,10 @@ export interface MoveReport {
   /** A locked door that stopped the walk short. */
   stoppedBy?: string;
   path: Point[];
+  /** Finding 68 / #41 vehicle travel, 2026-11-05: the thing the walker climbed out of first (a car, a bed). */
+  gotOutOf?: string;
+  /** Finding 68 / #41: the vehicle the walk ended in (walked to a vehicle in the same room = got into it). */
+  boarded?: string;
 }
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/^(the|a|an)\s+/, '');
@@ -142,6 +148,40 @@ function besideOnTheSameSide(map: LevelMap, target: Point, from: Point): Point {
   return nearestWalkable(map, target, 6) ?? target;
 }
 
+/** Where a target thing/being lies on this level (its own point), for the ring search. */
+async function anchorOf(map: LevelMap, target: MoveTarget): Promise<Point | null> {
+  if (target.kind === 'thing') return (await thingStanding(map, target.itemId))?.point ?? null;
+  if (target.kind === 'being') return (await beingStanding(map, target.characterId))?.point ?? null;
+  return null;
+}
+
+/**
+ * FINDING 73: the nearest square around `anchor` (rings of 5-ft squares, 16 bearings, out to four squares) that is walkable and
+ * that `from` can reach, with the path to it. Nearest to the anchor first, then nearest to the walker. Null when none is reachable
+ * (the caller reports the refusal). Pure.
+ */
+export function reachableSpotNear(map: LevelMap, walkMap: LevelMap, anchor: Point, from: Point, avoid: Point[] = []): { point: Point; path: NonNullable<ReturnType<typeof findPath>> } | null {
+  const SQUARE = 5 * 20; // 5 ft in map units (UNITS_PER_FT = 20)
+  const cands: Array<{ p: Point; dA: number; dF: number }> = [];
+  for (let ring = 1; ring <= 4; ring++) {
+    for (let k = 0; k < 16; k++) {
+      const ang = (k / 16) * Math.PI * 2;
+      const c = { x: anchor.x + Math.cos(ang) * ring * SQUARE, y: anchor.y + Math.sin(ang) * ring * SQUARE };
+      if (map.obstacles.some((o) => insideOrOn(c, o.points))) continue;
+      if (!roomAt(map, c)) continue;
+      const w = nearestWalkable(map, c, 1);
+      if (!w) continue;
+      cands.push({ p: w, dA: Math.hypot(w.x - anchor.x, w.y - anchor.y), dF: Math.hypot(w.x - from.x, w.y - from.y) });
+    }
+  }
+  cands.sort((x, y) => (Math.round(x.dA / SQUARE) - Math.round(y.dA / SQUARE)) || x.dF - y.dF);
+  for (const c of cands.slice(0, 64)) {
+    const path = findPath(walkMap, from, c.p, { avoid });
+    if (path) return { point: c.p, path };
+  }
+  return null;
+}
+
 function walkedRoom(map: LevelMap, p: Point): RoomPoly | null { return roomAt(map, p); }
 
 /**
@@ -161,20 +201,42 @@ export async function moveBeing(
   let walkFtPerS: number | undefined;
   try { const sheet = actor?.data ? (JSON.parse(actor.data) as { attributes?: { celerity?: { level?: number } } }) : null; walkFtPerS = walkFtPerSFromCelerity(sheet?.attributes?.celerity?.level); } catch { walkFtPerS = undefined; }
   if (!actor || actor.campaignId !== campaignId) return empty('?', 'not in this campaign');
+  // A RIDER WHO WALKS GETS OUT FIRST (finding 68 / #41 vehicle travel, 2026-11-05): a being inside a car, a bed or another being
+  // climbs out where the container stands, then walks. Walking to the thing it is inside of is no walk.
+  let gotOutOf: string | undefined;
+  const riding = await insideOf(characterId);
+  if (riding) {
+    if (target.kind === 'thing' && target.itemId === riding.containerId) {
+      const here = (await beingStanding(map, characterId))?.point ?? { x: 0, y: 0 };
+      return { ok: true, label: riding.containerName, from: here, to: here, feet: 0, seconds: 0, fromRoom: null, toRoom: null, opened: [], path: [] };
+    }
+    await seatBeingIn(campaignId, characterId, null, opts.cause);
+    gotOutOf = riding.containerName;
+  }
   const standing = await beingStanding(map, characterId);
   if (!standing) return empty('?', `${actor.name} stands nowhere on the map`);
   const dest = await destinationFor(map, target, standing.point);
   if (!dest) return empty('?', 'the target is nowhere on the map');
-  const from = standing.point;
+  // The container's point can sit inside its own drawn shape (a car's body): step out to the nearest standable spot.
+  const from = gotOutOf && map.obstacles.some((o) => insideOrOn(standing.point, o.points)) ? (nearestWalkable(map, standing.point, 6) ?? standing.point) : standing.point;
   const fromRoom = standing.room;
-  const base = { label: dest.label, from, fromRoom: fromRoom?.name ?? null };
+  const base = { label: dest.label, from, fromRoom: fromRoom?.name ?? null, ...(gotOutOf ? { gotOutOf } : {}) };
 
   // A LOCK IS WORKED FROM THE INSIDE (HW10 2026-10-29): a locked door that leaves the home the walker stands in is a closed
   // door to her — the way is found as if it were, and it is unlocked and opened on the way.
   const mine = map.portals.filter((p) => lockedFromMySide(map, p, from));
   const walkMap: LevelMap = mine.length ? { ...map, portals: map.portals.map((p) => (mine.some((m) => m.id === p.id && m.homeId === p.homeId) ? { ...p, state: 'closed' as const } : p)) } : map;
   // Other beings on the level are stepped around when there is room (soft, never a wall).
-  const path = findPath(walkMap, from, dest.point, { avoid: await othersStanding(campaignId, characterId, map) });
+  const avoid = await othersStanding(campaignId, characterId, map);
+  let path = findPath(walkMap, from, dest.point, { avoid });
+  // FINDING 73 (live 2026-11-05: "goes to the counter" → "no way from the coffee shop on Broadway to the counter"): a thing drawn as an
+  // obstacle (the counter, a table) has no standable square of its own; the spot "beside" it can sit behind it or in a pocket. Try the
+  // squares around it, nearest first, and stand at the first one the walker can actually reach.
+  if (!path && (target.kind === 'thing' || target.kind === 'being')) {
+    const around = await anchorOf(map, target);
+    const spot = around ? reachableSpotNear(map, walkMap, around, from, avoid) : null;
+    if (spot) { path = spot.path; dest.point = spot.point; }
+  }
   if (!path) return { ...empty(dest.label, `no way from ${fromRoom?.name ?? 'here'} to ${dest.label}`), ...base };
 
   // Doors the walker passes: a closed one is opened on the way (the one writer tells the facts and the canvases).
@@ -215,8 +277,21 @@ export async function moveBeing(
     } catch { /* the canvases will re-read */ }
   }
 
+  // ENTERING A VEHICLE (finding 68 / #41): a walk that ends at a vehicle in the same room ends inside it.
+  let boarded: string | undefined;
+  if (target.kind === 'thing' && !path.blockedBy) {
+    try {
+      const it = await prisma.campaignItem.findUnique({ where: { id: target.itemId }, select: { id: true, name: true, data: true } });
+      const itRoom = it ? (await thingStanding(map, it.id))?.room : null;
+      if (it && itRoom && toRoom && itRoom.id === toRoom.id && isVehicle(JSON.parse(it.data ?? '{}'))) {
+        await seatBeingIn(campaignId, characterId, { id: it.id, type: 'CAMPAIGN_ITEM' }, opts.cause);
+        boarded = it.name;
+      }
+    } catch { /* the walk stands; boarding is owed */ }
+  }
+
   const report: MoveReport = {
-    ok: true, ...base, to: end, feet: Math.round(path.feet * 10) / 10, seconds,
+    ok: true, ...base, ...(boarded ? { boarded } : {}), to: end, feet: Math.round(path.feet * 10) / 10, seconds,
     toRoom: toRoom?.name ?? null, opened, path: path.points,
     ...(path.blockedBy ? { stoppedBy: path.blockedBy.name } : {}),
   };
@@ -245,11 +320,13 @@ export async function walkCharacter(actorUserId: string, actorRole: string, char
 export function describeMove(name: string, r: MoveReport): string {
   if (!r.ok) return `${name} does not move: ${r.reason ?? 'no way'}.`;
   const bits: string[] = [];
+  const out = r.gotOutOf ? `${name} gets out of the ${r.gotOutOf}. ` : '';
+  if (r.boarded) bits.push(`gets into the ${r.boarded}`);
   if (r.opened.length) bits.push(`opens the ${r.opened.join(' and the ')}`);
   if (r.stoppedBy) bits.push(`stops at the ${r.stoppedBy} (locked)`);
   const where = r.toRoom && r.toRoom !== r.fromRoom ? ` into ${r.toRoom}` : '';
   const head = r.feet > 0 ? `${name} walks ${r.feet} ft${where} to ${r.label}` : `${name} is already at ${r.label}`;
-  return `${head}${bits.length ? ', ' + bits.join(', ') : ''}.`;
+  return `${out}${head}${bits.length ? ', ' + bits.join(', ') : ''}.`;
 }
 
 // ── Elsewhere (stretch 2026-10-31) ───────────────────────────────────────────
@@ -326,4 +403,69 @@ function roomCentreOf(room: RoomPoly): Point {
 export function locationPointOn(map: LevelMap, locationId: string): Point | null {
   const r = map.rooms.find((x) => x.id === locationId) ?? map.homes?.find((x) => x.id === locationId) ?? null;
   return r ? roomCentreOf(r) : null;
+}
+
+
+// ── Driving (finding 68 / #41 vehicle travel, 2026-11-05) ───────────────────
+
+/**
+ * Where a vehicle comes to rest at a way in: the exit portal's midpoint pushed `distanceFt` (default 6) to the EXTERIOR side
+ * (the side that lies in no drawn room). When both sides are outside every room, the side farther from `arrivalRoom`'s centre.
+ * Pure.
+ */
+export function parkSpotOutside(map: LevelMap, exit: Portal, arrivalRoom?: RoomPoly | null, distanceFt = 6): Point {
+  const mid = { x: (exit.a.x + exit.b.x) / 2, y: (exit.a.y + exit.b.y) / 2 };
+  const dx = exit.b.x - exit.a.x, dy = exit.b.y - exit.a.y, L = Math.hypot(dx, dy) || 1;
+  const n = { x: -dy / L, y: dx / L };
+  const d = distanceFt * 20; // UNITS_PER_FT
+  const sides = [1, -1].map((sg) => ({ x: mid.x + n.x * sg * d, y: mid.y + n.y * sg * d }));
+  const inRoom = (p: Point) => !!roomAt(map, p) || !!map.homes?.some((h) => insideOrOn(p, h.points));
+  const free = sides.filter((p) => !inRoom(p));
+  if (free.length === 1) return free[0];
+  const c = arrivalRoom ? roomCentreOf(arrivalRoom) : mid;
+  return (free.length ? free : sides).slice().sort((a, b) => Math.hypot(b.x - c.x, b.y - c.y) - Math.hypot(a.x - c.x, a.y - c.y))[0];
+}
+
+export interface DriveReport { ok: boolean; reason?: string; riders: string[]; room?: string; via?: string }
+
+/**
+ * The vehicle travels to another LOCATION and everyone inside it goes along, still inside. A drawn destination: the car is filed
+ * in the room the way in opens onto and parked just outside that way in. An undrawn one: filed there with no point. A vehicle
+ * leaving a lot with no gate drawn goes anyway (the gate is data owed). The clock is whatever the line already charged.
+ */
+export async function driveVehicle(campaignId: string, vehicle: { id: string; name: string }, to: { id: string; name: string }, toLevel: number | null): Promise<DriveReport> {
+  const item = await prisma.campaignItem.findUnique({ where: { id: vehicle.id }, select: { id: true, locationId: true } });
+  if (!item) return { ok: false, reason: 'the vehicle is gone', riders: [] };
+  try {
+    const { levelOfLocation } = await import('@/services/spatial-world');
+    const fromLevel = item.locationId ? await levelOfLocation(item.locationId) : null;
+    if (fromLevel !== null) {
+      const { map: origin } = await loadWorldLevel(campaignId, fromLevel);
+      if (!exitPortals(origin).length) console.log(`[drive] ${vehicle.name} leaves a level with no gate drawn (${origin.rooms.map((r) => r.name).join(', ')}) - the gate is data owed (finding 68 / #41)`);
+    }
+  } catch { /* the drive does not wait on the origin's map */ }
+
+  let roomId = to.id, roomName = to.name;
+  let park: Point | null = null, frac: { x: number; y: number } | null = null, via: string | undefined;
+  if (toLevel !== null) {
+    const { map } = await loadWorldLevel(campaignId, toLevel);
+    const exit = nearestExit(map, locationPointOn(map, to.id));
+    const room = exit ? roomOfExit(map, exit) : (map.rooms.find((r) => r.id === to.id) ?? null);
+    if (!exit || !room) return { ok: false, reason: `no way onto the map at ${to.name} is drawn (an opening to "outside")`, riders: [] };
+    roomId = room.id; roomName = room.name; via = exit.name;
+    const box = footprintBounds(room.points);
+    frac = worldToFraction(parkSpotOutside(map, exit, room), box);
+    park = fractionToWorld(frac, box); // what is stored is what the canvases and the riders see
+  }
+  const positionAt = Date.now();
+  await prisma.entityRelationship.deleteMany({ where: { sourceId: vehicle.id, sourceType: 'CAMPAIGN_ITEM', relationshipType: 'located_at', targetType: 'LOCATION' } });
+  await prisma.entityRelationship.create({ data: { campaignId, sourceId: vehicle.id, sourceType: 'CAMPAIGN_ITEM', targetId: roomId, targetType: 'LOCATION', relationshipType: 'located_at', strength: 5, ...(frac ? { data: JSON.stringify({ position: frac, positionAt }) } : {}) } });
+  await prisma.campaignItem.update({ where: { id: vehicle.id }, data: { locationId: roomId, holderId: null } });
+  if (park) { try { broadcastEvent(campaignId, { kind: 'token_moved', entityId: vehicle.id, entityType: 'item', x: park.x, y: park.y, placedAt: positionAt, roomId, roomName, cause: 'sim' } as never); } catch { /* canvases re-read */ } }
+  const riders = await ridersOf(vehicle.id);
+  for (const r of riders) {
+    await seatBeingIn(campaignId, r.id, { id: vehicle.id, type: 'CAMPAIGN_ITEM' }, 'sim');
+    if (!park) { const { clearBeingPoint } = await import('@/services/spatial-world'); await clearBeingPoint(r.id); }
+  }
+  return { ok: true, riders: riders.map((r) => r.name), room: roomName, via };
 }

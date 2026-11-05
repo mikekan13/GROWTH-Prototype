@@ -127,3 +127,16 @@ describe('a sound effect (HW9, 2026-10-29)', () => {
     expect(parseActEffects([{ op: 'answer', item: 'Her phone' }, { op: 'answer' }])).toEqual([{ op: 'answer', item: 'Her phone' }]);
   });
 });
+
+describe('answer needs a live signal (finding 72, 2026-11-05)', () => {
+  it('picks the held thing with a live signal, null when none carries one', async () => {
+    const { pickLiveHeld } = await import('./world-apply');
+    const { liveSignal } = await import('./item-signal');
+    const quiet = { id: 'a', name: 'Work phone', data: JSON.stringify({}) };
+    const ringing = { id: 'b', name: 'Personal phone', data: JSON.stringify({ signal: { text: 'rings', since: 1, kind: 'call', state: 'ringing', by: 'c1', until: 1000 } }) };
+    expect(pickLiveHeld([quiet], 5, liveSignal)).toBeNull();
+    const hit = pickLiveHeld([quiet, ringing], 5, liveSignal);
+    expect(hit?.item.name).toBe('Personal phone');
+    expect(pickLiveHeld([quiet, ringing], 5000, liveSignal)).toBeNull();
+  });
+});

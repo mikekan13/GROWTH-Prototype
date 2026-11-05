@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import { calculateCharacterTKV } from '../app/src/lib/kv-calculator';
+const p = process.argv[2];
+const sheet = JSON.parse(fs.readFileSync(p, 'utf8'));
+const b = calculateCharacterTKV(sheet) as any;
+const out: Record<string, unknown> = {};
+for (const [k, v] of Object.entries(b)) out[k] = (v && typeof v === 'object' && 'subtotal' in (v as any)) ? (v as any).subtotal : (v && typeof v === 'object' && 'total' in (v as any)) ? (v as any).total : Array.isArray(v) ? (v as any[]).reduce((s, x) => s + (x.kv ?? 0), 0) : (typeof v === 'object' ? JSON.stringify(v).slice(0, 80) : v);
+console.log(out);
+console.log('attrs', Object.fromEntries(Object.entries(sheet.attributes ?? {}).map(([k, a]: any) => [k, a?.level])));
+console.log('skills', (sheet.skills ?? []).map((s: any) => `${s.name}:${s.level}`).join(', '));
+console.log('traits', (sheet.traits ?? []).map((t: any) => `${t.name}(${t.type}) kv=${t.kv ?? t.karmicValue ?? '?'}`).join(' | '));
+console.log('seed', sheet.creation?.seed?.name, sheet.creation?.seed?.baseFateDie, 'fatedAge', sheet.fatedAge ?? sheet.creation?.seed?.fatedAge);

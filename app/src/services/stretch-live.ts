@@ -35,7 +35,7 @@ import { resolveIntent } from '@/daya/adjudicator';
 import { wake } from '@/daya/events';
 import { runDreamConsolidation } from '@/daya/scheduler';
 import { resolveDayaEntityId } from '@/daya/entity';
-import { dueIntentionsFor, setIntention, settleIntentionsByAct, settleIntention, intentionLine, type DueIntention } from '@/daya/intentions';
+import { dueIntentionsFor, setIntention, settleIntentionsByAct, settleIntention, intentionLine, isMeeting, leaveForLine, type DueIntention } from '@/daya/intentions';
 import { judgeIntentionsDone } from '@/daya/intention-judge';
 import { currentFacts } from '@/daya/world-ledger';
 import type { FactLine } from '@/daya/claim-vs-fact';
@@ -201,6 +201,8 @@ async function liveStretchNow(campaignId: string, actor: StretchActor, input: St
     // WHAT JEWL IS AT (2026-11-01: nine silent minutes and the Watcher resent his line): the live working tick names the window.
     try { broadcastEvent(campaignId, { kind: 'jewl_working', phase: 'tool', tool: 'advance_clock', label: `living ${span} — ${label} (${i + 1}/${windows.length})` }); } catch { /* best-effort */ }
     for (const b of beings) { b.listen = null; b.waits.clear(); b.stepsThisWindow = 0; b.spokeWith.clear(); }
+    // THE STRETCH KEEPS APPOINTMENTS (finding 63, 2026-11-05): a meeting that falls due inside this window is kept.
+    await keepAppointments(campaignId, beings, w, report);
 
     if (w.sleep) {
       await liveNight(campaignId, by, beings, w, hour, facts, report);
@@ -252,6 +254,35 @@ async function liveStretchNow(campaignId: string, actor: StretchActor, input: St
   }
   console.log(`[stretch] ${span} lived by ${beings.length} being(s): ${beings.map((b) => b.name).join(', ')} → ${report.localDate}`);
   return report;
+}
+
+/**
+ * FINDING 63 (2026-11-05): a pending meeting ("be at the coffee shop …") whose time falls by the end of this window moves the being to the
+ * place at the window's start (the simplest version: windows are quarter-days or days, so the arrival is placed at the window, not the minute),
+ * through the same adjudicator → move path the table uses, then the arrival settles it. A refused move leaves it pending (it lapses on its own).
+ */
+async function keepAppointments(campaignId: string, beings: Being[], w: StretchWindow, report: StretchReport): Promise<void> {
+  for (const b of beings) {
+    try {
+      const rows = await prisma.dayaIntention.findMany({ where: { entityId: b.entityDaId, status: 'PENDING' }, select: { id: true, description: true, dueCycle: true, dueUntil: true } });
+      const meet = rows.filter((r) => isMeeting(r.description) && r.dueCycle != null && r.dueCycle <= w.end).sort((x, y) => (x.dueCycle ?? 0) - (y.dueCycle ?? 0))[0];
+      if (!meet) continue;
+      const leave = leaveForLine([{ id: meet.id, description: meet.description, trigger: null, sourceMemoryId: null, goalId: null, why: 'time', authority: 'self', dueCycle: meet.dueCycle, dueUntil: meet.dueUntil } as DueIntention], meet.dueCycle ?? w.start);
+      if (!leave) continue;
+      const place = leave.deed.replace(/^leaves for /i, '');
+      const r = await resolveIntent({ campaignId, entityCharacterId: b.id, intent: leave.deed, cycle: Math.max(w.start, meet.dueCycle ?? w.start), narrated: true });
+      const refused = r.effects?.refused ?? [];
+      const rec = dayRec(b, w);
+      if (!(r.effects?.applied.length) || refused.some((x) => /^(?:move|drive)/i.test(x))) {
+        for (const x of refused) rec.refused.push(`${b.name}: ${x}`);
+        console.log(`[stretch] ${b.name}: could not keep "${meet.description.slice(0, 80)}" — ${refused.join('; ') || 'nothing moved'}`);
+        continue;
+      }
+      rec.acts.push(leave.deed);
+      await settleByAct(campaignId, b, `${b.name} arrives at ${place}`, rec);
+      console.log(`[stretch] ${b.name}: keeps the appointment — "${meet.description.slice(0, 80)}" (${r.effects?.applied.join('; ')})`);
+    } catch (err) { report.refused.push(`${b.name}: appointment not kept — ${msg(err)}`); }
+  }
 }
 
 // ── Night ────────────────────────────────────────────────────────────────────

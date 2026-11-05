@@ -457,6 +457,9 @@ export function openingSides(from: Point, to: Point, rooms: Array<{ owner: strin
   const onWalls = (pts: Point[]) => wallEdges([{ owner: '', points: pts }]).some(e => projectOnSegment(mid, e.a, e.b).dist <= tol);
   const sides = rooms.filter(r => onWalls(r.points)).map(r => r.owner);
   if (sides.length < 2 && home && onWalls(home)) sides.push('outside');
+  // Finding 58 (2026-11-05): an opening on exactly ONE room's wall with no other room on that wall leads outside — even when
+  // the home footprint was not given (the coffee shop's street door joined the shop to itself and nobody could enter).
+  if (sides.length === 1 && !sides.includes('outside')) sides.push('outside');
   return [...new Set(sides)];
 }
 

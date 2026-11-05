@@ -88,3 +88,34 @@ export function createCardReveal(storageKey?: string): CardReveal {
     reset() { starts.clear(); seeded = false; shown = new Set(readStored(storageKey)); },
   };
 }
+
+/**
+ * A card that GROWS (a deed or words joined to it later) never takes back what is printed: the characters already
+ * visible stay, and only the new tail is typed, from the moment it arrived. `start` undefined = history (shown whole).
+ */
+export interface GrowthReveal {
+  /** Characters visible now. */
+  visible(total: number, start: number | undefined, now: number): number;
+}
+
+export function createGrowthReveal(): GrowthReveal {
+  let lastTotal = -1;
+  let base = 0;
+  let growAt = 0;
+  return {
+    visible(total, start, now) {
+      if (lastTotal < 0) {
+        lastTotal = total;
+        if (start === undefined) { base = total; growAt = now; } else { base = 0; growAt = start; }
+      } else if (total > lastTotal) {
+        base = Math.min(lastTotal, base + revealChars(lastTotal - base, now - growAt));
+        growAt = now;
+        lastTotal = total;
+      } else if (total < lastTotal) {
+        lastTotal = total;
+        base = Math.min(base, total);
+      }
+      return Math.min(total, base + revealChars(total - base, now - growAt));
+    },
+  };
+}

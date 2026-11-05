@@ -1,0 +1,2 @@
+import { prisma } from '../app/src/lib/db';
+(async () => { const a = await prisma.campaign.findUnique({ where: { id: 'cms5z4j6z0000zg48z5vzl2jn' }, select: { canvasLayoutEpoch: true } }); console.log('epoch now', a?.canvasLayoutEpoch); await new Promise((r) => setTimeout(r, 20000)); const b = await prisma.campaign.findUnique({ where: { id: 'cms5z4j6z0000zg48z5vzl2jn' }, select: { canvasLayoutEpoch: true } }); console.log('epoch 20s later', b?.canvasLayoutEpoch); process.exit(0); })();

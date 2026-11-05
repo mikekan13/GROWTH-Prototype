@@ -7,7 +7,12 @@
 export type NameKind = 'person' | 'place' | 'thing' | 'org' | 'user';
 export interface NameEntry { name: string; kind: NameKind; aliases?: string[] }
 /** keys: lowercased real name / exact placeholder */
-export interface TranslationMap { toPlaceholder: Map<string, string>; toReal: Map<string, string> }
+export interface TranslationMap {
+  toPlaceholder: Map<string, string>;
+  toReal: Map<string, string>;
+  /** placeholder -> the exact original text of each occurrence, in order (finding 65, 2026-11-05) */
+  originals?: Map<string, string[]>;
+}
 
 const PREFIX: Record<NameKind, string> = {
   person: 'Person', place: 'Place', thing: 'Thing', org: 'Org', user: 'User',
@@ -15,7 +20,7 @@ const PREFIX: Record<NameKind, string> = {
 const MIN_LEN = 3;
 
 export function newTranslationMap(): TranslationMap {
-  return { toPlaceholder: new Map(), toReal: new Map() };
+  return { toPlaceholder: new Map(), toReal: new Map(), originals: new Map() };
 }
 
 /** 0 -> A, 25 -> Z, 26 -> AA, 27 -> AB ... */
@@ -86,6 +91,10 @@ export function translateOut(
       map.toPlaceholder.set(key, ph);
       map.toReal.set(ph, entry.name.trim());
     }
+    // finding 65, 2026-11-05: remember the exact text this occurrence replaced (alias, case, spacing)
+    if (!map.originals) map.originals = new Map();
+    const list = map.originals.get(ph);
+    if (list) list.push(m); else map.originals.set(ph, [m]);
     return ph;
   });
   return { text: out, map };
@@ -101,8 +110,12 @@ export function translateBack(text: string, map: TranslationMap): string {
   // A THING IN THE BEING'S MOUTH (table test run 7, 2026-11-04: "I set my Personal phone down"): the ledger's label comes back in its
   // own casing; after a lowercase determiner ("my", "the") a thing's first letter follows the sentence, unless a proper name sits
   // inside the label ("my Chess Pizza polo"). People and places keep their capitals.
+  // finding 65, 2026-11-05: restore the exact text each occurrence replaced ("Extra Space Coffee" must not come back as the
+  // entry's longer canonical name); a placeholder the cloud introduced itself (no remembered original) or one that stood for mixed forms falls back to canonical.
   return text.replace(re, (ph: string, offset: number) => {
-    const real = map.toReal.get(ph) ?? ph;
+    const orig = map.originals?.get(ph);
+    // one unambiguous original for this placeholder -> exactly that text; mixed forms (full name + alias) -> canonical
+    const real = orig && orig.length && orig.every(o => o === orig[0]) ? orig[0] : (map.toReal.get(ph) ?? ph);
     if (!ph.startsWith('Thing-') || !/\b(?:my|the|her|his|their|a|an|that|this|your|our)\s$/i.test(text.slice(Math.max(0, offset - 8), offset))) return real;
     if (/\s[A-Z][a-z]/.test(real)) return real;
     return real.charAt(0).toLowerCase() + real.slice(1);

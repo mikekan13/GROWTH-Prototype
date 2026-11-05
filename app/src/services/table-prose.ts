@@ -205,6 +205,28 @@ export function isDescriptive(sentence: string, actor: ProseRosterEntry): boolea
   return false;
 }
 
+// INNER NARRATION IS NOT A DEED (finding 67, live 2026-11-05: "He knew the 'if you want to' was weak but it was him." and "The store is
+// empty besides two workers who look at him strangely as he sits." went to the adjudicator as Kristopher's acts). A GRAMMATICAL class,
+// not content: (1) a mental/stative head verb in the past (the present ones are thoughts, see MENTAL_VERB_RE), (2) a sentence whose
+// subject is a thing or the scene while the actor sits in a subordinate clause, (3) a hypothetical or negated-habitual clause.
+const INNER_VERB_RE = /^(?:(?:really|just|already|still|always|never|also|even|only)\s+)?(?:knew|thought|wanted|wished|hoped|remembered|realised|realized|wondered|hated|loved|hates|loves|couldn['’]t stand|can['’]t stand|could not stand|cannot stand|didn['’]t (?:want|like)|doesn['’]t (?:want|like)|felt (?:like|that|as if|(?:so|very|too|really|more|less|a bit|a little)\b))\b/i;
+const HYPOTHETICAL_RE = /\bwould(?:n['’]t| not)?\b|^(?:normally|usually|typically|ordinarily|generally|as a rule)\b/i;
+const THING_HEAD_RE = /^(?:the|a|an|two|three|several|some|another|this|that|these|those|no|every|each)\s/i;
+/** "He knew it was weak." / "The store is empty as he sits." / "He wouldn't be up yet." → true (narration, never an act); "He sends a text." → false. Pure. */
+export function isInnerNarration(sentence: string, roster: ProseRosterEntry[]): boolean {
+  const s = pastOpener(sentence).replace(/[.!?…]+$/, '').trim();
+  if (!s) return false;
+  const names = roster.map(nameAlt).filter(Boolean);
+  const head = names.length ? `(?:${names.join('|')}|he|she)` : '(?:he|she)';
+  const subj = s.match(new RegExp(`^${head}(?!['’]s\\b)\\s+(.+)$`, 'i'));
+  if (subj) return INNER_VERB_RE.test(subj[1]) || HYPOTHETICAL_RE.test(subj[1]);
+  if (HYPOTHETICAL_RE.test(s) && new RegExp(`\\b${head}\\b`, 'i').test(s)) return true;
+  if (INNER_VERB_RE.test(s)) return true; // "Can't stand it anymore" — a fragment of someone's head
+  // A thing or the scene is the subject; the actor appears only later ("…as he sits"): the sentence is scene narration. A thing OF
+  // his with no he/she/name in it ("A tear falls from his eye") stays his owned thing.
+  return THING_HEAD_RE.test(s) && !actorHeaded(s, roster) && new RegExp(`\\b${head}\\b`, 'i').test(s);
+}
+
 // A stated span inside an act — "He waits a minute and then knocks again" — is time passing, which is the
 // Watcher's narration (and the clock's business), and then the act (Mike 2026-10-25: "a narration of a minute
 // passes while he waits … and then just him with ::He knocks again::").
@@ -606,6 +628,7 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
           rest.push(sentence); lastKind = 'narration'; continue;
         }
       }
+      if (isInnerNarration(sentence, roster)) { rest.push(sentence); lastKind = 'narration'; continue; }
       noteActor(actor);
       // "He waits a minute and then knocks again": the minute is narration (time passing), the knock his act.
       const span = splitDurationClause(sentence, actor);

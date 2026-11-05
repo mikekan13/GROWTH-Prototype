@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { segmentIsDeed, parseTableProse, segmentOwned, introducedSubject, isDescriptive, isThoughtBody, splitDurationClause, characterCards, type ParsedProse } from './table-prose';
+import { isInnerNarration, segmentIsDeed, parseTableProse, segmentOwned, introducedSubject, isDescriptive, isThoughtBody, splitDurationClause, characterCards, type ParsedProse } from './table-prose';
 import frozenJson from './table-prose.frozen.json';
 
 const frozen = frozenJson as Array<{ text: string; withRoster: boolean; parsed: ParsedProse }>;
@@ -613,5 +613,44 @@ describe('beat splitting: a clause with its own subject is attributed on its own
     expect(parseTableProse('Kristopher and Violet sit down.', [...roster], {}).actions).toHaveLength(1);
     const p = parseTableProse('Kristopher gives Violet and Rosemary the cups.', [...roster], {});
     expect(p.actions).toHaveLength(1);
+  });
+});
+
+describe('finding 67 (live 2026-11-05): inner narration is narration, never a deed', () => {
+  const r = [{ id: 'kris', name: 'Kristopher', sex: 'male' }, { id: 'vi', name: 'Violet', sex: 'female' }];
+  const refused = [
+    "He knew the 'if you want to' was weak but it was him.",
+    'Normally on his day off he wouldn’t even be out of bed yet.',
+    'The date is all he has thought about.',
+    'The store is empty besides two workers who look at him strangely as he sits.',
+    "He can't stand it anymore.",
+    "Can't stand it anymore",
+    'Kristopher hoped she would answer.',
+  ];
+  const deeds = [
+    'Picks up his phone and texts Violet.',
+    'Turns his car on and begins to slowly drive to the coffee shop.',
+    'Reads the message and smiles.',
+    'Goes to the counter and asks the worker for two large london fogs.',
+    'He sends a text to Violet.',
+    'Kristopher arrives and sits at a table.',
+    'A tear falls from his eye.',
+  ];
+  it('isInnerNarration refuses the inner sentences and keeps the deeds', () => {
+    for (const s of refused) expect(isInnerNarration(s, r), s).toBe(true);
+    for (const s of deeds) expect(isInnerNarration(s, r), s).toBe(false);
+  });
+  it('the parse files the inner sentences as narration and the deeds as acts', () => {
+    const text = "He knew the 'if you want to' was weak but it was him. Normally on his day off he wouldn't even be out of bed yet, but the date is all he has thought about. The store is empty besides two workers who look at him strangely as he sits. He can't stand it anymore. He picks up his phone and texts Violet.";
+    const p = parseTableProse(text, r, { recentActors: [r[0]] });
+    expect(p.actions?.map((a) => a.text)).toEqual(['Picks up his phone and texts Violet']);
+    expect(p.narration).toContain('The store is empty');
+    expect(p.narration).toContain('He knew the');
+    expect(p.narration).toContain('The date is all he has thought about');
+  });
+  it('the deeds still parse as acts', () => {
+    for (const s of ['He sends a text to Violet.', 'Kristopher arrives and sits at a table.', 'He reads the message and smiles.', 'He goes to the counter and asks the worker for two large london fogs.']) {
+      expect(parseTableProse(s, r, { recentActors: [r[0]] }).actions?.length, s).toBeGreaterThan(0);
+    }
   });
 });

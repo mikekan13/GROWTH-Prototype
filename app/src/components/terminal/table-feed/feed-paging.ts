@@ -9,6 +9,7 @@
  * Pure.
  */
 import type { TerminalEvent, GameSessionInfo } from '@/types/terminal';
+import { mergeKeepingPrinted } from './beat-state';
 
 export interface SourcePage<T> {
   rows: T[];
@@ -42,7 +43,8 @@ export function keepFrom(events: TerminalEvent[], cutoff: string | null): Termin
 /** Merge by id (incoming wins — a reverted change replaces its old row), oldest first. */
 export function mergeEvents(prev: TerminalEvent[], incoming: TerminalEvent[]): TerminalEvent[] {
   const byId = new Map(prev.map((e) => [e.id, e]));
-  for (const e of incoming) byId.set(e.id, e);
+  // A row re-pushed under the same id may only grow: printed card text is never rewritten (beat-state.ts).
+  for (const e of incoming) byId.set(e.id, mergeKeepingPrinted(byId.get(e.id), e));
   return [...byId.values()].sort((a, b) => ts(a.timestamp) - ts(b.timestamp));
 }
 

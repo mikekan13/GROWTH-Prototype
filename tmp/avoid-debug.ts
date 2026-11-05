@@ -1,0 +1,11 @@
+import { fixture, P } from '../app/src/lib/spatial/test-fixture';
+import { findPath } from '../app/src/lib/spatial/pathfinding';
+import { gridOf, cellXY, cellIndex, cellCentre } from '../app/src/lib/spatial/nav-grid';
+const map = fixture({ entry: 'open' });
+const g = gridOf(map);
+const blocker = P(200, 850);
+console.log('blocker cell', cellXY(g, blocker), 'centre', cellCentre(g, cellIndex(g, cellXY(g, blocker).cx, cellXY(g, blocker).cy)));
+const r = findPath(map, P(60, 700), P(340, 1000), { avoid: [blocker] })!;
+console.log('points', JSON.stringify(r.points), 'feet', r.feet);
+const s = findPath(map, P(60, 700), P(340, 1000))!;
+console.log('straight', JSON.stringify(s.points), 'feet', s.feet);

@@ -71,3 +71,24 @@ describe('clock times and day words (finding 57)', () => {
     expect(lineDuration('gm-line', 'He knocks on the door again.', { localHour: 22 }).source).toBe('plausible');
   });
 });
+
+describe('bare clock times with a day word (finding 66)', () => {
+  const live = 'The following day at exactly 2:22 Kristopher watches the first rain drops fall on his windshield.';
+  it('the live line is 14:22 tomorrow (1-6 read as pm, assumed 2026-11-05)', () => {
+    expect(lineDuration('gm-line', live, { localHour: 22, localMinute: 27 })).toEqual({ seconds: 57300, source: 'stated' });
+  });
+  it('a named part of day wins: "the next morning at 9:15" is 09:15 tomorrow', () => {
+    expect(statedDurationSeconds('The next morning at 9:15 he wakes.', { localHour: 22, localMinute: 0 })).toBe(2 * 3600 + 9 * 3600 + 15 * 60);
+    expect(statedDurationSeconds('The next morning at 2:15 he wakes.', { localHour: 22, localMinute: 0 })).toBe(2 * 3600 + 2 * 3600 + 15 * 60);
+  });
+  it('hour-only bare: "tomorrow at 7" is 07:00 (7-11 am)', () => {
+    expect(statedDurationSeconds('Tomorrow at 7 the bell rings.', { localHour: 22, localMinute: 0 })).toBe(9 * 3600);
+  });
+  it('a bare time with no day word is ignored', () => {
+    expect(lineDuration('gm-line', 'At 2:22 he looks up.', { localHour: 22 }).source).toBe('plausible');
+    expect(statedDurationSeconds('At 7 he leaves.', { localHour: 22 })).toBeNull();
+  });
+  it('"at exactly" keeps the am/pm form working', () => {
+    expect(statedDurationSeconds('At exactly 2:22 pm the rain starts.', { localHour: 12, localMinute: 0 })).toBe(2 * 3600 + 22 * 60);
+  });
+});

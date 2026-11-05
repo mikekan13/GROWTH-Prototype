@@ -75,6 +75,9 @@ Rules:
    goes on. The one who SET a signal off ends it from their side — hangs up,
    cancels the call, stops knocking — with {"op":"stop"}; it ends every signal
    the actor set off. Waiting while it goes on is nothing: [].
+   LEAVING FOR A PLACE (finding 63, 2026-11-05): "leaves for the coffee shop on Broadway", "heads to Extra Space Coffee",
+   "sets off for the hotel", "drives to the coffee shop" is move → that place, named exactly as the actor said it; the map
+   carries the actor there (a car the actor sits in goes with them). Never narration, never "wait".
    READING A MESSAGE (finding 40, 2026-11-05): a message that has arrived on a
    held thing is a signal too; reading it, opening it, looking at what it says,
    picking the thing up to see it is {"op":"answer","item":<that thing>} — the

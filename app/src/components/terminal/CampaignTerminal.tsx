@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useReducer, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import CommandInput from './CommandInput';
 import type { CommandInputHandle } from './CommandInput';
 import type { TerminalEvent, TerminalFilter, ChangeLogPayload, GameSessionInfo } from '@/types/terminal';
@@ -15,6 +15,9 @@ import CopilotChat from './CopilotChat';
 import TableSpeakBar from './TableSpeakBar';
 import PlanningChips from './PlanningChips';
 import BeingSpeakingLines from './BeingSpeakingLines';
+import ThinkingCards from './ThinkingCards';
+import { reduceThinking, isCardPending, DISSOLVE_MS, type ThinkingCard } from './table-feed/beat-state';
+import type { BeingSpeakingPhase } from '@/types/campaign-events';
 import { createCardReveal } from './table-feed/card-reveal';
 import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE, TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import TableFeed from './table-feed/TableFeed';
@@ -400,37 +403,45 @@ export default function CampaignTerminal({
     return () => window.removeEventListener('growth:table-note', onNote);
   }, []);
 
-  // Ruling 10 (2026-11-04): a card is shown ONCE, in its final words. While a being's record is built, a quiet
-  // pending row (its name and a pulsing mark) sits under the latest line; the card replaces it, typed out once.
-  interface PendingBeing { characterId: string; name: string; lineId: string | null; at: number; fading?: boolean }
-  const [pendingBeings, setPendingBeings] = useState<PendingBeing[]>([]);
+  // Ruling 10 + Michael 2026-11-05: a card is printed ONCE, in its final words; everything before that (listening, composing,
+  // rewriting) is off screen. While a being works, one large THINKING CARD stands at the tail (ThinkingCards.tsx); the finished
+  // card replaces it. Events: being_listening / being_done (CampaignCanvas), being_speaking phases (useCampaignStream).
+  const [thinking, dispatchThinking] = useReducer(reduceThinking, [] as ThinkingCard[]);
   useEffect(() => {
     const timers = new Set<ReturnType<typeof setTimeout>>();
     const later = (fn: () => void, ms: number) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); };
+    const dissolveThenRemove = (characterId: string) => later(() => dispatchThinking({ type: 'remove', characterId }), DISSOLVE_MS);
     const onListening = (e: Event) => {
-      const d = (e as CustomEvent<{ characterId?: string; characterName?: string; lineId?: string | null; at?: number }>).detail;
+      const d = (e as CustomEvent<{ characterId?: string; characterName?: string; at?: number; pillar?: ThinkingCard['pillar'] }>).detail;
       if (!d?.characterId) return;
-      const at = d.at ?? Date.now();
-      // One row per being per line: a second listening for the same being replaces it.
-      setPendingBeings(prev => [...prev.filter(p => p.characterId !== d.characterId), { characterId: d.characterId!, name: d.characterName || 'someone present', lineId: d.lineId ?? null, at }]);
-      // Safety: a pending mark never outlives a lost event.
-      later(() => setPendingBeings(prev => prev.filter(p => !(p.characterId === d.characterId && p.at === at))), 120000);
+      dispatchThinking({ type: 'listening', characterId: d.characterId, name: d.characterName, at: d.at ?? Date.now(), pillar: d.pillar });
     };
     const onDone = (e: Event) => {
       const d = (e as CustomEvent<{ characterId?: string; posted?: boolean }>).detail;
-      if (!d?.characterId || d.posted !== false) return; // posted: the card itself takes the row's place
-      setPendingBeings(prev => prev.map(p => (p.characterId === d.characterId ? { ...p, fading: true } : p)));
-      later(() => setPendingBeings(prev => prev.filter(p => !(p.characterId === d.characterId && p.fading))), 400);
+      if (!d?.characterId || d.posted !== false) return; // posted: the card itself takes the thinking card's place
+      dispatchThinking({ type: 'done', characterId: d.characterId, posted: false });
+      dissolveThenRemove(d.characterId);
     };
-    // The withheld-line question (a table note) takes the pending rows' place.
-    const onNoteClear = () => setPendingBeings([]);
+    const onSpeaking = (e: Event) => {
+      const d = (e as CustomEvent<BeingSpeakingPhase>).detail;
+      if (!d?.characterId) return;
+      dispatchThinking({ type: 'speaking', phase: d, at: Date.now() });
+      if (d.phase === 'final') dissolveThenRemove(d.characterId);
+    };
+    // The withheld-line question (a table note) takes the thinking cards' place.
+    const onNoteClear = () => dispatchThinking({ type: 'clear' });
+    // Safety: a thinking card never outlives a lost event (90 s).
+    const tick = setInterval(() => dispatchThinking({ type: 'expire', now: Date.now() }), 5000);
     window.addEventListener('growth:being-listening', onListening);
     window.addEventListener('growth:being-done', onDone);
+    window.addEventListener('growth:being-speaking', onSpeaking);
     window.addEventListener('growth:table-note', onNoteClear);
     return () => {
       window.removeEventListener('growth:being-listening', onListening);
       window.removeEventListener('growth:being-done', onDone);
+      window.removeEventListener('growth:being-speaking', onSpeaking);
       window.removeEventListener('growth:table-note', onNoteClear);
+      clearInterval(tick);
       timers.forEach(clearTimeout);
     };
   }, []);
@@ -999,7 +1010,27 @@ export default function CampaignTerminal({
   // One feed, laid out as a fold tree (chapter > session > rest > encounter),
   // with one search field. The logged session_start/_end lines give way to the
   // session folds.
-  const feedEvents = useMemo(() => withoutLoggedSessionLines(events), [events]);
+  // An unbuilt being card (its row exists, its scene + segments do not yet) is held off screen: it would be rewritten when built.
+  // Printed as it stands only after THINKING_MAX_MS (a builder that never finished, or history).
+  const [heldClock, setHeldClock] = useState(0);
+  const unheld = useMemo(() => {
+    void heldClock;
+    const t = Date.now();
+    return events.filter(e => e.payload?.kind !== 'being_thought' || !isCardPending(e.payload, t - new Date(e.timestamp).getTime()));
+  }, [events, heldClock]);
+  const hasHeld = unheld.length !== events.length;
+  // A thinking card is tall: keep the bottom pinned when one appears (only if the reader was already at the bottom).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || thinking.length === 0) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) el.scrollTop = el.scrollHeight;
+  }, [thinking.length]);
+  useEffect(() => {
+    if (!hasHeld) return;
+    const i = setInterval(() => setHeldClock(c => c + 1), 5000);
+    return () => clearInterval(i);
+  }, [hasHeld]);
+  const feedEvents = useMemo(() => withoutLoggedSessionLines(unheld), [unheld]);
   const emptyFrom = olderCursor ? (events[0]?.timestamp ?? null) : null;
   const [query, setQuery] = useState('');
   const searching = query.trim().length > 0;
@@ -1021,7 +1052,7 @@ export default function CampaignTerminal({
     const ids = new Set(freshCardsRef.current);
     freshCardsRef.current = [];
     const who = new Set(narrated.events.filter(e => ids.has(e.id) && e.characterId).map(e => e.characterId as string));
-    if (who.size) setPendingBeings(prev => (prev.some(p => who.has(p.characterId)) ? prev.filter(p => !who.has(p.characterId)) : prev));
+    if (who.size) { dispatchThinking({ type: 'card', characterIds: [...who] }); who.forEach(id => setTimeout(() => dispatchThinking({ type: 'remove', characterId: id }), DISSOLVE_MS)); }
   }, [narrated]);
   const hits = useMemo(() => {
     if (!searching) return 0;
@@ -1316,16 +1347,7 @@ export default function CampaignTerminal({
             }}
           />
           {/* A being is listening (ruling 10): its name and a quiet pulsing mark until its card lands. */}
-          {!searching && !viewAs && pendingBeings.length > 0 && (
-            <div data-pending-beings style={{ padding: '2px 14px' }}>
-              <style>{'@keyframes tf-pend{0%,80%,100%{opacity:.2}40%{opacity:1}}.tf-pend-dot{display:inline-block;animation:tf-pend 1.2s infinite}.tf-pend-dot:nth-child(2){animation-delay:.2s}.tf-pend-dot:nth-child(3){animation-delay:.4s}@media (prefers-reduced-motion:reduce){.tf-pend-dot{animation:none}}'}</style>
-              {pendingBeings.map(p => (
-                <div key={p.characterId} data-pending-being={p.characterId} style={{ fontFamily: mono, fontSize: 11, lineHeight: 1.5, color: novelOnly ? 'rgba(255,255,255,0.45)' : '#6b6b68', opacity: p.fading ? 0 : 1, transition: 'opacity 400ms ease' }}>
-                  {p.name} <span aria-label="thinking"><span className="tf-pend-dot">.</span><span className="tf-pend-dot">.</span><span className="tf-pend-dot">.</span></span>
-                </div>
-              ))}
-            </div>
-          )}
+          {!searching && !viewAs && <ThinkingCards cards={thinking} dark={novelOnly} />}
           {/* The engine's refusal of a typed line: one muted aside under the latest row (Watcher only). */}
           {!searching && !viewAs && tableNotes.map((t, i) => (
             <div key={i} data-table-note style={{ padding: '2px 14px', fontFamily: mono, fontSize: 11, lineHeight: 1.5, color: '#6b6b68', fontStyle: 'italic' }}>

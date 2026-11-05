@@ -40,10 +40,10 @@ function mechanicPhrase(mechanics: unknown): string {
   return parts.length ? ` [${parts.join('; ')}]` : '';
 }
 
-function abilitiesOf(data: unknown): Array<{ name: string; description: string }> {
+function abilitiesOf(data: unknown): Array<{ name: string; description: string; kv: number }> {
   const a = rec(data).itemAbilities;
   if (!Array.isArray(a)) return [];
-  return a.map((x) => ({ name: str(rec(x).name), description: str(rec(x).description) })).filter((x) => x.name);
+  return a.map((x) => ({ name: str(rec(x).name), description: str(rec(x).description), kv: typeof rec(x).kv === 'number' ? (rec(x).kv as number) : 0 })).filter((x) => x.name);
 }
 
 export function capabilitiesFrom(input: {
@@ -78,7 +78,9 @@ export function capabilitiesFrom(input: {
   for (const it of input.held ?? []) {
     const via = str(it?.name);
     for (const a of abilitiesOf(it?.data)) {
-      add({ face: 'can', source: 'item', name: a.name, via, aware: true, line: `CAN ${a.name}${via ? ` (with the ${via})` : ''}${tail(a.description)}` });
+      // A liability on a thing (negative KV — "Dead Battery") ACTS ON the bearer; it is not something they can do (2026-11-05).
+      if (a.kv < 0) add({ face: 'actsOn', source: 'item', name: a.name, via, aware: true, line: `ACTS ON them: ${a.name}${via ? ` (the ${via})` : ''}${tail(a.description)}` });
+      else add({ face: 'can', source: 'item', name: a.name, via, aware: true, line: `CAN ${a.name}${via ? ` (with the ${via})` : ''}${tail(a.description)}` });
     }
   }
 

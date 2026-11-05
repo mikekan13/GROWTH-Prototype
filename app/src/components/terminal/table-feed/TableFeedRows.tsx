@@ -8,8 +8,8 @@
  * lock on desktop, tap on touch, bottom sheet under 600 px). Nothing here is
  * hold-triggered; taps are `click`.
  */
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { type CardReveal, segmentChars, revealChars, revealDuration, truncateSegments } from './card-reveal';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { type CardReveal, type GrowthReveal, createGrowthReveal, segmentChars, truncateSegments } from './card-reveal';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { segmentMarks, splitEntities, presentCycle, realClock, type FeedSegment, type FeedTimescale, type EntityName } from '@/lib/feed-segments';
 import type { FeedRowModel, CharacterRowModel, NarrationRowModel, BarRowModel, WithdrawnRowModel, BeatRowModel, RollRowModel, Via } from './feed-rows';
@@ -314,13 +314,17 @@ export function CharacterRow({ row, caret, withdrawn }: { row: CharacterRowModel
   const total = segmentChars(row.segments);
   const start = row.via === 'being' ? typed?.startOf(row.key) : undefined;
   const [now, setNow] = useState(() => Date.now());
-  const typing = start !== undefined && now - start < revealDuration(total);
+  // Printed text is never taken back: a card that grows keeps what is visible and types only its new tail.
+  const growth = useRef<GrowthReveal | null>(null);
+  if (!growth.current) growth.current = createGrowthReveal();
+  const visibleChars = row.via === 'being' ? growth.current.visible(total, start, now) : total;
+  const typing = visibleChars < total;
   useEffect(() => {
     if (!typing) return;
     const t = setInterval(() => setNow(Date.now()), 40);
     return () => clearInterval(t);
   }, [typing]);
-  const shownSegments = typing ? truncateSegments(row.segments, revealChars(total, now - (start as number))) : row.segments;
+  const shownSegments = typing ? truncateSegments(row.segments, visibleChars) : row.segments;
   return (
     <div className={`row cl${withdrawn ? ' gone' : ''}`} data-row="character" data-via={row.via} {...attrs}>
       <PortraitChip row={row} />

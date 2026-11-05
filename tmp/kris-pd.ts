@@ -1,0 +1,2 @@
+import { prisma } from '../app/src/lib/db';
+(async () => { for (const id of ['cmvcbw49u0001h448qanzbhs3','cms60ndtn0000kw48ioq10i68']) { const c = await prisma.character.findUniqueOrThrow({ where: { id } }); const d = JSON.parse(c.data); console.log(c.name, JSON.stringify(d.identity?.physicalDescription).slice(0, 300), '| gender', d.identity?.gender, '| sex', d.identity?.sex); } process.exit(0); })();

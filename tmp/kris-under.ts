@@ -1,0 +1,2 @@
+import { prisma } from '../app/src/lib/db';
+(async () => { const c = await prisma.character.findUniqueOrThrow({ where: { id: 'cms60ndtn0000kw48ioq10i68' } }); const d = JSON.parse(c.data); console.log('underclothing:', JSON.stringify(d.identity?.underclothing), '| styleAesthetics', JSON.stringify(d.identity?.styleAesthetics), '| bodyLayers', JSON.stringify(d.identity?.designer?.bodyLayers?.map((l: any) => l.text))); process.exit(0); })();

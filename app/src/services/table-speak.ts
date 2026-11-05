@@ -38,9 +38,10 @@ import { broadcastEvent } from '@/lib/campaign-stream';
 import { converseWithEntity, listenToTable, answerAtTable, type ConverseStatus, type TableListenOutcome } from '@/daya/conversation';
 import { sceneBuilderOn, buildScene, buildBeingCard, sceneFacts, clockLine, nameHead, type SeedParts } from '@/services/scene-builder';
 import { getFamiliarity, familiarityAt, scoreForLevel } from '@/services/familiarity';
-import { settleIntentionsByAct } from '@/daya/intentions';
+import { settleIntentionsByAct, promiseFromReply, setIntention } from '@/daya/intentions';
 import { judgeIntentionsDone } from '@/daya/intention-judge';
 import { isDayaEnabled } from '@/daya/events';
+import { asWriteBack, leavesForPlace } from '@/daya/composer';
 import type { TableAsk, ListenTimings, AnswerTimings } from '@/daya/ensemble';
 import { readTableTalk, type TableTalkState, type TableUtterance } from '@/services/table-talk';
 import { learnIntroductions, groupRows } from '@/services/introductions';
@@ -72,6 +73,7 @@ import { statedStretchOf, simulateStatedStretch } from '@/services/table-timeski
 import { resolveIntent } from '@/daya/adjudicator';
 import { createCampaignItem } from '@/services/campaign-item';
 import { recentVoiceOf, recentCardTextsOf, liveVoiceBound } from '@/daya/voice-history';
+import { voicedByLine } from './watcher-voiced';
 import { markAddressedByName } from '@/daya/name-addressed';
 import { splitHeld, readHeldIn } from '@/daya/facts-for-actor';
 import { cueCoverage } from '@/daya/ladder';
@@ -571,6 +573,22 @@ function voicedIn(parsed: { actions?: Array<{ actorId: string; owned?: boolean }
   return [...new Set([...(parsed.actions ?? []).filter((a) => !a.owned).map((a) => a.actorId), ...(parsed.thoughts ?? []).map((t) => t.actorId), ...parsed.quotes.map((q) => q.speakerId).filter((id): id is string => !!id)])];
 }
 
+/**
+ * FINDING 62a: the characters the Watcher has voiced in THIS session (speech as them, a deed written for them) — sticky until the
+ * session ends. Cached per session in memory; each Watcher line invalidates the entry (it is re-read, then the line's own ids join,
+ * so a declaration still being written is not missed). Narration ABOUT a character does not count. Never throws.
+ */
+/**
+ * RULING (Michael, 2026-11-05): "Watcher-voiced characters isn't a thing really. Any non-Trailblazer character can be voiced by the
+ * Watcher. They may act on their own if the Watcher didn't already say what they are doing." So the rule is PER LINE, not per
+ * session: a being whose deed or speech THIS line gave does not also act on its own for this beat (the Watcher already said what it
+ * does); otherwise it is free. (He also said this is probably not the final resolution.)
+ */
+export async function watcherVoicedIds(_campaignId: string, _sessionId: string | null | undefined, line?: Parameters<typeof voicedByLine>[0]): Promise<Set<string>> {
+  return new Set(line ? voicedByLine(line) : []);
+}
+export function forgetWatcherVoiced(): void { /* nothing is remembered between lines any more */ }
+
 /** The roster by id, for a being's own voice (name + sex). */
 function actorsOf(roster: ProseRosterEntry[]): Record<string, OwnVoiceActor> {
   return Object.fromEntries(roster.map((r) => [r.id, { name: r.name, sex: r.sex ?? null }]));
@@ -884,6 +902,8 @@ async function runBeats(
     blended?: Set<string>;
     /** The roster character the Watcher voices (HELD REACTIONS): his reaction to another being's line is held to his next beat, not posted. */
     gmActorId?: string | null;
+    /** FINDING 62a: characters the Watcher has voiced (speech / deeds) this session — they do not act or speak on their own. */
+    watcherVoiced?: Set<string>;
     /** THE TURN HANDED OVER: a being the line's "waits until she…" names — it gets the turn after the beats. */
     turnTo?: string | null;
   },
@@ -1061,6 +1081,16 @@ async function runBeats(
         // THE CHOSEN ACT (Day 6, 2026-11-04, finding 23: thirty stays, one act): a being whose record chose an act DOES it — the act
         // is carded as its deed and read by the world (answer / hang up / write back), like a Watcher-narrated act but its own.
         const chosenAct = impulse === 'act' ? outcome.listened?.act?.trim() ?? '' : '';
+        // FINDING 62a — RULING ASSUMED 2026-11-05 (Michael has NOT ruled): a being the Watcher voices (the roster character his lines
+        // speak as: gmActorId = the last voiced actor, else the line's sole actor) does NOT act or speak on its own. Its beat still ran
+        // (perception, chooser, voice → the thought card, already posted above); a chosen act/speak is not executed in the world.
+        // Finding 64 was this: Kristopher chose "writes back to Violet", the words path found nothing, and the world heard nothing.
+        // STICKY per session (62a, round 2): voiced = the Watcher gave it speech or a deed this session, not "the last actor of this line".
+        if ((impulse === 'act' || impulse === 'speak') && !!truth.watcherVoiced?.has(listenerId)) {
+          const gmName = listeners.find((l) => l.id === listenerId)?.name ?? listenerId;
+          console.log(`[table-speak] ${gmName}: the Watcher voices this being — its chosen act stays a thought`);
+          return;
+        }
         if (chosenAct && !granted.has(listenerId) && !voiced.has(listenerId)) {
           granted.add(listenerId);
           const actorName = listeners.find((l) => l.id === listenerId)?.name ?? listenerId;
@@ -1073,21 +1103,25 @@ async function runBeats(
           // A WRITE-BACK NEEDS WORDS (finding 51, 2026-11-05): the deed "writes back to Kristopher on the phone" reached the world with no
           // message. The being composes its text (its own answer, as if its turn), the words go on the record as its text, and the deed
           // carries them to the other's thing as a received message.
-          const writeBack = /^writes?\s+(?:back\s+to\s+)?(.+?)(?:\s+again|\s+on\s+the\s+.+)?\s*$/i.exec(chosenAct);
+          // FINDING 70 (2026-11-05): asWriteBack (composer.ts) — the offered deed, with the words the act itself carried when it quoted any.
+          const writeBack = asWriteBack(chosenAct, [], outcome.listened?.thought);
           if (writeBack) {
-            let words: string | null = null;
-            try {
+            // Words the act carried are sent as they are; the being composes only when it carried none.
+            let words: string | null = outcome.listened?.actWords?.trim() || writeBack.words?.trim() || null;
+            if (!words) try {
               const o = await answerAtTable(listenerId, actor.role, { kind: 'turn' }, { onEvent: (event) => broadcastEvent(campaignId, { ...event, kind: 'being_speaking' }) });
               const a = o.answer?.action;
               words = o.status === 'ok' && a?.kind === 'speak' && a.content?.trim() ? a.content.trim() : null;
             } catch (err) { console.warn('[table-speak] the text had no words (non-fatal):', err instanceof Error ? err.message : err); }
             if (words) {
-              const to = writeBack[1].trim();
+              const to = writeBack.to;
               console.log(`[table-speak] ${actorName} texts ${to}: "${words}"`);
+              // FINDING 63 (2026-11-05): a reply that assents to a meeting makes a PLAN with a clock — read before the send changes the signal.
+              await planFromReply(campaignId, listenerId, actorName, words);
               await postChat(campaignId, 'ai_copilot', actor.userId, actorName, listenerId, actorName, `texts ${to}: "${words}"`, { via: 'being', raw: `texts ${to}: ${words}` });
               if (cardRowId) await appendBeingCardSegments(campaignId, cardRowId, [{ kind: 'speech', text: words }]).catch(() => undefined);
               const quote = { text: words, speakerId: listenerId, speakerLabel: actorName } as unknown as ProseQuote;
-              narratedActs(campaignId, [{ actorId: listenerId, actorLabel: actorName, text: `${chosenAct}: "${words}"` }], { userId: actor.userId, username: actor.username }, { narrated: false, quotes: [quote] });
+              narratedActs(campaignId, [{ actorId: listenerId, actorLabel: actorName, text: `${chosenAct}: "${words}"` }], { userId: actor.userId, username: actor.username }, { narrated: false, quotes: [quote], planned: true });
               return;
             }
             // Finding 62 (2026-11-05): no words, no deed at the world — it sounded a phone and borrowed another speaker's quote.
@@ -1152,15 +1186,20 @@ async function runBeats(
     try {
       const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
       const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { name: true, holderId: true, data: true } });
-      const { liveSignal } = await import('@/services/item-signal');
-      const goingRow = rows.map((r) => { let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; } return { r, s: liveSignal(d, cycle) }; }).find((x) => x.s?.by === listenerId);
+      const { liveSignals, mirrorOf } = await import('@/services/item-signal');
+      // Finding 69: the listener's OWN messages on a thing are a thread (the far side counts how many were read / unanswered).
+      const goingRow = rows.map((r) => { let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; } const sent = liveSignals(d, cycle).filter((x) => x.by === listenerId); return { r, sent, s: mirrorOf(sent) }; }).find((x) => x.s);
       const going = goingRow?.s ?? null;
       if (going && goingRow) {
         // WHOSE THING IT IS (session 2 live, 2026-11-03): "Her phone rings." left Kristopher thinking of "the ringing from the other night".
         const holder = goingRow.r.holderId ? (await prisma.character.findUnique({ where: { id: goingRow.r.holderId }, select: { name: true } }).catch(() => null))?.name?.split(/\s+/)[0] ?? null : null;
         const thing = goingRow.r.name.replace(/^(?:the|her|his|their|my)\s+/i, '');
         // Day 6 (2026-11-04): the far side by the signal's STATE — ringing, answered (on the line), a message delivered.
-        const content = going.state === 'connected'
+        const sentMsgs = goingRow!.sent.filter((x) => x.state === 'received' || x.state === 'read');
+        const manyText = sentMsgs.length > 1 && (going.state === 'received' || going.state === 'read')
+          ? (await import('@/services/item-signal')).threadTextFor(sentMsgs, 'caller', holder, { thing: `${holder ? `${holder}'s ` : ''}${thing}` })
+          : null;
+        const content = manyText ? manyText : going.state === 'connected'
           ? `${holder ?? 'They'} answered${holder ? ` ${holder}'s ${thing}` : ''}. You are on the line with ${holder ?? 'them'} now: what you say reaches them, and what they say reaches you.`
           : going.state === 'received'
             ? `Your message reached${holder ? ` ${holder}'s ${thing}` : ' them'}.${going.words ? ` It said: "${going.words}".` : ''} Nothing has come back yet.`
@@ -1585,7 +1624,8 @@ async function speakProseSplit(
   stage('jewl');
 
   // 0b. TIME — the line costs the world what it states, else what it plausibly takes (table-clock).
-  if (plan.world.length) await liveStatedTime(campaignId, actor, await advanceClockForLine(campaignId, 'gm-line', message), message);
+  // Finding 66 (2026-11-05): a stated time on ANY Watcher line moves the clock — even when every unit of the line was filed as a being's act.
+  await liveStatedTime(campaignId, actor, await advanceClockForLine(campaignId, 'gm-line', message), message);
   stage('clock');
   console.log(`[table-timing] ${JSON.stringify({ kind: 'line', totalBeforeBeatsMs: Date.now() - lineT0, stages: lineStages })}`);
 
@@ -1684,6 +1724,7 @@ async function speakProseSplit(
     const truthExtra = dialogue.map((d) => d.canonEventId).filter((id) => id !== truthPrimary);
     // "He waits for the door": the one being in a different room from the Watcher's character (null unless exactly one).
     const gmId = proseCtx.lastVoiced?.id ?? soleActor(parsed);
+    const watcherVoiced = await watcherVoicedIds(campaignId, (await liveVoiceBound(campaignId).catch(() => ({} as { sessionId?: string | null }))).sessionId ?? null, parsed);
     let otherBehindDoor: string | null = null;
     if (gmId && /\bfor the door\b/i.test(message)) {
       try {
@@ -1693,7 +1734,7 @@ async function speakProseSplit(
         otherBehindDoor = away.length === 1 ? away[0] : null;
       } catch { /* unknown → no turn handed */ }
     }
-    const answered = await runBeats(campaignId, actor, plan.beats, listeners, { primary: truthPrimary, extra: truthExtra, voicedIds: voicedIn(parsed), actorId: soleActor(parsed), thoughts: parsed.thoughts, actors: actorsById, preListened, blended, gmActorId: gmId, turnTo: waitsFor(message, roster, gmId, otherBehindDoor) }, {
+    const answered = await runBeats(campaignId, actor, plan.beats, listeners, { primary: truthPrimary, extra: truthExtra, voicedIds: voicedIn(parsed), actorId: soleActor(parsed), thoughts: parsed.thoughts, actors: actorsById, preListened, blended, gmActorId: gmId, watcherVoiced, turnTo: waitsFor(message, roster, gmId, otherBehindDoor) }, {
       waitForAnswers: true,
       answerAfterWorldOnly: BEINGS_ANSWER === 'always',
     });
@@ -1810,7 +1851,33 @@ function intentWithWords(a: { actorId: string; actorLabel: string; text: string 
   return `${a.text}\nThe words ${a.actorLabel} put into it, exactly: "${said.join(' ')}"`;
 }
 
-function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined, gm?: { userId: string; username: string }, opts: { narrated?: boolean; quotes?: ProseQuote[] } = {}): void {
+/**
+ * FINDING 63 (2026-11-05): a reply that assents to a proposed meeting ("Meet me at the coffee shop in 15 minutes or so?" → "I'll be there.")
+ * becomes a pending intention with a clock, so the engine can put the being on its feet when it is due. `asked` = the words of the
+ * message live on the being's own thing (a message another sent it), unless given. Non-fatal; never throws.
+ */
+async function planFromReply(campaignId: string, characterId: string, name: string, reply: string, asked?: string): Promise<void> {
+  try {
+    const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
+    let askedWords = asked?.trim() ?? '';
+    if (!askedWords) {
+      const { liveSignal } = await import('@/services/item-signal');
+      const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: characterId, data: { contains: '"signal"' } }, select: { data: true } });
+      for (const r of rows) {
+        let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; }
+        const s = liveSignal(d, cycle);
+        if (s?.words && s.by !== characterId) { askedWords = s.words; break; }
+      }
+    }
+    if (!askedWords) return;
+    const draft = promiseFromReply(reply, askedWords, cycle);
+    if (!draft) return;
+    await setIntention(characterId, { description: draft.description, trigger: null, dueCycle: draft.dueCycle, dueUntil: draft.dueUntil }, cycle);
+    console.log(`[intentions] ${name}: a promise → "${draft.description}" due ${draft.dueCycle?.toFixed(6) ?? 'no clock'} (finding 63, 2026-11-05)`);
+  } catch (err) { console.warn('[table-speak] the promise was not planned (non-fatal):', err instanceof Error ? err.message : err); }
+}
+
+function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined, gm?: { userId: string; username: string }, opts: { narrated?: boolean; quotes?: ProseQuote[]; planned?: boolean } = {}): void {
   // ONE DEED, ONE SOUND (session 4, 2026-11-04, finding 13): "He dials her number… then he hits call" are two steps of one deed; each
   // rang her phone, and the table heard two rings in the same second. The same sound at the same place from one line plays once.
   const sounded = new Set<string>();
@@ -1828,14 +1895,26 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
         .catch((err) => console.warn(`[table-speak] roll for ${a.actorLabel} not started (non-fatal):`, err instanceof Error ? err.message : err));
       continue;
     }
+    // FINDING 63 (2026-11-05): a Watcher-typed reply (a text with the character's quoted words) answering a message live on its thing plans too.
+    const replyWords = !opts.planned && /(?:texts?|writes?|replies|replied|types?|sends?|answers?|messages?)/i.test(a.text)
+      ? (opts.quotes ?? []).filter((q) => q.speakerId === a.actorId && q.text.trim()).map((q) => q.text.trim()).join(' ') : '';
     void feedCycle(campaignId)
-      .then((cycle) => resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: intentWithWords(a, opts.quotes), cycle: cycle ?? 0, narrated: opts.narrated ?? true }))
+      .then(async (cycle) => {
+        if (replyWords) await planFromReply(campaignId, a.actorId, a.actorLabel, replyWords);
+        return resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: intentWithWords(a, opts.quotes), cycle: cycle ?? 0, narrated: opts.narrated ?? true });
+      })
       .then(async (r) => {
         const applied = r.effects?.applied ?? [];
         const refused = r.effects?.refused ?? [];
         if (applied.length || refused.length) console.log(`[table-speak] narrated act by ${a.actorLabel}: ${applied.join('; ') || 'nothing moved'}${refused.length ? ` · refused: ${refused.join('; ')}` : ''}`);
         // WHAT THE ACT LACKED (2026-11-03): the Watcher is told, on a Watcher-only line; the act still happened.
         for (const text of refused) broadcastEvent(campaignId, { kind: 'table_note', text, actorId: a.actorId });
+        // FINDING 63 (2026-11-05): "leaves for X" — the move branch walked (or drove) the being there; arriving keeps the plan (actSettles).
+        const goingTo = leavesForPlace(a.text);
+        if (goingTo && applied.length && !refused.some((t) => /^(?:move|drive)/i.test(t))) {
+          console.log(`[table-speak] ${a.actorLabel} left for ${goingTo} — arrived: the plan is read against the arrival`);
+          settleByAct(campaignId, a.actorId, `${a.actorLabel} arrives at ${goingTo}`);
+        }
         // THE WORLD ANSWERS THE ACT (HW9, Mike 2026-10-29: "it should have had the phone ring when I first had Kristopher
         // call"): a sound the act caused elsewhere is narrated to the table by the world itself, as its own stretch — the
         // reach judge places it at the thing (sim/senses/named-things), so the one holding the phone hears her phone and the

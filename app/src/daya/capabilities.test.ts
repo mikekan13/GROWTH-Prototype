@@ -31,6 +31,15 @@ describe('capabilitiesFrom', () => {
     expect(c.map((x) => x.line)).toEqual(['CAN Call (with the Phone): Reach someone far.', 'CAN Camera (with the Phone): Takes pictures']);
     expect(c.every((x) => x.face === 'can' && x.via === 'Phone' && x.source === 'item')).toBe(true);
   });
+  it("a liability on a thing (negative KV, Dead Battery) ACTS ON the bearer rather than being something they can do (2026-11-05)", () => {
+    const dead = { name: 'Work phone', data: { itemAbilities: [{ name: 'Connected', description: 'Instant communication.', kv: 8 }, { name: 'Dead Battery', description: 'Requires daily charging.', kv: -2 }] } };
+    const c = capabilitiesFrom({ held: [dead] });
+    expect(c.find((x) => x.name === 'Connected')?.face).toBe('can');
+    const d = c.find((x) => x.name === 'Dead Battery');
+    expect(d?.face).toBe('actsOn');
+    expect(d?.aware).toBe(true);
+    expect(d?.line).toBe('ACTS ON them: Dead Battery (the Work phone): Requires daily charging.');
+  });
   it('inside a car gives Road Travel', () => {
     const c = capabilitiesFrom({ held: [], inside: car });
     expect(c).toEqual([{ face: 'can', source: 'inside', name: 'Road Travel', via: 'Honda', line: 'CAN Road Travel (in the Honda): Move fast on roads.', aware: true }]);
