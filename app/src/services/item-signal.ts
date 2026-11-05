@@ -42,7 +42,7 @@ export function liveSignal(data: unknown, nowCycle: number): ItemSignal | null {
   const until = typeof r.until === 'number' ? r.until : Number.POSITIVE_INFINITY;
   if (nowCycle >= until || nowCycle < since) return null;
   const kind = r.kind === 'call' || r.kind === 'text' || r.kind === 'other' ? r.kind : undefined;
-  const state = r.state === 'ringing' || r.state === 'connected' || r.state === 'received' ? r.state : undefined;
+  const state = r.state === 'ringing' || r.state === 'connected' || r.state === 'received' || r.state === 'read' ? r.state : undefined;
   return {
     text: r.text.trim(), since, until,
     ...(typeof r.by === 'string' && r.by ? { by: r.by } : {}),

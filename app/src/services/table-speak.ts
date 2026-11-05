@@ -941,7 +941,8 @@ async function runBeats(
     if (me) content = ownVoice(content, me);
     // WHO SAID WHOSE NAME (HW8 run 6): "Violet?" in his mouth is HIS saying HER name — not her thought opening on "Kristopher."
     const hearerName = listeners.find((l) => l.id === listenerId)?.name ?? '';
-    if (!own && hearerName) content = markAddressedByName(content, hearerName);
+    // The far side of its own signal names the caller — itself; that is not being addressed (GM scene 4: "says your name" on his own text).
+    if (!own && !stimulus.farSide && hearerName) content = markAddressedByName(content, hearerName);
     const carried: PlannedStimulus = { ...stimulus, content, ...(via ? { via } : {}), ...(own ? { own: true } : {}) };
     // A voiced being already listening to this beat (the page was built from its monologue): take that, once.
     const pre = truth.preListened?.get(listenerId);
