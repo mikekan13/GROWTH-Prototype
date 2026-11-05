@@ -579,3 +579,39 @@ describe('fronted prepositional phrase before a possessive subject (live 2026-11
     expect(p.actions?.[0]).toMatchObject({ actorId: 'vi', owned: true });
   });
 });
+
+describe('beat splitting: a clause with its own subject is attributed on its own (GM scene 3, 2026-11-05)', () => {
+  const roster: ProseRosterEntry[] = [{ id: 'kris', name: 'Kristopher', sex: 'male' }, { id: 'vi', name: 'Violet', sex: 'female' }, { id: 'ro', name: 'Rosemary Marsh', sex: 'female' }];
+  it('the live line: only "he leaves it idling and looks..." is his; the car clauses are narration (the parser cannot know the Fusion is his)', () => {
+    const p = parseTableProse("Kristopher turns the key. The Fusion's engine catches and the dash lights come up; he leaves it idling and looks at the phone on his knee.", [...roster], { recentActors: [roster[0]] });
+    expect(p.actions?.map((a) => [a.actorId, a.text, a.owned])).toEqual([
+      ['kris', 'Turns the key', undefined],
+      ['kris', 'Leaves it idling and looks at the phone on his knee', undefined],
+    ]);
+    expect(p.narration).toContain("The Fusion's engine catches.");
+    expect(p.narration).toContain('The dash lights come up.');
+  });
+  it('"he leaves it idling and looks at the phone" stays one deed (shared subject)', () => {
+    const p = parseTableProse('He leaves it idling and looks at the phone.', [...roster], { recentActors: [roster[0]] });
+    expect(p.actions).toHaveLength(1);
+  });
+  it('"Violet sets the mug down, and the radiator knocks twice." is her deed + narration', () => {
+    const p = parseTableProse('Violet sets the mug down, and the radiator knocks twice.', [...roster], { recentActors: [roster[0]] });
+    expect(p.actions).toHaveLength(1);
+    expect(p.actions?.[0]).toMatchObject({ actorId: 'vi', text: 'Sets the mug down' });
+    expect(p.narration).toBe('The radiator knocks twice.');
+  });
+  it('"She closes the laptop and the room goes quiet; her phone buzzes." is her deed, narration, owned', () => {
+    const p = parseTableProse('She closes the laptop and the room goes quiet; her phone buzzes.', [...roster], { recentActors: [roster[1]] });
+    expect(p.actions).toHaveLength(2);
+    expect(p.actions?.[0]).toMatchObject({ actorId: 'vi', text: 'Closes the laptop' });
+    expect(p.actions?.[0].owned).toBeUndefined();
+    expect(p.actions?.[1]).toMatchObject({ actorId: 'vi', owned: true });
+    expect(p.narration).toBe('The room goes quiet.');
+  });
+  it('"Kristopher and Violet sit down" and "gives Violet and Rosemary the cups" are not split', () => {
+    expect(parseTableProse('Kristopher and Violet sit down.', [...roster], {}).actions).toHaveLength(1);
+    const p = parseTableProse('Kristopher gives Violet and Rosemary the cups.', [...roster], {});
+    expect(p.actions).toHaveLength(1);
+  });
+});

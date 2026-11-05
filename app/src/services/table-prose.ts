@@ -421,16 +421,64 @@ export function splitSentences(text: string): string[] {
 // A scene clause joined to a FRONTED prepositional clause ("The apartment is quiet, and on the desk her phone's screen has gone dark.")
 // is two sentences: the first has no actor, the second's subject is the thing after the phrase (live 2026-11-05 00:31Z: the whole
 // compound went to Violet; the cloud page then kept "On the desk her phone's screen..." as her deed).
+// BEAT SPLITTING (GM scene 3, 2026-11-05: "The Fusion's engine catches and the dash lights come up; he leaves it idling and looks at
+// the phone" was one deed of Kristopher). A compound sentence splits at `;`, `, and|but|then`, ` and then ` and a plain ` and` when the
+// clause AFTER the join has its OWN grammatical subject; each clause is then attributed on its own. "and looks at the phone" shares the
+// subject, so it stays whole.
+const CLAUSE_JOIN_RE = /\s*;\s+|,\s+(?:and then|and|but|then)\s+|\s+and then\s+|\s+and\s+/gi;
+const IRREGULAR_VERB_RE = /^(?:come|go|are|were|have|do|fall|rise|ring|stop|start|turn|begin|wake|grow|drop|is|was|had|did|went|came|sat|stood|lit|rang|fell|rose|woke|grew)$/i;
+function verbish(tok: string | undefined): boolean {
+  if (!tok) return false;
+  const t = tok.replace(/[^\w'’]/g, '');
+  return IRREGULAR_VERB_RE.test(t) || (/(?:[^su]s|ed)$/i.test(t) && !/['’]s$/i.test(t));
+}
+/**
+ * Does this clause open with a subject of its own: a roster name or he/she/they/it, or a determiner/possessive head
+ * ("the Fusion's engine catches", "her phone buzzes", "the dash lights come up")? `plain` = the join was a bare "and",
+ * which asks for more evidence (a name or "he" must be followed by a verb-like word). Pure.
+ */
+export function hasOwnSubject(clause: string, roster: ProseRosterEntry[], plain = false): boolean {
+  const c = pastOpener(clause.trim());
+  const toks = c.split(/\s+/);
+  if (toks.length < 2) return false;
+  if (/^(?:he|she|they|it)$/i.test(toks[0])) return !plain || toks.length >= 2;
+  for (const entry of roster) {
+    const name = nameAlt(entry);
+    const m = name ? new RegExp(`^${name}(?!['’]s\\b)(?=$|[^\\w])`, 'i').exec(c) : null;
+    if (m) return !plain || verbish(c.slice(m[0].length).trim().split(/\s+/)[0]);
+  }
+  // After a bare "and", his/her/their heads and any clause naming the actor's own part ("a smile flutters across his face") are the
+  // actor's body going on, not a new subject.
+  if (plain && (/^(?:his|her|their|its)$/i.test(toks[0]) || /\b(?:his|her|their)\b/i.test(c.split(/\s*;\s+|,\s+/)[0]))) return false;
+  if (/^(?:the|a|an|this|that|these|those|his|her|their|its|\w+['’]s)$/i.test(toks[0]) && toks.length >= 3) {
+    for (let i = 2; i <= 4 && i < toks.length; i++) if (verbish(toks[i])) return true;
+  }
+  return false;
+}
 const FRONTED_PREP_JOIN_RE = /,?\s+and\s+(?=(?:on|in|by|at|across|under|beside|near|over|behind|from|through|along|against|inside|outside|beneath|above|below|between)\s+(?:the|a|an|her|his|their|its|this|that))/i;
-export function splitScenePhraseClauses(sentences: string[]): string[] {
+export function splitScenePhraseClauses(sentences: string[], roster: ProseRosterEntry[] = []): string[] {
   const out: string[] = [];
+  const cap = (t: string) => `${t.charAt(0).toUpperCase()}${t.slice(1)}`;
   for (const sent of sentences) {
     const end = sent.match(/[.!?…]+$/)?.[0] ?? '.';
-    const body = sent.replace(/[.!?…]+$/, '');
-    const m = FRONTED_PREP_JOIN_RE.exec(body);
-    if (!m || m.index === 0) { out.push(sent); continue; }
-    const rest = body.slice(m.index + m[0].length);
-    out.push(`${body.slice(0, m.index)}${end}`, `${rest.charAt(0).toUpperCase()}${rest.slice(1)}${end}`);
+    let body = sent.replace(/[.!?…]+$/, '');
+    // A fronted prepositional clause ("..., and on the desk her phone's screen...") is its own sentence.
+    const pm = FRONTED_PREP_JOIN_RE.exec(body);
+    if (pm && pm.index > 0) { out.push(`${body.slice(0, pm.index)}${end}`); body = cap(body.slice(pm.index + pm[0].length)); }
+    const pieces: string[] = [];
+    let start = 0;
+    for (const m of body.matchAll(CLAUSE_JOIN_RE)) {
+      const at = m.index ?? 0;
+      const left = body.slice(start, at);
+      const rest = body.slice(at + m[0].length);
+      const plain = /^\s+and\s+$/i.test(m[0]);
+      if (left.trim().split(/\s+/).length < (plain ? 3 : 2) || !hasOwnSubject(rest, roster, plain)) continue;
+      pieces.push(left);
+      start = at + m[0].length;
+    }
+    if (!pieces.length) { out.push(pm && pm.index > 0 ? `${body}${end}` : sent); continue; }
+    pieces.push(body.slice(start));
+    for (const piece of pieces) out.push(`${cap(piece.trim())}${end}`);
   }
   return out;
 }
@@ -530,7 +578,7 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
     const rest: string[] = [];
     // What the sentence before this one was, on this line: a thought goes on through a description after it.
     let lastKind: 'thought' | 'act' | 'description' | 'narration' | 'tag' | null = null;
-    for (const written of splitScenePhraseClauses(splitSentences(text))) {
+    for (const written of splitScenePhraseClauses(splitSentences(text), roster)) {
       let sentence = written;
       let actor = sentenceActor(sentence, roster, recent);
       if (!actor) {
