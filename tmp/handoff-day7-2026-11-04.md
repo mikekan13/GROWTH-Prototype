@@ -68,3 +68,5 @@ Canon (Repository/02_CHARACTER_CREATION/Nectars_and_Thorns_System.md, #needs-val
 - A terminal row for `table_note`; the stretch's cost on prod; perception THROUGH a container; enter/leave a container as ops.
 - The crystallized-or-not pass; dream ticks during a live session; "listen capped" cutting a reply into an act (#30c); an invented past deed inside a thought (#49).
 - The card review with you.
+
+**Scenes 8–9 (close):** the lived decision beat is in — on Kristopher's lines Violet now gets her beat with the read message in her hand; she chose to stay twice, with reasons, rather than write back (#56). Your call whether that is her or a bias (#51a): the chooser's instruction already says a read, unanswered message asks for an answer now. If you text her before the date in the third test, expect her to read it on her own and either write back (her words will land on his phone) or sit on it with a reason in her card.

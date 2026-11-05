@@ -161,3 +161,11 @@ WORKING, end to end: text with words → Violet reads on her own (one card) → 
 WORKING: text → read on her own (one card) → read line → his far side "read, nothing back yet" → her record "You have not written back" and her thought "Four works and I haven't said so yet".
 
 54. **SHE NEVER GETS THE BEAT TO WRITE BACK.** On Kristopher's next line her standing beat came back `not_lived` (spiritMs 0): a standing beat with nothing new is not lived, so the chooser never runs — the read-and-unanswered message in her hand never gets a decision on another's line. The write-back path (#51b) is only reachable when something reaches her or the Watcher prompts her — and a prompted (voiced) line keeps her doings as thoughts (#53). RULE: a standing beat is LIVED when the being has something of its own still going (a message read and unanswered, a ringing phone, an open line) — the chooser runs; a stay on an unchanged record posts no card (#43), an act does.
+
+## GM SCENE 8 (02:01Z→ 11-05, own-going build, :3001, rolled back)
+
+55. **THE LIVED BEAT CRASHED.** Her standing beat was lived at last ("something of its own is still going") and then died on `ingest.tags.arousal` — the unpersisted ingest has no tags. FIXED (guarded). Scene 9 is the first run where she gets the decision beat on another's line.
+
+## GM SCENE 9 (02:14Z→ 11-05, guarded build, :3001, rolled back) — the decision beat exists
+
+56. **SHE GETS HER BEAT AND CHOOSES TO STAY, WITH A REASON.** On Kristopher's two unvoiced lines Violet's standing beat was lived (her record: "Kristopher's message, read… You have not written back."), the chooser ran, and she chose stay twice: "I keep not writing back - which is itself a kind of answer, just not the legible one" / "I think I want to go… and I still haven't typed anything". The machinery is complete (text → read → decision beat → write-back path with words); the remaining question is the stay bias (#51a) — a human player might also sit on it for two beats, so this is for Michael to judge at the table, not for a prompt to force. "The lot is quiet except for the hum of the streetlamps." was correctly not his act (beat splitting).
