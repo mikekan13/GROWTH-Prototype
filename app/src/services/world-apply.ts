@@ -452,7 +452,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             try {
               const { clockNow } = await import('./table-clock');
               const { secondsToCycles } = await import('@/types/time');
-              const { withSignal, signalCause, liveSignal } = await import('./item-signal');
+              const { withSignal, signalCause, liveSignal, withoutSignal } = await import('./item-signal');
               const { cycle, ts } = await clockNow(campaignId);
               const row = await prisma.campaignItem.findUnique({ where: { id: where.itemId }, select: { data: true } });
               const rowData = parseData(row?.data ?? null);
@@ -476,6 +476,14 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
                 const words = e.words && /[\p{L}\p{N}]/u.test(e.words) ? e.words : (kind === 'text' ? quoted : undefined);
                 const state = kind === 'text' ? 'received' : 'ringing';
                 await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: soundText, since: cycle, until: state === 'received' ? Number.POSITIVE_INFINITY : cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}), kind, state, ...(words ? { words } : existing?.words ? { words: existing.words } : {}) })) } });
+              }
+              // A REPLY ANSWERS THE MESSAGE (finding 51, 2026-11-05): the actor's own thing that carried the other's unanswered message is settled.
+              if (where.holderId) {
+                const mine = await prisma.campaignItem.findMany({ where: { campaignId, holderId: actor.id, status: 'ACTIVE' }, select: { id: true, data: true } });
+                for (const m of mine) {
+                  const md = parseData(m.data ?? null); const ms = liveSignal(md, cycle);
+                  if (ms && ms.by === where.holderId && (ms.state === 'read' || ms.state === 'received')) await prisma.campaignItem.update({ where: { id: m.id }, data: { data: JSON.stringify(withoutSignal(md)) } });
+                }
               }
             } catch (err) { console.warn('[world-apply] signal not recorded (non-fatal):', err); }
           }

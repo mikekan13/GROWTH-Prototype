@@ -1070,6 +1070,28 @@ async function runBeats(
           const actText = actInThirdPerson(actorName, truth.actors?.[listenerId]?.sex, chosenAct);
           if (cardRowId && actText) await appendBeingCardSegments(campaignId, cardRowId, [{ kind: 'action', text: actText }], 'act').catch((err) => console.warn('[table-speak] act not joined to the card (non-fatal):', err instanceof Error ? err.message : err));
           else await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listenerId, name: actorName, sex: truth.actors?.[listenerId]?.sex }, chosenAct).catch((err) => console.warn('[table-speak] act card not posted (non-fatal):', err instanceof Error ? err.message : err));
+          // A WRITE-BACK NEEDS WORDS (finding 51, 2026-11-05): the deed "writes back to Kristopher on the phone" reached the world with no
+          // message. The being composes its text (its own answer, as if its turn), the words go on the record as its text, and the deed
+          // carries them to the other's thing as a received message.
+          const writeBack = /^writes?\s+(?:back\s+to\s+)?(.+?)(?:\s+again|\s+on\s+the\s+.+)?\s*$/i.exec(chosenAct);
+          if (writeBack) {
+            let words: string | null = null;
+            try {
+              const o = await answerAtTable(listenerId, actor.role, { kind: 'turn' }, { onEvent: (event) => broadcastEvent(campaignId, { ...event, kind: 'being_speaking' }) });
+              const a = o.answer?.action;
+              words = o.status === 'ok' && a?.kind === 'speak' && a.content?.trim() ? a.content.trim() : null;
+            } catch (err) { console.warn('[table-speak] the text had no words (non-fatal):', err instanceof Error ? err.message : err); }
+            if (words) {
+              const to = writeBack[1].trim();
+              console.log(`[table-speak] ${actorName} texts ${to}: "${words}"`);
+              await postChat(campaignId, 'ai_copilot', actor.userId, actorName, listenerId, actorName, `texts ${to}: "${words}"`, { via: 'being', raw: `texts ${to}: ${words}` });
+              if (cardRowId) await appendBeingCardSegments(campaignId, cardRowId, [{ kind: 'speech', text: words }]).catch(() => undefined);
+              const quote = { text: words, speakerId: listenerId, speakerLabel: actorName } as unknown as ProseQuote;
+              narratedActs(campaignId, [{ actorId: listenerId, actorLabel: actorName, text: `${chosenAct}: "${words}"` }], { userId: actor.userId, username: actor.username }, { narrated: false, quotes: [quote] });
+              return;
+            }
+            console.log(`[table-speak] ${actorName}: meant to write back but found no words — the deed stands without a message`);
+          }
           narratedActs(campaignId, [{ actorId: listenerId, actorLabel: actorName, text: chosenAct }], { userId: actor.userId, username: actor.username }, { narrated: false });
           return;
         }
