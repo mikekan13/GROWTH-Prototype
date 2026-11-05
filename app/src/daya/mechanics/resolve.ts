@@ -21,7 +21,8 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import type { GrowthCharacter } from '@/types/growth';
 import type { AttributeName } from '@/lib/character-actions';
-import { spendAttribute, restShort, restLong } from '@/lib/character-actions';
+import { spendAttribute, restShort, restLong, effortAllOrNothingSource } from '@/lib/character-actions';
+import { recordBlossomEvents } from '@/services/trait-blossom-events';
 import { markAttributeTrainable, markSkillTrainable } from '@/services/advancement';
 import { gatherTraitModifiers } from '@/services/trait-modifiers';
 import { applyDispositionEvent } from '@/services/daya-affect';
@@ -123,6 +124,12 @@ export async function resolveEffortCheck(input: ResolveEffortCheckInput): Promis
     poolCurrent,
   });
 
+  // Dialed to Eleven (Michael 2026-11-05): under a live effort_all_or_nothing blossom (Splitting) a being's
+  // wager is the whole pool or none - a partial wager snaps to the nearer end.
+  if (effortAllOrNothingSource(sheet) && effort.effortPoints > 0 && effort.effortPoints < poolCurrent) {
+    effort.effortPoints = effort.effortPoints * 2 >= poolCurrent ? poolCurrent : 0;
+  }
+
   const drAdjust = fitResult.skill ? fitResult.drAdjust : 0;
   const drFinal = Math.max(1, input.dr - drAdjust);
 
@@ -153,6 +160,7 @@ export async function resolveEffortCheck(input: ResolveEffortCheckInput): Promis
       next = fitResult.skill ? markSkillTrainable(next, fitResult.skill) : markAttributeTrainable(next, governingAttribute);
     }
     await prisma.character.update({ where: { id: input.characterId }, data: { data: JSON.stringify(next) } });
+    await recordBlossomEvents({ campaignId: character.campaignId, characterId: input.characterId, characterName: character.name, before: sheet, after: next });
 
     const currentAfter = next.attributes?.[governingAttribute]?.current ?? 0;
     // Awaited (not fire-and-forget) — the caller (and tests) rely on the

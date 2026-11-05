@@ -21,6 +21,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { spendAttribute, updateAttribute, type AttributeName } from '@/lib/character-actions';
+import { recordBlossomEvents } from '@/services/trait-blossom-events';
 import { broadcastDeathSave } from '@/services/death-save';
 import type { GrowthCharacter, GrowthConditions } from '@/types/growth';
 
@@ -81,6 +82,8 @@ export async function applyAttributeDamage(
     where: { id: input.characterId },
     data: { data: JSON.stringify(result.character) },
   });
+  // Dialed to Eleven (Michael 2026-11-05): a blossom a trait mechanic generated/expired is announced.
+  await recordBlossomEvents({ campaignId: character.campaignId, characterId: character.id, characterName: character.name, before: charData, after: result.character });
 
   // T25: crossing into Frequency 0 (directly or via overflow) opens the
   // Facing Death door — same GM-screen trigger as the deplete path (T27).
@@ -185,6 +188,7 @@ export async function setAttributeCurrent(
     where: { id: input.characterId },
     data: { data: JSON.stringify(result.character) },
   });
+  await recordBlossomEvents({ campaignId: character.campaignId, characterId: character.id, characterName: character.name, before: charData, after: result.character });
 
   return {
     characterId: input.characterId,

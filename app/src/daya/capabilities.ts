@@ -17,6 +17,29 @@ const rec = (x: unknown): Rec => (x && typeof x === 'object' && !Array.isArray(x
 const str = (x: unknown): string => (typeof x === 'string' ? x.trim() : '');
 const tail = (d: string): string => { const s = firstSentence(d); return s ? `: ${s}` : ''; };
 
+const cap1 = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
+
+/** Dialed to Eleven (Michael 2026-11-05): a compact phrase from a trait's mechanics DATA - no per-trait text. */
+function mechanicPhrase(mechanics: unknown): string {
+  if (!Array.isArray(mechanics)) return '';
+  const parts: string[] = [];
+  for (const raw of mechanics) {
+    const m = rec(raw);
+    if (m.kind === 'pool_multiplier' && Array.isArray(m.pools) && typeof m.factor === 'number') {
+      const pools = m.pools.map((p) => cap1(str(p))).join('/');
+      const how = m.factor === 2 ? 'doubled' : m.factor === 3 ? 'tripled' : m.factor === 0.5 ? 'halved' : `x${m.factor}`;
+      const what = m.direction === 'in' ? 'recovery of' : m.direction === 'out' ? 'loss from' : 'change to';
+      parts.push(`every ${what} ${pools} is ${how}`);
+    } else if (m.kind === 'generate_blossom') {
+      const w = rec(m.when); const b = rec(m.blossom);
+      if (str(w.pool) && str(b.name)) parts.push(`when ${cap1(str(w.pool))} reaches ${Number(w.at) || 0} it grows ${str(b.name)}`);
+    } else if (m.kind === 'effort_all_or_nothing') {
+      parts.push('Effort is all or nothing while this lasts');
+    }
+  }
+  return parts.length ? ` [${parts.join('; ')}]` : '';
+}
+
 function abilitiesOf(data: unknown): Array<{ name: string; description: string }> {
   const a = rec(data).itemAbilities;
   if (!Array.isArray(a)) return [];
@@ -47,7 +70,7 @@ export function capabilitiesFrom(input: {
       const hidden = r.hidden === true;
       add({
         face: hidden ? 'actsOn' : 'is', source: type, name, aware: !hidden,
-        line: `${type.toUpperCase()} ${name}${pillar ? ` (${pillar})` : ''}${tail(str(r.description))}`,
+        line: `${type.toUpperCase()} ${name}${pillar ? ` (${pillar})` : ''}${tail(str(r.description))}${mechanicPhrase(r.mechanics)}`,
       });
     }
   }

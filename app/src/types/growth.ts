@@ -259,6 +259,21 @@ export type TraitCategory = typeof TRAIT_CATEGORIES[number];
 
 export type TraitPillar = 'body' | 'spirit' | 'soul';
 
+export type AttributeName = keyof GrowthAttributes;
+
+/**
+ * A trait's mechanic as DATA (Dialed to Eleven, Michael 2026-11-05) - the engine
+ * reads these off a nectar/thorn/live blossom; nothing is coded per trait.
+ * pool_multiplier: scales changes to the listed pools' CURRENT (in = recovery, out = spend/damage).
+ * generate_blossom: when a pool's current reaches `at` (<=), the trait grows the blossom;
+ *   a trigger expiry carrying pool/above removes it when that pool is above `above`.
+ * effort_all_or_nothing: any Effort wagered is the whole remaining pool of the attribute, or none.
+ */
+export type TraitMechanic =
+  | { kind: 'pool_multiplier'; pools: AttributeName[]; factor: number; direction: 'both' | 'in' | 'out' }
+  | { kind: 'generate_blossom'; when: { pool: AttributeName; at: number }; blossom: { name: string; description: string; pillar: TraitPillar; mechanics: TraitMechanic[]; expiry: { kind: 'trigger'; text: string; pool: AttributeName; above: number } } }
+  | { kind: 'effort_all_or_nothing' };
+
 /**
  * A sense granted by a source (Mike 2026-10-09: a mind sense "could come from
  * anything. It would be like any other sense. could be an organ an item a
@@ -297,6 +312,10 @@ export interface GrowthTrait {
   category: TraitCategory;
   description: string;
   type: 'nectar' | 'blossom' | 'thorn';
+  /** Data-driven mechanics the engine fires (see TraitMechanic). */
+  mechanics?: TraitMechanic[];
+  /** Blossom expiry (mirrors forge-schemas); a trigger with pool/above is engine-checked. */
+  expiry?: { kind: 'time'; amount: number; unit: 'rounds' | 'hours' | 'days' | 'cycles' } | { kind: 'trigger'; text: string; pool?: AttributeName; above?: number };
   /**
    * Optional structured roll modifiers. The runtime sums applicable ones
    * during skill checks. Keep simple: flat bonuses keyed by skill/governor.

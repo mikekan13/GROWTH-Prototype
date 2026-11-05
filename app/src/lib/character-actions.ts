@@ -9,11 +9,11 @@
  * array of what happened (for logging, undo, AI audit trail).
  */
 
-import type { GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthSkill, GrowthTrait, SkillGovernor, AugmentSource } from '@/types/growth';
+import type { GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthSkill, GrowthTrait, SkillGovernor, AugmentSource, AttributeName, TraitMechanic } from '@/types/growth';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-export type AttributeName = keyof GrowthAttributes;
+export type { AttributeName };
 
 export interface ActionResult {
   character: GrowthCharacter;
@@ -45,6 +45,80 @@ function clampCurrent(value: number, max: number): number {
 
 function deepCloneCharacter(c: GrowthCharacter): GrowthCharacter {
   return JSON.parse(JSON.stringify(c));
+}
+
+// ── Trait mechanics (Dialed to Eleven, Michael 2026-11-05) ──────────────────
+// Mechanics are DATA on traits; these readers are generic.
+
+/** Mechanics carried by the sheet's nectars/thorns and LIVE blossoms (blossoms are rows in traits). */
+function liveMechanics(c: GrowthCharacter): Array<{ trait: GrowthTrait; m: TraitMechanic }> {
+  const out: Array<{ trait: GrowthTrait; m: TraitMechanic }> = [];
+  for (const t of c.traits ?? []) for (const m of t.mechanics ?? []) out.push({ trait: t, m });
+  return out;
+}
+
+/** Product of every pool_multiplier that touches `attr` in `dir` ('out' = spend, 'in' = restore). */
+function poolFactor(c: GrowthCharacter, attr: AttributeName, dir: 'in' | 'out'): number {
+  let f = 1;
+  for (const { m } of liveMechanics(c)) {
+    if (m.kind === 'pool_multiplier' && m.pools.includes(attr) && (m.direction === 'both' || m.direction === dir)) f *= m.factor;
+  }
+  return f;
+}
+
+/** Name of a live trait that makes Effort all-or-nothing, else null. */
+export function effortAllOrNothingSource(c: GrowthCharacter | null | undefined): string | null {
+  if (!c) return null;
+  for (const { trait, m } of liveMechanics(c)) if (m.kind === 'effort_all_or_nothing') return trait.name;
+  return null;
+}
+
+/**
+ * The all-or-nothing rule as a check: returns the error text when `effort` is a partial wager
+ * of `available` under a live all-or-nothing trait, else null.
+ */
+export function effortAllOrNothingViolation(c: GrowthCharacter | null | undefined, effort: number, available: number): string | null {
+  const src = effortAllOrNothingSource(c);
+  if (!src || effort <= 0 || effort >= available) return null;
+  return `${src}: all or nothing — wager the whole ${available} or none`;
+}
+
+/**
+ * Generate blossoms whose `when` is met and remove blossoms whose trigger expiry is met.
+ * Idempotent (dedupe by name + source). Mutates the (already cloned) character.
+ */
+function settleTraitTriggers(c: GrowthCharacter, changes: string[]): void {
+  if (!Array.isArray(c.traits)) return;
+  for (const { trait, m } of liveMechanics(c)) {
+    if (m.kind !== 'generate_blossom' || trait.type === 'blossom') continue;
+    const cur = c.attributes[m.when.pool]?.current;
+    if (cur === undefined || cur > m.when.at) continue;
+    if (c.traits.some(t => t.type === 'blossom' && t.name === m.blossom.name && t.source === trait.name)) continue;
+    c.traits.push({
+      name: m.blossom.name, type: 'blossom', category: 'fatigue', pillar: m.blossom.pillar,
+      description: m.blossom.description, source: trait.name,
+      mechanics: m.blossom.mechanics, expiry: m.blossom.expiry,
+    });
+    changes.push(`Blossom generated: ${m.blossom.name} (from ${trait.name})`);
+  }
+  c.traits = c.traits.filter(t => {
+    const e = t.expiry;
+    if (t.type !== 'blossom' || !e || e.kind !== 'trigger' || !e.pool || e.above === undefined) return true;
+    const cur = c.attributes[e.pool]?.current;
+    if (cur !== undefined && cur > e.above) { changes.push(`Blossom expired: ${t.name}`); return false; }
+    return true;
+  });
+}
+
+/** Blossoms generated/expired between two sheets (for the campaign event). */
+export function diffBlossoms(before: GrowthCharacter, after: GrowthCharacter): Array<{ action: 'generated' | 'expired'; name: string; source?: string }> {
+  const key = (t: GrowthTrait) => `${t.name}|${t.source ?? ''}`;
+  const b = new Map((before.traits ?? []).filter(t => t.type === 'blossom').map(t => [key(t), t]));
+  const a = new Map((after.traits ?? []).filter(t => t.type === 'blossom').map(t => [key(t), t]));
+  const out: Array<{ action: 'generated' | 'expired'; name: string; source?: string }> = [];
+  for (const [k, t] of a) if (!b.has(k)) out.push({ action: 'generated', name: t.name, source: t.source });
+  for (const [k, t] of b) if (!a.has(k)) out.push({ action: 'expired', name: t.name, source: t.source });
+  return out;
 }
 
 // ── Actions ─────────────────────────────────────────────────────────────────
@@ -93,6 +167,7 @@ export function updateAttribute(
     }
   }
 
+  settleTraitTriggers(c, changes);
   return { character: c, changes };
 }
 
@@ -103,7 +178,8 @@ export function updateAttribute(
 export function spendAttribute(
   character: GrowthCharacter,
   attributeName: AttributeName,
-  amount: number
+  amount: number,
+  opts?: { exempt?: boolean }
 ): ActionResult {
   if (amount <= 0) {
     return { character, changes: [] };
@@ -113,6 +189,13 @@ export function spendAttribute(
   if (!attr) {
     return { character, changes: [`Unknown attribute: ${attributeName}`] };
   }
+
+  // Dialed to Eleven (Michael 2026-11-05): pool_multiplier mechanics scale the hit. `exempt` =
+  // "Feelings are the instrument" (the player chose to move someone). The overflow to Frequency
+  // below is not re-scaled: frequency is in no multiplier's pool list.
+  const factor = opts?.exempt ? 1 : poolFactor(character, attributeName, 'out');
+  if (factor !== 1) amount = Math.round(amount * factor);
+  if (amount <= 0) return { character, changes: [] };
 
   const newCurrent = attr.current - amount;
 
@@ -150,6 +233,10 @@ export function restoreAttribute(
   if (!attr) {
     return { character, changes: [`Unknown attribute: ${attributeName}`] };
   }
+
+  // Dialed to Eleven (Michael 2026-11-05): recovery is scaled too (updateAttribute clamps at max).
+  const factor = poolFactor(character, attributeName, 'in');
+  if (factor !== 1) amount = Math.round(amount * factor);
 
   return updateAttribute(character, attributeName, attr.current + amount);
 }

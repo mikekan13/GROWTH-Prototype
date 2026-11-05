@@ -29,7 +29,8 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
 import { skilledCheck, unskilledCheck } from '@/lib/dice';
-import { spendAttribute, type AttributeName } from '@/lib/character-actions';
+import { spendAttribute, effortAllOrNothingViolation, type AttributeName } from '@/lib/character-actions';
+import { recordBlossomEvents } from '@/services/trait-blossom-events';
 import { NATURAL_TARGET } from '@/lib/damage-targeting';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
@@ -462,6 +463,9 @@ export async function declareIntentions(encounterId: string, actor: EncounterAct
       if (effort > cap) throw new ValidationError(`Effort ${effort} exceeds the cap ${cap} (Fate Die max${skill ? ' + skill level' : ''})`);
       const available = fresh.attrs[effortAttribute]?.current ?? 0;
       if (effort > available) throw new ValidationError(`${participant.name} has only ${available} ${effortAttribute} to wager`);
+      // Dialed to Eleven (Michael 2026-11-05): a live effort_all_or_nothing blossom (Splitting) - the whole pool or none.
+      const aon = effortAllOrNothingViolation(row ? parseSheet(row.data) : null, effort, available);
+      if (aon) throw new ValidationError(aon);
     } else {
       effort = 0;
     }
@@ -554,17 +558,19 @@ function isVitalDestroyed(anatomy: GrowthWorldItem, events: Array<{ partPath: st
  * later attribute-damage write in the same round never clobbers it. Returns
  * what was actually spent (clamped to the pool; 0 while Muted).
  */
-async function spendEffortNow(characterId: string, attribute: Governor, amount: number): Promise<{ spent: number; note?: string }> {
+async function spendEffortNow(characterId: string, attribute: Governor, amount: number, opts?: { exempt?: boolean }): Promise<{ spent: number; note?: string }> {
   if (amount <= 0) return { spent: 0 };
-  const row = await prisma.character.findUnique({ where: { id: characterId }, select: { data: true } });
+  const row = await prisma.character.findUnique({ where: { id: characterId }, select: { data: true, name: true, campaignId: true } });
   const sheet = row ? parseSheet(row.data) : null;
   if (!sheet?.attributes) return { spent: 0, note: 'no attribute pools on sheet' };
   if ((sheet.attributes.focus?.current ?? 0) <= 0) return { spent: 0, note: 'Muted — Focus at 0' };
   const available = sheet.attributes[attribute]?.current ?? 0;
   const spent = Math.min(amount, Math.max(0, available));
   if (spent <= 0) return { spent: 0, note: `${attribute} pool empty` };
-  const next = spendAttribute(sheet, attribute as AttributeName, spent).character;
+  // Dialed to Eleven (Michael 2026-11-05): spendAttribute applies pool multipliers; `exempt` = "Feelings are the instrument".
+  const next = spendAttribute(sheet, attribute as AttributeName, spent, { exempt: opts?.exempt }).character;
   await prisma.character.update({ where: { id: characterId }, data: { data: JSON.stringify(next) } });
+  await recordBlossomEvents({ campaignId: row?.campaignId, characterId, characterName: row?.name, before: sheet, after: next });
   return { spent, note: spent < amount ? `pool short — wagered ${spent} of ${amount}` : undefined };
 }
 

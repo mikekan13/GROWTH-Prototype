@@ -83,3 +83,14 @@ describe('capabilitiesOf', () => {
     expect(await capabilitiesOf('c1')).toEqual([]);
   });
 });
+
+describe('capabilitiesFrom — trait mechanics phrase (Dialed to Eleven)', () => {
+  it('derives a phrase from mechanic data, generically', () => {
+    const c = capabilitiesFrom({ held: [], traits: [
+      { name: 'Dialed to Eleven', type: 'thorn', pillar: 'soul', description: 'Everything lands twice.', mechanics: [{ kind: 'pool_multiplier', pools: ['willpower', 'wisdom', 'wit'], factor: 2, direction: 'both' }] },
+      { name: 'Splitting', type: 'blossom', description: 'All or nothing.', mechanics: [{ kind: 'effort_all_or_nothing' }] },
+    ] });
+    expect(c[0].line).toBe('THORN Dialed to Eleven (soul): Everything lands twice. [every change to Willpower/Wisdom/Wit is doubled]');
+    expect(c[1].line).toContain('[Effort is all or nothing while this lasts]');
+  });
+});
