@@ -505,7 +505,8 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           const sig = liveSignal(d, cycle);
           // Day 6 (2026-11-04): answering a RINGING call opens the line (connected: speech crosses both ways until someone hangs up);
           // answering a received message is reading it (the signal is done); answering a thing that is quiet clears whatever was there.
-          if (sig && sig.state !== 'received' && sig.by) {
+          // Only a RINGING call opens a line (GM scene 5: answering a READ text connected a phone call).
+          if (sig && (sig.state === 'ringing' || !sig.state) && sig.by) {
             await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withSignal(d, signalInState(sig, 'connected'))) } });
             if (answeredByHolder) {
               report.applied.push(`${answeredByHolder.name} answers "${item.name}" — on the line with ${actor.name}`);
@@ -516,14 +517,16 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           } else if (sig && sig.state === 'received') {
             // Reading a message (finding 33): the WORDS are what the reader now has — handed as what was read. The message stays on the
             // thing as `read` (Day 8, 2026-11-05): a human player would write back or let it be; "write back" stays on the list until then.
-            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withSignal(d, signalInState(sig, 'read'))) } });
+            const { secondsToCycles } = await import('@/types/time');
+            const { ts } = await clockNow(campaignId);
+            // A read message waits for an answer for a while (two hours of world time), then it is simply a message that was read.
+            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withSignal(d, { ...signalInState(sig, 'read'), until: cycle + secondsToCycles(7200, ts) })) } });
             const sender = sig.by ? await prisma.character.findUnique({ where: { id: sig.by }, select: { name: true } }).catch(() => null) : null;
             report.applied.push(`${actor.name} reads the message on "${item.name}"${sender?.name ? ` from ${sender.name}` : ''}${sig.words ? `: "${sig.words}"` : ''}`);
             if (sig.words) (report.read ??= []).push({ by: actor.id, item: item.name, words: sig.words, ...(sender?.name ? { from: sender.name } : {}) });
           } else if (sig && sig.state === 'read') {
-            // Letting a read message be (or writing back, which the sound op records on the other's thing): it is done.
-            await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
-            report.applied.push(`${actor.name} puts the message on "${item.name}" to rest`);
+            // Looking at a read message again changes nothing: it stays read, still unanswered (writing back is a sound op on the other's thing).
+            report.applied.push(`${actor.name} looks at the message on "${item.name}" again; it stays read, unanswered`);
           } else {
             await prisma.campaignItem.update({ where: { id: item.id }, data: { data: JSON.stringify(withoutSignal(d)) } });
             report.applied.push(`${actor.name} answers "${item.name}"`);
