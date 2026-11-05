@@ -63,3 +63,23 @@ describe('Day 6 (2026-11-04): a signal has a state; the parties on a line', () =
     expect(signalLines([{ name: 'Her phone', holderId: 'vi', data }], 'vi', 1.5)[0]).toContain('a message has come in');
   });
 });
+
+describe('Day 8 (2026-11-05): a message READ is a signal state of its own', () => {
+  const base = { text: "Violet's phone chimes.", since: 1, until: 2, by: 'kris', kind: 'text' as const };
+  it("signalInState 'read' holds the signal open (until Infinity), like connected", () => {
+    const sig = liveSignal(withSignal({}, { ...base, state: 'received', words: 'hi' }), 1.5)!;
+    const read = signalInState(sig, 'read');
+    expect(read.state).toBe('read');
+    expect(read.until).toBe(Number.POSITIVE_INFINITY);
+    expect(read.words).toBe('hi');
+    expect(signalInState(sig, 'received').until).toBe(2);
+  });
+  it('tells a read message to both sides, with and without its words', () => {
+    const sig = { ...base, state: 'read' as const, words: 'Is this the woman with purple hair?' };
+    expect(signalTextFor(sig, 'holder', 'Kristopher')).toBe(`Kristopher's message, read: "Is this the woman with purple hair?". You have not written back.`);
+    expect(signalTextFor(sig, 'caller', 'Violet')).toBe('Violet read your message. It said: "Is this the woman with purple hair?" Nothing has come back yet.');
+    const bare = { ...base, state: 'read' as const };
+    expect(signalTextFor(bare, 'holder', 'Kristopher')).toBe("Kristopher's message, read. You have not written back.");
+    expect(signalTextFor(bare, 'caller', 'Violet')).toBe('Violet read your message. Nothing has come back yet.');
+  });
+});

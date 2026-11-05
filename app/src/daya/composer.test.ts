@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
+import { chat } from './model-client';
 vi.mock('server-only', () => ({}));
 vi.mock('./model-client', () => ({ chat: vi.fn() }));
 vi.mock('@/ai/network/translator', async () => await vi.importActual('@/ai/network/translator'));
 import { orderPrompt, parsePiece } from './orders';
-import { chooserPrompt, parseChoice, resolveRecord, recordIsEmpty, recordGist, candidateLines, openingOf, actsFor, actPairsFor, type Candidates } from './composer';
+import { chooserPrompt, parseChoice, resolveRecord, recordIsEmpty, recordGist, candidateLines, composeBeat, openingOf, actsFor, actPairsFor, type Candidates } from './composer';
 import { newTranslationMap, translateOut, translateBack } from '@/ai/network/translator';
 
 describe('orders — narrow, nameless pieces (SIMULATION-COMPOSER-DESIGN-2026-11-03)', () => {
@@ -127,5 +128,37 @@ describe('Day 6 (2026-11-04): acts on the list, the act in the choice', () => {
     expect(resolveRecord(choice!, 'Your phone rings.', 'tight', c).act).toBe('answers the phone');
     expect(parseChoice('{"about":["G1"],"imagine":null,"impulse":"act"}', c)).toMatchObject({ impulse: 'stay' });
     expect(parseChoice('{"about":["G1"],"imagine":null,"impulse":"act","act":"A9"}', c)).toMatchObject({ impulse: 'stay' });
+  });
+});
+
+describe('Day 8 (2026-11-05): a read message offers its own acts', () => {
+  it('the holder of a read message may write back or leave it; the sender may write again', () => {
+    const pairs = actPairsFor([{ text: 'x', mine: false, holder: 'Violet', state: 'read', other: 'Kristopher', thing: 'Her phone' }], []);
+    expect(pairs[0]).toEqual({ label: 'write back to Kristopher', deed: 'writes back to Kristopher on the phone' });
+    expect(pairs[1]).toEqual({ label: 'leave the message unanswered for now', deed: 'puts the phone down without answering' });
+    const mine = actPairsFor([{ text: 'x', mine: true, holder: 'Kristopher', state: 'read', other: 'Violet', thing: 'His phone' }], []);
+    expect(mine[0].label).toBe('write Violet again');
+  });
+});
+
+describe('Day 8 (2026-11-05): an own line is never a quiet beat', () => {
+  const args = (over: Record<string, unknown>) => ({
+    campaignId: 'c', entityId: 'e-own-test', name: 'Violet', identity: 'A woman.', voice: 'plain', desires: '', feltBefore: 'calm',
+    envelope: 'A room.', event: 'Violet looks at the message a moment longer.', senses: ['sight'], own: false,
+    memories: [], innerSoFar: '', recent: [], held: [], facts: [], perceived: 'Nothing new reaches you.', ...over,
+  });
+  const choose = () => vi.mocked(chat).mockResolvedValue({ text: '{"about":[],"imagine":null,"impulse":"stay"}' } as never);
+  it('own + nothing-new perception: the record carries the event as what reached her', async () => {
+    choose();
+    const beat = await composeBeat(args({ own: true }) as never);
+    expect(beat).not.toBeNull();
+    expect(beat!.record.perceived).toBe('Violet looks at the message a moment longer.');
+    expect(recordIsEmpty(beat!.record)).toBe(false);
+  });
+  it('not own, not prompted, nothing new: the beat stays quiet (perceived null)', async () => {
+    choose();
+    const beat = await composeBeat(args({ own: false }) as never);
+    expect(beat!.record.perceived).toBeNull();
+    expect(beat!.empty).toBe(true);
   });
 });
