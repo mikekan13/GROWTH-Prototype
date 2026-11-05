@@ -418,6 +418,23 @@ export function splitSentences(text: string): string[] {
   return out;
 }
 
+// A scene clause joined to a FRONTED prepositional clause ("The apartment is quiet, and on the desk her phone's screen has gone dark.")
+// is two sentences: the first has no actor, the second's subject is the thing after the phrase (live 2026-11-05 00:31Z: the whole
+// compound went to Violet; the cloud page then kept "On the desk her phone's screen..." as her deed).
+const FRONTED_PREP_JOIN_RE = /,?\s+and\s+(?=(?:on|in|by|at|across|under|beside|near|over|behind|from|through|along|against|inside|outside|beneath|above|below|between)\s+(?:the|a|an|her|his|their|its|this|that))/i;
+export function splitScenePhraseClauses(sentences: string[]): string[] {
+  const out: string[] = [];
+  for (const sent of sentences) {
+    const end = sent.match(/[.!?…]+$/)?.[0] ?? '.';
+    const body = sent.replace(/[.!?…]+$/, '');
+    const m = FRONTED_PREP_JOIN_RE.exec(body);
+    if (!m || m.index === 0) { out.push(sent); continue; }
+    const rest = body.slice(m.index + m[0].length);
+    out.push(`${body.slice(0, m.index)}${end}`, `${rest.charAt(0).toUpperCase()}${rest.slice(1)}${end}`);
+  }
+  return out;
+}
+
 /** `Ruth: …` — a line that is one speaker's words from start to finish. */
 export function isScriptLine(line: string): boolean {
   const script = line.match(SCRIPT_PREFIX_RE);
@@ -513,7 +530,7 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
     const rest: string[] = [];
     // What the sentence before this one was, on this line: a thought goes on through a description after it.
     let lastKind: 'thought' | 'act' | 'description' | 'narration' | 'tag' | null = null;
-    for (const written of splitSentences(text)) {
+    for (const written of splitScenePhraseClauses(splitSentences(text))) {
       let sentence = written;
       let actor = sentenceActor(sentence, roster, recent);
       if (!actor) {

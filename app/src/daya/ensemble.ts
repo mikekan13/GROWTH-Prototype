@@ -39,7 +39,7 @@ import { filterVoice, droppedLog, hasLightFact, isSpokenRepeat } from './voice-f
 import { absentThingsFor } from './absent-things';
 import { competingSpecific, specificsHint } from './specifics';
 import { presenceFacts, knowsLine } from './presence-facts';
-import { recentSpokenOf, recentVoiceOf, liveVoiceBound, recentWakesOf } from './voice-history';
+import { recentSpokenOf, recentVoiceOf, liveVoiceBound, recentWakesOf, lastCardGistOf } from './voice-history';
 import { capabilitiesOf, capabilityLines } from './capabilities';
 import { nameIsHers, unmarkAddressed } from './name-addressed';
 import { claimVsFact, factHint, type FactLine } from './claim-vs-fact';
@@ -1167,8 +1167,14 @@ export async function listenStimulus(
         composedFelt = beat.felt;
         composedAct = beat.record.act ?? null;
         composedPieces = { beatKey: beat.beatKey, perceived: beat.perceived, felt: beat.felt, wakes: beat.wakes, recent: priorVoice.slice(0, 4), gist: beat.plan.gist, impulse: beat.plan.impulse, ...(beat.plan.why ? { why: beat.plan.why } : {}) };
+        // AN UNCHANGED RECORD IS NO BEAT (finding 43, 2026-11-05: Kristopher carded "Your message reached Violet's phone. Nothing has come
+        // back yet." on every line): nothing new reached it, nothing woke, and the same gist as its last card — it has said this; no card.
+        const lastGist = ctx.campaignId && !beat.empty && beat.perceived === null && !beat.wakes.length
+          ? await liveVoiceBound(ctx.campaignId).then((b) => lastCardGistOf(ctx.campaignId!, characterId, b)).catch(() => null) : null;
+        const unchanged = !!lastGist && lastGist === beat.plan.gist.trim();
+        if (unchanged) console.log(`[composer] ${ctx.name}: record unchanged since its last card — no beat`);
         // AN EMPTY RECORD IS NO BEAT (table test 2026-11-03: "Nothing new reaches you" became "the phone is still chiming in my hand").
-        raw = beat.empty ? `\nImpulse: ${beat.plan.impulse}${beat.plan.why ? ` — ${beat.plan.why}` : ''}` : `${beat.thought}\nImpulse: ${beat.plan.impulse}${beat.plan.impulse === 'stay' && beat.plan.why ? ` — ${beat.plan.why}` : ''}`;
+        raw = (beat.empty || unchanged) ? `\nImpulse: ${beat.plan.impulse}${beat.plan.why ? ` — ${beat.plan.why}` : ''}` : `${beat.thought}\nImpulse: ${beat.plan.impulse}${beat.plan.impulse === 'stay' && beat.plan.why ? ` — ${beat.plan.why}` : ''}`;
       } else {
         // The local choice failed: the being keeps its earlier state; never the old single monologue (it invents).
         raw = '\nImpulse: stay';

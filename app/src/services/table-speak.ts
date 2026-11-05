@@ -749,7 +749,7 @@ export async function speakProse(
       feed: { via: 'typed', raw: message, narration: parsed.narration, speech: parsed.quotes, actions: parsed.actions },
     });
     canonEventId = declared.event.id;
-    narratedActs(campaignId, parsed.actions, actor);
+    narratedActs(campaignId, parsed.actions, actor, { quotes: parsed.quotes });
   }
   for (const q of parsed.quotes) {
     try {
@@ -1628,7 +1628,7 @@ async function speakProseSplit(
       feed: { via: 'typed', raw: rawMessage, ...feedParts },
     });
     canonEventId = declared.event.id;
-    narratedActs(campaignId, parsed.actions, actor);
+    narratedActs(campaignId, parsed.actions, actor, { quotes: parsed.quotes });
     if (pageAfter) pageAfter({ canonEventId: declared.event.id, gameEventId: declared.gameEventId ?? null });
   } else if (pageAfter) {
     for (const id of voicedHere) void postVoicedBeat(id);
@@ -1776,7 +1776,14 @@ async function withholdUnheld(
   throw new UnheldThingError(`${lines.join(' ')} Add it, or change the line.`, missing.flatMap((x) => x.things), missing[0].a.actorId);
 }
 
-function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined, gm?: { userId: string; username: string }, opts: { narrated?: boolean } = {}): void {
+/** Finding 39 (2026-11-05): an act's words live on the LINE (the quote), not in the act — they travel with the intent so a text carries them. Pure. */
+function intentWithWords(a: { actorId: string; actorLabel: string; text: string }, quotes?: ProseQuote[]): string {
+  const said = (quotes ?? []).filter((q) => q.speakerId === a.actorId && q.text.trim()).map((q) => q.text.trim());
+  if (!said.length) return a.text;
+  return `${a.text}\nThe words ${a.actorLabel} put into it, exactly: "${said.join(' ')}"`;
+}
+
+function narratedActs(campaignId: string, actions: Array<{ actorId: string; actorLabel: string; text: string }> | undefined, gm?: { userId: string; username: string }, opts: { narrated?: boolean; quotes?: ProseQuote[] } = {}): void {
   // ONE DEED, ONE SOUND (session 4, 2026-11-04, finding 13): "He dials her number… then he hits call" are two steps of one deed; each
   // rang her phone, and the table heard two rings in the same second. The same sound at the same place from one line plays once.
   const sounded = new Set<string>();
@@ -1795,7 +1802,7 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
       continue;
     }
     void feedCycle(campaignId)
-      .then((cycle) => resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: a.text, cycle: cycle ?? 0, narrated: opts.narrated ?? true }))
+      .then((cycle) => resolveIntent({ campaignId, entityCharacterId: a.actorId, intent: intentWithWords(a, opts.quotes), cycle: cycle ?? 0, narrated: opts.narrated ?? true }))
       .then(async (r) => {
         const applied = r.effects?.applied ?? [];
         const refused = r.effects?.refused ?? [];

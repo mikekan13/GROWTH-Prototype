@@ -472,7 +472,8 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
                 // line. The KIND decides the state; a text's words fall back to what the actor's line quoted; a received message waits
                 // (no end of its own) until it is read.
                 const quoted = (actText ?? '').match(/["“]([^"”]{2,600})["”]/)?.[1]?.trim();
-                const words = e.words ?? (kind === 'text' ? quoted : undefined);
+                // "…" is not the message (GM scene 2: the model wrote an ellipsis as the words): words must carry a letter or a digit.
+                const words = e.words && /[\p{L}\p{N}]/u.test(e.words) ? e.words : (kind === 'text' ? quoted : undefined);
                 const state = kind === 'text' ? 'received' : 'ringing';
                 await prisma.campaignItem.update({ where: { id: where.itemId }, data: { data: JSON.stringify(withSignal(rowData, { text: soundText, since: cycle, until: state === 'received' ? Number.POSITIVE_INFINITY : cycle + secondsToCycles(SIGNAL_SECONDS, ts), ...(cause.by ? { by: cause.by } : {}), kind, state, ...(words ? { words } : existing?.words ? { words: existing.words } : {}) })) } });
               }

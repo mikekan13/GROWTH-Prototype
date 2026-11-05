@@ -551,3 +551,31 @@ describe('segmentIsDeed — the page may not invent a deed (GM scene 1, 2026-11-
     expect(segmentIsDeed(seed, 'k', 'Her phone sits on the desk beside the laptop, its screen still lit with the new message.')).toBe(false);
   });
 });
+
+describe('fronted prepositional phrase before a possessive subject (live 2026-11-05 00:31Z)', () => {
+  const roster: ProseRosterEntry[] = [{ id: 'vi', name: 'Violet', sex: 'female' }, { id: 'kris', name: 'Kristopher', sex: 'male' }, { id: 'ro', name: 'Rosemary Marsh', sex: 'female' }];
+  it('the live line: the laptop is her deed, the phone screen is owned, the apartment is no one', () => {
+    const p = parseTableProse("Violet closes the laptop. The apartment is quiet, and on the desk her phone's screen has gone dark again.", [...roster], { recentActors: [roster[0]] });
+    expect(p.actions).toHaveLength(2);
+    expect(p.actions?.[0]).toMatchObject({ actorId: 'vi', text: 'Closes the laptop' });
+    expect(p.actions?.[0].owned).toBeUndefined();
+    expect(p.actions?.[1]).toMatchObject({ actorId: 'vi', owned: true, text: "On the desk her phone's screen has gone dark again" });
+    expect(p.narration).toBe('The apartment is quiet.');
+  });
+  it('"By the window Kristopher\'s phone buzzes once." is owned by Kristopher', () => {
+    const p = parseTableProse("By the window Kristopher's phone buzzes once.", [...roster], { recentActors: [roster[0]] });
+    expect(p.actions).toHaveLength(1);
+    expect(p.actions?.[0]).toMatchObject({ actorId: 'kris', owned: true });
+  });
+  it('"In the dark car he sets the phone on his knee." is his deed, not owned', () => {
+    const p = parseTableProse('In the dark car he sets the phone on his knee.', [...roster], { recentActors: [roster[1]] });
+    expect(p.actions).toHaveLength(1);
+    expect(p.actions?.[0]).toMatchObject({ actorId: 'kris' });
+    expect(p.actions?.[0].owned).toBeUndefined();
+  });
+  it('"Across the room her laptop\'s fan whirs." is owned by Violet', () => {
+    const p = parseTableProse("Across the room her laptop's fan whirs.", [...roster], { recentActors: [roster[0]] });
+    expect(p.actions).toHaveLength(1);
+    expect(p.actions?.[0]).toMatchObject({ actorId: 'vi', owned: true });
+  });
+});

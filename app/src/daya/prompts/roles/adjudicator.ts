@@ -75,6 +75,12 @@ Rules:
    goes on. The one who SET a signal off ends it from their side — hangs up,
    cancels the call, stops knocking — with {"op":"stop"}; it ends every signal
    the actor set off. Waiting while it goes on is nothing: [].
+   READING A MESSAGE (finding 40, 2026-11-05): a message that has arrived on a
+   held thing is a signal too; reading it, opening it, looking at what it says,
+   picking the thing up to see it is {"op":"answer","item":<that thing>} — the
+   words are then the reader's. A text the actor SENDS is {"op":"sound","at":
+   <the called person's thing>,"kind":"text","words":<the exact words — from the
+   quote on the line when there is one>}.
    THE ANSWER TOLD FROM THE CALLER'S SIDE (finding 32, 2026-11-04): a line that
    says the call the actor set off was picked up — "hears the ring stop and
    someone breathing", "she answers", "the line opens", "a voice says hello" —

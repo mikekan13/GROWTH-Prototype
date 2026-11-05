@@ -46,3 +46,13 @@ Canon (Repository/02_CHARACTER_CREATION/Nectars_and_Thorns_System.md, #needs-val
 - The crystallized-or-not pass ("our entire what is crystallized and what not needs to be fixed"); dream ticks during a live session (the dream agent wrote three new Rosemary rows mid-call — they wake as memories).
 - "listen capped" cutting a reply into an act (finding 30c) — measure on prod first.
 - The card review with Michael (his lines beside the cards, marking act / thought / exposition / narration).
+
+---
+# Day 8 addendum (11-05, Claude at the Watcher's seat until 2 am)
+
+**Ruling 13 (traits of everything) + 13b (the being is a player who never forgets its sheet) — BUILT, first pass.** `src/daya/capabilities.ts`: `capabilitiesOf(characterId)` = Nectars/Thorns/Blossoms (IS; `hidden: true` → ACTS ON, unaware) + abilities of held things (CAN, via the thing: the phones' "Connected", "Camera & Records") + the thing it is INSIDE (CAN: the Fusion's "Road Travel") + known spells (CAN cast) + true conditions (ACTS ON). Where it goes every beat: the chooser's prompt ("What X IS, always") and its act list ("use Connected (personal phone)"…), the voice record ("WHAT IT IS, ALWAYS"), the adjudicator's user message ("What the entity IS / CAN DO / What ACTS ON the entity now — apply it to the outcome, never put it in its mouth"), the perception order ("Others in view, and what SHOWS of them": body-pillar traits only — Ageless Face shows, a Thorn of the soul does not).
+**Not yet:** a Nectar FIRING as a rule (needs your answers, Day 7 handoff); a vehicle moving with its riders (finding 41); the terminal showing a trait card when one bears on a beat.
+
+**GM scenes (tmp/gm.ts, each rolled back):** findings 33–43 in `tmp/session3-live-findings-2026-11-04.md`. Headline: the text now lands `received` with its WORDS, Violet reads it on her own record (one card: thought + action), the words land as a line in her room; Kristopher's far side says delivered; a standing far-side state no longer cards every beat; the page can no longer invent a deed from the builder's prose.
+
+**For your third test (unchanged):** opening line sets day + hour; the stretch runs; watch her answers land and the one-card beats. If you text before the date, you will now see the words arrive and her read them.

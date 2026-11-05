@@ -124,7 +124,7 @@ async function main() {
     const n = await prisma.campaignEvent.count({ where: { campaignId: C, createdAt: { gt: new Date(st.from) } } });
     console.log(`rows to roll back: ${n}`);
     execSync(`node --env-file=.env --env-file=.env.local --import tsx ../tmp/restore-world.ts "${st.snapFile}" ${st.from}`, { stdio: 'inherit', cwd: 'C:/Projects/GRO.WTH/app' });
-    try { execSync('node ../tmp/dev-pod.mjs stop', { stdio: 'inherit', cwd: 'C:/Projects/GRO.WTH/app' }); } catch { /* pod */ }
+    if (rest[0] === 'keep') console.log('pod kept warm'); else { try { execSync('node ../tmp/dev-pod.mjs stop', { stdio: 'inherit', cwd: 'C:/Projects/GRO.WTH/app' }); } catch { /* pod */ } }
     return;
   }
   throw new Error(`unknown command ${cmd}`);
