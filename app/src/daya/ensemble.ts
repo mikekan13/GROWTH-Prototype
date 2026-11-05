@@ -523,7 +523,7 @@ async function runStimulusPipeline(
   const activeGoals = await prisma.goal.findMany({ where: { characterId, status: 'ACTIVE' }, select: { id: true, description: true } });
   const freq = ctx.sheet?.attributes?.frequency;
   const situation = {
-    threatened: ingest.tags.arousal >= 0.7 && ingest.tags.valence < 0,
+    threatened: (ingest.tags?.arousal ?? 0) >= 0.7 && (ingest.tags?.valence ?? 0) < 0,
     frequencyLow: !!freq && freq.level > 0 && freq.current <= freq.level * 0.25,
   };
   const recallResult = await recall(
@@ -1041,7 +1041,7 @@ export async function listenStimulus(
       ruminationLockActive,
       goals: activeGoals,
       situation: {
-        threatened: ingest.tags.arousal >= 0.7 && ingest.tags.valence < 0,
+        threatened: (ingest.tags?.arousal ?? 0) >= 0.7 && (ingest.tags?.valence ?? 0) < 0,
         frequencyLow: !!freq && freq.level > 0 && freq.current <= freq.level * 0.25,
       },
     },
