@@ -134,9 +134,11 @@ function looksProper(name: string): boolean {
 export async function campaignNames(campaignId: string): Promise<NameEntry[]> {
   try {
     const { prisma } = await import('@/lib/db');
+
+    const { locationAliases } = await import('@/lib/location-aliases');
     const [chars, locs, items] = await Promise.all([
       prisma.character.findMany({ where: { campaignId }, select: { name: true } }),
-      prisma.location.findMany({ where: { campaignId }, select: { name: true } }),
+      prisma.location.findMany({ where: { campaignId }, select: { name: true, data: true } }),
       prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { name: true } }),
     ]);
     const out: NameEntry[] = [];
@@ -158,7 +160,9 @@ export async function campaignNames(campaignId: string): Promise<NameEntry[]> {
       const name = (l.name ?? '').trim();
       // A description is not a name (2026-11-03: "the lot behind the hotel" went out as "Place-A" and the perception agent
       // could not know it was a parking lot). Only a place name with a capitalised word past a leading "The" is swapped.
-      if (name && /\b[A-Z]/.test(name.replace(/^the\s+/i, ''))) push({ name, kind: 'place' });
+      // Finding 96 (2026-11-05): the names people call the place by (data.aliases) swap with it — "Extra Space Coffee" is the shop.
+      const aliases = locationAliases((l as { data?: string | null }).data ?? null);
+      if ((name && /\b[A-Z]/.test(name.replace(/^the\s+/i, ''))) || aliases.length) push({ name, kind: 'place', aliases: aliases.length ? aliases : undefined });
     }
     for (const i of items) {
       const name = (i.name ?? '').trim();

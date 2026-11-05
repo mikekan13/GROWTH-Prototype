@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/db';
 import { liveSignals } from './item-signal';
 import { placeFromThread } from '@/daya/intentions';
+import { locationAliases } from '@/lib/location-aliases';
 
 /**
  * The Location the other party of one of `characterId`'s live threads names (a message "I'm already here" at a place in the thread),
@@ -17,11 +18,17 @@ export async function threadPlaceFor(campaignId: string, characterId: string, cy
     }
     if (!texts.some((t) => t.trim())) return null;
     const [locs, edge] = await Promise.all([
-      prisma.location.findMany({ where: { campaignId }, select: { id: true, name: true } }),
+      prisma.location.findMany({ where: { campaignId }, select: { id: true, name: true, data: true } }),
       prisma.entityRelationship.findFirst({ where: { campaignId, sourceId: characterId, relationshipType: 'located_at', targetType: 'LOCATION' }, select: { targetId: true } }),
     ]);
     const here = locs.find((l) => l.id === edge?.targetId)?.name;
-    return placeFromThread(texts, locs.map((l) => l.name), here ? [here] : []);
+    // Finding 96 (2026-11-05): a place has the names people call it by ("Extra Space Coffee" for "the coffee shop on Broadway") — the
+    // Location's data.aliases[] — and the thread is matched against all of them; the canonical name is what comes back.
+    const canon = new Map<string, string>();
+    for (const l of locs) { canon.set(l.name.toLowerCase(), l.name); for (const al of locationAliases(l.data)) canon.set(al.toLowerCase(), l.name); }
+    const exclude = here ? [here, ...locationAliases(locs.find((l) => l.name === here)?.data ?? null)] : [];
+    const hit = placeFromThread(texts, [...canon.values(), ...[...canon.keys()].map((k) => k)].filter((v, i, arr) => arr.findIndex((x) => x.toLowerCase() === v.toLowerCase()) === i), exclude);
+    return hit ? canon.get(hit.toLowerCase()) ?? hit : null;
   } catch (err) {
     console.warn('[thread-place] thread place not read (non-fatal):', err instanceof Error ? err.message : err);
     return null;

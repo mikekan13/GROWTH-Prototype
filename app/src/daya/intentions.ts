@@ -66,7 +66,7 @@ export interface DueIntention {
 const PROSPECTIVE_RE = /\bI(?:'m| am) going to\b|\bI will\b|\bI'll\b|\bI plan to\b|\bI mean to\b|\bI intend to\b|\bI(?:'m| am) supposed to\b|\bI have to\b|\bI(?:'ve| have) decided to\b|\bI promised to\b|\bI(?:'m| am) meant to\b/i;
 /** "If he doesn't, I go to the shelter" — a conditional present counts as a plan. */
 /** Finding 78 (2026-11-05): a first-person present resolve in a thought — "I should write back", "I need to answer" — is held now, not someday. */
-const RESOLVE_RE = /^(?:(?:and|but|so|then|now|okay|ok|no|yes),?\s+)?I (?:should|need to|ought to)\s+(?!be\b|have\b|not\b)[a-z]+/i;
+const RESOLVE_RE = /^(?:(?:and|but|so|then|now|okay|ok|no|yes),?\s+)?I (?:should|need to|ought to)\s+(?:\w+ly\s+|just\s+)?(?!be\b|have\b|not\b)[a-z]+/i; // finding 93 (2026-11-05): an adverb may sit between the modal and the verb ("I should probably put my boots on")
 const CONDITIONAL_PLAN_RE = /^(?:and |but |then )?if\s+([^,]+),\s*I\s+(?!was\b|had\b|did\b|would\b|could\b|thought\b|think\b|knew\b|know\b|might\b|should\b|am\b|'m\b)\w+/i;
 /** A habit needs its marker AND the being doing something in the present: "I lock the door every time". */
 const ROUTINE_RE = /\b(every (?:day|night|morning|evening|afternoon|week|time)|each (?:day|night|morning|evening|time)|always|daily|nightly|most (?:days|nights|mornings|evenings))\b/i;
@@ -118,7 +118,7 @@ function triggerOf(sentence: string): string | null {
  * The intentions a stretch of a being's own words carries. Pure; deterministic.
  * `atCycle` is when the words were formed — "tonight" is that day's evening.
  */
-export function extractIntentions(content: string, atCycle: number): IntentionDraft[] {
+export function extractIntentions(content: string, atCycle: number, opts: { resolveOnly?: boolean } = {}): IntentionDraft[] {
   const out: IntentionDraft[] = [];
   const seen = new Set<string>();
   const dayStart = Math.floor(atCycle / DAY_CYCLES) * DAY_CYCLES;
@@ -126,6 +126,12 @@ export function extractIntentions(content: string, atCycle: number): IntentionDr
     const sentence = raw.trim();
     if (sentence.length < 8 || !SELF_RE.test(sentence) || PAST_RE.test(sentence)) continue;
     const resolve = RESOLVE_RE.test(sentence);
+
+    // Finding 94 (2026-11-05): a THOUGHT binds only when it resolves ("I should write back") — a reflective sentence about someone else
+
+    // ("He said he wanted to listen… all I have to do is walk through it") is not a plan.
+
+    if (opts.resolveOnly && !resolve) continue;
     const prospective = PROSPECTIVE_RE.test(sentence) || CONDITIONAL_PLAN_RE.test(sentence) || resolve;
     const cadence = cadenceOf(sentence);
     if (!prospective && !cadence) continue;
@@ -176,8 +182,8 @@ export function intentionLine(due: Array<Pick<DueIntention, 'description'>>): st
  * entity; a sentence already noted is left alone. Links the row to a vine when
  * the sentence touches one. Never throws outward.
  */
-export async function noteIntentions(entityId: string, memoryId: string | null, content: string, atCycle: number): Promise<number> {
-  const drafts = extractIntentions(content, atCycle);
+export async function noteIntentions(entityId: string, memoryId: string | null, content: string, atCycle: number, opts: { source?: string } = {}): Promise<number> {
+  const drafts = extractIntentions(content, atCycle, { resolveOnly: opts.source === 'reasoning' });
   if (!drafts.length) return 0;
   let made = 0;
   try {

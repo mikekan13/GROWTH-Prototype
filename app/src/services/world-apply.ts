@@ -23,6 +23,7 @@
  * Refused effects are reported, never thrown: the act still happened in the
  * story as the adjudicator told it; the map just did not move for that part.
  */
+import { locationAliases } from '@/lib/location-aliases';
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { parseOpenings, type DoorState } from '@/lib/canvas-geometry';
@@ -707,8 +708,15 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           const gmId = actor.campaign?.gmUserId ?? '';
           const resolved = await resolveMoveRef(campaignId, e.to, actor.id);
           if (!resolved) {
-            const locs = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { id: true, name: true } });
-            const to = locs.find((l) => l.id === e.to) ?? locs.find((l) => l.name.toLowerCase() === e.to.trim().toLowerCase()) ?? locs.find((l) => e.to.toLowerCase().includes(l.name.toLowerCase()));
+            const locs = await prisma.location.findMany({ where: { campaignId, status: { not: 'DESTROYED' } }, select: { id: true, name: true, data: true } });
+            // Finding 97 (2026-11-05): "the coffee shop" must find "the coffee shop on Broadway" (the model does not always write the whole name), and
+            // finding 96: a place's aliases ("Extra Space Coffee") name it too. Exact name/alias → the words contain the name → the name/alias contains the words.
+            const want = e.to.trim().toLowerCase().replace(/^the\s+/, '');
+            const namesOf = (l: { name: string; data: string | null }) => [l.name, ...locationAliases(l.data)].map((n) => n.toLowerCase().replace(/^the\s+/, ''));
+            const to = locs.find((l) => l.id === e.to)
+              ?? locs.find((l) => namesOf(l).some((n) => n === want))
+              ?? locs.find((l) => namesOf(l).some((n) => want.includes(n)))
+              ?? (want.length >= 4 ? locs.find((l) => namesOf(l).some((n) => n.includes(want))) : undefined);
             if (!to) { report.refused.push(`move: nothing called "${e.to}" on the map`); break; }
             if (map && to.id === map.roomId) { report.applied.push(`already in ${to.name}`); break; }
             const toLevel = await levelOfLocation(to.id);

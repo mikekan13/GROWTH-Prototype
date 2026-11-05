@@ -238,7 +238,7 @@ export async function writeMemoryEntry(params: WriteMemoryParams): Promise<{ id:
   // pressure; dream-authored rows don't (no self-triggering). Fire-and-forget.
   // Intentions (Mike 2026-10-25): the being's own prospective words become rows it can be reminded of.
   // (Was called twice here — found 2026-10-30; the second call only re-read the table.)
-  if (params.source !== 'dream') await noteIntentions(params.entityId, row.id, params.content, params.narrativeCycle);
+  if (params.source !== 'dream') await noteIntentions(params.entityId, row.id, params.content, params.narrativeCycle, { source: params.source });
 
   if (params.source !== 'dream' && !params.skipDreamPressure) {
     void import('./dream-pressure').then(m => m.accumulateDreamPressure(params.entityId, params.salience ?? 0)).catch(() => {});

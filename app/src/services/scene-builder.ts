@@ -505,6 +505,9 @@ function stripFences(raw: string): string {
 }
 
 function parseJson<T>(raw: string): T | null {
+  // Finding 95 (2026-11-05): the prompt names beings as `Name [id]` so the model can tell them apart; an id that comes BACK in the text is
+  // never prose for the record ("He texts Violet [cms60…] from Personal phone.") — stripped before anything is read.
+  raw = raw.replace(/\s*\[c[a-z0-9]{20,}\]/g, '');
   const t = stripFences(raw);
   const start = t.indexOf('{');
   const end = t.lastIndexOf('}');
