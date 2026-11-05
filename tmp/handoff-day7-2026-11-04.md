@@ -95,3 +95,23 @@ $env:NODE_OPTIONS='--max-old-space-size=4096'; npx next build --webpack
 Start-Process -WindowStyle Hidden cmd.exe -ArgumentList '/c npx next start -p 3001 1>> ..\logs\prod-server.out.log 2>> ..\logs\prod-server.err.log'
 ```
 Then the replay: `node --env-file=.env --env-file=.env.local --import tsx ../tmp/gm.ts start` and the lines in the scratchpad plan (replay-coffee-date.md: the time line first, "It is 2:22 pm the following afternoon…"). Code is committed and pushed (ca509c0); world rolled back to post-session-6 + coffee shop (ACTIVE, with a door) + lot gate + Dialed to Eleven on his sheet; pod OFF.
+
+---
+
+## DAY 10 (2026-11-05 afternoon, Michael: "You can fix it if it's down") — REBUILT, REPLAYED, FIXED
+
+**What happened**
+1. :3001 rebuilt alone (nothing else running) in ~5 min, clean; started hidden. Routes live under `/hub`, `/campaign`, `/auth`, `/api` (there is no `/health` or `/login`).
+2. GM REPLAY 10 of the coffee date on the Day 9 build (pod ~45 min, 9 lines, world rolled back to `tmp/gm/snapshot-1793915928776.json`, pod OFF): `tmp/session3-live-findings-2026-11-04.md` → findings 75–91 + the FIX LIST for the fourth attempt. Headline: the Day 9 spine WORKS when words reach her (she read on her own, chose the write-back shape on her own, LEFT HOME on her own after "I'm already here", answered "I think I did, yes" in the room) — and the date died on one guard: the never-guess check ate her typed words (80), the adjudicator then invented words for her text (83), he never learned she answered (84), she stalled on the landing with no destination (86).
+3. Fixed in commit after 6b0b905 (code; suite 2961/271 green, tsc clean): 73, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 88, 89/91, 90. Four sonnet agents + me; details in the commit message and the findings file's fix list.
+4. :3001 rebuilt again with the fixes (see below for state).
+
+**Not verified live yet (needs the fourth attempt or a short GM replay):** the 'message' ask returning words; thought→plan giving her the next beat; room-change + way-out departure → trip to the thread place; the doorstep step-in (81/73); voiced being's own row (89); heard-text merge (90 — the agent inferred the shape from the trace, not from a call site it could point at).
+
+**Design flags for Michael**
+- 76's phrase: "about 16 hours (since yesterday, evening; you have slept since then)" — wording is mine, change freely.
+- The departure heuristic (86) fires on DATA: the act changed rooms AND the new room has an opening to "outside"/"stairs down" AND a live thread names where the other is. A kitchenette step never fires; a landing/lot step does.
+- 82: the record agent closed the sentence-pin loophole in `segmentIsDeed`; the scene-builder path that folds a being's doings into card prose is unchanged (prose stays prose).
+- 1–6 bare times read as afternoon (assumed, still open). Stretch arrival at window start (assumed, still open).
+
+**Recovery (if :3001 is down):** `cd C:\Projects\GRO.WTH\app; $env:NODE_OPTIONS='--max-old-space-size=4096'; npx next build --webpack` with nothing else running, then `Start-Process -WindowStyle Hidden cmd.exe -ArgumentList '/c npx next start -p 3001 1>> ..\logs\prod-server.out.log 2>> ..\logs\prod-server.err.log'`. Probe `http://localhost:3001/hub` (200).
