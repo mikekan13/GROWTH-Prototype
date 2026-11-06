@@ -9,7 +9,7 @@ RULING (Michael 2026-11-06): audio is how GRO.WTH is played; the always-on mic i
 
 - `tts-server/` (repo root) — Kokoro-82M on FastAPI, loopback :9001: `POST /v1/audio/speech` {input, voice, speed, response_format:'wav'} → wav (header `X-Audio-Seconds`), `GET /v1/voices`, `GET /health`; `start.bat` on the global Python 3.13; started by `boot.ps1` (`-NoTts`). Sibling of `whisper-server/` (:9000, faster-whisper small.en, OpenAI-compatible transcriptions).
 - `src/lib/speech-voices.ts` — PURE. `KOKORO_VOICES` (15), `NARRATOR_VOICE` (bm_daniel), `voiceForCharacter({id, gender, voice})`: a `data.voice` on the sheet wins; else the gender pool (female / male / all, narrator excluded) picked by FNV-1a of the id — same being, same voice forever. Tests `speech-voices.test.ts`.
-- `src/services/speech.ts` — `synthesizeSpeech({text, voice, speed})` → the TTS server (`TTS_LOCAL_URL`, default `http://127.0.0.1:9001/v1/audio/speech`, 20 s timeout; `{ok:false,status,detail}` on failure); `voiceForCharacterId(id)` (Prisma lookup → `voiceForCharacter`). Tests `speech.test.ts`.
+- `src/services/speech.ts` — `synthesizeSpeech({text, spec, speed})` → the TTS server (`TTS_LOCAL_URL`, default `http://127.0.0.1:9001/v1/audio/speech`, 20 s timeout; `{ok:false,status,detail}` on failure); `voiceSpecForCharacterId(id)` (Prisma lookup → `voiceSpecForCharacter`; alias `voiceForCharacterId`). Signature changed later the same night, see "Designed voices" below. Tests `speech.test.ts`.
 - `POST /api/speech/speak` — {text 1..4000, characterId?|null, speed? 0.5..2} → `audio/wav` + `X-Voice` (+ `X-Audio-Seconds`); narrator when no character; 404 unknown character; 503 `speech server unavailable`. requireAuth.
 - `POST /api/speech/transcribe` — multipart `audio` (≤ 15 MB) + `prompt` (names likely to be said → Whisper initialPrompt) → `{text, provider}` via `transcribeAudio` (`src/ai/providers/stt.ts`); a bracketed provider marker → 503 `speech-to-text unavailable`. requireAuth. (Follow-up: feed `services/stt-vocabulary.ts` as the prompt.)
 - `src/hooks/table-reader-utterances.ts` — PURE. `utterancesFor(event, roster)`: a being's (`actor === 'ai_copilot'`) card → ordered utterances through `buildFeedRows`: narration rows and `action` segments → narrator, `speech` segments → the character, `thought` skipped; `cleanSpoken` strips quote and ((…))/[[…]] marks. Tests `table-reader-queue.test.ts`.
@@ -19,6 +19,46 @@ RULING (Michael 2026-11-06): audio is how GRO.WTH is played; the always-on mic i
 - Phone: the mic needs a secure origin → `tailscale serve --bg 3001` (https://christophoros.taila59e25.ts.net → :3001).
 - Verified on :3001 2026-11-06: Violet → bf_isabella, Kristopher → bm_george, narrator bm_daniel, ~0.8 s a line warm; a synthesized line transcribed back word for word in 0.65 s. Browser mic/playback not yet exercised by a person.
 - NEXT (the lane): always-on mic on the existing `audio-chunk` → `hearSpoken` beats path (VAD end-of-line, gate the mic while the table speaks); per-NPC `voiced: table | watcher | controlled` on the sheet; `data.voice` chosen by the Watcher.
+
+## Designed voices — Qwen3-TTS voice design + cloning, fx chain for non-human voices (2026-11-06)
+
+A voice is a saved artifact on the sheet (`data.voice`), designed once from a text description, then cloned for every line. Kokoro stays the derived default and the fallback. All LOCAL: audio and transcripts never leave the machine; designed voices only, never a real person's voice.
+
+`tts-server/` endpoints (:9001, loopback; `server.py`, `fx.py`, `fx_test.py`, `README.md`):
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | `{ok, model, device, voices, refs}` + `engines: {kokoro, qwen_base: ready\|loading\|absent\|error, qwen_design: ready\|absent\|error}` |
+| GET | `/v1/voices` | the 15 Kokoro voices |
+| POST | `/v1/audio/speech` | `{input, voice, voice_ref?, fx?, speed, response_format:'wav'}` → wav; `voice_ref` = Qwen Base clone path (`voice` and `speed` ignored); headers `X-Audio-Seconds`, `X-Engine: kokoro\|qwen`, `X-Fx`; 404 unknown ref, 503 Base unavailable |
+| POST | `/v1/voices/design` | `{description, text, language='English', seed?, fx?}` → `{id, seconds, sample_rate, preview_wav_base64}`; saves the RAW clip to `refs/<id>.wav` + `.json`; same description + seed = same voice; 503 if VoiceDesign absent |
+| GET | `/v1/voices/refs/{id}` | the raw reference wav |
+| GET | `/v1/voices/refs/{id}/meta` | `{id, description, transcript, language, seed, sample_rate, seconds, created}` |
+| GET | `/v1/fx/presets` | `{name: params}` |
+
+- `refs/` (under `tts-server/`) is gitignored; each ref = wav + json (description, transcript, seed). The clone prompt is cached per ref id in memory.
+- Models are local directories under `C:\Projects\GRO.WTH\models\` (env `QWEN_TTS_MODELS_DIR`): `Qwen3-TTS-12Hz-1.7B-Base` and `-VoiceDesign` (Apache-2.0). Downloaded by `logs/qwen-dl.py` (ranged HTTP downloader; `huggingface_hub` large-file downloads hang on this machine). A missing model = server still starts, engine reports `absent`.
+- fx (`fx` = preset name | params object | `{preset, ...overrides}`), all params optional: `pitch` semitones -24..24, `formant` 0.5..2 (voice size), `layers` 0..4 (detuned copies), `grit` 0..1, `sub` 0..1 (octave down), `air` 0..1 (breath), `reverb` 0..1, `crush` 0..1, `ring` Hz (0 = off); peak limited to 0.95; applied over the human performance so emotion survives. Presets: `human` (none), `demonic`, `angelic`, `monstrous`, `robotic`, `ghostly`, `giant`, `tiny`.
+- Model swap rule: Base (~4 GB bf16) and VoiceDesign (~4 GB) each fill half of the 8 GB RTX 4060, so only one is ever loaded. Design = unload Base → load VoiceDesign → generate a ~7 s reference clip → unload → reload Base; one GPU lock, so speech queues during a design. Measured 2026-11-06: design 20-26 s wall; Qwen clone speak ~9 s wall for ~4 s of audio (about 2x slower than real time); Kokoro ~0.8 s a line; fx adds 1-2 s; VRAM ~6.9 GB with whisper + Kokoro + Qwen Base resident.
+
+App side:
+
+- `src/lib/speech-voices.ts` — adds `FX_PRESETS`, `fxParamsSchema`, `voiceSpecSchema`/`VoiceSpec` `{engine:'kokoro'|'qwen', voice?, ref?, description?, transcript?, preset?, fx?, seed?, lockedAt?}` stored at character `data.voice`; `parseVoiceSpec` (also accepts a bare legacy Kokoro id); `voiceSpecForCharacter` (stored spec, else the derived Kokoro default: gender pool + FNV-1a of the id; narrator `bm_daniel`).
+- `src/services/speech.ts` — `voiceSpecForCharacterId(id)`; `synthesizeSpeech({text, spec, speed})` posts `voice_ref` (or `voice` when no ref) + `fx` (`spec.fx ?? spec.preset`) to the tts server, 20 s timeout.
+- `src/services/voice-design.ts` — `describeVoiceFromSheet` (description derived from the sheet), `designVoiceForCharacter` (POST `/v1/voices/design`, 60 s timeout, seed defaults to FNV-1a of the id, saves `{engine:'qwen', ref, description, transcript, preset, fx, seed}`), `setVoiceForCharacter` (patch preset / fx / Kokoro voice / `lockedAt`), `clearVoiceForCharacter` (back to the derived default).
+- `GET|POST|DELETE /api/characters/[id]/voice` — GET `{spec, derived, description, presets}`; POST `{action:'design', description?, text?, preset?, fx?, seed?}` → `{spec, previewWavBase64}` or `{action:'set', preset?, fx?, voice?, lockedAt?}`; DELETE resets. ADMIN or the campaign GM only (owners excluded).
+- `POST /api/speech/speak` — now resolves the full `VoiceSpec`, so a designed voice speaks with its fx; `POST /api/speech/transcribe` unchanged.
+- `components/character/VoiceSection.tsx` — HEAR / DESIGN / LOCK / RESET + preset select; mounted in `CharacterTab.tsx` under the AppearanceDesigner, GM-only.
+- `src/hooks/useTableReader.ts` — unchanged contract: with AUDIO on, the table reads `ai_copilot` events aloud, each line in its being's voice. `components/terminal/TableSpeakBar.tsx` — MIC + AUDIO buttons.
+- State 2026-11-06: Violet and Kristopher have designed Qwen voices saved on their sheets.
+
+OWED:
+- Voice as a genesis stage in the walk, beside the portrait (ruled; not built). Brief `tmp/voice-identity-brief-2026-11-06.md`.
+- Per-NPC playback `voiced: table | watcher | controlled`; immersion mode.
+- Latency (2x real time on the Qwen path): streaming, or a smaller clone model.
+- `speed` is ignored on the Qwen path.
+- Derived descriptions (`describeVoiceFromSheet`) still contain trait names.
+
 
 ## JEWL world-keeping from the table (2026-11-01)
 

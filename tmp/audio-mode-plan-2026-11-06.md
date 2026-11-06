@@ -36,3 +36,6 @@ tsc, vitest, detached prod build (check free RAM first; see feedback-manage-syst
 - NON-HUMAN voices (monstrous, demonic, angelic…) handled by the same system → fx chain presets + per-voice params (tts-server/fx.py).
 - IMMERSION MODE: a table option where you never hear the other humans as themselves; everything is filtered through the voices. v1 = mic → text → the character's designed voice for players too; later real-time voice conversion.
 - OWED: audit the Watcher's campaign settings page — add what belongs, remove what shouldn't be there.
+
+## Designed voices — SHIPPED ~00:45 local 11-06
+Qwen3-TTS 1.7B VoiceDesign + Base on tts-server :9001; Violet + Kristopher designed; fx presets re-tuned for intelligibility (sweep against a designed clip, whisper word match ≥0.93). See tmp/handoff-day7-2026-11-04.md "DESIGNED VOICES SHIPPED" for the test path and the owed list.

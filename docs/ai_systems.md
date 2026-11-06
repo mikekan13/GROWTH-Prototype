@@ -365,3 +365,15 @@ Ruling: [[ruling-world-building-recursion-jewl-swarm-personality-2026-10-16]] �
 ## Speech — local STT + TTS for the table (2026-11-06)
 
 Status: v1 LIVE on :3001. Ruling: audio is how GRO.WTH is played (always-on mic = standard). Whisper (`whisper-server/`, :9000, faster-whisper small.en, CUDA) hears; Kokoro-82M (`tts-server/`, :9001, CUDA) speaks. The app fronts both through `/api/speech/transcribe` and `/api/speech/speak` (`services/speech.ts`, `lib/speech-voices.ts`); the client reads each being's new card aloud (`hooks/useTableReader.ts`) and takes the Watcher's spoken line into the box (TableSpeakBar MIC). Voices are derived per being (sheet `data.voice` → gender pool → id hash), narrator fixed. Privacy: audio and transcripts never leave the machine; only fiction text goes to the cloud through Qwen. Details: docs/module_registry.md "Audio mode v1".
+
+### Voice identity (2026-11-06, later the same night)
+
+Two layers, like the portrait. DESIGN ONCE: Qwen3-TTS 1.7B VoiceDesign turns a text description (derived from the sheet by `describeVoiceFromSheet`, or written by the Watcher) into a ~7 s reference clip, saved in `tts-server/refs/` and recorded on the sheet as `data.voice {engine:'qwen', ref, description, transcript, preset, fx, seed}` — a genesis artifact, same description + seed = same voice. SPEAK EVERY LINE: the Qwen3-TTS Base model clones from the saved ref (`voice_ref` on `POST /v1/audio/speech`). Kokoro-82M remains the derived default (gender pool + FNV-1a of the id) and the fallback when no ref exists or Qwen is unavailable.
+
+Non-human beings (monstrous, demonic, angelic, robotic, ghostly, giant, tiny) keep a human performance and get an fx chain on top (pitch, formant, layers, grit, sub, air, reverb, crush, ring), so emotion survives the transformation. The raw ref is stored untouched; fx is applied at speak time from `spec.fx ?? spec.preset`.
+
+Only one 1.7B model fits on the 8 GB GPU at a time: design swaps Base out for VoiceDesign and back (20-26 s); clone speak ~9 s for ~4 s of audio (2x real time), Kokoro ~0.8 s. Everything local; audio and transcripts never leave the machine; designed voices only, never a real person's voice.
+
+Licences: Qwen3-TTS (Base + VoiceDesign) Apache-2.0, Kokoro-82M Apache-2.0. F5-TTS and XTTS rejected (non-commercial weights).
+
+Status: BUILT and tested (commit f6ca3a5); Violet and Kristopher have designed voices. Owed: voice as a genesis stage in the walk (ruled), per-NPC voiced table|watcher|controlled, immersion mode, latency, `speed` on the Qwen path, trait names in derived descriptions. See `docs/module_registry.md` "Designed voices".
