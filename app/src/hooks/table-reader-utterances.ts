@@ -11,22 +11,34 @@ export function cleanSpoken(text: string): string {
     .trim();
 }
 
-/** A being's card -> the lines to read aloud, in order. Watcher/player events yield nothing. */
+/**
+ * An event -> the lines to read aloud, in order (Michael 2026-11-06: the NARRATOR voices everything that is
+ * not a character's own line, so the table sounds like one story and the characters are sound bites in it).
+ *  - every narration row (the Watcher's typed line, the engine's built-up prose, a being's scene line, an action)
+ *    -> the narrator (characterId null)
+ *  - a character row's speech -> that character's voice; its actions -> the narrator; thoughts stay silent
+ *  - time passing (game_event `timeskip`) -> the narrator reads the summary
+ * Session start/end, rolls, checks, system and JEWL bars are not read.
+ */
 export function utterancesFor(event: TerminalEvent, roster: RosterName[]): Utterance[] {
-  if (event.actor !== 'ai_copilot') return [];
-  const flat: Array<NarrationRowModel | CharacterRowModel> = [];
-  for (const row of buildFeedRows([event], roster)) {
-    if (row.type === 'beat') for (const g of row.groups) flat.push(...g);
-    else if (row.type === 'narration' || row.type === 'character') flat.push(row);
-  }
   const out: Utterance[] = [];
   const push = (raw: string, characterId: string | null) => {
     const text = cleanSpoken(raw);
     if (text) out.push({ text, characterId });
   };
+  const p = event.payload;
+  if (p?.kind === 'game_event' && p.eventType === 'timeskip') {
+    if (typeof p.description === 'string') push(p.description, null);
+    return out;
+  }
+  const flat: Array<NarrationRowModel | CharacterRowModel> = [];
+  for (const row of buildFeedRows([event], roster)) {
+    if (row.type === 'beat') for (const g of row.groups) flat.push(...g);
+    else if (row.type === 'narration' || row.type === 'character') flat.push(row);
+  }
   for (const row of flat) {
     if (row.type === 'narration') {
-      if (row.via === 'being') push(row.text, null);
+      if (!row.mechanical) push(row.text, null);
     } else {
       for (const s of row.segments) {
         if (s.kind === 'speech') push(s.text, row.characterId);

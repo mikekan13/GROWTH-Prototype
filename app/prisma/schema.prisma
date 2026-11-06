@@ -288,6 +288,10 @@ model Campaign {
   campaignItems       CampaignItem[]
   goals               Goal[]
   aiSettings          String?              // JSON<CampaignAISettings> — provider preferences per feature
+  // The campaign's NARRATOR (Michael 2026-11-06): a designed VoiceSpec (lib/speech-voices) that voices every
+  // narration line in audio mode — the Watcher's typed lines, the beings' actions, scene lines, time passing —
+  // so the table sounds like one story and the characters' lines are sound bites in it. Null = Kokoro default.
+  narratorVoice       String?              // JSON<VoiceSpec>
   // Bumped when the server re-lays the whole canvas (JEWL organizing it). A browser holding an
   // older epoch clears its remembered canvas layout for this campaign on load (2026-09-28).
   canvasLayoutEpoch   Int                  @default(0)

@@ -1381,7 +1381,7 @@ export default function CampaignTerminal({
             held={jewl.held}
             onHold={jewl.setHeld}
             audioOn={audioOn}
-            audioState={reader.unavailable ? 'unavailable' : reader.speaking ? 'speaking' : 'idle'}
+            audioState={reader.unavailable ? 'unavailable' : reader.locked ? 'locked' : reader.speaking ? 'speaking' : 'idle'}
             onAudioToggle={() => {
               const next = !audioOn;
               setAudioOn(next);

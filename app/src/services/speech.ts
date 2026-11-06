@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { NotFoundError } from '@/lib/errors';
-import { NARRATOR_VOICE, voiceSpecForCharacter, type VoiceSpec } from '@/lib/speech-voices';
+import { NARRATOR_VOICE, parseVoiceSpec, voiceSpecForCharacter, type VoiceSpec } from '@/lib/speech-voices';
 
 export type SpeechResult =
   | { ok: true; body: ArrayBuffer; seconds: number | null; engine: string | null; fx: string | null }
@@ -33,6 +33,15 @@ export async function voiceSpecForCharacterId(characterId?: string | null): Prom
 
 /** @deprecated use voiceSpecForCharacterId */
 export const voiceForCharacterId = voiceSpecForCharacterId;
+
+/** The campaign's narrator (Michael 2026-11-06): its designed VoiceSpec when one is saved, else the Kokoro default. */
+export async function voiceSpecForNarrator(campaignId?: string | null): Promise<VoiceSpec> {
+  const fallback: VoiceSpec = { engine: 'kokoro', voice: NARRATOR_VOICE };
+  if (!campaignId) return fallback;
+  const row = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { narratorVoice: true } });
+  if (!row?.narratorVoice) return fallback;
+  try { return parseVoiceSpec(JSON.parse(row.narratorVoice)) ?? fallback; } catch { return fallback; }
+}
 
 export async function synthesizeSpeech(args: { text: string; spec: VoiceSpec; speed?: number }): Promise<SpeechResult> {
   const url = process.env.TTS_LOCAL_URL ?? 'http://127.0.0.1:9001/v1/audio/speech';

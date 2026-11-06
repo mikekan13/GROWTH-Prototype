@@ -88,15 +88,8 @@ function designBase(): string {
 
 export interface DesignOpts { description?: string; text?: string; preset?: string; fx?: FxParams; seed?: number }
 
-export async function designVoiceForCharacter(
-  characterId: string,
-  opts: DesignOpts = {},
-): Promise<{ spec: VoiceSpec; previewWavBase64: string }> {
-  const character = await loadCharacter(characterId);
-  const description = (opts.description?.trim() || describeVoiceFromSheet(character)).slice(0, 600);
-  const text = (opts.text?.trim() || `${character.name} here. Say what you came to say.`).slice(0, 400);
-  const seed = opts.seed ?? fnv1a(character.id);
-
+/** Ask the speech server to design a voice from a description: returns the saved ref id and a preview clip. */
+async function designVoice(args: { description: string; text: string; seed: number; fx?: FxParams | string }): Promise<{ ref: string; previewWavBase64: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DESIGN_TIMEOUT_MS);
   let json: { id?: unknown; preview_wav_base64?: unknown };
@@ -104,7 +97,7 @@ export async function designVoiceForCharacter(
     const res = await fetch(`${designBase()}/v1/voices/design`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description, text, language: 'English', seed, fx: opts.fx ?? opts.preset ?? undefined }),
+      body: JSON.stringify({ description: args.description, text: args.text, language: 'English', seed: args.seed, fx: args.fx ?? undefined }),
       signal: controller.signal,
     });
     if (!res.ok) {
@@ -120,12 +113,76 @@ export async function designVoiceForCharacter(
     clearTimeout(timer);
   }
   if (typeof json.id !== 'string' || !json.id) throw new ServiceUnavailableError('Voice design server returned no voice id');
+  return { ref: json.id, previewWavBase64: typeof json.preview_wav_base64 === 'string' ? json.preview_wav_base64 : '' };
+}
 
-  const spec: VoiceSpec = { engine: 'qwen', ref: json.id, description, transcript: text, seed };
+export async function designVoiceForCharacter(
+  characterId: string,
+  opts: DesignOpts = {},
+): Promise<{ spec: VoiceSpec; previewWavBase64: string }> {
+  const character = await loadCharacter(characterId);
+  const description = (opts.description?.trim() || describeVoiceFromSheet(character)).slice(0, 600);
+  const text = (opts.text?.trim() || `${character.name} here. Say what you came to say.`).slice(0, 400);
+  const seed = opts.seed ?? fnv1a(character.id);
+  const designed = await designVoice({ description, text, seed, fx: opts.fx ?? opts.preset ?? undefined });
+  const spec: VoiceSpec = { engine: 'qwen', ref: designed.ref, description, transcript: text, seed };
   if (opts.preset) spec.preset = opts.preset;
   if (opts.fx) spec.fx = opts.fx;
   await saveData(characterId, { ...character.data, voice: spec });
-  return { spec, previewWavBase64: typeof json.preview_wav_base64 === 'string' ? json.preview_wav_base64 : '' };
+  return { spec, previewWavBase64: designed.previewWavBase64 };
+}
+
+// ─── The campaign's NARRATOR (Michael 2026-11-06) ───────────────────────────────────────────────────────────
+// One designed voice per campaign that reads everything that is not a character's own line. The Watcher
+// will design it at campaign creation (owed); until then it is set by the Watcher/ADMIN through the route.
+
+const NARRATOR_FALLBACK_DESCRIPTION = "A storyteller's voice: mature, low and unhurried, warm but even, reading a novel aloud late at night.";
+const NARRATOR_SAMPLE = 'Rain finds the windshield one drop at a time. He does not move. The phone is still in his hand.';
+
+async function loadCampaign(campaignId: string) {
+  const row = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { id: true, name: true, narratorVoice: true } });
+  if (!row) throw new NotFoundError('Campaign not found');
+  let current: VoiceSpec | null = null;
+  try { current = row.narratorVoice ? parseVoiceSpec(JSON.parse(row.narratorVoice)) : null; } catch { current = null; }
+  return { id: row.id, name: row.name, current };
+}
+
+export async function getNarratorVoice(campaignId: string): Promise<VoiceSpec | null> {
+  return (await loadCampaign(campaignId)).current;
+}
+
+export async function designNarratorVoice(
+  campaignId: string,
+  opts: DesignOpts = {},
+): Promise<{ spec: VoiceSpec; previewWavBase64: string }> {
+  const campaign = await loadCampaign(campaignId);
+  const description = (opts.description?.trim() || NARRATOR_FALLBACK_DESCRIPTION).slice(0, 600);
+  const text = (opts.text?.trim() || NARRATOR_SAMPLE).slice(0, 400);
+  const seed = opts.seed ?? fnv1a(`narrator:${campaign.id}`);
+  const designed = await designVoice({ description, text, seed, fx: opts.fx ?? opts.preset ?? undefined });
+  const spec: VoiceSpec = { engine: 'qwen', ref: designed.ref, description, transcript: text, seed };
+  if (opts.preset) spec.preset = opts.preset;
+  if (opts.fx) spec.fx = opts.fx;
+  await prisma.campaign.update({ where: { id: campaignId }, data: { narratorVoice: JSON.stringify(spec) } });
+  return { spec, previewWavBase64: designed.previewWavBase64 };
+}
+
+export async function setNarratorVoice(
+  campaignId: string,
+  patch: Partial<Pick<VoiceSpec, 'preset' | 'fx' | 'voice' | 'lockedAt'>>,
+): Promise<VoiceSpec> {
+  const campaign = await loadCampaign(campaignId);
+  const next: VoiceSpec = { ...(campaign.current ?? { engine: 'kokoro' as const }) };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v !== undefined) (next as Record<string, unknown>)[k] = v;
+  }
+  await prisma.campaign.update({ where: { id: campaignId }, data: { narratorVoice: JSON.stringify(next) } });
+  return next;
+}
+
+export async function clearNarratorVoice(campaignId: string): Promise<void> {
+  await loadCampaign(campaignId);
+  await prisma.campaign.update({ where: { id: campaignId }, data: { narratorVoice: null } });
 }
 
 export async function setVoiceForCharacter(

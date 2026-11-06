@@ -9,18 +9,28 @@ const DOWN_MS = 30_000;
 
 interface Item { u: Utterance; blob: Promise<Blob | null> | null }
 
+function isNotAllowed(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'NotAllowedError';
+}
+
 /**
- * Reads each being's NEW card aloud (never history, never the Watcher's own lines).
- * unlock() must run inside a user gesture so mobile browsers allow later play().
+ * Reads each NEW line aloud — narration in the campaign's narrator voice, a character's speech in its own
+ * (table-reader-utterances). Never history.
+ *
+ * Browsers refuse play() until a user gesture has touched audio. unlock() runs inside a gesture (the AUDIO
+ * button); when the preference was restored from storage without one (stress test 2026-11-06: the phone played
+ * nothing all session), the first refused play() marks the reader `locked`, keeps the line, and the next
+ * tap or key anywhere on the page unlocks and resumes.
  */
 export function useTableReader({ enabled, events, roster, campaignId }: {
   enabled: boolean;
   events: TerminalEvent[];
   roster: { id: string; name: string }[];
   campaignId: string;
-}): { speaking: boolean; unavailable: boolean; stop: () => void; unlock: () => Promise<void> } {
+}): { speaking: boolean; unavailable: boolean; locked: boolean; stop: () => void; unlock: () => Promise<boolean> } {
   const [speaking, setSpeaking] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
+  const [locked, setLocked] = useState(false);
   const handled = useRef<Set<string>>(new Set());
   const primed = useRef(false);
   const queue = useRef<Item[]>([]);
@@ -32,6 +42,7 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
   const gen = useRef(0);
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
+  const lockedRef = useRef(false);
 
   const audio = useCallback(() => {
     if (!audioEl.current) audioEl.current = new Audio();
@@ -52,7 +63,7 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
     item.blob = fetch('/api/speech/speak', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: item.u.text, characterId: item.u.characterId }),
+      body: JSON.stringify({ text: item.u.text, characterId: item.u.characterId, campaignId }),
       signal: aborter.current.signal,
     }).then(async (res) => {
       if (!res.ok) { if (res.status === 503) markDown(); return null; }
@@ -62,30 +73,41 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
       return null;
     });
     return item.blob;
-  }, [markDown]);
+  }, [markDown, campaignId]);
 
   const pump = useCallback(async () => {
-    if (playing.current) return;
+    if (playing.current || lockedRef.current) return;
     playing.current = true;
     const myGen = gen.current;
     setSpeaking(true);
     while (queue.current.length > 0 && gen.current === myGen) {
-      const head = queue.current.shift()!;
+      const head = queue.current[0];
       const blobPromise = ensure(head);
       // Prefetch exactly one ahead while this one plays.
-      if (queue.current[0]) void ensure(queue.current[0]);
+      if (queue.current[1]) void ensure(queue.current[1]);
       const blob = await blobPromise;
       if (gen.current !== myGen) break;
-      if (!blob || blob.size === 0) continue;
+      if (!blob || blob.size === 0) { queue.current.shift(); continue; }
       const url = URL.createObjectURL(blob);
       const el = audio();
-      await new Promise<void>((resolve) => {
-        const done = () => { el.onended = null; el.onerror = null; URL.revokeObjectURL(url); resolve(); };
+      const refused = await new Promise<boolean>((resolve) => {
+        const done = () => { el.onended = null; el.onerror = null; URL.revokeObjectURL(url); resolve(false); };
         el.onended = done;
         el.onerror = done;
         el.src = url;
-        el.play().catch(done);
+        el.play().catch((err: unknown) => {
+          el.onended = null; el.onerror = null; URL.revokeObjectURL(url);
+          resolve(isNotAllowed(err));
+        });
       });
+      if (gen.current !== myGen) break;
+      if (refused) {
+        // No gesture yet: keep the line at the head and wait for one (the blob is kept, it replays).
+        lockedRef.current = true;
+        setLocked(true);
+        break;
+      }
+      queue.current.shift();
     }
     if (gen.current === myGen) { playing.current = false; setSpeaking(false); }
   }, [audio, ensure]);
@@ -101,13 +123,20 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
     setSpeaking(false);
   }, []);
 
-  const unlock = useCallback(async () => {
+  /** Run inside a user gesture. Returns true when the browser now allows playback. */
+  const unlock = useCallback(async (): Promise<boolean> => {
     try {
       const el = audio();
       el.src = SILENT_WAV;
       await el.play();
-    } catch { /* gesture refused or no audio device */ }
-  }, [audio]);
+      lockedRef.current = false;
+      setLocked(false);
+      if (queue.current.length > 0) void pump();
+      return true;
+    } catch {
+      return false; // gesture refused or no audio device
+    }
+  }, [audio, pump]);
 
   // Enable / disable: on enable, everything already here is history.
   useEffect(() => {
@@ -117,6 +146,18 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
     primed.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, campaignId]);
+
+  // Locked: the next tap or key anywhere unlocks and resumes.
+  useEffect(() => {
+    if (!enabled || !locked || typeof document === 'undefined') return;
+    const onGesture = () => { void unlock(); };
+    document.addEventListener('pointerdown', onGesture, { capture: true });
+    document.addEventListener('keydown', onGesture, { capture: true });
+    return () => {
+      document.removeEventListener('pointerdown', onGesture, { capture: true });
+      document.removeEventListener('keydown', onGesture, { capture: true });
+    };
+  }, [enabled, locked, unlock]);
 
   // New events.
   useEffect(() => {
@@ -129,7 +170,7 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
     }
     if (fresh.length === 0 || Date.now() < downUntil.current) return;
     for (const u of fresh) queue.current.push({ u, blob: null });
-    if (playing.current && queue.current[0]) void ensure(queue.current[0]);
+    if (playing.current && queue.current[1]) void ensure(queue.current[1]);
     void pump();
   }, [enabled, events, ensure, pump]);
 
@@ -138,5 +179,5 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
     if (downTimer.current) clearTimeout(downTimer.current);
   }, [stop]);
 
-  return { speaking, unavailable, stop, unlock };
+  return { speaking, unavailable, locked, stop, unlock };
 }

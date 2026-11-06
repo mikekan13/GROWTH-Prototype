@@ -21,6 +21,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { JEWL_CHAT_CSS, fs, MONO, BEBAS, READ } from '@/components/terminal/jewlChatCss';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import { useBackCloses } from '@/hooks/useBackCloses';
+import { useAudioModePref } from '@/hooks/useAudioModePref';
 import { openJewlWork } from '@/lib/jewl-work';
 import { GenesisProdAsk, genesisProdActionOf } from './GenesisProdAsk';
 
@@ -216,6 +217,8 @@ export function JewlChip() {
   // Voice output (TTS) — speak each new assistant message via the browser's
   // Web Speech API. Default on; toggle off if you want quiet.
   const [voiceMuted, setVoiceMuted] = useState(false);
+  // The Watcher's table audio mode for this campaign (live): when on, JEWL's mic and browser voice stand down.
+  const tableAudioOn = useAudioModePref(campaignId);
   const lastSpokenIdRef = useRef<string | null>(null);
   // True until the chip has done its FIRST history load. Anything already in
   // history when the chip mounts is treated as "already spoken" so we don't
@@ -640,7 +643,8 @@ export function JewlChip() {
     lastSpokenIdRef.current = latestAssistant.id;
     setThinking(false);
 
-    if (voiceMuted) return;
+    // Table audio mode on (2026-11-06): the narrator and the beings have the floor; JEWL does not talk over them.
+    if (voiceMuted || tableAudioOn) return;
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     try {
       const synth = window.speechSynthesis;
@@ -660,7 +664,7 @@ export function JewlChip() {
       if (preferred) u.voice = preferred;
       synth.speak(u);
     } catch { /* TTS optional; never block the chip */ }
-  }, [messages, voiceMuted]);
+  }, [messages, voiceMuted, tableAudioOn]);
 
   const openFlagPicker = useCallback((messageId: string) => {
     setFlagTarget(messageId);
@@ -905,6 +909,9 @@ export function JewlChip() {
   useEffect(() => {
     if (!campaignId) return;
     if (typeof window === 'undefined') return;
+    // Table audio mode on (2026-11-06): the table is speaking through the speakers, so JEWL's always-on mic
+    // stands down — it heard the table's own voice and posted it as the Watcher's lines in the stress test.
+    if (tableAudioOn) { setAudioStatus('idle'); return; }
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setAudioStatus('unsupported');
       return;
@@ -1029,7 +1036,7 @@ export function JewlChip() {
         setWorkSessions(Array.isArray(data.sessions) ? data.sessions : []);
       }
     } catch { /* strip is best-effort */ }
-  }, [campaignId]);
+  }, [campaignId, tableAudioOn]);
 
   const { on: onStreamEvent } = useCampaignStream({
     campaignId: campaignId ?? '',

@@ -58,7 +58,7 @@ export default function TableSpeakBar({
   /** Audio mode (reads each being's new card aloud) — state lives in CampaignTerminal. */
   audioOn?: boolean;
   onAudioToggle?: () => void;
-  audioState?: 'idle' | 'speaking' | 'unavailable';
+  audioState?: 'idle' | 'speaking' | 'unavailable' | 'locked';
   onEvent?: () => void;
   /** Session-start warm-up (2026-10-26): while given, the bar is LOCKED and this ticker stands in its place. */
   warmup?: React.ReactNode;
@@ -268,6 +268,9 @@ export default function TableSpeakBar({
       {!warmup && audioOn && audioState === 'unavailable' && (
         <div style={{ ...strip, color: '#6b6b68' }}>no speech server</div>
       )}
+      {!warmup && audioOn && audioState === 'locked' && (
+        <div data-audio-locked style={{ ...strip, color: '#7a4a00' }}>tap anywhere for sound — the browser is holding the table&apos;s voice until you do</div>
+      )}
       {/* Lines the table did not hear (out-of-character asides, check calls):
           shown quietly so a dropped line never looks swallowed; clears on the next send. */}
       {ignored && ignored.length > 0 && !sending && (
@@ -303,7 +306,7 @@ export default function TableSpeakBar({
         <button
           type="button"
           onClick={() => onAudioToggle?.()}
-          title={audioOn ? "Audio on: each being's new card is read aloud" : 'Audio off'}
+          title={audioOn ? 'Audio on: the narrator reads the table, each character speaks its own lines' : 'Audio off'}
           aria-pressed={audioOn}
           style={{
             width: 68, height: 48, border: '2px solid #002f6c', cursor: 'pointer',

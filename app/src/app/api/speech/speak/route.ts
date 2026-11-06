@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
-import { synthesizeSpeech, voiceSpecForCharacterId } from '@/services/speech';
+import { synthesizeSpeech, voiceSpecForCharacterId, voiceSpecForNarrator } from '@/services/speech';
 
 export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({
   text: z.string().min(1).max(4000),
   characterId: z.string().min(1).nullable().optional(),
+  /** No characterId = the narrator; with a campaignId, that campaign's designed narrator (2026-11-06). */
+  campaignId: z.string().min(1).nullable().optional(),
   speed: z.number().min(0.5).max(2).optional(),
 });
 
@@ -17,7 +19,9 @@ export async function POST(request: NextRequest) {
   try {
     await requireAuth();
     const body = bodySchema.parse(await request.json());
-    const spec = await voiceSpecForCharacterId(body.characterId);
+    const spec = body.characterId
+      ? await voiceSpecForCharacterId(body.characterId)
+      : await voiceSpecForNarrator(body.campaignId);
     const result = await synthesizeSpeech({ text: body.text, spec, speed: body.speed });
     if (!result.ok) {
       return NextResponse.json({ error: 'speech server unavailable', detail: result.detail }, { status: 503 });

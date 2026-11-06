@@ -60,6 +60,23 @@ OWED:
 - Derived descriptions (`describeVoiceFromSheet`) still contain trait names.
 
 
+
+## The narrator, and one mouth at a time (2026-11-06, after the first voice stress test)
+
+Michael: "we need a narrator voice, someone that takes all of the narration parts so it sounds like a story… that voice should voice everything else, so when the characters talk they are like sound bites." Session 3 (02:32–02:52 local) also showed three faults, all fixed here: the table's voices never played on the phone (the AUDIO preference was restored from storage with no user gesture, so every `play()` was refused and dropped); JEWL's chip spoke his replies through the browser's Web Speech voice and the phone mic posted them back as the Watcher's declarations; and the always-on mic chunked silence into Whisper hallucinations ("Shout out to the audience") and sentences into fragments.
+
+- `prisma/schema.prisma` `Campaign.narratorVoice String?` — JSON `VoiceSpec` of the campaign's designed narrator (migration `20261106090000_campaign_narrator_voice`). Null = Kokoro `bm_daniel`. The Watcher will design it at campaign creation (owed); tonight it is set through the route.
+- `src/services/speech.ts` — `voiceSpecForNarrator(campaignId?)`.
+- `src/services/voice-design.ts` — `designVoice()` (shared call to `/v1/voices/design`), `designNarratorVoice(campaignId, opts)`, `getNarratorVoice`, `setNarratorVoice`, `clearNarratorVoice`.
+- `src/app/api/campaigns/[id]/narrator-voice/route.ts` — GET `{spec, fallback, presets}`; POST `{action:'design', description?, text?, preset?, fx?, seed?}` → `{spec, previewWavBase64}` / `{action:'set', preset?, fx?, voice?, lockedAt?}` → `{spec}`; DELETE. Watcher or ADMIN (`canManageCampaign`).
+- `src/app/api/speech/speak/route.ts` — body gains `campaignId`; no `characterId` + `campaignId` = that campaign's narrator.
+- `src/hooks/table-reader-utterances.ts` — `utterancesFor` now reads EVERY narration row to the narrator (the Watcher's typed line, built-up prose, a being's scene line, actions), a character row's speech in that character's voice, and `game_event` `timeskip` descriptions (time passing) to the narrator. Thoughts, rolls, checks, session start/end and JEWL bars stay silent. Tests `table-reader-queue.test.ts`.
+- `src/hooks/useTableReader.ts` — sends `campaignId`; a refused `play()` (no gesture yet) marks the reader `locked`, KEEPS the line at the head of the queue, and the next tap or key anywhere on the page unlocks and resumes (`unlock()` returns a boolean). `TableSpeakBar` shows "tap anywhere for sound" in that state (`audioState: 'locked'`).
+- `src/lib/audio-mode-pref.ts` — `writeAudioMode` broadcasts `growth:audio-mode`; `subscribeAudioMode`; `src/hooks/useAudioModePref.ts`.
+- `src/components/copilot/JewlChip.tsx` — while the campaign's table audio mode is ON, JEWL's always-on mic does not start (`audioStatus: 'idle'`) and JEWL's Web Speech voice is silent. One mouth and one ear at a time until half-duplex exists.
+
+Owed from the stress test (tmp/session-notes-2026-11-06.md): the mic lane (voice-activity gate on the device, Whisper's own no-speech confidence instead of the phrase list in `audio-chunk/route.ts`, utterance assembly, capture paused while the table speaks); a confirm ticket before any span runs beyond the scene (a typed "waiting for the sky to open up" ran THREE DAYS); the world clock still at the night of the call after the snapshot replays; a being re-running a kept event (Kristopher called again); Violet's stale routine step ("pay Kristopher 22.97"); texts and stretch summaries reaching the ear; JEWL's own designed voice and a private Watcher↔JEWL channel; the narrator designed at campaign creation.
+
 ## JEWL world-keeping from the table (2026-11-01)
 
 - `src/ai/copilot/tool-profiles.ts` — `nextGrants` keeps a grant for the rest of the turn (was: dropped when unused for a round). `src/ai/copilot/runtime.ts` — `STAGE_ONLY_TOOLS` no longer holds `stock_goods` / `stock_kit` (requestable on any lane); reply hygiene (echoed `[ISO]: ` stamps stripped); one bounce per dispatch when a granted tool was never used.
