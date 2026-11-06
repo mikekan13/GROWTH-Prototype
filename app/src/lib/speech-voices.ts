@@ -1,4 +1,5 @@
-// Voice choice for spoken text (Kokoro). Pure: no service imports.
+// Voice choice for spoken text (Kokoro / designed Qwen voices). Pure: no service imports.
+import { z } from 'zod';
 
 export interface KokoroVoice {
   id: string;
@@ -28,7 +29,7 @@ export const KOKORO_VOICES: readonly KokoroVoice[] = [
 export const NARRATOR_VOICE = 'bm_daniel';
 
 /** FNV-1a 32-bit. */
-function fnv1a(s: string): number {
+export function fnv1a(s: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
@@ -45,8 +46,55 @@ function poolFor(gender: string | null | undefined): KokoroVoice[] {
   return base;
 }
 
-export function voiceForCharacter(c: { id: string; gender?: string | null; voice?: string | null }): string {
-  if (c.voice && KOKORO_VOICES.some(v => v.id === c.voice)) return c.voice;
+export function voiceForCharacter(c: { id: string; gender?: string | null; voice?: unknown }): string {
+  if (typeof c.voice === 'string' && KOKORO_VOICES.some(v => v.id === c.voice)) return c.voice;
+  if (c.voice && typeof c.voice === 'object') {
+    const kv = (c.voice as { voice?: unknown }).voice;
+    if (typeof kv === 'string' && KOKORO_VOICES.some(v => v.id === kv)) return kv;
+  }
   const pool = poolFor(c.gender);
   return pool[fnv1a(c.id) % pool.length].id;
+}
+
+export const FX_PRESETS: readonly string[] = ['human', 'demonic', 'angelic', 'monstrous', 'robotic', 'ghostly', 'giant', 'tiny'];
+
+export const fxParamsSchema = z.object({
+  pitch: z.number().min(-24).max(24).optional(),
+  formant: z.number().min(0.5).max(2).optional(),
+  layers: z.number().min(0).max(4).optional(),
+  grit: z.number().min(0).max(1).optional(),
+  sub: z.number().min(0).max(1).optional(),
+  air: z.number().min(0).max(1).optional(),
+  reverb: z.number().min(0).max(1).optional(),
+  crush: z.number().min(0).max(1).optional(),
+  ring: z.number().min(0).optional(),
+});
+export type FxParams = z.infer<typeof fxParamsSchema>;
+
+export const voiceSpecSchema = z.object({
+  engine: z.enum(['kokoro', 'qwen']),
+  voice: z.string().optional(),
+  ref: z.string().optional(),
+  description: z.string().optional(),
+  transcript: z.string().optional(),
+  preset: z.string().optional(),
+  fx: fxParamsSchema.optional(),
+  seed: z.number().int().optional(),
+  lockedAt: z.string().optional(),
+});
+export type VoiceSpec = z.infer<typeof voiceSpecSchema>;
+
+/** New object form, or a bare legacy Kokoro id. Anything else -> null. */
+export function parseVoiceSpec(raw: unknown): VoiceSpec | null {
+  if (typeof raw === 'string') {
+    return KOKORO_VOICES.some(v => v.id === raw) ? { engine: 'kokoro', voice: raw } : null;
+  }
+  const r = voiceSpecSchema.safeParse(raw);
+  return r.success ? r.data : null;
+}
+
+export function voiceSpecForCharacter(c: { id: string; gender?: string | null; voice?: unknown }): VoiceSpec {
+  const parsed = parseVoiceSpec(c.voice);
+  if (parsed) return parsed;
+  return { engine: 'kokoro', voice: voiceForCharacter({ id: c.id, gender: c.gender }) };
 }

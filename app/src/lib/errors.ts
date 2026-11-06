@@ -164,3 +164,11 @@ export class EditOutOfScopeError extends AppError {
     this.name = 'EditOutOfScopeError';
   }
 }
+
+/** A backing service (e.g. the local TTS / voice-design server) is down or unavailable. Maps to 503. */
+export class ServiceUnavailableError extends AppError {
+  constructor(message: string) {
+    super(message, 503);
+    this.name = 'ServiceUnavailableError';
+  }
+}

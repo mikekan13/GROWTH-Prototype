@@ -31,3 +31,8 @@ tsc, vitest, detached prod build (check free RAM first; see feedback-manage-syst
 5. Trailblazers: mic too; a player's own character is never TTS'd.
 6. Voice per being: `data.voice` chosen by the Watcher on the sheet, default derived (gender pool + id). Later: designed voices as part of genesis.
 7. Typing stays as the fallback everywhere (same box).
+
+## Notes from the car (Michael, 11-06 late)
+- NON-HUMAN voices (monstrous, demonic, angelic…) handled by the same system → fx chain presets + per-voice params (tts-server/fx.py).
+- IMMERSION MODE: a table option where you never hear the other humans as themselves; everything is filtered through the voices. v1 = mic → text → the character's designed voice for players too; later real-time voice conversion.
+- OWED: audit the Watcher's campaign settings page — add what belongs, remove what shouldn't be there.

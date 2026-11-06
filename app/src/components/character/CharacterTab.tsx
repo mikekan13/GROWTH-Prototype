@@ -10,6 +10,7 @@ import { safeJsonParse } from '@/lib/safe-json';
 import IdentityLockWizard from './IdentityLockWizard';
 import AppearanceDesigner from './designer/AppearanceDesigner';
 import InventorySection from './InventorySection';
+import VoiceSection from './VoiceSection';
 import Paperdoll from './Paperdoll';
 import CharacterGenesisSections from './CharacterGenesisSections';
 import { GenesisLoadingOverlay, GenesisBadge, useGenesisProgress, genesisInFlight } from './GenesisLoading';
@@ -1039,6 +1040,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 void refetchGenesis();
               }}
             />
+            {isGM && effectiveCharacter?.id && (
+              <VoiceSection characterId={effectiveCharacter.id} name={characterName || effectiveCharacter.name || 'Someone'} />
+            )}
           </div>
         )}
 
