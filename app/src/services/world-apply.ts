@@ -443,17 +443,20 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             // which she then read and answered a second time). When the actor and the holder of the thing stand in the same place, a sound
             // at that thing is refused unless the line itself says the act was a message or a call. This reads the Watcher's/being's own
             // words for the verb of sending — a grammar check on the line, not a list of what may be said.
-            if (where.holderId && where.holderId !== actor.id) {
+            // The other party: the holder of the thing when it is someone else's; when the sound is at the actor's OWN device
+            // (session 6, 07:56: the adjudicator put "Violet's phone chimes" at Kristopher's Work phone), whoever the line addressed.
+            const otherIds = where.holderId && where.holderId !== actor.id ? [where.holderId] : addressedIds.filter((id) => id !== actor.id);
+            if (otherIds.length) {
               const places = await prisma.entityRelationship.findMany({
-                where: { campaignId, relationshipType: 'located_at', sourceType: 'CHARACTER', sourceId: { in: [actor.id, where.holderId] } },
+                where: { campaignId, relationshipType: 'located_at', sourceType: 'CHARACTER', sourceId: { in: [actor.id, ...otherIds] } },
                 select: { sourceId: true, targetId: true },
               });
               const mine = places.filter((r) => r.sourceId === actor.id).map((r) => r.targetId);
-              const theirs = places.filter((r) => r.sourceId === where.holderId).map((r) => r.targetId);
+              const theirs = places.filter((r) => otherIds.includes(r.sourceId)).map((r) => r.targetId);
               const together = mine.length > 0 && mine.some((id) => theirs.includes(id));
               const saysSent = /\b(?:text(?:s|ed|ing)?|messag(?:e|es|ed|ing)|send(?:s|ing)?|sent|call(?:s|ed|ing)?|dial(?:s|ed|ing)?|voicemail|writes?\s+back|repl(?:y|ies|ied|ying)\s+(?:by|on|over)|types?)\b/i.test(actText ?? '');
               if (together && !saysSent) {
-                const holderName = (await prisma.character.findUnique({ where: { id: where.holderId }, select: { name: true } }).catch(() => null))?.name ?? 'the other';
+                const holderName = (await prisma.character.findUnique({ where: { id: otherIds[0] }, select: { name: true } }).catch(() => null))?.name ?? 'the other';
                 report.refused.push(`sound at ${where.name}: ${actor.name} and ${holderName} are in the same place — that was said, not sent`);
                 break;
               }
