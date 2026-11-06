@@ -138,10 +138,14 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
     }
   }, [audio, pump]);
 
-  // Enable / disable: on enable, everything already here is history.
+  // Enable / disable: on enable, everything already here is history. When the preference is restored on a page
+  // load, `enabled` can flip before the events have been fetched (an empty list) — priming then would make the
+  // whole record "new" and the reader would read the campaign from the top (16 lines after a reload, 2026-11-06).
+  // So priming waits for the first non-empty events list.
   useEffect(() => {
     if (!enabled) { stop(); primed.current = false; return; }
     aborter.current = new AbortController();
+    if (events.length === 0) { primed.current = false; return; }
     for (const e of events) handled.current.add(e.id);
     primed.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,7 +165,14 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
 
   // New events.
   useEffect(() => {
-    if (!enabled || !primed.current) return;
+    if (!enabled) return;
+    if (!primed.current) {
+      // First non-empty list after enabling = history, never read.
+      if (events.length === 0) return;
+      for (const e of events) handled.current.add(e.id);
+      primed.current = true;
+      return;
+    }
     const fresh: Utterance[] = [];
     for (const e of events) {
       if (handled.current.has(e.id)) continue;
