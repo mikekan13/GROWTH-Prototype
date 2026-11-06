@@ -655,7 +655,12 @@ export async function buildScene(
       const mono = monologues.get(c.actorId) ?? '';
       const seedActs = seed.actions.filter((a) => a.actorId === c.actorId);
       if (mono && seedActs.length) console.log(`[scene-builder] ${labelOf(c.actorId)}: the Watcher's act stands; the monologue's doings stay thoughts`);
-      if (mono && !seedActs.length) {
+      // 2026-11-06 (session 5): a monologue's physical doing is NEVER promoted to an act any more. The being's chosen act is posted by the
+      // act path itself (table-speak, finding 23) and the world applies or refuses it; a doing promoted from the inner voice wrote deeds the
+      // world never did — Violet's card said she typed "Yes please." and hit send while the adjudicator had sent nothing, and both beings then
+      // remembered a text that did not exist. A doing in the voice stays the voice (a thought) — the never-guess law applies to deeds too.
+      const PROMOTE_DOINGS = false;
+      if (PROMOTE_DOINGS && mono && !seedActs.length) {
         const carried = vetted.filter((s) => s.kind === 'thought' || s.kind === 'action').map((s) => s.text);
         for (const sent of splitSentences(mono)) {
           if (carried.some((k) => Math.max(cueCoverage(sent, k), cueCoverage(k, sent)) >= 0.7)) continue;

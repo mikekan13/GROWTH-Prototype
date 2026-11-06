@@ -139,8 +139,12 @@ const pl = (e: CardLike): Payload | null => (e.payload && typeof e.payload === '
 export function isCardPending(payload: unknown, ageMs: number): boolean {
   const p = payload as Payload | null;
   if (!p || p.kind !== 'being_thought') return false;
-  if (p.segments?.length || (p.scene && String(p.scene).trim())) return false;
-  return ageMs < THINKING_MAX_MS;
+  // 2026-11-06: a card is printed ONCE, in its final words — it stays behind the thinking card until the server SETTLES it (the act
+  // joined, the builder done), never shown half-built and then rewritten. Safety: a card the server never settles shows after THINKING_MAX_MS.
+  if ((p as { settled?: boolean }).settled === true) return false;
+  if (ageMs >= THINKING_MAX_MS) return false;
+  if (!p.segments?.length && !(p.scene && String(p.scene).trim())) return true;
+  return true;
 }
 
 const sameText = (a: string, b: string) => a.trim() === b.trim();

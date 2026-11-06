@@ -27,6 +27,8 @@ export function utterancesFor(event: TerminalEvent, roster: RosterName[]): Utter
     if (text) out.push({ text, characterId });
   };
   const p = event.payload;
+  // The world's own device lines (a phone sounding, the words read off a screen) are not read aloud: the beings' cards carry them.
+  if (p?.kind === 'game_event' && p.eventType === 'declaration' && p.via === 'device') return out;
   if (p?.kind === 'game_event' && p.eventType === 'timeskip') {
     if (typeof p.description === 'string') push(p.description, null);
     return out;

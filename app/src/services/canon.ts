@@ -237,7 +237,7 @@ export async function memoryVersusTruth(campaignId: string, actor: { userId: str
 
 /** What a table writer hands declareCanon for the feed row only (types/terminal TableFeedFields). Never read back by the engine. */
 export interface DeclarationFeed {
-  via?: 'typed' | 'spoken';
+  via?: 'typed' | 'spoken' | 'device';
   raw?: string;
   narration?: string | null;
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;

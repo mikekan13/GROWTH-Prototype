@@ -77,9 +77,9 @@ export function TableFeedProvider({ entities, timescale, onRevert, reverting, on
 
 // ── small pieces ─────────────────────────────────────────────────────────────
 
-const VIA_GLYPH: Record<Via, string> = { typed: '⌨', spoken: '🎙', being: '◈' };
-const VIA_WORD: Record<Via, string> = { typed: 'typed', spoken: 'spoken', being: 'answered by the being' };
-const VIA_RAW: Record<Via, string> = { typed: 'AS TYPED', spoken: 'AS HEARD', being: 'AS ANSWERED' };
+const VIA_GLYPH: Record<Via, string> = { typed: '⌨', spoken: '🎙', being: '◈', device: '◌' };
+const VIA_WORD: Record<Via, string> = { typed: 'typed', spoken: 'spoken', being: 'answered by the being', device: 'the world' };
+const VIA_RAW: Record<Via, string> = { typed: 'AS TYPED', spoken: 'AS HEARD', being: 'AS ANSWERED', device: 'THE WORLD' };
 
 function hhmm(iso: string): string {
   return realClock(iso).slice(0, 5);

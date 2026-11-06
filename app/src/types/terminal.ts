@@ -61,7 +61,7 @@ export interface DiceRollPayload {
  */
 export interface TableFeedFields {
   /** How the line reached the table: typed by a person, spoken into the mic, or answered by a being (DAYA). */
-  via?: 'typed' | 'spoken' | 'being';
+  via?: 'typed' | 'spoken' | 'being' | 'device';
   /** The campaign clock (meta cycles) when the line was recorded — the in-world time shown before the real one. */
   cycle?: number;
   /** The pre-processed text, exactly as typed or transcribed, when it differs from the cleaned text. */

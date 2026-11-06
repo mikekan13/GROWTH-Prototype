@@ -375,7 +375,13 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   // A WATCHER LINE THROUGH THE BEING IS A BEAT (finding 45, 2026-11-05: "Violet looks at the message a moment longer" → "quiet beat, nothing
   // woke — no beat"): its own doing, as told to it, is what reached it — never a quiet beat.
   const moved = a.prompted || a.own;
-  const perceived = a.standing || (!moved && NOTHING.test(perceivedRaw.trim())) ? null : (moved && NOTHING.test(perceivedRaw.trim()) ? a.event : perceivedRaw);
+  // 2026-11-06 (session 5 cross-wire): the perception order rewrote ANOTHER being's act from this being's viewpoint and made it the actor —
+  // Violet "heard" "I take the work phone out of my pocket" (Kristopher's deed) and Kristopher "heard" "I type 'Yes please.' and hit send"
+  // (Violet's). What reached a being about someone else is never in the first person: fall back to the event as narrated.
+  const firstPersonLeak = !a.own && /^\s*(?:I|I'm|I've|I'll|My)(?=[\s,.!?;:]|$)/.test(perceivedRaw);
+  if (firstPersonLeak) console.warn(`[composer] perception came back in the first person for someone else's deed — kept the event as told: ${perceivedRaw.slice(0, 100)}`);
+  const perceivedSafe = firstPersonLeak ? a.event : perceivedRaw;
+  const perceived = a.standing || (!moved && NOTHING.test(perceivedSafe.trim())) ? null : (moved && NOTHING.test(perceivedSafe.trim()) ? a.event : perceivedSafe);
   const fragments = a.memories.slice(0, 8).map((m, i) => ({ i, text: m.text, ...(m.age ? { age: m.age } : {}) }));
   const going = (a.going ?? []).slice(0, 4);
   // A QUIET BEAT (run 2, 2026-11-03: every quiet beat cost three cloud orders and a local choice, ~20 s, to think about a key ring).

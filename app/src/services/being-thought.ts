@@ -83,6 +83,25 @@ export async function appendBeingCardSegments(campaignId: string, eventId: strin
 }
 
 /** Never throws: a record that fails to write is logged, the table does not notice. Returns the row's id for the card to follow. */
+/**
+ * THE CARD IS PRINTED ONCE, IN ITS FINAL WORDS (Michael 2026-11-05/06: "we get a thinking card for each entity and that stays until their
+ * final card is written"). A being's card is held off the page (isCardPending) until its beat is SETTLED here — after the act path has
+ * joined its deed and the builder has finished — then shown whole. Idempotent; non-fatal.
+ */
+export async function settleBeingCard(campaignId: string, eventId: string | null | undefined): Promise<void> {
+  if (!eventId) return;
+  try {
+    const ev = await prisma.campaignEvent.findUnique({ where: { id: eventId } });
+    if (!ev) return;
+    let payload: Record<string, unknown> = {};
+    try { payload = JSON.parse(ev.payload ?? '{}') as Record<string, unknown>; } catch { /* fresh */ }
+    if (payload.settled === true) return;
+    payload = { ...payload, settled: true };
+    await prisma.campaignEvent.update({ where: { id: eventId }, data: { payload: JSON.stringify(payload) } });
+    pushRow(campaignId, ev, payload);
+  } catch (err) { console.warn('[being-thought] card not settled (non-fatal):', err instanceof Error ? err.message : err); }
+}
+
 export async function recordBeingThought(campaignId: string, by: { userId: string; username: string }, r: BeingThoughtRecord): Promise<string | null> {
   try {
     const payload = {

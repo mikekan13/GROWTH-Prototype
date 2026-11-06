@@ -85,11 +85,13 @@ const seg = (kind: string, text: string) => ({ kind, text });
 const row = (id: string, payload: Record<string, unknown>) => ({ id, timestamp: '2026-11-05T10:00:00Z', payload }) as never;
 
 describe('card rows: held until built, append-only', () => {
-  it('an unbuilt row is held while young, printed when old', () => {
+  it('a row is held until the server settles it (printed once, in its final words), printed when old regardless', () => {
     const p = { kind: 'being_thought', thought: 't' };
     expect(isCardPending(p, 1000)).toBe(true);
     expect(isCardPending(p, THINKING_MAX_MS + 1)).toBe(false);
-    expect(isCardPending({ ...p, segments: [seg('thought', 't')] }, 1)).toBe(false);
+    // 2026-11-06: segments alone no longer print the card — the act may still be joining; settled does.
+    expect(isCardPending({ ...p, segments: [seg('thought', 't')] }, 1)).toBe(true);
+    expect(isCardPending({ ...p, segments: [seg('thought', 't')], settled: true }, 1)).toBe(false);
   });
   it('later segments append without changing earlier text', () => {
     const prev = { kind: 'being_thought', segments: [seg('thought', 'I wonder.')] };

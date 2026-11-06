@@ -164,7 +164,12 @@ export default function CampaignTerminal({
   const [audioOn, setAudioOn] = useState(false);
   useEffect(() => { setAudioOn(readAudioMode(campaignId)); }, [campaignId]);
   const readerRoster = useMemo(() => (tableEntities ?? []).filter((e) => e.kind === 'npc' || e.kind === 'character').map((e) => ({ id: e.id, name: e.name })), [tableEntities]);
-  const reader = useTableReader({ enabled: audioOn && isGM && !!activeSession && !viewAs, events, roster: readerRoster, campaignId });
+  // The reader voices a being's card only once it is settled (printed once, in its final words — never a half-built card).
+  const readerEvents = useMemo(() => {
+    const t = Date.now();
+    return events.filter(e => e.payload?.kind !== 'being_thought' || !isCardPending(e.payload, t - new Date(e.timestamp).getTime()));
+  }, [events]);
+  const reader = useTableReader({ enabled: audioOn && isGM && !!activeSession && !viewAs, events: readerEvents, roster: readerRoster, campaignId });
   const tableAvailable = isGM && !!activeSession;
 
   // Recorder chunk length (U2c): while a session is live AND the engine's split

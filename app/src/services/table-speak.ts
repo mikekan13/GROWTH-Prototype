@@ -66,7 +66,7 @@ import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, dismiss
 import { emitBeingListening, emitBeingDone } from '@/services/being-presence';
 import { advanceClockForLine } from '@/services/table-clock';
 import type { ListenImpulse } from '@/daya/prompts/roles/spirit';
-import { recordBeingThought, attachBeingCard, type BeingThoughtRecord, appendBeingCardSegments } from '@/services/being-thought';
+import { recordBeingThought, attachBeingCard, type BeingThoughtRecord, appendBeingCardSegments, settleBeingCard } from '@/services/being-thought';
 import { actorMap, whereOthersStand } from '@/services/world-apply';
 import { actInThirdPerson, worldChangeSentences } from '@/daya/act-card';
 import { didNotHear } from '@/daya/did-not-hear';
@@ -765,13 +765,16 @@ export async function speakProse(
   const soloAttributed = parsed.narration === null && !hasActions && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
   await liveStatedTime(campaignId, actor, await advanceClockForLine(campaignId, 'gm-line', message), message);
   if (parsed.narration !== null || hasActions || parsed.quotes.length !== 1) {
-    const declared = await declareCanon(campaignId, actor, {
+    const declared = await declareCanon(campaignId, input.worldEvent ? { ...actor, username: 'the world' } : actor, {
       narration: parsed.full,
       kind: 'narration',
       actorId: soleActor(parsed),
       locationId: input.locationId ?? null,
       witnessIds: [],
-      feed: { via: 'typed', raw: message, narration: parsed.narration, speech: parsed.quotes, actions: parsed.actions },
+      // 2026-11-06: a world event (a phone sounding, the words read off a screen) is the WORLD's line — `via: 'device'`, voiced by "the world",
+      // never stamped with the Watcher's name (session 5: every chime and read line carried Mikekan13). The novel view folds these away;
+      // the Log keeps them; the reader does not read them aloud.
+      feed: { via: input.worldEvent ? 'device' : 'typed', raw: message, narration: parsed.narration, speech: parsed.quotes, actions: parsed.actions },
     });
     canonEventId = declared.event.id;
     narratedActs(campaignId, parsed.actions, actor, { quotes: parsed.quotes });
@@ -977,6 +980,8 @@ async function runBeats(
     const pre = truth.preListened?.get(listenerId);
     if (pre) truth.preListened!.delete(listenerId);
     let cardDone: () => void = () => {};
+    // The card to SETTLE when this being's beat is over (printed once, in its final words — 2026-11-06).
+    let settleRowId: string | null = null;
     // Finding 85 (2026-11-05): several hears of one being in a beat chain their waits - a chosen act waits for ALL of this being's cards.
     const earlierCard = cardPosted.get(listenerId);
     cardPosted.set(listenerId, Promise.all([earlierCard, new Promise<void>((r) => { cardDone = r; })]).then(() => undefined));
@@ -1044,6 +1049,7 @@ async function runBeats(
           emitBeingDone(campaignId, { characterId: listenerId, lineId: truthId, posted: !!rowId });
           cardDone();
           cardRowId = rowId;
+          settleRowId = rowId;
           if (rowId) beatCards.set(listenerId, { rowId, truthId, heard: carried.content, attached: Promise.resolve() });
           if (!repeat && !holding && sceneBuilderOn() && thought && !own && rowId) {
             // A COMPOSED THOUGHT NEEDS NO BUILDER (Day 5, 2026-11-04): the record bounded it and the voice wrote it whole. When the
@@ -1160,7 +1166,7 @@ async function runBeats(
         }
       })
       .catch((err) => console.error('[table-speak] listening failed (non-fatal):', err))
-      .finally(() => cardDone());
+      .finally(() => { cardDone(); void settleBeingCard(campaignId, settleRowId); });
   };
 
   // Perception units 6+7 (PERCEPTION_REACH=on) — the reach/notice pass sits in the LISTEN beat: a stretch

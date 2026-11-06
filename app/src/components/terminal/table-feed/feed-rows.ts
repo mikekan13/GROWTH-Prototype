@@ -26,7 +26,7 @@ import { parseTableProse, characterCards } from '@/services/table-prose';
 import { foldSpokenBeats } from '../SpokenBeatBlock';
 import { stripNonEvents } from '@/lib/non-event';
 
-export type Via = 'typed' | 'spoken' | 'being';
+export type Via = 'typed' | 'spoken' | 'being' | 'device';
 /** Who voiced the line: the Watcher, a Trailblazer, or the being itself (DAYA). */
 export type Voice = 'Watcher' | 'Trailblazer' | 'Being';
 
@@ -255,6 +255,9 @@ export function eventRows(e: TerminalEvent, roster: RosterName[]): FeedRowModel[
   switch (p?.kind) {
     case 'chat': { const r = chatRow(e, p); return r ? [r] : []; }
     case 'game_event':
+      // 2026-11-06: the WORLD's own lines (a phone sounding, the words read off a screen — `via: 'device'`) are not narration: the novel
+      // reads like a novel (the beings' cards carry what they heard), the Log keeps the line as a quiet system row.
+      if (p.eventType === 'declaration' && p.via === 'device' && p.description?.trim()) return [{ type: 'system', key: e.id, timestamp: e.timestamp, lines: [`[WORLD] ${p.description.trim()}`] }];
       if (p.eventType === 'declaration' && p.description?.trim()) return declarationRows(e, p, roster);
       { const r = gameEventRow(e, p); return r ? [r] : []; }
     case 'dice_roll': return [diceRow(e, p as DiceRollPayload)];
