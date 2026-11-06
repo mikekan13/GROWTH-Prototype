@@ -27,3 +27,6 @@ A deterministic DSP chain AFTER synthesis, driven from the being's data (materia
 1. Now: Kokoro blend derived from the sheet + the non-human chain; `data.voice` object; voice preview on the sheet ("hear her").
 2. Next: Chatterbox smoke on the 4060 (licence verified) → designed reference clip at genesis → the speak route speaks from the clip.
 3. Later: emotion intensity from state + traits; voice as a genesis dialogue step (JEWL prods: "what does she sound like?").
+
+## RULED (Michael 2026-11-06): "Yes, this would be part of the Genesis."
+The walk gains a VOICE stage beside PORTRAIT: Seed → Root → Branches → Appearance → World → Memories → Vines → Portrait → **Voice** → Born (order of Portrait/Voice to settle; both are identity artifacts). JEWL prods for it in the genesis dialogue ("what does she sound like?"); the player/Watcher hears candidates and locks one (gate, like the designer and the portrait lock, `services/genesis-gates.ts`); the locked clip + recipe are written to `data.voice`. Step 1 therefore builds the designed voice, not only a derived default — the derived blend is the first candidate JEWL offers.
