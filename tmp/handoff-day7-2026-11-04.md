@@ -124,3 +124,10 @@ Then the replay: `node --env-file=.env --env-file=.env.local --import tsx ../tmp
 - TOOLING PITFALL (memory saved): doubled backslashes inside a Bash-tool command collapse — four regex edits lost their escapes; fixed by splicing exact lines from a quoted heredoc file. Grep what you wrote.
 
 **STATE AT ~23:35Z 11-05 — :3001 DOWN AGAIN (build killed by the system for low memory, second time today; nothing else was running — 6.2 GB free afterwards). `.next/BUILD_ID` is gone. All code is committed and pushed (7f41608; suite 2964/271 green, tsc clean). Recovery, when Michael says so: `cd C:\Projects\GRO.WTH\app; $env:NODE_OPTIONS='--max-old-space-size=4096'; npx next build --webpack` then `Start-Process -WindowStyle Hidden cmd.exe -ArgumentList '/c npx next start -p 3001 1>> ..\logs\prod-server.out.log 2>> ..\logs\prod-server.err.log'`; probe http://localhost:3001/hub → 200. World: post-session-6 + coffee shop (door, lot gate, aliases) + Dialed to Eleven; pod OFF.**
+
+## STATE AT ~00:10Z 11-06 — :3001 BACK UP (build 7f41608+)
+
+- Cause of all three build kills found: free RAM was 1.6 GB of 15.8 (Ollama desktop app idle at 3.85 GB, Steam, Discord, Signal, NVIDIA overlay), AND the kill came from Claude Code's own background-task memory guard, not Windows.
+- Michael's ruling (from the car): this PC exists for GRO.WTH; close idle programs to free RAM before heavy work; a low-memory kill is mine to prevent.
+- Fix that worked: close the idle apps (1.6 → 6.3 GB free), run the build DETACHED (`Start-Process -WindowStyle Hidden cmd /c set NODE_OPTIONS=--max-old-space-size=4096&& npx next build --webpack`, PID in logs/prod-build.pid) and wait on the PID. Detached processes are outside the task guard.
+- Server started hidden on :3001, /hub → 200. World unchanged (post-session-6 + coffee shop). Ready for Michael's fourth attempt.
