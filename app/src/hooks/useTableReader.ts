@@ -43,6 +43,9 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
   const rosterRef = useRef(roster);
   rosterRef.current = roster;
   const lockedRef = useRef(false);
+  // Nothing older than the moment the reader was enabled is ever read (2026-11-06, session 6: history arriving in a later batch —
+  // older pages, a refetch — looked "new" and the whole record was read from the top again).
+  const enabledAt = useRef(0);
 
   const audio = useCallback(() => {
     if (!audioEl.current) audioEl.current = new Audio();
@@ -145,6 +148,7 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
   useEffect(() => {
     if (!enabled) { stop(); primed.current = false; return; }
     aborter.current = new AbortController();
+    enabledAt.current = Date.now();
     if (events.length === 0) { primed.current = false; return; }
     for (const e of events) handled.current.add(e.id);
     primed.current = true;
@@ -177,6 +181,8 @@ export function useTableReader({ enabled, events, roster, campaignId }: {
     for (const e of events) {
       if (handled.current.has(e.id)) continue;
       handled.current.add(e.id);
+      // History that arrives late (an older page, a refetch) is never read: only what happened after the reader was enabled.
+      if (new Date(e.timestamp).getTime() < enabledAt.current - 15_000) continue;
       fresh.push(...utterancesFor(e, rosterRef.current));
     }
     if (fresh.length === 0 || Date.now() < downUntil.current) return;

@@ -74,7 +74,7 @@ async function endpointView(): Promise<LaneReadiness['endpoint'] | undefined> {
     return c.signal;
   };
   try {
-    const health = (await (await fetch(`https://api.runpod.ai/v2/${id}/health`, { headers: H, signal: withTimeout(4000) })).json()) as {
+    const health = (await (await fetch(`https://api.runpod.ai/v2/${id}/health`, { headers: H, signal: withTimeout(12000) })).json()) as {
       workers?: Record<string, number>; jobs?: { inQueue?: number };
     };
     const w = health.workers ?? {};
@@ -82,13 +82,13 @@ async function endpointView(): Promise<LaneReadiness['endpoint'] | undefined> {
       ready: w.ready ?? 0, initializing: w.initializing ?? 0, running: w.running ?? 0,
       throttled: w.throttled ?? 0, unhealthy: w.unhealthy ?? 0, queue: health.jobs?.inQueue ?? 0,
     };
-    const ep = (await (await fetch(`https://rest.runpod.io/v1/endpoints/${id}?includeWorkers=true`, { headers: H, signal: withTimeout(4000) })).json()) as {
+    const ep = (await (await fetch(`https://rest.runpod.io/v1/endpoints/${id}?includeWorkers=true`, { headers: H, signal: withTimeout(12000) })).json()) as {
       workers?: Array<{ id: string; lastStatusChange?: string }>;
     };
     const live = (ep.workers ?? []).filter((x) => !/Exited/.test(x.lastStatusChange ?? ''));
     try {
       const b = (await (await fetch(`https://api.runpod.io/graphql`, {
-        method: 'POST', headers: H, body: JSON.stringify({ query: '{ myself { clientBalance } }' }), signal: withTimeout(4000),
+        method: 'POST', headers: H, body: JSON.stringify({ query: '{ myself { clientBalance } }' }), signal: withTimeout(12000),
       })).json()) as { data?: { myself?: { clientBalance?: number } } };
       if (typeof b.data?.myself?.clientBalance === 'number') out.balance = b.data.myself.clientBalance;
     } catch { /* the balance is a courtesy */ }
@@ -96,7 +96,7 @@ async function endpointView(): Promise<LaneReadiness['endpoint'] | undefined> {
     for (const x of live) {
       const q = `{ pod(input:{podId:"${x.id}"}) { machine { gpuDisplayName } runtime { uptimeInSeconds } } }`;
       const r = (await (await fetch(`https://api.runpod.io/graphql`, {
-        method: 'POST', headers: H, body: JSON.stringify({ query: q }), signal: withTimeout(4000),
+        method: 'POST', headers: H, body: JSON.stringify({ query: q }), signal: withTimeout(12000),
       })).json()) as { data?: { pod?: { machine?: { gpuDisplayName?: string }; runtime?: { uptimeInSeconds?: number } } } };
       const p = r.data?.pod;
       if (p?.runtime) { out.worker = { id: x.id, gpu: p.machine?.gpuDisplayName, uptimeSeconds: p.runtime.uptimeInSeconds }; break; }

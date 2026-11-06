@@ -1721,9 +1721,10 @@ async function speakProseSplit(
     } catch (err) { console.warn('[table-speak] voiced beat not posted (non-fatal):', err instanceof Error ? err.message : err); }
   };
   if (narration !== null && (narrated || hasActions || parsed.quotes.length !== 1)) {
-    const declared = await declareCanon(campaignId, actor, {
+    // 2026-11-06: the world's own line (a phone sounding, the words read) is `via: 'device'`, voiced by "the world" — see speakProse.
+    const declared = await declareCanon(campaignId, input.worldEvent ? { ...actor, username: 'the world' } : actor, {
       narration, kind: 'narration', actorId: soleActor(parsed), locationId: input.locationId ?? null, witnessIds: [],
-      feed: { via: 'typed', raw: rawMessage, ...feedParts },
+      feed: { via: input.worldEvent ? 'device' : 'typed', raw: rawMessage, ...feedParts },
     });
     canonEventId = declared.event.id;
     narratedActs(campaignId, parsed.actions, actor, { quotes: parsed.quotes });

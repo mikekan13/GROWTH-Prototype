@@ -44,7 +44,10 @@ function headers(): Record<string, string> | null {
   return key ? { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' } : null;
 }
 
-async function gql<T>(query: string, ms = 6000): Promise<T | null> {
+// 2026-11-06: RunPod's API answered in 6-12 s during the night's sessions; a 6 s abort logged "runpod unreachable" twenty times and
+// "resume did not take" four times while the pod was in fact resuming. 15 s, and the warning at most once a minute.
+let lastUnreachableWarnAt = 0;
+async function gql<T>(query: string, ms = 15000): Promise<T | null> {
   const H = headers();
   if (!H) return null;
   const c = new AbortController();
@@ -56,7 +59,10 @@ async function gql<T>(query: string, ms = 6000): Promise<T | null> {
     if (j.errors) console.warn('[text-pod] runpod said', JSON.stringify(j.errors).slice(0, 200));
     return j.data ?? null;
   } catch (err) {
-    console.warn('[text-pod] runpod unreachable', err instanceof Error ? err.message : err);
+    if (Date.now() - lastUnreachableWarnAt > 60_000) {
+      lastUnreachableWarnAt = Date.now();
+      console.warn('[text-pod] runpod unreachable (further warnings muted for a minute)', err instanceof Error ? err.message : err);
+    }
     return null;
   } finally {
     clearTimeout(t);

@@ -438,6 +438,26 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             const holdsSomething = await prisma.campaignItem.count({ where: { campaignId, holderId: actor.id, status: 'ACTIVE' } });
             if (holdsSomething) { const { knownElsewhere } = await import('./elsewhere-world'); for (const k of await knownElsewhere(campaignId, actor.id)) if (!addressedIds.includes(k)) addressedIds.push(k); }
             const actorRoomIds = [map?.roomId, map?.home.id].filter((x): x is string => !!x);
+            // SPEECH IN THE SAME ROOM IS NEVER A MESSAGE (Michael 2026-11-06, session 6: "these phantom texts are ruining an otherwise
+            // decent scene" — Kristopher asked her a question across the coffee-shop table and the adjudicator ALSO sent it to her phone,
+            // which she then read and answered a second time). When the actor and the holder of the thing stand in the same place, a sound
+            // at that thing is refused unless the line itself says the act was a message or a call. This reads the Watcher's/being's own
+            // words for the verb of sending — a grammar check on the line, not a list of what may be said.
+            if (where.holderId && where.holderId !== actor.id) {
+              const places = await prisma.entityRelationship.findMany({
+                where: { campaignId, relationshipType: 'located_at', sourceType: 'CHARACTER', sourceId: { in: [actor.id, where.holderId] } },
+                select: { sourceId: true, targetId: true },
+              });
+              const mine = places.filter((r) => r.sourceId === actor.id).map((r) => r.targetId);
+              const theirs = places.filter((r) => r.sourceId === where.holderId).map((r) => r.targetId);
+              const together = mine.length > 0 && mine.some((id) => theirs.includes(id));
+              const saysSent = /\b(?:text(?:s|ed|ing)?|messag(?:e|es|ed|ing)|send(?:s|ing)?|sent|call(?:s|ed|ing)?|dial(?:s|ed|ing)?|voicemail|writes?\s+back|repl(?:y|ies|ied|ying)\s+(?:by|on|over)|types?)\b/i.test(actText ?? '');
+              if (together && !saysSent) {
+                const holderName = (await prisma.character.findUnique({ where: { id: where.holderId }, select: { name: true } }).catch(() => null))?.name ?? 'the other';
+                report.refused.push(`sound at ${where.name}: ${actor.name} and ${holderName} are in the same place — that was said, not sent`);
+                break;
+              }
+            }
             if (!soundMayLandAt({ holderId: where.holderId, thingRoomId: where.locationId, actorId: actor.id, actorRoomIds, addressedIds })) {
               report.refused.push(`sound at ${where.name}: ${actor.name}'s act cannot reach it — not held by ${actor.name} or the person addressed, and not in ${map?.roomName ?? 'the actor\'s place'}`);
               break;
