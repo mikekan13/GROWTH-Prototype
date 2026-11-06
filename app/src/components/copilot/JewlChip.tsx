@@ -21,7 +21,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { JEWL_CHAT_CSS, fs, MONO, BEBAS, READ } from '@/components/terminal/jewlChatCss';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import { useBackCloses } from '@/hooks/useBackCloses';
-import { useAudioModePref } from '@/hooks/useAudioModePref';
+import { useAlwaysOnMicPref, useAudioModePref } from '@/hooks/useAudioModePref';
+import { writeAlwaysOnMic } from '@/lib/audio-mode-pref';
 import { openJewlWork } from '@/lib/jewl-work';
 import { GenesisProdAsk, genesisProdActionOf } from './GenesisProdAsk';
 
@@ -221,6 +222,8 @@ export function JewlChip() {
   const jewlSpeechAbortRef = useRef<AbortController | null>(null);
   // The Watcher's table audio mode for this campaign (live): when on, JEWL's mic and browser voice stand down.
   const tableAudioOn = useAudioModePref(campaignId);
+  // The always-on mic is OPT-IN per campaign (default off) since 2026-11-06; the drawer's Mic button turns it on.
+  const alwaysOnMic = useAlwaysOnMicPref(campaignId);
   const lastSpokenIdRef = useRef<string | null>(null);
   // True until the chip has done its FIRST history load. Anything already in
   // history when the chip mounts is treated as "already spoken" so we don't
@@ -917,6 +920,8 @@ export function JewlChip() {
     // Table audio mode on (2026-11-06): the table is speaking through the speakers, so JEWL's always-on mic
     // stands down — it heard the table's own voice and posted it as the Watcher's lines in the stress test.
     if (tableAudioOn) { setAudioStatus('idle'); return; }
+    // Opt-in (2026-11-06): no recorder at all until the Watcher turns the Mic on for this campaign.
+    if (!alwaysOnMic) { setAudioStatus('idle'); return; }
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setAudioStatus('unsupported');
       return;
@@ -1041,7 +1046,7 @@ export function JewlChip() {
         setWorkSessions(Array.isArray(data.sessions) ? data.sessions : []);
       }
     } catch { /* strip is best-effort */ }
-  }, [campaignId, tableAudioOn]);
+  }, [campaignId, tableAudioOn, alwaysOnMic]);
 
   const { on: onStreamEvent } = useCampaignStream({
     campaignId: campaignId ?? '',
@@ -1226,19 +1231,37 @@ export function JewlChip() {
             <span className="jo-audio" data-jewl-audio={audioStatus} data-jewl-no-audio={noAudioFlag || undefined} title={noAudioFlag ? 'Nothing captured from the mic recently — check it is unmuted and the right input' : undefined}>
               <i style={{ color: audioGlyphColour }}>{audioGlyph}</i>{audioWords}
             </span>
-            {(audioStatus === 'listening' || audioStatus === 'muted') && (
+            {/* Mic ON/OFF (opt-in since 2026-11-06): off = no recorder at all; on = the always-on lane feeds the table.
+                While table AUDIO is on the mic stands down regardless (one mouth, one ear). */}
+            {campaignId && (
+              <button
+                onClick={() => {
+                  const next = !alwaysOnMic;
+                  writeAlwaysOnMic(campaignId, next);
+                  if (!next) announceTableFeedRef.current(null);
+                }}
+                aria-label={alwaysOnMic ? 'Turn the mic off' : 'Turn the mic on'}
+                aria-pressed={alwaysOnMic}
+                title={tableAudioOn ? 'Table audio is on: the mic stands down while the table speaks' : alwaysOnMic ? 'Mic on — the table hears this device. Click to turn it off.' : 'Mic off. Click to let the table hear this device.'}
+                className={`jo-tool${alwaysOnMic ? '' : ' jo-off'}`}
+                disabled={tableAudioOn}
+              >
+                Mic
+              </button>
+            )}
+            {alwaysOnMic && !tableAudioOn && (audioStatus === 'listening' || audioStatus === 'muted') && (
               <button
                 onClick={() => {
                   setAudioMuted(m => !m);
                   // Mute is the STOP for the table feed: nothing said while muted is heard.
                   if (!audioMuted) announceTableFeedRef.current(null);
                 }}
-                aria-label={audioMuted ? 'Unmute mic' : 'Mute mic'}
+                aria-label={audioMuted ? 'Unmute' : 'Mute'}
                 aria-pressed={audioMuted}
-                title={audioMuted ? 'Unmute mic' : 'Mute mic (audio keeps recording but is dropped)'}
+                title={audioMuted ? 'Unmute' : 'Mute (audio keeps recording but is dropped)'}
                 className={`jo-tool${audioMuted ? ' jo-off' : ''}`}
               >
-                Mic
+                {audioMuted ? 'Muted' : 'Mute'}
               </button>
             )}
             <button

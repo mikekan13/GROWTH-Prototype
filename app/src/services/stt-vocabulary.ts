@@ -24,24 +24,11 @@ interface CachedVocab {
 const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, CachedVocab>();
 
-// Canon names that should ALWAYS prime Whisper. Kept TIGHT — every word
-// here biases Whisper toward emitting it on silence (Whisper "hears" what
-// it was primed on). Only add names that are routinely spoken aloud.
-// Lore-deep cosmology terms (Sephirot names, Yaldabaoth, etc.) were
-// removed after they started showing up as hallucinations on silence.
-const CANON_GLOBAL = [
-  // Prime Party — actively named in conversation
-  'Val Pendragon',
-  'Tara Almswood',
-  'Kai',
-  "Et'herling",
-  // JEWL himself
-  'JEWL',
-  // Core mechanics terms — said in nearly every session
-  'KRMA',
-  'GROWTH',
-  'Godhead',
-];
+// 2026-11-06: the hard-coded "Prime Party" list (Val Pendragon, Tara Almswood, Kai, Et'herling) was removed — those
+// are one campaign's party, and Whisper emitted "Tara Almswood" as a hallucinated declaration in a campaign she is
+// not in. The vocabulary is DERIVED from the campaign (its characters and locations); the only global term is JEWL,
+// who is addressed at every table. No keyword lists (feedback-engine-dynamic-not-hard-prompted-2026-10-17).
+const CANON_GLOBAL = ['JEWL'];
 
 export async function buildSttVocabulary(campaignId: string): Promise<string> {
   const cached = cache.get(campaignId);

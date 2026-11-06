@@ -16,7 +16,7 @@ import { prisma } from '../app/src/lib/db';
 
 const C = 'cms5z4j6z0000zg48z5vzl2jn';
 const SNAP = 'C:/Projects/GRO.WTH/tmp/gm/snapshot-1793919527030.json';
-const FROM = '2026-11-06T08:30:00.000Z';
+const FROM = process.argv[2] ?? '2026-11-06T08:30:00.000Z';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const p = prisma as any;
 
