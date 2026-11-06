@@ -184,3 +184,27 @@ MICHAEL'S DEBRIEF (05:28): "Bit of a disaster still with the texting. The narrat
 BUILT THE SAME NIGHT (06:05, while Michael showered): the world's device lines are `via: 'device'` / "the world" — hidden from the novel ([WORLD] rows in the Log), not voiced; the scene-builder never promotes a monologue's doings to acts; the composer keeps the event as told when a perception comes back in the first person for someone else's deed; a being's card SETTLES server-side (being-thought.settleBeingCard) and stays behind the thinking card until settled (beat-state.isCardPending); the reader voices settled cards only. STILL OPEN: the message ask returning a non-message (Violet's write-back → nothing sent), being acts bypassing the reach judge (the cause of the cross-wire), two phones, merged quotes, multi-step acts, speed.
 
 NEXT (Claude's recommendation): fix 1 and 2 first (they corrupt the record), then 3's actor stamp and the device resolver by kind, then the preprocessor tickets (4), then the narrator's device-line diet (7). Rolls talk, standard setup, settings audit, mic lane, describer, mobile Tapestry overlap and send-safety remain owed.
+
+## SESSION 6 PLAYED — 05:58–08:46 local 11-06 — THE COFFEE DATE HAPPENED — KEPT — supersedes "NEXT" above
+State: session ended, pod stopped, record KEPT. Violet and Kristopher are at the coffee shop on Broadway, 20 Oct 2026 about 15:20, drinks finished, talking about a second date. Her phone is in her hand. Message threads closed by hand. The time-and-place facts for this scene were partly set by hand (below).
+
+What worked (first time, on build bf4c313 and after): face to face, Michael typing Kristopher, Violet answering in character and voiced. Best lines: "Because you were the only one who stayed for the answer." · "I hadn't considered that silence could be — distributed." · "I'd want to see the dissertation, at least — or some evidence of a defense." · "I think those might be the same word." · "I think I can survive it — provided the first one actually occurs." Pure speech lines answer in 3–6 s; lines with narration 12–24 s.
+
+Built tonight after session 5 (commits 6c3b3ae, 6eb9861, bf4c313 + the last commit): world lines via 'device'/"the world" hidden from the novel and not voiced; no deeds promoted from a monologue; first-person perception guard; cards settle server-side behind the thinking card; reader never reads anything older than the moment AUDIO was enabled; same-room guard (said, not sent), widened twice; RunPod timeouts + rate-limited warning.
+
+STILL OPEN, ranked:
+1. THREADS DO NOT CLOSE: "read and not written back" stays `going` forever and steered Violet into thinking his laugh came through a phone. Presence must supersede a thread. Closed by hand tonight (tmp/close-threads.ts). THE FIX IS NOT BUILT.
+2. VIOLET'S WRITE-BACK: the message ask returned a non-message, the filter dropped it, nothing was sent, and her card still says she typed and sent. Needs: words-only ask, and "did not send" written to her record.
+3. CROSS-WIRE CAUSE: being acts skip the reach judge. The first-person guard treats the symptom only.
+4. PERSPECTIVE FLIP in thoughts (3 cases: "Kristopher just took a sip and smiled at me", "She said that out loud", "She just asked me that" about his own line). Possibly linked to the tone filter withholding context.
+5. TONE FILTER: flirting hit `sexual`; softening timed out; chunks of daya:reconciliation and daya:order_voice were WITHHELD (08:45–46). Check the timeout and what a withheld chunk does to the voice writer.
+6. DEVICE LINE ATTRIBUTION inconsistent: 07:56 via 'device', 14:38 actorName 'the world' but via 'typed'. Find the path; a typed-via device line still reads as narration.
+7. MAP: the coffee shop has no map placement, "move… target is nowhere on the map"; Violet placed by hand (tmp/set-location.ts). "Walks inside" produced a silent 10 min.
+8. TIME: "It is 2:20 in the afternoon the next day" landed 07:39; built prose keeps its hour after a re-time.
+9. PREPROCESSOR: unresolved subject, merged quotes, multi-step acts, read vs send; a line opening on a quote gets speaker "someone present"; a Watcher line reached both beings as "a sound from beyond the room" while they sat together (14:26, senses-filter audibleOnly).
+10. Kristopher's being offered to buy her a coffee at the coffee shop (14:26). Perception rolls fired on "studies her" and "tries to read" — rolls talk.
+11. SPEED: being turn 13–17 s, sequential; clones 2× real time; pod sleeps after 20–25 quiet min (cold 5 min).
+
+MICHAEL OWES / AUDIO OWED: VIOLET'S VOICE REDESIGN NOT DONE ("too husky, higher, softer"). JEWL thicker drawl via the describer. Narrated recap over cold start. Narrator carrying the story: he reported hearing voices without narration on the session 6 replay; re-check on a clean run. Mobile: Tapestry overlap (screenshot), send-safety. Then STRIKE/CORRECT/RE-TIME tools (the by-hand set: scrub-after, scrub-facts, scrub-chime-since, retime, set-cycle, set-location, hold-item, mark-read, close-threads, restore-events). Note scrub-after.ts does not snapshot yet, and scrub-phantom-text.ts over-matched: do not reuse it.
+
+NEXT: fix 1 (presence closes threads), then 2, 3, 4. Then Violet's voice with Michael. Rolls talk, standard setup, settings audit, mic lane, map migration remain.

@@ -445,7 +445,14 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             // words for the verb of sending — a grammar check on the line, not a list of what may be said.
             // The other party: the holder of the thing when it is someone else's; when the sound is at the actor's OWN device
             // (session 6, 07:56: the adjudicator put "Violet's phone chimes" at Kristopher's Work phone), whoever the line addressed.
-            const otherIds = where.holderId && where.holderId !== actor.id ? [where.holderId] : addressedIds.filter((id) => id !== actor.id);
+            let otherIds = where.holderId && where.holderId !== actor.id ? [where.holderId] : addressedIds.filter((id) => id !== actor.id);
+            // Session 6, 08:38: "…then he replies. \"I'll handle with care…\"" named nobody, so nobody was addressed and the guard had no other
+            // party. A QUOTED line that sounds the speaker's own device, with nobody addressed, is checked against everyone in play: a line of
+            // speech does not ring the speaker's phone. An unquoted "His phone rings" is not speech and still sounds.
+            if (!otherIds.length && where.holderId === actor.id) {
+              const { actorWordsFromIntent } = await import('./item-signal');
+              if (actorWordsFromIntent(actText)) otherIds = people.map((c) => c.id).filter((id) => id !== actor.id);
+            }
             if (otherIds.length) {
               const places = await prisma.entityRelationship.findMany({
                 where: { campaignId, relationshipType: 'located_at', sourceType: 'CHARACTER', sourceId: { in: [actor.id, ...otherIds] } },
