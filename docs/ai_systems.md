@@ -361,3 +361,7 @@ Ruling: [[ruling-world-building-recursion-jewl-swarm-personality-2026-10-16]] �
 - **CAPACITY**: goods carry `volumeCuFt`; new holders `capacityCuFt` / `capacityLbs`; over-capacity placements are refused with the reason.
 - **DRESS**: the first outfit is dealer's choice FROM her wardrobe kit. With no player seated, the character chooses ("You are <name>. Choose what you put on today from your own clothes…", persona from `DayaEntity.personaProfile`); with a player seated, the proposal is offered to them to steer (`chooser`, `audience`). Kit pieces crystallize only on approval.
 - Tool gating: `stock_kit` is in `COMPLETION_STAGE_TOOLS.WORLD` and `STAGE_ONLY_TOOLS`.
+
+## Speech — local STT + TTS for the table (2026-11-06)
+
+Status: v1 LIVE on :3001. Ruling: audio is how GRO.WTH is played (always-on mic = standard). Whisper (`whisper-server/`, :9000, faster-whisper small.en, CUDA) hears; Kokoro-82M (`tts-server/`, :9001, CUDA) speaks. The app fronts both through `/api/speech/transcribe` and `/api/speech/speak` (`services/speech.ts`, `lib/speech-voices.ts`); the client reads each being's new card aloud (`hooks/useTableReader.ts`) and takes the Watcher's spoken line into the box (TableSpeakBar MIC). Voices are derived per being (sheet `data.voice` → gender pool → id hash), narrator fixed. Privacy: audio and transcripts never leave the machine; only fiction text goes to the cloud through Qwen. Details: docs/module_registry.md "Audio mode v1".

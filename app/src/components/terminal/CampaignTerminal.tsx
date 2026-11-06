@@ -21,6 +21,8 @@ import type { BeingSpeakingPhase } from '@/types/campaign-events';
 import { createCardReveal } from './table-feed/card-reveal';
 import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE, TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import TableFeed from './table-feed/TableFeed';
+import { useTableReader } from '@/hooks/useTableReader';
+import { readAudioMode, writeAudioMode } from '@/lib/audio-mode-pref';
 import { perceptionFeedOn, PERCEIVED_FEED_STALE_EVENT } from '@/lib/perception-feed';
 import ViewAsPicker, { readViewAs, writeViewAs, type ViewAsCharacter } from './table-feed/ViewAsPicker';
 import { pageCutoff, keepFrom, mergeEvents, withoutLoggedSessionLines } from './table-feed/feed-paging';
@@ -158,6 +160,11 @@ export default function CampaignTerminal({
   // live (Mike 2026-09-02: "another tab there that is only available when
   // the canvas is in session mode").
   const isGM = _userRole === 'WATCHER' || _userRole === 'GODHEAD' || _userRole === 'ADMIN';
+  // Audio mode: each being's new card is read aloud (Watcher only; preference per campaign).
+  const [audioOn, setAudioOn] = useState(false);
+  useEffect(() => { setAudioOn(readAudioMode(campaignId)); }, [campaignId]);
+  const readerRoster = useMemo(() => (tableEntities ?? []).filter((e) => e.kind === 'npc' || e.kind === 'character').map((e) => ({ id: e.id, name: e.name })), [tableEntities]);
+  const reader = useTableReader({ enabled: audioOn && isGM && !!activeSession && !viewAs, events, roster: readerRoster, campaignId });
   const tableAvailable = isGM && !!activeSession;
 
   // Recorder chunk length (U2c): while a session is live AND the engine's split
@@ -1373,6 +1380,14 @@ export default function CampaignTerminal({
             onEvent={refreshEvents}
             held={jewl.held}
             onHold={jewl.setHeld}
+            audioOn={audioOn}
+            audioState={reader.unavailable ? 'unavailable' : reader.speaking ? 'speaking' : 'idle'}
+            onAudioToggle={() => {
+              const next = !audioOn;
+              setAudioOn(next);
+              writeAudioMode(campaignId, next);
+              if (next) void reader.unlock();
+            }}
             register={(api) => { speakApi.current = api; }}
             warmup={warm.mode === 'warming' ? (
               <WarmupTicker

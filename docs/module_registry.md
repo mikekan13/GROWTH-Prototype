@@ -3,6 +3,23 @@
 Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all components inventoried)
 
 
+## Audio mode v1 — the table speaks and listens (2026-11-06)
+
+RULING (Michael 2026-11-06): audio is how GRO.WTH is played; the always-on mic is the standard, typing a fallback. Everything below is LOCAL — no audio or transcript leaves the machine.
+
+- `tts-server/` (repo root) — Kokoro-82M on FastAPI, loopback :9001: `POST /v1/audio/speech` {input, voice, speed, response_format:'wav'} → wav (header `X-Audio-Seconds`), `GET /v1/voices`, `GET /health`; `start.bat` on the global Python 3.13; started by `boot.ps1` (`-NoTts`). Sibling of `whisper-server/` (:9000, faster-whisper small.en, OpenAI-compatible transcriptions).
+- `src/lib/speech-voices.ts` — PURE. `KOKORO_VOICES` (15), `NARRATOR_VOICE` (bm_daniel), `voiceForCharacter({id, gender, voice})`: a `data.voice` on the sheet wins; else the gender pool (female / male / all, narrator excluded) picked by FNV-1a of the id — same being, same voice forever. Tests `speech-voices.test.ts`.
+- `src/services/speech.ts` — `synthesizeSpeech({text, voice, speed})` → the TTS server (`TTS_LOCAL_URL`, default `http://127.0.0.1:9001/v1/audio/speech`, 20 s timeout; `{ok:false,status,detail}` on failure); `voiceForCharacterId(id)` (Prisma lookup → `voiceForCharacter`). Tests `speech.test.ts`.
+- `POST /api/speech/speak` — {text 1..4000, characterId?|null, speed? 0.5..2} → `audio/wav` + `X-Voice` (+ `X-Audio-Seconds`); narrator when no character; 404 unknown character; 503 `speech server unavailable`. requireAuth.
+- `POST /api/speech/transcribe` — multipart `audio` (≤ 15 MB) + `prompt` (names likely to be said → Whisper initialPrompt) → `{text, provider}` via `transcribeAudio` (`src/ai/providers/stt.ts`); a bracketed provider marker → 503 `speech-to-text unavailable`. requireAuth. (Follow-up: feed `services/stt-vocabulary.ts` as the prompt.)
+- `src/hooks/table-reader-utterances.ts` — PURE. `utterancesFor(event, roster)`: a being's (`actor === 'ai_copilot'`) card → ordered utterances through `buildFeedRows`: narration rows and `action` segments → narrator, `speech` segments → the character, `thought` skipped; `cleanSpoken` strips quote and ((…))/[[…]] marks. Tests `table-reader-queue.test.ts`.
+- `src/hooks/useTableReader.ts` — `useTableReader({enabled, events, roster, campaignId})`: on enable everything present is history; each NEW being event is queued and played in order through one `HTMLAudioElement` (blob from `/api/speech/speak`, one prefetched ahead); 503/network → `unavailable` for 30 s; `unlock()` plays a silent wav inside the toggle gesture so phones allow later play; `stop()` on disable/unmount. Never reads the Watcher's own lines.
+- `src/lib/audio-mode-pref.ts` — `readAudioMode/writeAudioMode` (localStorage `growth:audio-mode:<campaignId>`, try/catch).
+- `components/terminal/TableSpeakBar.tsx` — two buttons left of Send: **MIC** (tap start / tap stop; MediaRecorder webm/opus → mp4 fallback; POST transcribe with the awake names as prompt; the words land in the box, the Watcher sends; "listening…" / errors in the status strip; "mic needs HTTPS" when `navigator.mediaDevices` is missing) and **AUDIO** (props `audioOn`, `onAudioToggle`, `audioState` idle|speaking|unavailable). `CampaignTerminal.tsx` owns the pref + mounts the reader (`enabled = audioOn && isGM && activeSession && !viewAs`).
+- Phone: the mic needs a secure origin → `tailscale serve --bg 3001` (https://christophoros.taila59e25.ts.net → :3001).
+- Verified on :3001 2026-11-06: Violet → bf_isabella, Kristopher → bm_george, narrator bm_daniel, ~0.8 s a line warm; a synthesized line transcribed back word for word in 0.65 s. Browser mic/playback not yet exercised by a person.
+- NEXT (the lane): always-on mic on the existing `audio-chunk` → `hearSpoken` beats path (VAD end-of-line, gate the mic while the table speaks); per-NPC `voiced: table | watcher | controlled` on the sheet; `data.voice` chosen by the Watcher.
+
 ## JEWL world-keeping from the table (2026-11-01)
 
 - `src/ai/copilot/tool-profiles.ts` — `nextGrants` keeps a grant for the rest of the turn (was: dropped when unused for a round). `src/ai/copilot/runtime.ts` — `STAGE_ONLY_TOOLS` no longer holds `stock_goods` / `stock_kit` (requestable on any lane); reply hygiene (echoed `[ISO]: ` stamps stripped); one bounce per dispatch when a granted tool was never used.

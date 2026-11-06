@@ -131,3 +131,18 @@ Then the replay: `node --env-file=.env --env-file=.env.local --import tsx ../tmp
 - Michael's ruling (from the car): this PC exists for GRO.WTH; close idle programs to free RAM before heavy work; a low-memory kill is mine to prevent.
 - Fix that worked: close the idle apps (1.6 → 6.3 GB free), run the build DETACHED (`Start-Process -WindowStyle Hidden cmd /c set NODE_OPTIONS=--max-old-space-size=4096&& npx next build --webpack`, PID in logs/prod-build.pid) and wait on the PID. Detached processes are outside the task guard.
 - Server started hidden on :3001, /hub → 200. World unchanged (post-session-6 + coffee shop). Ready for Michael's fourth attempt.
+
+## AUDIO MODE v1 SHIPPED — ~01:10Z 11-06 (Michael from the car: "let's get audio mode up and running")
+
+RULING while building: audio is HOW GROWTH is played; always-on mic is the standard; typing a fallback; per-NPC playback options; a STANDARD SETUP owed (memory ruling-audio-is-how-growth-is-played-always-on-mic-2026-11-06).
+
+Built (plan tmp/audio-mode-plan-2026-11-06.md), all local:
+- tts-server/ (Kokoro-82M FastAPI :9001, /v1/audio/speech, /v1/voices, /health; start.bat on global py313; boot.ps1 -NoTts block + smoke line). whisper-server already on :9000.
+- API: /api/speech/speak ({text, characterId|null, speed?} → wav; voice from data.voice or gender pool + id hash; narrator bm_daniel) and /api/speech/transcribe (multipart audio + prompt → {text}); src/services/speech.ts, src/lib/speech-voices.ts.
+- Client: TableSpeakBar MIC + AUDIO buttons; src/hooks/useTableReader.ts reads NEW being cards (speech in voice, deeds narrator, thoughts silent); pref src/lib/audio-mode-pref.ts; CampaignTerminal mounts the reader (GM, live session, not view-as).
+- tailscale serve → :3001 (was :3000, dev down) so the phone has HTTPS for the mic: https://christophoros.taila59e25.ts.net
+- Verified on :3001: Violet bf_isabella / Kristopher bm_george / narrator bm_daniel, 0.8 s per line warm; Violet's synthesized line transcribed back exactly in 0.65 s; no-auth → 401. Browser mic/playback NOT yet exercised by a human.
+
+STATE: :3001 UP on this build; whisper :9000 UP; tts :9001 UP; pod OFF; world post-session-6 + coffee shop unchanged.
+
+Next: Michael tries MIC + AUDIO on the phone (HTTPS url above) or desktop; standard-setup talk; always-on mic (VAD + gating while the table speaks); per-NPC voiced: table|watcher|controlled on the sheet.

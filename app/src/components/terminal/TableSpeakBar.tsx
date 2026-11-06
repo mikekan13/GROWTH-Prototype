@@ -50,8 +50,15 @@ export default function TableSpeakBar({
   held = null,
   onHold,
   register,
+  audioOn = false,
+  onAudioToggle,
+  audioState = 'idle',
 }: {
   campaignId: string;
+  /** Audio mode (reads each being's new card aloud) — state lives in CampaignTerminal. */
+  audioOn?: boolean;
+  onAudioToggle?: () => void;
+  audioState?: 'idle' | 'speaking' | 'unavailable';
   onEvent?: () => void;
   /** Session-start warm-up (2026-10-26): while given, the bar is LOCKED and this ticker stands in its place. */
   warmup?: React.ReactNode;
@@ -70,6 +77,11 @@ export default function TableSpeakBar({
   /** Lines the last send dropped on purpose (see ProseResponse.ignored). Cleared on the next send. */
   const [ignored, setIgnored] = useState<string[] | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // MIC: tap to record, tap to stop; the transcript lands in the box, never auto-sent.
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const micNeedsHttps = typeof navigator !== 'undefined' && !navigator.mediaDevices;
   // JEWL's stop: the popup is mounted by CampaignTerminal; it re-sends the held words / restores them through this.
   useEffect(() => {
     register?.({ send: (message, ticketId) => send(message, ticketId), restoreWords: (message) => { setValue(message); inputRef.current?.focus(); }, note: setNote });
@@ -181,6 +193,59 @@ export default function TableSpeakBar({
 
   const awake = dayaActive.map((d) => d.name).join(', ');
 
+  useEffect(() => () => {
+    const r = recorderRef.current;
+    if (r && r.state !== 'inactive') { try { r.stream.getTracks().forEach((t) => t.stop()); r.stop(); } catch { /* ignore */ } }
+  }, []);
+
+  async function toggleMic() {
+    if (transcribing) return;
+    if (recording) { recorderRef.current?.stop(); return; }
+    if (!navigator.mediaDevices?.getUserMedia) { setNote('mic needs HTTPS'); return; }
+    setNote(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = typeof MediaRecorder !== 'undefined'
+        ? (MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '')
+        : '';
+      const rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        recorderRef.current = null;
+        setRecording(false);
+        const type = rec.mimeType || mimeType || 'audio/webm';
+        void transcribe(new Blob(chunks, { type }), type.includes('mp4') ? 'line.mp4' : 'line.webm');
+      };
+      recorderRef.current = rec;
+      rec.start();
+      setRecording(true);
+    } catch (err) {
+      setNote(err instanceof Error ? `mic: ${err.message}` : 'mic unavailable');
+    }
+  }
+
+  async function transcribe(blob: Blob, filename: string) {
+    if (blob.size === 0) return;
+    setTranscribing(true);
+    try {
+      const fd = new FormData();
+      fd.append('audio', blob, filename);
+      if (awake) fd.append('prompt', awake);
+      const res = await fetch('/api/speech/transcribe', { method: 'POST', body: fd });
+      const json = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
+      if (!res.ok) { setNote(json.error ?? (res.status === 503 ? 'speech-to-text is down' : 'transcription failed')); return; }
+      const text = (json.text ?? '').trim();
+      if (text) setValue((v) => (v ? v.replace(/\s+$/, '') + ' ' : '') + text);
+      inputRef.current?.focus();
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTranscribing(false);
+    }
+  }
+
   // Look: the approved drawer mockup (2026-10-07 v7) — off-white bar under a
   // black rule; JEWL's held question on the book's grey aside bar (p 64);
   // white input with a navy rule; navy/gold Bebas buttons. Behaviour unchanged.
@@ -193,12 +258,15 @@ export default function TableSpeakBar({
       {/* No control toggles here (Mike 2026-10-24): the Watcher voices whom the Watcher voices,
           and whoever is not voiced plays itself. Control is contextual, not a switch. */}
       {/* GM-only status strip — infra truth, never part of the table record */}
-      {!warmup && (note || coreStatus === 'warming' || sending) && (
+      {!warmup && (note || coreStatus === 'warming' || sending || transcribing) && (
         <div style={{ ...strip, color: '#7a4a00' }}>
-          {sending
+          {transcribing ? 'listening…' : sending
             ? `The table is responding…${coreStatus !== 'ready' ? ' (core warming from cold, first response can take minutes)' : ''}`
             : note ?? 'The core is warming up from a cold start…'}
         </div>
+      )}
+      {!warmup && audioOn && audioState === 'unavailable' && (
+        <div style={{ ...strip, color: '#6b6b68' }}>no speech server</div>
       )}
       {/* Lines the table did not hear (out-of-character asides, check calls):
           shown quietly so a dropped line never looks swallowed; clears on the next send. */}
@@ -231,6 +299,35 @@ export default function TableSpeakBar({
             color: '#000', backgroundColor: '#fff', border: 0, borderLeft: '4px solid #002f6c', padding: '6px 8px',
           }}
         />
+        <style>{'@keyframes growthMicPulse{0%,100%{opacity:1}50%{opacity:.55}}'}</style>
+        <button
+          type="button"
+          onClick={() => onAudioToggle?.()}
+          title={audioOn ? "Audio on: each being's new card is read aloud" : 'Audio off'}
+          aria-pressed={audioOn}
+          style={{
+            width: 68, height: 48, border: '2px solid #002f6c', cursor: 'pointer',
+            fontFamily: bebas, fontSize: 20, letterSpacing: '0.06em',
+            backgroundColor: audioOn ? '#002f6c' : '#fafaf8', color: audioOn ? '#ffcc78' : '#002f6c',
+          }}
+        >
+          AUDIO{audioOn && audioState === 'speaking' ? ' …' : ''}
+        </button>
+        <button
+          type="button"
+          onClick={() => void toggleMic()}
+          disabled={transcribing || sending || !!held}
+          title={micNeedsHttps ? 'mic needs HTTPS' : recording ? 'Tap to stop' : 'Tap to speak'}
+          style={{
+            width: 60, height: 48, border: 0, cursor: 'pointer',
+            fontFamily: bebas, fontSize: 20, letterSpacing: '0.06em',
+            backgroundColor: recording ? '#f7525f' : '#002f6c', color: recording ? '#fff' : '#ffcc78',
+            animation: recording ? 'growthMicPulse 1s ease-in-out infinite' : undefined,
+            opacity: micNeedsHttps || transcribing || sending || held ? 0.55 : 1,
+          }}
+        >
+          MIC
+        </button>
         <button
           onClick={() => void handleSubmit()}
           disabled={sending || !!held || !value.trim()}

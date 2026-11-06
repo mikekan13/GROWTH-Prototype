@@ -12,6 +12,7 @@
 # -----------------------------------------------------------------------------
 param(
     [switch]$NoWhisper,
+    [switch]$NoTts,
     [switch]$Restart
 )
 
@@ -19,6 +20,7 @@ $ErrorActionPreference = 'Stop'
 $Root      = $PSScriptRoot
 $AppDir    = Join-Path $Root 'app'
 $WhisperDir= Join-Path $Root 'whisper-server'
+$TtsDir    = Join-Path $Root 'tts-server'
 $LogDir    = Join-Path $Root 'logs'   # <-- OUTSIDE app/, not watched by webpack
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
@@ -60,6 +62,21 @@ if (-not $NoWhisper) {
     }
 }
 
+# --- Kokoro TTS server (port 9001) -------------------------------------------
+if (-not $NoTts) {
+    if (Test-Port 9001) {
+        Write-Host '[boot] tts-server already up on :9001 — leaving it.' -ForegroundColor DarkGray
+    } else {
+        Write-Host '[boot] starting tts-server (logs -> logs\tts.*.log)...' -ForegroundColor Cyan
+        Start-Process -FilePath 'cmd.exe' `
+            -ArgumentList ('/c "' + (Join-Path $TtsDir 'start.bat') + '"') `
+            -WorkingDirectory $TtsDir `
+            -RedirectStandardOutput (Join-Path $LogDir 'tts.out.log') `
+            -RedirectStandardError  (Join-Path $LogDir 'tts.err.log') `
+            -WindowStyle Hidden | Out-Null
+    }
+}
+
 # --- Next.js dev server (port 3000) ------------------------------------------
 if (Test-Port 3000) {
     Write-Host '[boot] dev server already up on :3000 — leaving it.' -ForegroundColor DarkGray
@@ -87,6 +104,7 @@ if (Test-Port 3000) {
 Write-Host '[boot] waiting for services...' -ForegroundColor Cyan
 $devUp = Wait-Port 3000 90
 $whUp  = if ($NoWhisper) { $null } else { Wait-Port 9000 120 }  # first run builds venv
+$ttsUp = if ($NoTts) { $null } else { Wait-Port 9001 120 }  # model load + warm-up
 
 Write-Host ''
 Write-Host '================ GRO.WTH boot status ================' -ForegroundColor White
@@ -95,6 +113,11 @@ if ($NoWhisper) {
     Write-Host '  whisper     (:9000) : SKIPPED (-NoWhisper)' -ForegroundColor DarkGray
 } else {
     Write-Host ("  whisper     (:9000) : {0}" -f $(if ($whUp) {'UP'} else {'DOWN — see logs\whisper.err.log'})) -ForegroundColor $(if ($whUp){'Green'}else{'Red'})
+}
+if ($NoTts) {
+    Write-Host '  tts         (:9001) : SKIPPED (-NoTts)' -ForegroundColor DarkGray
+} else {
+    Write-Host ("  tts         (:9001) : {0}" -f $(if ($ttsUp) {'UP'} else {'DOWN — see logs\tts.err.log'})) -ForegroundColor $(if ($ttsUp){'Green'}else{'Red'})
 }
 
 # Confirm whisper actually answers /health, not just an open socket.
@@ -106,7 +129,15 @@ if ($whUp) {
         Write-Host '  whisper /health     : socket open but /health not ready yet (model may still be loading)' -ForegroundColor Yellow
     }
 }
+if ($ttsUp) {
+    try {
+        $t = Invoke-RestMethod -Uri 'http://127.0.0.1:9001/health' -TimeoutSec 5
+        Write-Host "  tts /health         : OK (model=$($t.model) device=$($t.device))" -ForegroundColor Green
+    } catch {
+        Write-Host '  tts /health         : socket open but /health not ready yet (model may still be loading)' -ForegroundColor Yellow
+    }
+}
 Write-Host '====================================================' -ForegroundColor White
-Write-Host '  App:  http://localhost:3000' -ForegroundColor White
+Write-Host '  App: http://localhost:3000' -ForegroundColor White
 Write-Host '  Logs: ' -NoNewline; Write-Host $LogDir -ForegroundColor White
 Write-Host '  Stop: .\boot.ps1 -Restart  (or kill the node/python procs)' -ForegroundColor DarkGray
