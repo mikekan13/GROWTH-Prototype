@@ -34,6 +34,14 @@ export async function voiceSpecForCharacterId(characterId?: string | null): Prom
 /** @deprecated use voiceSpecForCharacterId */
 export const voiceForCharacterId = voiceSpecForCharacterId;
 
+/** JEWL's voice (Michael 2026-11-06: "a slight Southern drawl, a Southern gentleman who also happens to be the smartest ever created"):
+ *  JEWL is a GodHead with a universal character sheet, so his designed voice lives in that sheet's data.voice like any being's. */
+export async function voiceSpecForJewl(): Promise<VoiceSpec> {
+  const g = await prisma.godHead.findUnique({ where: { name: 'JEWL' }, select: { characterId: true } });
+  if (!g) return { engine: 'kokoro', voice: 'am_michael' };
+  return voiceSpecForCharacterId(g.characterId);
+}
+
 /** The campaign's narrator (Michael 2026-11-06): its designed VoiceSpec when one is saved, else the Kokoro default. */
 export async function voiceSpecForNarrator(campaignId?: string | null): Promise<VoiceSpec> {
   const fallback: VoiceSpec = { engine: 'kokoro', voice: NARRATOR_VOICE };

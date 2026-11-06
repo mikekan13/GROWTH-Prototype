@@ -217,6 +217,8 @@ export function JewlChip() {
   // Voice output (TTS) — speak each new assistant message via the browser's
   // Web Speech API. Default on; toggle off if you want quiet.
   const [voiceMuted, setVoiceMuted] = useState(false);
+  const jewlAudioRef = useRef<HTMLAudioElement | null>(null);
+  const jewlSpeechAbortRef = useRef<AbortController | null>(null);
   // The Watcher's table audio mode for this campaign (live): when on, JEWL's mic and browser voice stand down.
   const tableAudioOn = useAudioModePref(campaignId);
   const lastSpokenIdRef = useRef<string | null>(null);
@@ -618,17 +620,16 @@ export function JewlChip() {
     doRefresh();
   }, [messages, router]);
 
-  // TTS — speak each new assistant message via Web Speech API. The
-  // browser's voice is robotic, which fits JEWL's Archon/Vegeta-pride
-  // canon. We can swap to OpenAI/Eleven TTS later through the same hook.
-  // Also clear the "thinking" indicator the moment JEWL's reply lands.
+  // JEWL's VOICE (Michael 2026-11-06): each new assistant message is spoken in JEWL's designed voice through the
+  // local speech server (/api/speech/speak, speaker 'jewl' — his GodHead sheet's data.voice: a Southern gentleman,
+  // the smartest ever made). Replaces the browser's Web Speech voice. The newest reply supersedes one still playing.
+  // Also clears the "thinking" indicator the moment JEWL's reply lands.
   useEffect(() => {
     if (messages.length === 0) return;
     // Defer until first history fetch has completed — otherwise the very
     // first render would mark the latest historical assistant message as
     // "new" and read it aloud.
     if (!initialHistoryLoadedRef.current) return;
-    // Find the most recent assistant message with a real (persisted) id.
     const latestAssistant = [...messages]
       .reverse()
       .find(
@@ -643,28 +644,32 @@ export function JewlChip() {
     lastSpokenIdRef.current = latestAssistant.id;
     setThinking(false);
 
-    // Table audio mode on (2026-11-06): the narrator and the beings have the floor; JEWL does not talk over them.
-    if (voiceMuted || tableAudioOn) return;
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    try {
-      const synth = window.speechSynthesis;
-      // Cancel anything currently speaking — newer reply supersedes.
-      synth.cancel();
-      const u = new SpeechSynthesisUtterance(latestAssistant.content || '');
-      u.rate = 1.05;
-      u.pitch = 0.9;
-      u.volume = 0.95;
-      // Prefer a male-ish English voice if available — closer to JEWL's
-      // canonical voice. Falls back to whatever the OS provides.
-      const voices = synth.getVoices();
-      const preferred =
-        voices.find(v => /en[-_]?US/i.test(v.lang) && /male|david|mark|guy/i.test(v.name)) ||
-        voices.find(v => /en/i.test(v.lang)) ||
-        null;
-      if (preferred) u.voice = preferred;
-      synth.speak(u);
-    } catch { /* TTS optional; never block the chip */ }
-  }, [messages, voiceMuted, tableAudioOn]);
+    if (voiceMuted) return;
+    const text = (latestAssistant.content || '').replace(/\(\(|\)\)|\[\[|\]\]/g, '').trim();
+    if (!text) return;
+    const controller = new AbortController();
+    jewlSpeechAbortRef.current?.abort();
+    jewlSpeechAbortRef.current = controller;
+    (async () => {
+      try {
+        const res = await fetch('/api/speech/speak', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text.slice(0, 4000), speaker: 'jewl' }),
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        if (controller.signal.aborted) return;
+        const el = jewlAudioRef.current ?? (jewlAudioRef.current = new Audio());
+        try { el.pause(); } catch { /* ignore */ }
+        const url = URL.createObjectURL(blob);
+        el.onended = () => URL.revokeObjectURL(url);
+        el.src = url;
+        await el.play().catch(() => URL.revokeObjectURL(url)); // no gesture yet: silent, never blocks the chip
+      } catch { /* speech optional; never block the chip */ }
+    })();
+  }, [messages, voiceMuted]);
 
   const openFlagPicker = useCallback((messageId: string) => {
     setFlagTarget(messageId);
