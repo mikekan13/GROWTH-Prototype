@@ -91,4 +91,17 @@ describe('bare clock times with a day word (finding 66)', () => {
   it('"at exactly" keeps the am/pm form working', () => {
     expect(statedDurationSeconds('At exactly 2:22 pm the rain starts.', { localHour: 12, localMinute: 0 })).toBe(2 * 3600 + 22 * 60);
   });
+
+  it('a time with a named part of day lands on that clock time (session 6 "2:20 in the afternoon the next day")', () => {
+    const at = (h: number, m = 0) => h * 3600 + m * 60;
+    const ctx = { localHour: 21, localMinute: 0 };
+    expect(statedDurationSeconds('It is 2:20 in the afternoon the next day', ctx)).toBe(86400 - at(21) + at(14, 20));
+    expect(statedDurationSeconds('2:20 pm', { localHour: 9 })).toBe(at(14, 20) - at(9));
+    expect(statedDurationSeconds('It is 2:20 in the afternoon.', { localHour: 9 })).toBe(at(14, 20) - at(9));
+    expect(statedDurationSeconds('It is 2:20 in the afternoon.', ctx)).toBe(86400 - at(21) + at(14, 20));
+    expect(statedDurationSeconds('Just before noon tomorrow, at noon tomorrow', ctx)).toBe(86400 - at(21) + at(12));
+    expect(statedDurationSeconds('It is half past seven the next morning', ctx)).toBe(86400 - at(21) + at(7, 30));
+    expect(statedDurationSeconds('ten minutes later', ctx)).toBe(600);
+    expect(statedDurationSeconds('three hours pass', ctx)).toBe(3 * 3600);
+  });
 });

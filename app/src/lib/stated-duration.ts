@@ -67,7 +67,32 @@ export function statedDurationSeconds(text: string, ctx: StatedDurationContext =
   const dayPart = /\b(?:tomorrow|(?:the )?(?:next|following))\s+(morning|afternoon|evening|night)\b/i.exec(t)?.[1]?.toLowerCase();
   const bh = bm ? Number(bm[1]) : -1;
   const bmin = bm ? Number(bm[2] ?? 0) : 0;
-  if (cm && Number(cm[1]) >= 1 && Number(cm[1]) <= 12) {
+  // "2:20 in the afternoon" / "7 in the morning" / "half past seven the next morning": a time with a named part of day (no am/pm, no "at").
+  const hw = (w: string) => (/^\d/.test(w) ? Number(w) : SMALL_NUMBERS[w.toLowerCase()]);
+  const pm1 = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(?:in the\s+|of the\s+|at\s+)?(morning|afternoon|evening|night)\b/i);
+  const pm2 = t.match(/\b(half|quarter) (past|to) (\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b(?:\s+(?:in the\s+|the next\s+|the following\s+|tomorrow\s+)?(morning|afternoon|evening|night))?/i);
+  const partHour = (h: number, part: string | undefined): number => {
+    const p = (part ?? '').toLowerCase();
+    if (p === 'morning') return h % 12;
+    if (p === 'afternoon' || p === 'evening') return (h % 12) + 12;
+    if (p === 'night') return h >= 6 && h <= 11 ? h + 12 : h % 12;
+    return h <= 6 ? (h % 12) + 12 : h % 12 === 0 ? 12 : h;
+  };
+  let partSec: number | null = null;
+  if (!cm && !oc) {
+    if (pm1 && (pm1[2] !== undefined || /in the|of the/i.test(pm1[0])) && Number(pm1[1]) >= 1 && Number(pm1[1]) <= 12) {
+      partSec = partHour(Number(pm1[1]), pm1[3]) * 3600 + Number(pm1[2] ?? 0) * 60;
+    } else if (pm2 && hw(pm2[3]) >= 1 && hw(pm2[3]) <= 12) {
+      const h = hw(pm2[3]);
+      const part = pm2[4] ?? dayPart;
+      const base = partHour(pm2[2].toLowerCase() === 'to' ? (h + 11) % 12 || 12 : h, part);
+      const mins = pm2[1].toLowerCase() === 'half' ? 30 : pm2[2].toLowerCase() === 'to' ? 45 : 15;
+      partSec = base * 3600 + mins * 60;
+    }
+  }
+  if (partSec !== null) {
+    clockSec = partSec;
+  } else if (cm && Number(cm[1]) >= 1 && Number(cm[1]) <= 12) {
     const pm = cm[3].toLowerCase().startsWith('p');
     clockSec = ((Number(cm[1]) % 12) + (pm ? 12 : 0)) * 3600 + Number(cm[2] ?? 0) * 60;
   } else if (oc && Number(oc[1]) >= 1 && Number(oc[1]) <= 12) {
