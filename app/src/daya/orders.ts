@@ -240,7 +240,20 @@ export async function placeOrder<O extends Order>(
   const t0 = Date.now();
   try {
     const { system, user, maxTokens } = orderPrompt(order);
+    // A GUTTED PROMPT IS A FAILED ORDER (2026-11-07, session 6's perspective flips): when the tone filter withholds or blocks a chunk of
+    // this order on its way out, the answer was built without it (the "first person / whose deed" lines can be the ones gone). Treat
+    // the order as failed so the caller's safe fallback stands. A softened chunk still carries its sense and is kept.
+    const { onToneWithheld } = await import('@/ai/network/tone-filter');
+    let gutted = false;
+    const stop = onToneWithheld((e) => {
+      if ((e.outcome === 'withheld' || e.outcome === 'blocked') && e.caller.includes(`order_${order.kind}`) && (!e.campaignId || e.campaignId === ctx.campaignId)) gutted = true;
+    });
     const res = await chat({ tier: 'C', subsystem: `order_${order.kind}`, contentClass: 'fiction', campaignId: ctx.campaignId, entityId: ctx.entityId, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], maxTokens, temperature: order.kind === 'voice' ? 0.8 : 0.3 }, overrides);
+    stop();
+    if (gutted) {
+      console.warn(`[orders] ${order.kind}: a chunk of the order was withheld by the tone filter — the answer is not used (${Date.now() - t0}ms)`);
+      return null;
+    }
     const piece = parsePiece(order.kind, res.text);
     if (!piece) console.warn(`[orders] ${order.kind}: the answer did not parse (${Date.now() - t0}ms)`);
     // THE TRAINING LOG (2026-11-03): the brief and the piece, as a pair, with the real names (local only).
