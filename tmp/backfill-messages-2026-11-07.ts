@@ -6,6 +6,7 @@
  *   node --env-file=.env --env-file=.env.local --import tsx ../tmp/backfill-messages-2026-11-07.ts [--apply]   (from app/)
  */
 import '../app/scripts/_server-only-shim';
+import { writeFileSync } from 'node:fs';
 import { prisma } from '../app/src/lib/db';
 import { localUnitsToCycles, type CalendarSpec } from '../app/src/types/time';
 
@@ -23,12 +24,9 @@ interface Msg {
   evidence: number[]; questions?: string[];
 }
 
+// Michael 2026-11-07: vm1/vm2 were ONE voicemail, and any message Violet never read is removed from the record as if it were never
+// real — so the rain voicemail and "london fog" are gone. Kristopher's messages and the first call went from his WORK phone.
 const msgs: Msg[] = [
-  { key: 'vm1', medium: 'voicemail', from: KRIS, fromThing: WORK, to: VIOLET, toThing: HER_PHONE, content: 'I just saw some rain. You still want to get to know me?', notice: "Violet's phone signals a new voicemail.", sent: 0.009830815298085063,
-    evidence: [0.009830815298085063, 0.009830973847044983],
-    questions: ['The Watcher typed a second voicemail a minute later ("Do you still want to get to know me? Because I just saw rain.") — the same voicemail restated (because the engine chimed the first as a text), or two voicemails?', 'Did Violet ever listen to this voicemail? The record shows no read.'] },
-  { key: 'vm2', medium: 'voicemail', from: KRIS, fromThing: WORK, to: VIOLET, toThing: HER_PHONE, content: 'Do you still want to get to know me? Because I just saw rain.', notice: "Violet's phone signals a new voicemail.", sent: 0.00983129094496482,
-    evidence: [0.00983129094496482, 0.009831417784132754], questions: ['Possibly the same voicemail as vm1, restated (see vm1).', 'Did Violet ever listen to it? The record shows no read.'] },
   { key: 'vm3', medium: 'voicemail', from: KRIS, fromThing: WORK, to: VIOLET, toThing: HER_PHONE, content: "Sorry if it is weird that I'm sending you voicemails... I guess I just wanted to hear your voice before I see you. Which sounds weird... Sorry. We can text if that makes you more comfortable?", notice: "Violet's phone chimes with a new voicemail from Kristopher.", sent: 0.009840677043392013, read: 0.009849682624315402,
     evidence: [0.009840677043392013, 0.009840803882559947, 0.00984099414131185, 0.009849682624315402, 0.00986617171614696], questions: ['The record shows this one read twice (0.0098497 and 0.0098662); the first is kept as the read time.'] },
   { key: 'tx1', medium: 'text', from: VIOLET, fromThing: HER_PHONE, to: KRIS, toThing: WORK, content: "Not weird at all. It's nice to hear it.", notice: 'Work phone chimes with an incoming text.', sent: 0.009857324684183488, read: 0.009873211289967355, replyTo: 'vm3',
@@ -45,8 +43,6 @@ const msgs: Msg[] = [
     evidence: [0.009892839651205305, 0.009892998200165225, 0.009907965221981563], questions: ['The engine read it merged with "Yes please." (the merged-quote fault); the words here are his alone.'] },
   { key: 'vm5', medium: 'voicemail', from: VIOLET, fromThing: HER_PHONE, to: KRIS, toThing: WORK, content: "I am leaving right now. I'll be there in ten minutes. You have my uptmost interest.", notice: 'Work phone sounds with a voicemail notification.', sent: 0.009900735389409264, read: 0.009923312761301704, replyTo: 'vm4',
     evidence: [0.009900735389409264, 0.009900893938369184, 0.009901052487329103, 0.009923312761301704] },
-  { key: 'tx6', medium: 'text', from: KRIS, fromThing: WORK, to: VIOLET, toThing: HER_PHONE, content: "I'm getting a london fog. Does that sound good to you?", notice: "Violet's phone chimes with a text from Kristopher.", sent: 0.009915670701433616,
-    evidence: [0.009915670701433616, 0.009915829250393535], questions: ['Did Violet read it before walking in? The record shows no read.'] },
 ];
 
 async function main() {
@@ -69,6 +65,7 @@ async function main() {
   for (const m of msgs) console.log(`  ${m.key} ${m.medium} ${m.from === KRIS ? 'K→V' : 'V→K'} sent ${m.sent.toFixed(7)} read ${m.read?.toFixed(7) ?? '—'} settle ${(replied.get(m.key) ?? MET).toFixed(7)} ${replied.has(m.key) ? 'replied' : 'met'} "${m.content.slice(0, 40)}"${m.questions ? ` [${m.questions.length} Q]` : ''}`);
   if (!apply) { console.log('(dry run — pass --apply)'); return; }
   const old = await prisma.worldMessage.findMany({ where: { campaignId: CAMPAIGN, data: { contains: TAG } }, select: { id: true } });
+  if (old.length) writeFileSync(`data/archive/backfill-messages-replaced-${Date.now()}.json`, JSON.stringify(await prisma.worldMessage.findMany({ where: { id: { in: old.map((o) => o.id) } } }), null, 1));
   if (old.length) await prisma.worldMessage.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
   const ids = new Map<string, string>();
   for (const m of msgs) {
@@ -82,10 +79,10 @@ async function main() {
     ids.set(m.key, row.id);
   }
   await prisma.worldMessage.create({ data: {
-    campaignId: CAMPAIGN, medium: 'call', senderId: KRIS, senderThingId: null, recipientId: VIOLET, recipientThingId: HER_PHONE, contentKind: 'sound',
+    campaignId: CAMPAIGN, medium: 'call', senderId: KRIS, senderThingId: WORK, recipientId: VIOLET, recipientThingId: HER_PHONE, contentKind: 'sound',
     content: 'A phone call: Kristopher dialed the number on the five-dollar bill; Violet answered; they agreed to coffee tomorrow.', notice: "Violet's phone rings.",
     sentCycle: callStart, deliveredCycle: callStart, noticedCycle: callStart, readCycle: callAnswered, settledCycle: callEnd, settledReason: 'ended', durationSeconds: callSeconds,
-    data: JSON.stringify({ backfill: TAG, key: 'call1', answeredCycle: callAnswered, sourceEvents: evIds([callStart, 0.0079869519089425, callEnd]), questions: ['Which of his two phones did he dial from? The record says only "his phone".'] }),
+    data: JSON.stringify({ backfill: TAG, key: 'call1', answeredCycle: callAnswered, sourceEvents: evIds([callStart, 0.0079869519089425, callEnd])}),
   } });
   console.log(`wrote ${msgs.length + 1} rows (replaced ${old.length})`);
 }
