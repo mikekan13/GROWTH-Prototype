@@ -74,7 +74,7 @@ describe('parseTableProse — outputs recorded BEFORE unquoted speech was added 
   // table-prose.frozen.json was written by the previous parser (2026-10-06) for
   // quoted lines, script lines, plain narration and near-misses of the new form.
   it.each(frozen.map((f) => [f.text, f] as const))('%s', (_text, f) => {
-    expect(parseTableProse(f.text, f.withRoster ? roster : [])).toEqual(f.parsed);
+    expect({ ...parseTableProse(f.text, f.withRoster ? roster : []), unresolved: undefined }).toEqual(f.parsed);
   });
   it('covers every existing path', () => {
     expect(frozen.length).toBeGreaterThanOrEqual(17);
@@ -108,7 +108,8 @@ describe('parseTableProse — unquoted speech (a transcript has no quote marks)'
     'The stranger says, sit down.',
     'You wonder what Ruth says, if anything.',
   ])('not speech, about no one at the table — narration is left exactly as written: %s', (text) => {
-    expect(parseTableProse(text, roster)).toEqual({ full: text, narration: text, quotes: [] });
+    // (`unresolved` - a "You ..." sentence reported, never guessed - is the one addition, 2026-11-06; the narration itself is unchanged.)
+    expect({ ...parseTableProse(text, roster), unresolved: undefined }).toEqual({ full: text, narration: text, quotes: [] });
   });
   it.each([
     ['Danny says he never touched it.', 'danny', 'Says he never touched it'],
@@ -658,5 +659,40 @@ describe('finding 67 (live 2026-11-05): inner narration is narration, never a de
     for (const s of ['He sends a text to Violet.', 'Kristopher arrives and sits at a table.', 'He reads the message and smiles.', 'He goes to the counter and asks the worker for two large london fogs.']) {
       expect(parseTableProse(s, r, { recentActors: [r[0]] }).actions?.length, s).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('session 5/6 (2026-11-06): a quote that opens the line, several quotes on one line, an unresolved "you"', () => {
+  const table: ProseRosterEntry[] = [{ id: 'v', name: 'Violet Marsh', sex: 'female' }, { id: 'k', name: 'Kristopher Vale', sex: 'male' }];
+  it('"Come sit down," Kristopher says. - the first name after the quote is the speaker (roster holds the full name)', () => {
+    const p = parseTableProse('"Come sit down," Kristopher says.', table, {});
+    expect(p.quotes.map((q) => [q.speakerId, q.text])).toEqual([['k', 'Come sit down,']]);
+  });
+  it('"I\'ll handle with care..." then he replies. - he is the one man on the roster even when only she acted lately', () => {
+    for (const ctx of [{}, { recentActors: [table[1]] }]) {
+      const p = parseTableProse('"I\'ll handle with care..." then he replies.', table, ctx);
+      expect(p.quotes.map((q) => [q.speakerId, q.speakerLabel])).toEqual([['k', 'Kristopher Vale']]);
+    }
+  });
+  it('two men on the roster and nobody recent: "he" stays unclaimed (never guessed)', () => {
+    const two = [...table, { id: 'o', name: 'Oren', sex: 'male' }];
+    const p = parseTableProse('"I\'ll handle with care..." then he replies.', two, {});
+    expect(p.quotes[0].speakerId).toBeNull();
+  });
+  it('her text and his text keep their own speakers and are two quotes', () => {
+    const p = parseTableProse('Kristopher sees her text "Yes please." But he doesn\'t know what she wants ordered so he texts her: "Well... What should I order you?"', table, { recentActors: [table[1]] });
+    expect(p.quotes.map((q) => [q.speakerId, q.text])).toEqual([['v', 'Yes please.'], ['k', 'Well... What should I order you?']]);
+  });
+  it('"You just got a voicemail." stays unresolved: narration, no act, reported', () => {
+    for (const ctx of [{}, { recentActors: [table[0]] }, { recentActors: [table[1], table[0]] }]) {
+      const p = parseTableProse('You just got a voicemail.', table, ctx);
+      expect(p.actions).toBeUndefined();
+      expect(p.narration).toBe('You just got a voicemail.');
+      expect(p.unresolved).toEqual([{ kind: 'you', sentence: 'You just got a voicemail.' }]);
+    }
+  });
+  it('a line that names whom it is for is not reported unresolved', () => {
+    const p = parseTableProse('Violet, you just got a voicemail.', table, {});
+    expect(p.unresolved).toBeUndefined();
   });
 });

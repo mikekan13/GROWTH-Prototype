@@ -87,13 +87,16 @@ export interface ParsedProse {
   actions?: ProseAction[];
   /** Sentences of what a roster character thinks, remembers or wants. Absent when there are none. */
   thoughts?: ProseThought[];
+  /** Sentences whose subject "you" the line could not resolve to one being - never guessed, never an act. Absent when there are none. */
+  unresolved?: Array<{ kind: 'you'; sentence: string }>;
 }
 
 // An unterminated quote runs to the end of the line (HW3, Mike 2026-10-24: a line without its closing mark lost its speech).
 const QUOTE_RE = /["“]([^"”]+)(?:["”]|$)/g;
 // `::Kristopher knocks twice::` — the AOL-RP action marker (lib/feed-segments), on the GM's own line.
 const ACTION_SPAN_RE = /::\s*([^:][\s\S]*?)\s*::/g;
-const HE_RE = /\b(?:he|him|his|himself)\b/i;
+const SECOND_PERSON_SUBJECT_RE = /^(?:(?:and|but|then|so|now)\s+)?(?:you|your|you['’]re|you['’]ve|you['’]ll)\b/i;
+const HE_RE =/\b(?:he|him|his|himself)\b/i;
 const SHE_RE = /\b(?:she|her|hers|herself)\b/i;
 
 type Sex = 'm' | 'f' | null;
@@ -122,6 +125,31 @@ export function pronounActor(window: string, recent: ProseRosterEntry[]): ProseR
     if (sex === null || sex === want) return entry;
   }
   return null;
+}
+
+/**
+ * A pronoun with nobody recent to carry it: the ONE roster character whose sex fits it (session 5/6 2026-11-06: a line that opens on
+ * a quote — `"I'll handle with care..." then he replies.` — when only she had acted lately). Two fits, or none, is no answer. Pure.
+ */
+export function pronounInRoster(window: string, roster: ProseRosterEntry[]): ProseRosterEntry | null {
+  const he = HE_RE.exec(window);
+  const she = SHE_RE.exec(window);
+  if (!he && !she) return null;
+  const want: Sex = he && (!she || he.index <= she.index) ? 'm' : 'f';
+  const fits = roster.filter((r) => sexOf(r) === want);
+  return fits.length === 1 ? fits[0] : null;
+}
+
+// "Kristopher sees her text "Yes please."" / "his voicemail: "..."": the words are the OWNER's (the pronoun's), not the one who reads them.
+const OWNED_MESSAGE_BEFORE_QUOTE_RE = /\b(his|her)\s+(?:(?:text|sms|written|voice|new|latest|last|first|reply)\s+)*(?:texts?|messages?|replys?|replies|reply|voicemails?|notes?|answers?|responses?)\s*[:,]?\s*$/i;
+/** `sees her text` → the roster character the pronoun points at, other than the sentence's own subject. Null when unclear. Pure. */
+export function messageOwnerBefore(before: string, roster: ProseRosterEntry[], subject: ProseRosterEntry | null, recent: ProseRosterEntry[]): ProseRosterEntry | null {
+  const m = OWNED_MESSAGE_BEFORE_QUOTE_RE.exec(before.trimEnd());
+  if (!m) return null;
+  const want: Sex = m[1].toLowerCase() === 'his' ? 'm' : 'f';
+  if (subject && sexOf(subject) === want) return subject;
+  const fits = (r: ProseRosterEntry) => sexOf(r) === want && r.id !== subject?.id;
+  return recent.find(fits) ?? (roster.filter(fits).length === 1 ? roster.find(fits)! : null);
 }
 
 /** The roster character named LAST in a stretch of prose (for "who was just talked about"). */
@@ -393,7 +421,7 @@ export function introducedSubject(sentence: string | null): string | null {
 function findRosterName(window: string, roster: ProseRosterEntry[]): ProseRosterEntry | null {
   let best: { entry: ProseRosterEntry; at: number } | null = null;
   for (const entry of roster) {
-    const re = new RegExp(`(^|[^\\w])${entry.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^\\w])`, 'i');
+    const re = new RegExp(`(^|[^\\w])${nameAlt(entry)}(?=$|[^\\w])`, 'i');
     const m = window.match(re);
     if (m && m.index !== undefined) {
       const at = m.index + (m[1]?.length ?? 0);
@@ -423,7 +451,7 @@ function withoutPossessives(window: string): string {
 function firstRosterName(window: string, roster: ProseRosterEntry[]): ProseRosterEntry | null {
   let best: { entry: ProseRosterEntry; at: number } | null = null;
   for (const entry of roster) {
-    const re = new RegExp(`(^|[^\\w])${entry.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^\\w])`, 'i');
+    const re = new RegExp(`(^|[^\\w])${nameAlt(entry)}(?=$|[^\\w])`, 'i');
     const m = window.match(re);
     if (m && m.index !== undefined && (!best || m.index < best.at)) best = { entry, at: m.index };
   }
@@ -599,6 +627,9 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
   const thoughts: ProseThought[] = [];
   const lines = full.split(/\r?\n/);
   const narrationParts: string[] = [];
+  const unresolved: Array<{ kind: 'you'; sentence: string }> = [];
+  // The line opened by naming whom it is for ("Violet, you just got a voicemail.") - then YOU is that one, not unresolved.
+  let lineAddressed: ProseRosterEntry | null = null;
   // Who a bare pronoun points at: most recent first — this message's own
   // actors and speakers, then whoever acted last before it.
   const recent: ProseRosterEntry[] = ctx.recentActors?.length ? [...ctx.recentActors] : ctx.lastActor ? [ctx.lastActor] : [];
@@ -618,6 +649,13 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
     let lastKind: 'thought' | 'act' | 'description' | 'narration' | 'tag' | null = null;
     for (const written of splitScenePhraseClauses(splitSentences(text), roster)) {
       let sentence = written;
+      // "You just got a voicemail.": the Watcher speaks to a character. YOU is nobody on the roster until the line says who - it is
+      // never guessed from the last actor (it fell to "her"). It stays narration, and is reported as unresolved. Pure grammar: a
+      // sentence that opens on you / your, unless the line opened by naming whom it is for ("Violet, you just got a voicemail.").
+      if (SECOND_PERSON_SUBJECT_RE.test(sentence.trim())) {
+        if (!lineAddressed) unresolved.push({ kind: 'you', sentence: sentence.trim() });
+        rest.push(sentence); lastKind = 'narration'; continue;
+      }
       let actor = sentenceActor(sentence, roster, recent);
       if (!actor) {
         // "After a minute, he knocks again.": the span is narration first; the rest is whoever it is about.
@@ -666,6 +704,8 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
     //     narration and becomes his own action; a span with no actor stays
     //     narration exactly as before.
     let line = rawLine;
+    lineAddressed = null;
+    for (const entry of roster) if (new RegExp(`^\\s*${nameAlt(entry)}\\s*[,:]\\s`, 'i').test(line)) lineAddressed = entry;
     const quotesBefore = quotes.length;
     const actionsBefore = actions.length;
     // The actor of an action span on THIS line: a bare quote beside it is his
@@ -748,10 +788,19 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
         continue;
       }
       const subjectActor = contextSentence ? sentenceActor(contextSentence, roster, recent, { ownedThings: false }) : null;
+      // Several quotes on one line each keep their own mouth: "sees HER text "Yes please."" is hers, "he texts her: "Well..."" is his.
+      // The words immediately before the quote decide; they are cut at the last sentence the text before it closed.
+      const ownerOfText = messageOwnerBefore(before.slice(-80), roster, subjectActor, recent);
+      if (ownerOfText) {
+        quotes.push({ text: quoteText, speakerId: ownerOfText.id, speakerLabel: ownerOfText.name, context: contextSentence });
+        cursor = start + m[0].length;
+        continue;
+      }
       const named = subjectActor ?? findRosterName(withoutPossessives(beforeWindow.slice(-160)), roster) ?? (runsOn ? firstRosterName(afterTag.slice(0, 120), roster) : null);
       // No name by the quote: "His voice is warm. 'Take your time.'" → the
       // man the table was just talking about, if the pronoun fits his sheet.
-      const byPronoun = named ? null : pronounActor(`${contextSentence ?? ''} ${runsOn ? afterTag.slice(0, 120) : ''}`, recent);
+      const pronounWindow = `${contextSentence ?? ''} ${runsOn ? afterTag.slice(0, 120) : ''}`;
+      const byPronoun = named ? null : pronounActor(pronounWindow, recent) ?? (recent.length === 0 ? pronounInRoster(pronounWindow, roster) : null);
       const npc = named ?? byPronoun ?? (contextSentence === null ? lineActor ?? voiceGoesOn : null);
       const subject = npc ? null : introducedSubject(contextSentence);
       quotes.push({
@@ -794,7 +843,7 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
   }
 
   const narration = narrationParts.join('\n').trim() || null;
-  return { full, narration, quotes, ...(actions.length ? { actions } : {}), ...(thoughts.length ? { thoughts } : {}) };
+  return { full, narration, quotes, ...(actions.length ? { actions } : {}), ...(thoughts.length ? { thoughts } : {}), ...(unresolved.length ? { unresolved } : {}) };
 }
 
 
