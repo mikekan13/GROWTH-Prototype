@@ -20,7 +20,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import type { Point } from '@/lib/canvas-geometry';
-import { walkFtPerSFromCelerity } from '@/lib/spatial/pathfinding';
+import { walkFtPerSFromCelerity, cutPolyline, alongFraction } from '@/lib/spatial/pathfinding';
 import { findPath, insideOrOn, pathSeconds, portalPassability, roomAt, roomByName, portalsOfRoom, spotInRoom, spotAtPortal, spotBeside, nearestWalkable, crossesBlocking, wayOutDoor, lockedFromMySide, type LevelMap, type Portal, type RoomPoly, type Pace } from '@/lib/spatial';
 import { loadWorldLevel, beingStanding, thingStanding, stampBeingPoint, roomIdOf, levelOfBeing, exitPortals } from '@/services/spatial-world';
 import { moveCharacterToLocation } from '@/services/character-location';
@@ -69,6 +69,8 @@ export interface MoveReport {
   boarded?: string;
   /** Finding 81 (2026-11-05): a move to the room the walker is already in is no act, never a refusal; the rest of the act carries on. */
   already?: boolean;
+  /** AN ACT TAKES TIME (2026-11-07): the beat's span could not hold the whole walk; it stopped part-way and this much is left. */
+  partial?: { remainingSeconds: number };
 }
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/^(the|a|an)\s+/, '');
@@ -257,7 +259,7 @@ export async function moveBeing(
   campaignId: string,
   characterId: string,
   target: MoveTarget,
-  opts: { cause: 'sim' | 'gm' | 'jewl'; pace?: Pace; world?: { map: LevelMap } },
+  opts: { cause: 'sim' | 'gm' | 'jewl'; pace?: Pace; world?: { map: LevelMap }; maxSeconds?: number | null },
 ): Promise<MoveReport> {
   const { map } = opts.world ?? await loadWorldLevel(campaignId, await levelOfBeing(characterId));
   const actor = await prisma.character.findUnique({ where: { id: characterId }, select: { id: true, name: true, campaignId: true, data: true, campaign: { select: { gmUserId: true } } } });
@@ -322,6 +324,20 @@ export async function moveBeing(
   }
   if (!path) return { ...empty(dest.label, `no way from ${fromRoom?.name ?? 'here'} to ${dest.label}`), ...base };
 
+  // AN ACT TAKES TIME (Michael 2026-11-07; TIME-LAW-2026-11-07.md): a walk the beat's span cannot hold goes as far as the span allows,
+  // along its own path; only the doors before that point are opened; the rest is carried by the caller as an ongoing act.
+  let partial: MoveReport['partial'];
+  if (opts.maxSeconds != null && path.points.length > 1) {
+    const full = pathSeconds(path.feet, opts.pace ?? 'walk', walkFtPerS);
+    if (full > opts.maxSeconds) {
+      const f = Math.max(0, opts.maxSeconds) / full;
+      const pts = path.points;
+      const mid = (p: { a: Point; b: Point }) => ({ x: (p.a.x + p.b.x) / 2, y: (p.a.y + p.b.y) / 2 });
+      path = { ...path, points: cutPolyline(pts, f), feet: path.feet * f, portals: path.portals.filter((p) => alongFraction(pts, mid(p)) <= f), blockedBy: undefined };
+      partial = { remainingSeconds: Math.max(1, full - Math.max(0, opts.maxSeconds)) };
+    }
+  }
+
   // Doors the walker passes: a closed one is opened on the way (the one writer tells the facts and the canvases).
   const opened: string[] = [];
   if (usedInner && fromRoom) {
@@ -344,7 +360,7 @@ export async function moveBeing(
   const end = path.points[path.points.length - 1] ?? from;
   const moved = path.points.length > 1 && (Math.abs(end.x - from.x) > 0.5 || Math.abs(end.y - from.y) > 0.5);
   const toRoom = walkedRoom(map, end) ?? fromRoom;
-  const seconds = moved ? pathSeconds(path.feet, opts.pace ?? 'walk', walkFtPerS) : 0;
+  const seconds = partial ? Math.max(0, Math.round(opts.maxSeconds ?? 0)) : moved ? pathSeconds(path.feet, opts.pace ?? 'walk', walkFtPerS) : 0;
 
   if (moved) {
     const filedId = await roomIdOf(characterId);
@@ -380,7 +396,7 @@ export async function moveBeing(
 
   // ENTERING A VEHICLE (finding 68 / #41): a walk that ends at a vehicle in the same room ends inside it.
   let boarded: string | undefined;
-  if (target.kind === 'thing' && !path.blockedBy) {
+  if (target.kind === 'thing' && !path.blockedBy && !partial) {
     try {
       const it = await prisma.campaignItem.findUnique({ where: { id: target.itemId }, select: { id: true, name: true, data: true } });
       const itRoom = it ? (await thingStanding(map, it.id))?.room : null;
@@ -395,6 +411,7 @@ export async function moveBeing(
     ok: true, ...base, ...(boarded ? { boarded } : {}), to: end, feet: Math.round(path.feet * 10) / 10, seconds,
     toRoom: toRoom?.name ?? null, opened, path: path.points,
     ...(path.blockedBy ? { stoppedBy: path.blockedBy.name } : {}),
+    ...(partial ? { partial } : {}),
   };
   if (path.blockedBy && !moved) return { ...report, ok: false, reason: `the ${path.blockedBy.name} is locked` };
   return report;

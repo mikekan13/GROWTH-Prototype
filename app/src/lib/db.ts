@@ -92,7 +92,8 @@ class GrowthLibSql extends PrismaLibSql {
 }
 
 function createPrismaClient() {
-  const dbPath = path.join(process.cwd(), 'dev.db');
+  // GROWTH_DB_PATH (2026-11-07): run a script against a COPY of the database (smoke tests of world changes) without touching dev.db.
+  const dbPath = process.env.GROWTH_DB_PATH || path.join(process.cwd(), 'dev.db');
   const adapter = new GrowthLibSql({ url: `file:${dbPath}` });
   return new PrismaClient({ adapter });
 }

@@ -255,3 +255,40 @@ export function walkFtPerSFromCelerity(celerity: number | null | undefined): num
   if (typeof celerity !== 'number' || !(celerity > 0)) return undefined;
   return Math.max(1.5, Math.min(12, celerity / 6));
 }
+
+/**
+ * AN ACT TAKES TIME (2026-11-07, the movement cap): the first `fraction` (0..1) of a polyline, by length — where a walk that the beat's
+ * span cannot hold has got to. Always keeps the start point. Pure.
+ */
+export function cutPolyline(pts: Point[], fraction: number): Point[] {
+  if (pts.length < 2 || fraction >= 1) return pts.slice();
+  const f = Math.max(0, fraction);
+  const segs = pts.slice(1).map((p, i) => Math.hypot(p.x - pts[i].x, p.y - pts[i].y));
+  let want = segs.reduce((a, b) => a + b, 0) * f;
+  const out: Point[] = [pts[0]];
+  for (let i = 0; i < segs.length; i++) {
+    if (want <= 0) break;
+    if (segs[i] <= want) { out.push(pts[i + 1]); want -= segs[i]; continue; }
+    const t = want / segs[i];
+    out.push({ x: pts[i].x + (pts[i + 1].x - pts[i].x) * t, y: pts[i].y + (pts[i + 1].y - pts[i].y) * t });
+    break;
+  }
+  return out;
+}
+
+/** How far along a polyline (0..1, by length) the point nearest `p` lies. Pure. */
+export function alongFraction(pts: Point[], p: Point): number {
+  if (pts.length < 2) return 0;
+  let total = 0, best = Infinity, bestAt = 0;
+  const lens = pts.slice(1).map((q, i) => Math.hypot(q.x - pts[i].x, q.y - pts[i].y));
+  const L = lens.reduce((a, b) => a + b, 0) || 1;
+  for (let i = 0; i < lens.length; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy;
+    const t = L2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2));
+    const d = Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+    if (d < best) { best = d; bestAt = (total + t * lens[i]) / L; }
+    total += lens[i];
+  }
+  return bestAt;
+}

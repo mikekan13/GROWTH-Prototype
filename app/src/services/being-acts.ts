@@ -100,9 +100,10 @@ export async function advanceOpenActs(campaignId: string, nowCycle: number): Pro
  * The being turned to something else: what it was in the middle of is credited up to now and ends `interrupted`, progress kept.
  * Never throws.
  */
-export async function interruptActs(campaignId: string, characterId: string, nowCycle: number, why: string): Promise<number> {
+export async function interruptActs(campaignId: string, characterId: string, nowCycle: number, why: string, onlyIds?: string[]): Promise<number> {
   try {
-    const open = await prisma.beingAct.findMany({ where: { campaignId, characterId, endedCycle: null } });
+    if (onlyIds && !onlyIds.length) return 0;
+    const open = await prisma.beingAct.findMany({ where: { campaignId, characterId, endedCycle: null, ...(onlyIds ? { id: { in: onlyIds } } : {}) } });
     if (!open.length) return 0;
     const ts = await timescaleOf(campaignId);
     let n = 0;
@@ -176,4 +177,72 @@ export async function readAtPace(campaignId: string, characterId: string, thingI
     }
   }
   return { read, partial, actId: act.id };
+}
+
+// ── THE BEAT'S SPAN AND THE MOVEMENT CAP (2026-11-07) ─────────────────────────────────────────────────────────────────────────────
+// The Watcher's line sets how much time a beat holds (advanceClockForLine 'gm-line'). Each being's walks in that beat share it; a walk
+// longer than what is left goes part-way (moveBeing maxSeconds) and a 'move' act carries the rest into the next beats. In an encounter
+// the rounds own the clock: no cap. A Watcher dragging a token is never capped (only cause 'sim' asks for a budget).
+
+interface Beat { seconds: number; cycle: number; spent: Map<string, number> }
+const beats = new Map<string, Beat>();
+
+/** A new Watcher line: the beat now holds `seconds` (null clears it — an encounter, or no span). */
+export function noteBeatSpan(campaignId: string, seconds: number | null, cycle: number): void {
+  if (seconds == null || !(seconds > 0)) { beats.delete(campaignId); return; }
+  beats.set(campaignId, { seconds, cycle, spent: new Map() });
+}
+
+/** Seconds this being still has in the current beat for walking, or null (no cap). Never throws. */
+export async function moveBudget(campaignId: string, characterId: string): Promise<number | null> {
+  const b = beats.get(campaignId);
+  if (!b) return null;
+  try {
+    const enc = await prisma.encounter.findFirst({ where: { campaignId, status: 'ACTIVE' }, select: { id: true } });
+    if (enc) return null;
+  } catch { return null; }
+  return Math.max(0, b.seconds - (b.spent.get(characterId) ?? 0));
+}
+
+export function spendBeat(campaignId: string, characterId: string, seconds: number): void {
+  const b = beats.get(campaignId);
+  if (b && seconds > 0) b.spent.set(characterId, (b.spent.get(characterId) ?? 0) + seconds);
+}
+
+/** The open acts of a being, by id (taken BEFORE a new act is applied, so only those are interrupted by it). */
+export async function openActIds(campaignId: string, characterId: string): Promise<string[]> {
+  try { return (await prisma.beingAct.findMany({ where: { campaignId, characterId, endedCycle: null }, select: { id: true } })).map((a) => a.id); } catch { return []; }
+}
+
+/** A walk the beat could not hold: the rest is an ongoing 'move' act toward the same target. */
+export async function startMoveAct(campaignId: string, characterId: string, target: unknown, label: string, walked: number, remaining: number, cycle: number): Promise<void> {
+  try {
+    await prisma.beingAct.create({ data: {
+      campaignId, characterId, kind: 'move', pillar: 'body', unit: 'seconds', total: walked + remaining, done: walked,
+      startedCycle: cycle, updatedCycle: cycle, data: JSON.stringify({ target, label, log: [{ at: cycle, walked, remaining }] }),
+    } });
+    console.log(`[being-acts] ${characterId}: walking to ${label} — ${remaining}s still to go after this beat`);
+  } catch (err) { console.warn('[being-acts] the ongoing walk was not recorded (non-fatal):', err instanceof Error ? err.message : err); }
+}
+
+/**
+ * A new beat: every ongoing walk goes on toward its target for as long as the beat holds; done when it arrives, abandoned when the way
+ * is gone. Never throws.
+ */
+export async function continueMoves(campaignId: string, nowCycle: number): Promise<void> {
+  try {
+    const open = await prisma.beingAct.findMany({ where: { campaignId, kind: 'move', endedCycle: null } });
+    if (!open.length) return;
+    const { moveBeing } = await import('./being-movement');
+    for (const a of open) {
+      const d = JSON.parse(a.data) as { target: Parameters<typeof moveBeing>[2]; label: string; log: Array<Record<string, unknown>> };
+      const budget = await moveBudget(campaignId, a.characterId);
+      const walk = await moveBeing(campaignId, a.characterId, d.target, { cause: 'sim', maxSeconds: budget });
+      spendBeat(campaignId, a.characterId, walk.seconds);
+      d.log.push({ at: nowCycle, walked: walk.seconds, ok: walk.ok, ...(walk.partial ? { remaining: walk.partial.remainingSeconds } : {}), ...(walk.reason ? { reason: walk.reason } : {}) });
+      const ended = !walk.ok ? { endedCycle: nowCycle, endReason: 'abandoned' } : !walk.partial ? { endedCycle: nowCycle, endReason: 'done' } : {};
+      await prisma.beingAct.update({ where: { id: a.id }, data: { done: a.done + walk.seconds, updatedCycle: nowCycle, data: JSON.stringify(d), ...ended } });
+      console.log(`[being-acts] ${a.characterId}: the walk to ${d.label} goes on — ${walk.ok ? (walk.partial ? `${walk.partial.remainingSeconds}s still to go` : 'arrived') : `stopped: ${walk.reason}`}`);
+    }
+  } catch (err) { console.warn('[being-acts] ongoing walks not continued (non-fatal):', err instanceof Error ? err.message : err); }
 }

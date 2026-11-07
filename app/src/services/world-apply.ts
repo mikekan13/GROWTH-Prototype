@@ -807,7 +807,12 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             const homeRooms = new Set([...underNames, to.name.toLowerCase()]);
             const door = lvl.portals.find((p) => p.homeId === to.id && p.kind === 'door' && p.between.some((b) => !homeRooms.has(b.toLowerCase())));
             if (door) {
-              const walk = await moveBeing(campaignId, actor.id, { kind: 'portal', portalId: door.id, homeId: door.homeId }, { cause: 'sim' });
+              // AN ACT TAKES TIME (2026-11-07): the walk shares the beat's span; what does not fit carries on as an ongoing walk.
+              const acts = await import('./being-acts');
+              const doorTarget = { kind: 'portal' as const, portalId: door.id, homeId: door.homeId };
+              const walk = await moveBeing(campaignId, actor.id, doorTarget, { cause: 'sim', maxSeconds: await acts.moveBudget(campaignId, actor.id) });
+              acts.spendBeat(campaignId, actor.id, walk.seconds);
+              if (walk.ok && walk.partial) { await acts.startMoveAct(campaignId, actor.id, doorTarget, to.name, walk.seconds, walk.partial.remainingSeconds, (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0); report.applied.push(`${actor.name} is on the way to ${to.name} (${walk.partial.remainingSeconds}s still to go)`); }
               if (walk.ok && (walk.feet > 0 || walk.opened.length)) { report.applied.push(describeMove(actor.name, walk)); if (walk.toRoom && walk.toRoom !== walk.fromRoom) report.moved = { from: walk.fromRoom, to: walk.toRoom }; }
               else if (!walk.ok) report.refused.push(`move to ${to.name}: ${walk.reason ?? 'no way'}`);
               map = await actorMap(actorCharacterId);
@@ -821,14 +826,21 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             map = await actorMap(actorCharacterId);
             break;
           }
-          let walk = await moveBeing(campaignId, actor.id, resolved.target, { cause: 'sim' });
+          // AN ACT TAKES TIME (2026-11-07): the walk shares the beat's span; what does not fit carries on as an ongoing walk.
+          const acts = await import('./being-acts');
+          let walk = await moveBeing(campaignId, actor.id, resolved.target, { cause: 'sim', maxSeconds: await acts.moveBudget(campaignId, actor.id) });
           if (!walk.ok && /stands nowhere on the map/.test(walk.reason ?? '')) {
             // Coming from elsewhere: appear at the way onto the level nearest the target, then walk the rest.
             const arrived = await arriveOnMap(campaignId, actor.id, await targetPoint(campaignId, resolved.target));
             if (arrived.ok) {
               report.applied.push(`${actor.name} arrives by the ${arrived.via} at ${arrived.room}`); if (arrived.room) report.moved = { from: null, to: arrived.room };
-              walk = await moveBeing(campaignId, actor.id, resolved.target, { cause: 'sim' });
+              walk = await moveBeing(campaignId, actor.id, resolved.target, { cause: 'sim', maxSeconds: await acts.moveBudget(campaignId, actor.id) });
             } else report.refused.push(`move to ${resolved.label}: ${arrived.reason}`);
+          }
+          acts.spendBeat(campaignId, actor.id, walk.seconds);
+          if (walk.ok && walk.partial) {
+            await acts.startMoveAct(campaignId, actor.id, resolved.target, resolved.label, walk.seconds, walk.partial.remainingSeconds, (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0);
+            report.applied.push(`${actor.name} is on the way to ${resolved.label} (${walk.partial.remainingSeconds}s still to go)`);
           }
           // A walk of no feet that opened nothing is no act (HW12 2026-10-31: "Kristopher is already at Entry door" narrated three times).
           if (walk.ok && walk.feet <= 0 && !walk.opened.length && !walk.gotOutOf && !walk.boarded) console.log(`[world-apply] ${actor.name}: already at ${resolved.label} — nothing to apply`);
