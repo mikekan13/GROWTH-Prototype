@@ -282,4 +282,4 @@ write-back on :3001 (pod on only with Michael); then the remaining cross-wire pa
   (never a Watcher's drag), never in an encounter (rounds own the clock). Interruption: narratedActs must snapshot the actor's open
   acts BEFORE resolveIntent and interrupt only those (today it interrupts any open act after an applied act — fine for reading,
   wrong once a move act is created by the act itself).
-- :3001 is on 4fe7fc0 (before these four commits) — rebuild before the next play to get the cross-wire + withheld fixes.
+- :3001 REBUILT on fdd8443 (all of the above live), answering 200.
