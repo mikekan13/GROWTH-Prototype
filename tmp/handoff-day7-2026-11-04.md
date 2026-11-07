@@ -208,3 +208,51 @@ STILL OPEN, ranked:
 MICHAEL OWES / AUDIO OWED: VIOLET'S VOICE REDESIGN NOT DONE ("too husky, higher, softer"). JEWL thicker drawl via the describer. Narrated recap over cold start. Narrator carrying the story: he reported hearing voices without narration on the session 6 replay; re-check on a clean run. Mobile: Tapestry overlap (screenshot), send-safety. Then STRIKE/CORRECT/RE-TIME tools (the by-hand set: scrub-after, scrub-facts, scrub-chime-since, retime, set-cycle, set-location, hold-item, mark-read, close-threads, restore-events). Note scrub-after.ts does not snapshot yet, and scrub-phantom-text.ts over-matched: do not reuse it.
 
 NEXT: fix 1 (presence closes threads), then 2, 3, 4. Then Violet's voice with Michael. Rolls talk, standard setup, settings audit, mic lane, map migration remain.
+
+## 11-07 (Michael ~05:00–07:00 local, then Claude overnight) — MESSAGES ARE RECORDS · THE TIME LAW · VOICES — supersedes "NEXT" above
+Commits 4d8d973 → 4fe7fc0, all pushed; :3001 REBUILT on 4fe7fc0 and answering; suite 3,019 green, tsc clean. Pod untouched (off).
+
+RULINGS (memory): capture all the data / GROWTH is spreadsheets (texts = full records, any medium incl. spells) · acts take time and
+carry over (TIME-LAW-2026-11-07.md, REVISED section at top = Michael's answers) · WHY we capture everything = continuity + AI session
+VIDEOS (likely more profitable than subscriptions; users never see the minutiae) · history of everything, current state = a view ·
+CORRECTION (override, as it always was) vs IN-WORLD CHANGE (history) — ask when unclear · original-timeline characters have scattered,
+broken memories (partial amnesia covers gaps in the old canon) · JEWL's voice has an in-world history (sinister era → benevolent; undated).
+
+BUILT
+1. WorldMessage (any medium; sender/recipient thing nullable = mind; every moment stamped; never overwritten). Opening a conversation
+   reads ALL unread from that sender, oldest first. The notice shows who/how many/how long ago, never unread words. Read receipts =
+   a setting on the reader's phone (`data.readReceipts:false`). Read exchanges settle when sender and reader stand in the same place
+   (handoff item 1). Texts no longer live on CampaignItem.data.signals (calls still do).
+2. BACKFILL: the kept sessions' 11 messages + session 2's call rebuilt from CampaignEvents (tmp/backfill-messages-2026-11-07.ts; each
+   row names its source events; open questions in data.questions). QUESTIONS FOR MICHAEL: (a) vm1/vm2 — one voicemail restated or two?
+   (b) did Violet ever listen to vm1/vm2, or read "london fog"? (recorded unread, settled when they met) (c) which of his phones dialled
+   the first call? All open threads settle at the moment she walked into the coffee shop (they were closed by hand after session 6).
+3. Write-back (item 2): a text's words are no longer filtered as a "repeat of a thought" (the cause: "I'm putting on my boots." was
+   dropped); an unsent write-back stays OFF her card and her memory says "I meant to write back… No message went."
+4. Perspective flips (item 4): the perception order now says someone else's deed stays theirs (third person; "I" only for her senses);
+   first-person rewriting (own-voice) only for the being's own sentences, never quoted words, never pronouns when sex is unknown; the
+   leak guard catches "I <deed>" anywhere, lets "I hear him say…" stand.
+5. Cross-wire (item 3, partly): a refused text no longer chimes; beings' acts reach the world in the third person. NOT done: the
+   stub-verdict hear() paths (table-speak ~1252/1264/1334) still skip the reach judge; `own` flags in gatedHear can still go to the wrong
+   being; the tone filter withholding prompt chunks is not detected by placeOrder (orders.ts ~241) — needs plumbing from ai/network.
+6. TIME LAW BASE: BeingAct (what a being is in the middle of). Reading goes at pace: Soul actions × 24 words (the sim's ordinary
+   estimate, ≈240 wpm for one Soul action/round); one round credited for the beat it is chosen in; the rest credited as the clock moves
+   (lazily, by every reader of the world); each message stamped when finished; another applied act interrupts it, progress kept.
+   Smoke-tested live (tmp/smoke-read-at-pace.ts). NOT built: movement cap (risky to strand beings mid-room; design = BeingAct kind
+   'move' with the token interpolated along the path), pushing past pace (needs the DR ladder).
+7. Position history: every walk → HistoryEntry type 'move' with from/to/path/feet/seconds. (Correction to what I told Michael: MOOD was
+   already logged — DayaAffect updates write HistoryEntry with the numbers, and each thought card stores its felt state.) Overwrite
+   audit list still owed beyond these two: character.update (58 call sites — pools, conditions), campaignItem holder/condition,
+   location door states, worldFact edits, intentions/routines, currency.
+8. Voices: Violet = round 3 #3 (ref 1a6443c191854a1c, seed 58) — a correction, no history kept. JEWL stays L (no candidate beat it).
+   Michael's unscripted JEWL take: tmp/voice/jewl-performance-2026-11-07.m4a/.wav (63 s, both eras demonstrated).
+
+DESCRIBER RESEARCH (for "a GM improvises a voice that becomes not theirs"):
+- Describe: Qwen3-Omni-30B-A3B-Captioner — Apache-2.0, detailed audio captions incl. emotion; 30B MoE → the pod, not this PC. Feed it
+  the unscripted take, ask for timbre/pitch/pace/accent/attitude → Qwen3-TTS voice design (already running). Verify the official model card.
+- Keep the performance, lose the speaker: OpenVoice V2 tone-colour converter — MIT (V1+V2 since Apr 2024); convert the Watcher's take
+  onto a designed voice's timbre. Verify checkpoint terms + MeloTTS dependency licence.
+- Seed-VC is GPL-3.0 (and archived) — avoid for commercial.
+
+NEXT: Michael answers the 3 backfill questions; skills talk (DR ladder + Watcher limits); a short live check of reading at pace and the
+write-back on :3001 (pod on only with Michael); then the remaining cross-wire paths, the movement cap, the describer on the pod.

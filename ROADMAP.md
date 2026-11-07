@@ -1,6 +1,14 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-10-31
+Last updated: 2026-11-07
+
+> 2026-11-07 (after the coffee date, session 6 kept): MESSAGES ARE RECORDS (WorldMessage, any medium; opening a conversation reads
+> every unread message oldest first; the kept sessions' texts backfilled from the record) and the BASE OF THE TIME LAW
+> (TIME-LAW-2026-11-07.md: pace from the action count, pillar-bound; BeingAct carries an act over beats; reading at pace built,
+> movement cap not yet). Handoff fixes 2 (write-back) and 4 (perspective flips) built, 3 (cross-wire) partly; walks logged with
+> their path. Violet's voice recast. NEXT: Michael's 3 backfill questions, the skills talk (DR ladder), a live check on :3001,
+> the rest of the cross-wire, the movement cap, the describer (Qwen3-Omni Captioner + OpenVoice V2). Handoff:
+> tmp/handoff-day7-2026-11-04.md "11-07".
 
 > 2026-10-24 (hello world 2 → fixes): HW2 ran on the split loop (TABLE_SPLIT_LOOP=on). Violet listened to every
 > line and never answered: the ask reader needed a name, and the clock never moved (cycle 0.0022 all session).
