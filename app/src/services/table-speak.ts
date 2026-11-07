@@ -1212,10 +1212,11 @@ async function runBeats(
     // rang. A being who set off a signal that is still live hears it go on: that is his beat, not the empty standing one.
     try {
       const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
-      const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { name: true, holderId: true, data: true } });
-      const { liveSignals, mirrorOf } = await import('@/services/item-signal');
+      const { withMessages } = await import('@/services/world-messages');
+      const rows = await withMessages(campaignId, await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { id: true, name: true, holderId: true, data: true } }), cycle);
+      const { liveSignals, mirrorOf, senderSees } = await import('@/services/item-signal');
       // Finding 69: the listener's OWN messages on a thing are a thread (the far side counts how many were read / unanswered).
-      const goingRow = rows.map((r) => { let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; } const sent = liveSignals(d, cycle).filter((x) => x.by === listenerId); return { r, sent, s: mirrorOf(sent) }; }).find((x) => x.s);
+      const goingRow = rows.map((r) => { const sent = liveSignals(r.data, cycle).filter((x) => x.by === listenerId); return { r, sent, s: mirrorOf(sent) }; }).find((x) => x.s);
       const going = goingRow?.s ?? null;
       if (going && goingRow) {
         // WHOSE THING IT IS (session 2 live, 2026-11-03): "Her phone rings." left Kristopher thinking of "the ringing from the other night".
@@ -1228,13 +1229,13 @@ async function runBeats(
           : null;
         const content0 = manyText ? manyText : going.state === 'connected'
           ? `${holder ?? 'They'} answered${holder ? ` ${holder}'s ${thing}` : ''}. You are on the line with ${holder ?? 'them'} now: what you say reaches them, and what they say reaches you.`
-          : going.state === 'received'
+          : senderSees(going) === 'received'
             ? `Your message reached${holder ? ` ${holder}'s ${thing}` : ' them'}.${going.words ? ` It said: "${going.words}".` : ''} Nothing has come back yet.`
           : going.state === 'read'
             ? `${holder ?? 'They'} read your message.${going.words ? ` It said: "${going.words}".` : ''} Nothing has come back yet.`
             : `${FAR_SIDE_HEAD} ${going.text}${holder ? ` It is ${holder}'s ${thing}, going now because of what you did.` : ''} Nobody has answered it yet.`;
         // Finding 84 (2026-11-05): a message waiting unread on a thing the being HOLDS is part of its moment too - derived from the thread (state 'received'), appended after the far-side sentence; its words stay unread.
-        const unreadHeld = rows.filter((r) => r.holderId === listenerId).map((r) => { let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; } return { r, unread: liveSignals(d, cycle).filter((x) => x.state === 'received' && x.by !== listenerId) }; }).filter((x) => x.unread.length);
+        const unreadHeld = rows.filter((r) => r.holderId === listenerId).map((r) => ({ r, unread: liveSignals(r.data, cycle).filter((x) => x.state === 'received' && x.by !== listenerId) })).filter((x) => x.unread.length);
         const content = unreadHeld.length ? `${content0} ${unreadHeld.map((x) => `Your ${x.r.name.replace(/^(?:the|her|his|their|my|your)s+/i, '')} has ${x.unread.length > 1 ? `${x.unread.length} messages` : 'a message'} you have not read.`).join(' ')}` : content0;
         console.log(`[standing-beat] ${listeners.find((l) => l.id === listenerId)?.name ?? listenerId}: the far side of their own signal — ${content}`);
         standingIds.add(listenerId);
@@ -1894,10 +1895,10 @@ async function planFromReply(campaignId: string, characterId: string, name: stri
     let askedWords = asked?.trim() ?? '';
     if (!askedWords) {
       const { liveSignal } = await import('@/services/item-signal');
-      const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: characterId, data: { contains: '"signal"' } }, select: { data: true } });
+      const { withMessages } = await import('@/services/world-messages');
+      const rows = await withMessages(campaignId, await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: characterId }, select: { id: true, data: true } }), cycle);
       for (const r of rows) {
-        let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; }
-        const s = liveSignal(d, cycle);
+        const s = liveSignal(r.data, cycle);
         if (s?.words && s.by !== characterId) { askedWords = s.words; break; }
       }
     }

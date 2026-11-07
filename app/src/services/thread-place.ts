@@ -1,6 +1,7 @@
 // Finding 86 (2026-11-05): where a live thread says the other being is — read from the campaign's own Locations, never from a keyword list.
 import { prisma } from '@/lib/db';
 import { liveSignals } from './item-signal';
+import { withMessages } from './world-messages';
 import { placeFromThread } from '@/daya/intentions';
 import { locationAliases } from '@/lib/location-aliases';
 
@@ -10,11 +11,10 @@ import { locationAliases } from '@/lib/location-aliases';
  */
 export async function threadPlaceFor(campaignId: string, characterId: string, cycle: number): Promise<string | null> {
   try {
-    const items = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: characterId, data: { contains: '"signal"' } }, select: { data: true } });
+    const items = await withMessages(campaignId, await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: characterId }, select: { id: true, data: true } }), cycle);
     const texts: string[] = [];
     for (const it of items) {
-      let d: unknown = null; try { d = it.data ? JSON.parse(it.data) : null; } catch { d = null; }
-      for (const s of liveSignals(d, cycle)) if (s.by !== characterId) texts.push(s.words ?? '', s.text ?? '');
+      for (const s of liveSignals(it.data, cycle)) if (s.by !== characterId) texts.push(s.words ?? '', s.text ?? '');
     }
     if (!texts.some((t) => t.trim())) return null;
     const [locs, edge] = await Promise.all([

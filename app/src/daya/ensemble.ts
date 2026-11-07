@@ -452,9 +452,10 @@ async function beatFacts(ctx: EntityContext, cue: string, heldNames: string[] = 
     let signals: string[] = [];
     if (ctx.campaignId) {
       try {
-        const rows = await prisma.campaignItem.findMany({ where: { campaignId: ctx.campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { name: true, holderId: true, data: true } });
+        const rows = await prisma.campaignItem.findMany({ where: { campaignId: ctx.campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { id: true, name: true, holderId: true, data: true } });
         const { signalLines } = await import('@/services/item-signal');
-        signals = signalLines(rows.map((r) => { let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; } return { name: r.name, holderId: r.holderId, data: d }; }), ctx.characterId, ctx.cycle);
+        const { withMessages } = await import('@/services/world-messages');
+        signals = signalLines((await withMessages(ctx.campaignId, rows, ctx.cycle)).map((r) => ({ name: r.name, holderId: r.holderId, data: r.data })), ctx.characterId, ctx.cycle);
       } catch { signals = []; }
     }
     const lines = [
@@ -1101,7 +1102,7 @@ export async function listenStimulus(
   // going. Near = in its hands or its room, people in view; absent = elsewhere (a thought placing one here is dropped); going = a live
   // signal it holds or set off itself. Best-effort, like the rest of the ground.
   const ledger = (omniscient || !ctx.campaignId) ? null : await Promise.resolve().then(() => Promise.all([
-    prisma.campaignItem.findMany({ where: { campaignId: ctx.campaignId!, status: 'ACTIVE' }, select: { name: true, holderId: true, locationId: true, data: true } }),
+    prisma.campaignItem.findMany({ where: { campaignId: ctx.campaignId!, status: 'ACTIVE' }, select: { id: true, name: true, holderId: true, locationId: true, data: true } }),
     prisma.entityRelationship.findMany({ where: { campaignId: ctx.campaignId!, relationshipType: 'located_at', sourceType: 'CHARACTER' }, select: { sourceId: true, targetId: true } }),
     prisma.character.findMany({ where: { campaignId: ctx.campaignId! }, select: { id: true, name: true } }),
   ])).then(async ([items, edges, chars]) => {
@@ -1111,11 +1112,13 @@ export async function listenStimulus(
     // Day 6 (2026-11-04): the signal's end is a CYCLE; it was compared with Date.now() and every signal read as over — Violet's
     // phone rang thirty times with STILL GOING empty in her record. The ledger's clock judges, and the state rides along.
     const { liveSignals, mirrorOf, threadTextFor } = await import('@/services/item-signal');
+    const { withMessages } = await import('@/services/world-messages');
+    const laid = new Map((await withMessages(ctx.campaignId!, items.filter((x) => x.holderId), ctx.cycle)).map((x) => [x.id, x.data]));
     const heldCount = items.filter((x) => x.holderId === characterId).length;
     const going: Array<{ text: string; mine: boolean; holder: string; state?: 'ringing' | 'connected' | 'received' | 'read'; other?: string; words?: string; thing?: string }> = [];
     for (const it of items) {
       let d: unknown = null;
-      try { d = JSON.parse(it.data ?? '{}'); } catch { d = null; }
+      if (laid.has(it.id)) d = laid.get(it.id); else { try { d = JSON.parse(it.data ?? '{}'); } catch { d = null; } }
       // Finding 69/60 (2026-11-05): a thing holds a THREAD; the line is told from the thread, and names the thing when the holder has several.
       const thread = liveSignals(d, ctx.cycle);
       const sig = mirrorOf(thread);
@@ -1848,10 +1851,10 @@ async function hasDuePlan(entityId: string, cycle: number): Promise<boolean> {
 /** Finding 54 (2026-11-05): does the being hold a thing with a live signal, or has it set one off (a call ringing, a message read and unanswered, an open line)? */
 async function hasOwnGoing(campaignId: string, characterId: string, cycle: number): Promise<boolean> {
   const { liveSignal } = await import('@/services/item-signal');
-  const rows = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null }, data: { contains: '"signal"' } }, select: { holderId: true, data: true } });
+  const { withMessages } = await import('@/services/world-messages');
+  const rows = await withMessages(campaignId, await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null } }, select: { id: true, holderId: true, data: true } }), cycle);
   for (const r of rows) {
-    let d: unknown = null; try { d = r.data ? JSON.parse(r.data) : null; } catch { d = null; }
-    const sig = liveSignal(d, cycle);
+    const sig = liveSignal(r.data, cycle);
     if (sig && (r.holderId === characterId || sig.by === characterId)) return true;
   }
   return false;

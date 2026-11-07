@@ -195,6 +195,7 @@ function resolveFateDie(character: Partial<GrowthCharacter> | null): FateDie {
  */
 import { statesHandOver, HAND_OVER_NUDGE, statesPayment, PAYMENT_NUDGE } from './hand-over';
 import { signalLines } from '@/services/item-signal';
+import { withMessages } from '@/services/world-messages';
 import { capabilitiesOf, capabilityLines, type Capability } from './capabilities';
 
 function safeJson(raw: string | null): unknown {
@@ -214,7 +215,7 @@ export async function resolveIntent(
     Promise.resolve().then(() => prisma.character.findUnique({ where: { id: entityCharacterId }, select: { id: true, name: true, data: true } })),
     Promise.resolve().then(() => prisma.character.findMany({ where: { campaignId, id: { not: entityCharacterId }, entityType: { in: ['NPC', 'PLAYER_CHARACTER'] } }, select: { name: true } })),
     Promise.resolve().then(() => actorMap(entityCharacterId)).catch(() => null),
-    Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: entityCharacterId, status: 'ACTIVE' }, select: { name: true, data: true }, take: 100 })).catch((): Array<{ name: string; data: string | null }> => []),
+    Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: entityCharacterId, status: 'ACTIVE' }, select: { id: true, name: true, data: true }, take: 100 })).catch((): Array<{ id: string; name: string; data: string | null }> => []),
   ]);
 
   if (!character) {
@@ -257,8 +258,10 @@ export async function resolveIntent(
   const standRows = await whereOthersStand(campaignId, entityCharacterId, map);
   const whereabouts = whereaboutsLines(map?.roomName ?? null, standRows);
   // WHAT THE ACTOR SET OFF (session 2, 2026-11-02): a caller who hangs up must see the call he placed is still ringing, or "stop" has nothing to end.
-  const setOff = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null, notIn: [entityCharacterId] } }, select: { name: true, holderId: true, data: true }, take: 300 })
-    .then((rows) => signalLines(rows.map((r) => ({ name: r.name, holderId: r.holderId, data: safeJson(r.data) })), entityCharacterId, cycle))
+  // 2026-11-07: messages are records (world-messages.ts), laid onto the things they landed on.
+  const heldLaid = await withMessages(campaignId, heldRows, cycle).catch(() => heldRows.map((r) => ({ ...r, data: safeJson(r.data) })));
+  const setOff = await prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE', holderId: { not: null, notIn: [entityCharacterId] } }, select: { id: true, name: true, holderId: true, data: true }, take: 300 })
+    .then(async (rows) => signalLines((await withMessages(campaignId, rows, cycle)).map((r) => ({ name: r.name, holderId: r.holderId, data: r.data })), entityCharacterId, cycle))
     .catch((): string[] => []);
   // A named person on another level: what they carry is reachable only through a signal (their phone rings), never by hand.
   let signalBlock: string[] = [];
@@ -298,7 +301,7 @@ export async function resolveIntent(
     ...(isLines.length ? [`What the entity IS (its Nectars, Thorns, Blossoms — permanent exploits that bend the base rules): ${isLines.join(' | ')}`] : []),
     ...(canDo.length ? [`What the entity CAN DO beyond a baseline human (its things' abilities, the thing it is in, its spells): ${canDo.join(' | ')}`] : []),
     ...(actsOn.length ? [`What ACTS ON the entity now, whether it knows or not (apply it to the outcome; never put it in its own mouth): ${actsOn.join(' | ')}`] : []),
-    ...signalLines(heldRows.map((r) => ({ name: r.name, holderId: entityCharacterId, data: safeJson(r.data) })), entityCharacterId, cycle),
+    ...signalLines(heldLaid.map((r) => ({ name: r.name, holderId: entityCharacterId, data: r.data })), entityCharacterId, cycle),
     ...setOff,
     '',
     ...signalBlock,

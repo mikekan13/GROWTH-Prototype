@@ -1690,3 +1690,35 @@ model LastKnown {
   @@unique([viewerId, subjectId])
   @@index([campaignId, viewerId])
 }
+
+// A MESSAGE IS A RECORD (Michael 2026-11-07: "a text message shouldn't just be a text message and from who — it should have a
+// timestamp and everything else a normal text message would have… GROWTH is essentially just massive spreadsheets"; and "this isn't
+// just texts but should be flexible enough to handle any sort of messaging system. Spells, etc."). One row per message sent by ANY
+// medium — a text, a voicemail, an email, a letter, a sending spell, a voice in the mind — every moment stamped in campaign cycles,
+// never overwritten. What a device or a mind shows is derived from these rows.
+model WorldMessage {
+  id               String   @id @default(cuid())
+  campaignId       String
+  medium           String   // free word for HOW it travels: text | voicemail | email | letter | spell:<name> | thought | ...
+  senderId         String?  // Character who sent it (null = unknown / the world)
+  senderThingId    String?  // the thing it went out through (a phone, a focus, a quill); null = sent by the sender alone (a thought)
+  recipientId      String   // Character it is for
+  recipientThingId String?  // the thing it lands on (her phone, a letterbox, a scrying bowl); null = it lands in the recipient's mind
+  contentKind      String   @default("words") // words | image | sound | feeling | object — what it carries
+  content          String   // the words exactly as written, or a plain description of what it carries
+  notice           String   @default("") // how its arrival shows ("Violet's phone chimes", "a voice at the edge of her mind")
+  sentCycle        Float
+  deliveredCycle   Float?   // null = still travelling / undeliverable (device off, letter in the post, spell out of range)
+  noticedCycle     Float?   // the recipient became aware of it (lock screen, envelope on the mat)
+  readCycle        Float?   // opened and taken in
+  settledCycle     Float?   // the exchange moved on
+  settledReason    String?  // replied | met | let_go | struck | expired
+  replyToId        String?  // the WorldMessage this one answers
+  durationSeconds  Int?     // a voicemail's or a sending's length
+  data             String   @default("{}") // JSON: what the medium itself records (spell cost/range, postmark, attachments...)
+  createdAt        DateTime @default(now())
+
+  @@index([campaignId])
+  @@index([recipientThingId])
+  @@index([campaignId, recipientId, senderId])
+}

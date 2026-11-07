@@ -31,6 +31,12 @@ export interface ItemSignal {
   words?: string;
   /** Finding 60 (2026-11-05): the id of the SENDER's own thing this came from, so a reply goes back to that phone, not the first match. */
   fromItem?: string;
+  /** 2026-11-07: a message is a record (world-messages.ts) — its row, how it travelled, how long ago it came, who it is from, and whether the reader's thing sends read receipts. */
+  messageId?: string;
+  medium?: string;
+  ago?: string;
+  fromName?: string;
+  receiptsOff?: boolean;
 }
 
 type Data = Record<string, unknown>;
@@ -51,7 +57,25 @@ function parseEntry(r: unknown, nowCycle: number | null): ItemSignal | null {
     ...(kind ? { kind } : {}), ...(state ? { state } : {}),
     ...(typeof x.words === 'string' && x.words.trim() ? { words: x.words.trim().slice(0, 600) } : {}),
     ...(typeof x.fromItem === 'string' && x.fromItem ? { fromItem: x.fromItem } : {}),
+    ...(typeof x.messageId === 'string' ? { messageId: x.messageId } : {}),
+    ...(typeof x.medium === 'string' ? { medium: x.medium } : {}),
+    ...(typeof x.ago === 'string' ? { ago: x.ago } : {}),
+    ...(typeof x.fromName === 'string' ? { fromName: x.fromName } : {}),
+    ...(x.receiptsOff === true ? { receiptsOff: true } : {}),
   };
+}
+
+/**
+ * What the SENDER's side knows of a message's state (2026-11-07): "read" only when the reader's thing sends read receipts; otherwise
+ * it was delivered and that is all. Pure.
+ */
+export function senderSees(sig: ItemSignal): SignalState | undefined {
+  return sig.state === 'read' && sig.receiptsOff ? 'received' : sig.state;
+}
+
+/** How an unread message shows before it is opened (2026-11-07: the notice says who and when, never the words). Pure. */
+function unreadNotice(n: number, who: string, ago?: string): string {
+  return `${n > 1 ? `${numWord(n)} unread messages` : 'An unread message'} from ${who}${ago ? `, ${n > 1 ? 'the latest ' : ''}${ago} ago` : ''}. The words are not known until it is opened; opening it is your act.`;
 }
 
 /** Every entry of the thread, oldest first; `nowCycle` null keeps expired ones too. A legacy single `data.signal` is a thread of one. */
@@ -121,8 +145,9 @@ export function onTheLine(parties: Array<{ holderId: string; by: string }>, a: s
 export function signalTextFor(sig: ItemSignal, side: 'holder' | 'caller', other?: string | null): string {
   const who = other ?? (side === 'holder' ? 'someone' : 'them');
   if (sig.state === 'connected') return side === 'holder' ? `You are on the line with ${who}: the call is answered and open.` : `${who} answered: you are on the line with ${who}.`;
-  if (sig.state === 'received') return side === 'holder' ? `${sig.text} It reads: "${sig.words ?? '…'}"` : `Your message reached ${who}.${sig.words ? ` It said: "${sig.words}"` : ''} Nothing has come back yet.`;
-  if (sig.state === 'read') return side === 'holder' ? `${who}'s message, read${sig.words ? `: "${sig.words}"` : ''}. You have not written back.` : `${who} read your message.${sig.words ? ` It said: "${sig.words}"` : ''} Nothing has come back yet.`;
+  const st = side === 'caller' ? senderSees(sig) : sig.state;
+  if (st === 'received') return side === 'holder' ? unreadNotice(1, sig.fromName ?? who, sig.ago) : `Your message reached ${who}.${sig.words ? ` It said: "${sig.words}"` : ''} Nothing has come back yet.`;
+  if (st === 'read') return side === 'holder' ? `${who}'s message, read${sig.words ? `: "${sig.words}"` : ''}. You have not written back.` : `${who} read your message.${sig.words ? ` It said: "${sig.words}"` : ''} Nothing has come back yet.`;
   return side === 'holder' ? `${sig.text} It is ringing now and not answered.` : `${sig.text} It is still going; nobody has answered it.`;
 }
 
@@ -150,7 +175,7 @@ export function threadTextFor(thread: ItemSignal[], side: 'holder' | 'caller', o
     const who = other ?? (side === 'holder' ? 'someone' : 'them');
     if (g.length === 1) {
       const t = signalTextFor(g[0], side, other);
-      parts.push(on && g[0].state === 'read' ? t.replace(/message, read/, `message${on}, read`) : on && g[0].state === 'received' ? `${t.replace(/\.?\s*It reads:/, `${on}. It reads:`)}` : t);
+      parts.push(on && g[0].state === 'read' ? t.replace(/message, read/, `message${on}, read`) : on && g[0].state === 'received' ? t.replace(/(from [^,.]+)/, `$1${on}`) : t);
       continue;
     }
     const newest = g[g.length - 1];
@@ -158,14 +183,18 @@ export function threadTextFor(thread: ItemSignal[], side: 'holder' | 'caller', o
     if (side === 'holder') {
       const head = `${numWord(g.length)} messages from ${who}${on}`;
       const allRead = earlier.every((e) => e.state === 'read');
-      if (newest.state === 'received') {
-        parts.push(`${head}, the newest unread: ${q(newest.words)} — the earlier ${earlier.length === 1 ? 'one' : 'ones'}${allRead ? ', read' : ''}: ${earlier.map((e) => q(e.words)).join('; ')}${allRead ? ', not written back' : ''}.`);
+      const unread = g.filter((e) => e.state === 'received');
+      const read = g.filter((e) => e.state === 'read');
+      if (unread.length) {
+        // 2026-11-07: unread words are not known; the read ones are, oldest first.
+        parts.push(`${unreadNotice(unread.length, newest.fromName ?? who, unread[unread.length - 1].ago).replace(/\.\s/, `${on}. `)}${read.length ? ` Already read, oldest first, not written back: ${read.map((e) => q(e.words)).join('; ')}.` : ''}`);
       } else {
-        parts.push(`${head}, ${allRead ? 'all read' : 'the newest read'} and not written back; newest first: ${[newest, ...earlier].map((e) => q(e.words)).join('; ')}.`);
+        parts.push(`${head}, ${allRead ? 'all read' : 'the newest read'} and not written back; oldest first: ${g.map((e) => q(e.words)).join('; ')}.`);
       }
     } else {
-      const read = g.filter((e) => e.state === 'read').length;
-      parts.push(`Your ${g.length} messages reached ${opts?.thing ?? who}: ${read} read, ${g.length - read} not yet read. The newest said: ${q(newest.words)}. Nothing has come back yet.`);
+      const read = g.filter((e) => senderSees(e) === 'read').length;
+      const status = g.some((e) => e.receiptsOff) ? 'delivered (their phone does not say when they are read)' : `${read} read, ${g.length - read} not yet read`;
+      parts.push(`Your ${g.length} messages reached ${opts?.thing ?? who}: ${status}. The newest said: ${q(newest.words)}. Nothing has come back yet.`);
     }
   }
   return parts.join(' ');
@@ -178,6 +207,8 @@ function storeEntry(signal: ItemSignal): Record<string, unknown> {
     ...(signal.by ? { by: signal.by } : {}), ...(signal.kind ? { kind: signal.kind } : {}), ...(signal.state ? { state: signal.state } : {}),
     ...(signal.words ? { words: signal.words.slice(0, 600) } : {}),
     ...(signal.fromItem ? { fromItem: signal.fromItem } : {}),
+    ...(signal.messageId ? { messageId: signal.messageId } : {}), ...(signal.medium ? { medium: signal.medium } : {}),
+    ...(signal.ago ? { ago: signal.ago } : {}), ...(signal.fromName ? { fromName: signal.fromName } : {}), ...(signal.receiptsOff ? { receiptsOff: true } : {}),
   };
 }
 
@@ -291,13 +322,13 @@ export function signalLines(items: SignalItem[], viewerId: string, nowCycle: num
     if (it.holderId === viewerId) {
       const unread = thread.filter((s) => s.state === 'received');
       if (sig.state === 'connected') out.push(`The ${bare(it.name)} you are holding: the call is answered and open. What you say reaches the one on the line, and what they say reaches you, until one of you hangs up.`);
-      else if (sig.state === 'received') out.push(`The ${bare(it.name)} you are holding: ${unread.length > 1 ? `${unread.length} messages have come in, the newest reads: "${sig.words ?? '…'}"` : `a message has come in. It reads: "${sig.words ?? '…'}"`}. Whoever sent it cannot hear you; writing back is your act.`);
+      else if (sig.state === 'received') out.push(`The ${bare(it.name)} you are holding: ${unreadNotice(unread.length, sig.fromName ?? 'someone', unread[unread.length - 1]?.ago)} Whoever sent it cannot hear you.`);
       else out.push(`The ${bare(it.name)} you are holding: ${sig.text} — right now. It goes on until you answer it or it stops; answering it is your act, and so is leaving it. Whoever set it off cannot hear you until you answer it. It does not tell you who set it off: you know who only if your memory or the world's facts say so.`);
     } else {
       const mine = mirrorOf(thread.filter((s) => s.by === viewerId));
       if (!mine) continue;
       if (mine.state === 'connected') out.push(`What you set off was answered: you are on the line. What you say reaches them now.`);
-      else if (mine.state === 'received') out.push(`Your message reached them.${mine.words ? ` It said: "${mine.words}".` : ''} Nothing has come back yet.`);
+      else if (senderSees(mine) === 'received') out.push(`Your message reached them.${mine.words ? ` It said: "${mine.words}".` : ''} Nothing has come back yet.`);
       else out.push(`What you set off is still going: ${mine.text} It has not been answered.`);
     }
   }

@@ -665,3 +665,12 @@ One row per routine of a being: `name` (the being's register), `triggers` (JSON 
 ### Currency
 A campaign currency (stored-KRMA vehicle, many per campaign, AI-managed). `krmaPerUnit` anchored on objects.
 - `denominations`: JSON `[{name, faceValue, form?, weightLbs?, primaryMaterial?}]` — the faces it comes in, set by JEWL in establish_currency (2026-11-01). Nothing in code knows a currency; a cash thing's recipe is `ItemPart.each.tenderOf = currencyId` ("any denomination").
+
+## WorldMessage — a message is a record (Michael 2026-11-07; migration `20261107090000_world_message`)
+One row per message sent by ANY medium (`medium`: text | voicemail | email | letter | `spell:<name>` | thought …). `senderThingId` /
+`recipientThingId` are the things it went out through / landed on (null = sent by the being alone / lands in the mind). `contentKind`
+(words | image | sound | feeling | object) + `content`; `notice` = how its arrival shows. Every moment stamped in campaign cycles and
+never overwritten: `sentCycle`, `deliveredCycle` (null = still travelling), `noticedCycle`, `readCycle`, `settledCycle` +
+`settledReason` (replied | met | let_go | struck | expired), `replyToId`, `durationSeconds`, `data` (JSON: what the medium records).
+A thing's live thread is DERIVED from these rows (`services/world-messages.ts withMessages`); texts are no longer stored on
+`CampaignItem.data.signals` (calls still are). A thing's `data.readReceipts: false` hides "read" from the sender.

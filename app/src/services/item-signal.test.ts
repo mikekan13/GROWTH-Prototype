@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { liveSignal, withSignal, withoutSignal, signalLines, signalInState, connectedParties, onTheLine, signalTextFor, actorWordsFromIntent, replyTargetItem, liveSignals, mirrorOf, threadTextFor, markRead, settleFrom, pickFromItem, withoutOneSignal, withoutSignalsBy } from './item-signal';
+import { liveSignal, withSignal, withoutSignal, signalLines, signalInState, connectedParties, onTheLine, signalTextFor, actorWordsFromIntent, replyTargetItem, liveSignals, mirrorOf, threadTextFor, markRead, settleFrom, pickFromItem, withoutOneSignal, withoutSignalsBy, senderSees } from './item-signal';
 
 const sig = { text: "Violet's phone rings wherever she has it.", since: 100, until: 200, by: 'kris' };
 
@@ -55,12 +55,23 @@ describe('Day 6 (2026-11-04): a signal has a state; the parties on a line', () =
     expect(onTheLine(parties, 'vi', 'vi')).toBe(false);
     expect(connectedParties([{ holderId: 'vi', data }], 1.5)).toEqual([]);
   });
-  it('a message lands with its words and is told to both sides', () => {
-    const data = withSignal({}, { text: "Violet's phone chimes.", since: 1, until: 2, by: 'kris', kind: 'text', state: 'received', words: 'Is this the woman with purple hair?' });
+  it('a message lands with its words; the holder is told who and when, never the words, until it is opened (2026-11-07)', () => {
+    const data = withSignal({}, { text: "Violet's phone chimes.", since: 1, until: 2, by: 'kris', kind: 'text', state: 'received', words: 'Is this the woman with purple hair?', fromName: 'Kristopher', ago: 'about 2 minutes' });
     const sig = liveSignal(data, 1.5)!;
-    expect(signalTextFor(sig, 'holder', 'Kristopher')).toContain('It reads: "Is this the woman with purple hair?"');
+    const holder = signalTextFor(sig, 'holder', 'Kristopher');
+    expect(holder).toBe('An unread message from Kristopher, about 2 minutes ago. The words are not known until it is opened; opening it is your act.');
+    expect(holder).not.toContain('purple');
     expect(signalTextFor(sig, 'caller', 'Violet')).toContain('Your message reached Violet.');
-    expect(signalLines([{ name: 'Her phone', holderId: 'vi', data }], 'vi', 1.5)[0]).toContain('a message has come in');
+    const line = signalLines([{ name: 'Her phone', holderId: 'vi', data }], 'vi', 1.5)[0];
+    expect(line).toContain('An unread message from Kristopher');
+    expect(line).not.toContain('purple');
+  });
+  it("read receipts belong to the reader's thing: with them off the sender sees only that it was delivered (2026-11-07)", () => {
+    const sig = { text: 't', since: 1, until: 99, by: 'kris', kind: 'text' as const, state: 'read' as const, words: 'hi', receiptsOff: true };
+    expect(senderSees(sig)).toBe('received');
+    expect(signalTextFor(sig, 'caller', 'Violet')).toContain('Your message reached Violet.');
+    expect(signalTextFor(sig, 'holder', 'Kristopher')).toContain("Kristopher's message, read");
+    expect(senderSees({ ...sig, receiptsOff: undefined })).toBe('read');
   });
 });
 
@@ -160,12 +171,14 @@ describe('finding 69 (2026-11-05): a thing holds a THREAD of signals', () => {
   });
   it('Finding 79: the going piece strips the sentence full stop before " on the <thing>"', () => {
     const one = withSignal({}, { ...text('Coffee?', 1), text: 'The phone chimes with a text message.' });
-    expect(threadTextFor(liveSignals(one, 2), 'holder', 'Kristopher', { thing: 'Personal phone' })).toBe('The phone chimes with a text message on the Personal phone. It reads: "Coffee?"');
+    expect(threadTextFor(liveSignals(one, 2), 'holder', 'Kristopher', { thing: 'Personal phone' })).toBe('An unread message from Kristopher on the Personal phone. The words are not known until it is opened; opening it is your act.');
   });
   it('the holder is told the thread, the sender is told how many were read', () => {
     const read1 = withSignal(withSignal({}, { ...text('Coffee?', 1), state: 'read' }), text('Hello?? 2pm', 2));
     expect(threadTextFor(liveSignals(read1, 3), 'holder', 'Kristopher', { thing: 'Personal phone' }))
-      .toBe('Two messages from Kristopher on the Personal phone, the newest unread: "Hello?? 2pm" — the earlier one, read: "Coffee?", not written back.');
+      .toBe('An unread message from Kristopher on the Personal phone. The words are not known until it is opened; opening it is your act. Already read, oldest first, not written back: "Coffee?".');
+    const allRead = withSignal(withSignal({}, { ...text('Coffee?', 1), state: 'read' }), { ...text('Hello?? 2pm', 2), state: 'read' });
+    expect(threadTextFor(liveSignals(allRead, 3), 'holder', 'Kristopher')).toBe('Two messages from Kristopher, all read and not written back; oldest first: "Coffee?"; "Hello?? 2pm".');
     const sent = threadTextFor(liveSignals(read1, 3), 'caller', 'Violet', { thing: "Violet's phone" });
     expect(sent).toContain("Your 2 messages reached Violet's phone: 1 read, 1 not yet read");
     expect(sent).toContain('"Hello?? 2pm"');
