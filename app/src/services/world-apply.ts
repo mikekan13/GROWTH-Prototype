@@ -575,7 +575,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
           }
           if (!item) { report.refused.push(`answer "${e.item}": ${actor.name} is not holding it`); break; }
           // 2026-11-07: messages are records (world-messages.ts) laid onto the thing for reading; writes go to the thing's OWN data.
-          const { withMessages, readConversation } = await import('./world-messages');
+          const { withMessages } = await import('./world-messages');
           const viewOf = async (id: string) => (await withMessages(campaignId, [{ id, data: (await prisma.campaignItem.findUnique({ where: { id }, select: { data: true } }))?.data ?? null }], cycle))[0].data;
           let d: Record<string, unknown> = await viewOf(item.id);
           let sig = liveSignal(d, cycle);
@@ -609,8 +609,11 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
             // OPENING THE CONVERSATION (Michael 2026-11-07: "when I open the text messages I'm going to read all of those text messages, in
             // chronological order"): every unread message from that sender is read, oldest first, whatever words the act used. A read
             // message waits for an answer for a while (world-messages READ_WAIT_SECONDS), then it is simply a message that was read.
-            // Reading at the being's PACE within the beat's span is the time law (TIME-LAW-2026-11-07.md), not built yet.
-            const readMsgs = await readConversation(campaignId, item.id, cycle, sig.by ?? null);
+            // AT THE BEING'S PACE (time law, 2026-11-07): what fits the beat is read now, oldest first; the rest carries over as time passes.
+            const { readAtPace } = await import('./being-acts');
+            const paced = await readAtPace(campaignId, actor.id, item.id, cycle, sig.by ?? null);
+            const readMsgs = paced.read;
+            if (paced.partial) report.applied.push(`${actor.name} is still reading the messages on "${item.name}" — partway into one: "${paced.partial.content}…"`);
             const sender = sig.by ? await prisma.character.findUnique({ where: { id: sig.by }, select: { name: true } }).catch(() => null) : null;
             for (const m of readMsgs) {
               report.applied.push(`${actor.name} reads the message on "${item.name}"${sender?.name ? ` from ${sender.name}` : ''}: "${m.content}"`);

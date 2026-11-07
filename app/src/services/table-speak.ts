@@ -1949,6 +1949,11 @@ function narratedActs(campaignId: string, actions: Array<{ actorId: string; acto
       .then(async (r) => {
         const applied = r.effects?.applied ?? [];
         const refused = r.effects?.refused ?? [];
+        // AN ACT TAKES TIME (2026-11-07): doing something else in the world ends what the being was in the middle of (reading), progress kept.
+        if (applied.length && !(r.effects?.read?.length)) {
+          const { interruptActs } = await import('@/services/being-acts');
+          await interruptActs(campaignId, a.actorId, (await feedCycle(campaignId)) ?? 0, a.text.slice(0, 120));
+        }
         if (applied.length || refused.length) console.log(`[table-speak] narrated act by ${a.actorLabel}: ${applied.join('; ') || 'nothing moved'}${refused.length ? ` · refused: ${refused.join('; ')}` : ''}`);
         // WHAT THE ACT LACKED (2026-11-03): the Watcher is told, on a Watcher-only line; the act still happened.
         for (const text of refused) broadcastEvent(campaignId, { kind: 'table_note', text, actorId: a.actorId });

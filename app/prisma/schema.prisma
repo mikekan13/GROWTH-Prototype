@@ -1722,3 +1722,26 @@ model WorldMessage {
   @@index([recipientThingId])
   @@index([campaignId, recipientId, senderId])
 }
+
+// AN ACT TAKES TIME (Michael 2026-11-07, TIME-LAW-2026-11-07.md): what a being is in the middle of, and how far along. An act is paid
+// from the being's pillar-bound actions as world time passes; what does not fit a beat carries over until it is done or interrupted.
+// Progress is recorded, never overwritten away: `data.log` appends every advance.
+model BeingAct {
+  id           String   @id @default(cuid())
+  campaignId   String
+  characterId  String
+  kind         String   // read | (move, … later)
+  pillar       String   // body | spirit | soul — whose actions pay for it
+  unit         String   // what progress counts: words | feet | …
+  total        Float    // how much the act is
+  done         Float    @default(0)
+  startedCycle Float
+  updatedCycle Float    // progress credited up to here
+  endedCycle   Float?
+  endReason    String?  // done | interrupted | abandoned
+  data         String   @default("{}") // JSON: the act's own record (message queue, log of advances)
+  createdAt    DateTime @default(now())
+
+  @@index([campaignId, endedCycle])
+  @@index([characterId])
+}

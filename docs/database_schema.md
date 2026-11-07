@@ -674,3 +674,9 @@ never overwritten: `sentCycle`, `deliveredCycle` (null = still travelling), `not
 `settledReason` (replied | met | let_go | struck | expired), `replyToId`, `durationSeconds`, `data` (JSON: what the medium records).
 A thing's live thread is DERIVED from these rows (`services/world-messages.ts withMessages`); texts are no longer stored on
 `CampaignItem.data.signals` (calls still are). A thing's `data.readReceipts: false` hides "read" from the sender.
+
+## BeingAct — an act takes time (Michael 2026-11-07; migration `20261107120000_being_act`; TIME-LAW-2026-11-07.md)
+What a being is in the middle of: `kind` (read now; move later), `pillar` whose actions pay, `unit`/`total`/`done` progress,
+`startedCycle`/`updatedCycle` (credited up to), `endedCycle` + `endReason` (done | interrupted | abandoned), `data` (the act's record:
+reading = the message queue oldest first, words per round, `log[]` of every advance). Progress is credited lazily from the clock
+(`services/being-acts.ts advanceOpenActs`, called by `withMessages`); each WorldMessage gets its own `readCycle` when the reader finishes it.

@@ -1,0 +1,31 @@
+import '../app/scripts/_server-only-shim';
+import { prisma } from '../app/src/lib/db';
+import { recordMessage } from '../app/src/services/world-messages';
+import { readAtPace, advanceOpenActs, interruptActs } from '../app/src/services/being-acts';
+import { secondsToCycles } from '../app/src/types/time';
+const C = 'cms5z4j6z0000zg48z5vzl2jn', V = 'cms60ndtn0000kw48ioq10i68', K = 'cmvcbw49u0001h448qanzbhs3', THING = 'smoke-thing';
+async function main() {
+  const tsRow = await prisma.timescale.findFirst({ where: { campaignId: C } });
+  const ts = { unitsPerMetaCycle: tsRow!.unitsPerMetaCycle, calendar: tsRow!.calendar ? JSON.parse(tsRow!.calendar) : null };
+  const s = (sec: number) => secondsToCycles(sec, ts);
+  const t0 = 0.02;
+  const texts = ['Hey are you up?', 'I wanted to tell you something about the coffee shop, about how the light came through the window and I could not stop looking at you the whole time.', 'Sorry. That was a lot.', 'Goodnight Violet.'];
+  for (const [i, w] of texts.entries()) await recordMessage({ campaignId: C, medium: 'text', senderId: K, recipientId: V, recipientThingId: THING, content: w, notice: 'smoke', cycle: t0 + s(i * 10), data: { smoke: true } });
+  const now = t0 + s(60);
+  const r1 = await readAtPace(C, V, THING, now, K);
+  console.log('beat 1 (one round credited): read', r1.read.map((m) => m.content.slice(0, 20)), 'partial', r1.partial?.wordsRead);
+  await advanceOpenActs(C, now + s(0.5));
+  const mid = await prisma.worldMessage.findMany({ where: { recipientThingId: THING }, orderBy: { sentCycle: 'asc' }, select: { readCycle: true } });
+  console.log('after 3 s more: read stamps', mid.map((m) => m.readCycle ? ((m.readCycle - now) / s(1)).toFixed(1) + 's' : '—'));
+  await interruptActs(C, V, now + s(1), 'a knock at the door');
+  await advanceOpenActs(C, now + s(60));
+  const end = await prisma.worldMessage.findMany({ where: { recipientThingId: THING }, orderBy: { sentCycle: 'asc' }, select: { readCycle: true } });
+  const act = await prisma.beingAct.findFirst({ where: { characterId: V, campaignId: C }, orderBy: { createdAt: 'desc' } });
+  console.log('after interrupt + a minute: read', end.map((m) => (m.readCycle ? 'read' : 'unread')), 'act', act?.endReason, act?.done, '/', act?.total);
+  const r2 = await readAtPace(C, V, THING, now + s(70), K);
+  console.log('opens it again: read now', r2.read.map((m) => m.content.slice(0, 20)), 'partial', r2.partial?.wordsRead ?? null);
+  await prisma.worldMessage.deleteMany({ where: { recipientThingId: THING } });
+  await prisma.beingAct.deleteMany({ where: { characterId: V, campaignId: C, data: { contains: THING } } });
+  console.log('cleaned');
+}
+main().finally(() => prisma.$disconnect());

@@ -125,6 +125,8 @@ export async function withMessages<T extends { id: string; data: unknown }>(camp
   if (!items.length) return base;
   try {
     const cycle = nowCycle ?? (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
+    // AN ACT TAKES TIME (2026-11-07): reading in progress is credited up to now before anyone looks at the thing.
+    await (await import('./being-acts')).advanceOpenActs(campaignId, cycle);
     await settleMetInPerson(campaignId, cycle);
     const rows = await prisma.worldMessage.findMany({ where: { campaignId, recipientThingId: { in: items.map((i) => i.id) }, settledCycle: null }, orderBy: { sentCycle: 'asc' } });
     if (!rows.length) return base;
