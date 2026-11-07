@@ -1696,7 +1696,9 @@ async function speakProseSplit(
   // waited for the voiced being's whole listen and the cloud build (15 s of a 36 s beat) before it was handed anything.
   let voicedHere: string[] = [];
   let pageAfter: ((ids: { canonEventId: string; gameEventId: string | null }) => void) | null = null;
-  if (sceneBuilderOn() && narration !== null && (narrated || hasActions)) {
+  // 2026-11-07 (session 6): a world line is never paged — the page rewrote its declaration with `via: 'typed'` (a 14:38 chime read as the Watcher's narration
+  // while the 07:56 one stayed `device`). The world's line stays the world's, and the rewrite below also keeps the via it was declared with.
+  if (!input.worldEvent && sceneBuilderOn() && narration !== null && (narrated || hasActions)) {
     voicedHere = voicedIn(parsed).filter((id) => listeners.some((l) => l.id === id));
     preListened = preListenVoiced(actor, plan, parsed, actorsById, voicedHere, await readingsFor(voicedHere, parsed.full));
     // The voiced beings' beats go into the page's cards (or, if the page fails, are posted from their listen below).
@@ -1710,7 +1712,7 @@ async function speakProseSplit(
         const built = await buildScene(campaignId, seed, monologues, await sceneFacts(campaignId, focus.length ? focus : listeners.map((l) => l.id)));
         if (built.source === 'cloud') {
           await rewriteDeclarationFeed(campaignId, ids, {
-            via: 'typed', raw: rawMessage,
+            via: input.worldEvent ? 'device' : 'typed', raw: rawMessage,
             narration: built.scene,
             speech: parsed.quotes,
             // The page may not invent a deed (2026-11-05): only segments the seed had as this actor's action are deeds; owned stays owned.

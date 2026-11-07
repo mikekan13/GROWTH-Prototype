@@ -50,3 +50,4 @@ style-refs/sheets/
 tts-server/__pycache__/
 tts-server/refs/
 models/
+tmp/describer-pod.json

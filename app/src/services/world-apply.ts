@@ -411,6 +411,29 @@ export function signalReachLines(texts: string[], rows: Array<{ id: string; name
 }
 
 /**
+ * ONE ACT, IN THE ORDER IT HAPPENS (session 5, 2026-11-07: "picks up the phone and texts her" — the adjudicator listed the sound before the
+ * take, so the text was checked while the phone still lay on the table and was refused, though the same act picks it up first). A 'take'
+ * lands ahead of any earlier effect that needs the thing in hand (sound/answer/give/put) — unless that earlier effect is a give/put of the
+ * SAME item (then the act really did let go of it first). Every other order is kept. Pure; stable.
+ */
+export function orderActEffects(effects: ActEffect[]): ActEffect[] {
+  const out: ActEffect[] = [];
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  for (const e of effects) {
+    if (e.op !== 'take') { out.push(e); continue; }
+    let at = out.length;
+    while (at > 0) {
+      const prev = out[at - 1];
+      const needsHand = prev.op === 'sound' || prev.op === 'answer' || ((prev.op === 'give' || prev.op === 'put') && !same(prev.item, e.item));
+      if (!needsHand) break;
+      at--;
+    }
+    out.splice(at, 0, e);
+  }
+  return out;
+}
+
+/**
  * Apply a resolved act's effects to the map. Never throws; each effect lands
  * or is refused with a reason. One `character_update` broadcast at the end
  * when anything moved, so open canvases re-read.
@@ -422,7 +445,7 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
   if (!actor || actor.campaignId !== campaignId) { report.refused.push('actor not in this campaign'); return report; }
   let map = await actorMap(actorCharacterId);
 
-  for (const e of effects) {
+  for (const e of orderActEffects(effects)) {
     try {
       switch (e.op) {
         case 'sound': {

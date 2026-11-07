@@ -128,6 +128,22 @@ describe('a sound effect (HW9, 2026-10-29)', () => {
   });
 });
 
+describe('one act is applied in the order it happens (session 5, 2026-11-07)', () => {
+  it('a take lands before the sound that needs the thing in hand', async () => {
+    const { orderActEffects } = await import('./world-apply');
+    const sound = { op: 'sound' as const, at: 'Work phone', text: 'It chimes.', kind: 'text' as const };
+    const take = { op: 'take' as const, item: 'Work phone' };
+    expect(orderActEffects([sound, take])).toEqual([take, sound]);
+    expect(orderActEffects([take, sound])).toEqual([take, sound]);
+  });
+  it('a give of the same item before the take is kept in order', async () => {
+    const { orderActEffects } = await import('./world-apply');
+    const give = { op: 'give' as const, item: 'Work phone', to: 'Ruth' };
+    const take = { op: 'take' as const, item: 'work phone' };
+    expect(orderActEffects([give, take])).toEqual([give, take]);
+  });
+});
+
 describe('answer needs a live signal (finding 72, 2026-11-05)', () => {
   it('picks the held thing with a live signal, null when none carries one', async () => {
     const { pickLiveHeld } = await import('./world-apply');
