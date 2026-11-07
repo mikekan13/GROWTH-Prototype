@@ -262,3 +262,24 @@ write-back on :3001 (pod on only with Michael); then the remaining cross-wire pa
 - STRIKE (Michael: "Everything. Strike them from the record."): 5 table lines (the second rain voicemail, the london-fog text, their chimes), 2 canon events, 3 of Kristopher's "your messages reached her phone" thoughts, 5 memories. The first line is CORRECTED, not struck: he sits in his car waiting for rain and opens his phone; the voicemail sentence is cut (table line, canon, his memory). The in-person london fog at the coffee shop stays. tmp/strike-unread-messages-2026-11-07.ts.
 - REWRITE (Michael: "you will probably have to rewrite a lot of thoughts because Kristopher was worried about it"): 37 thought records + 28 memories rewritten to the corrected record (from him: voicemail "Sorry if…", "Okay. Good.", voicemail "I hope you're on your way", "Should I go ahead and order for you?", "Well... What should I order you?"); 9 "heard" lines corrected (incl. two cross-wired ones: "I take the work phone out of my pocket", her typing reaching him before she sent it); 2 thoughts + 2 memories that only reacted to struck lines deleted; the 13:10 flip ("But right now Kristopher is laughing") fixed. Spec: tmp/rewrite-thoughts-2026-11-07.json. Snapshots of everything in app/data/archive (strike-unread-messages-*, rewrite-thoughts-*, backfill-messages-replaced-*).
 - LEFT ALONE, flagged: canon event cmw4toxcy0007zo48nv5ea44c — a leftover from the rolled-back session 3 of 11-06 ("Half past ten at night… sends her a voicemail I just saw some rain"); not part of the kept record's table lines, but still in CanonEvent. Michael: strike it too?
+
+### 11-07 morning (Michael showering → bed) — overnight list, round 2
+- CROSS-WIRE CAUSE fixed (397a91c): a voiced being's stretch that also tells ANOTHER character's deed ("…Violet types 'Yes please' and
+  hits send") was handed whole as "your own doing" → the perception made her deed his. Now `tellsAnothersDeed` (own-voice.ts) marks
+  such a stretch not wholly its own; its own sentences still turn "I …" (the narrowed rewrite), the others' stay theirs.
+- THE STATE JOURNAL (0174aef): SQLite TRIGGERS journal every insert / real change / delete of Character, CampaignItem, Location,
+  WorldFact, EntityRelationship (location edges) and Currency into `StateJournal` with the world clock — inside the same transaction,
+  whatever path (services, JEWL, scripts). Tested on a copy first (a sheet change ≈ 27 KB, 4 ms; no-op touches not journaled). This is
+  the overwrite audit's answer at the data layer instead of 40 files. Triggers must be re-created if a future migration rebuilds those
+  tables. NOTE: the live DB is app/dev.db (app/prisma/dev.db is an empty 0-byte file) — my earlier "pre-world-message" backup copied
+  the empty one and was deleted; a real backup is app/data/archive/dev-pre-state-journal-*.db.
+- WITHHELD CHUNKS (e786711): placeOrder listens to the tone filter while its call runs; a withheld/blocked chunk of that order = a
+  failed order → the caller's safe fallback (softened chunks are kept).
+- MOVEMENT CAP — NOT BUILT, by choice. Design for a session with Michael: the GM line's span (advanceClockForLine 'gm-line') is the
+  beat's budget; world-apply's move op passes `maxSeconds` (span minus what the being already spent this beat) to moveBeing; a walk
+  longer than that is cut along its path (doors opened only up to the cut), stamped there, and a BeingAct kind 'move' {target}
+  carries the rest; each new GM line re-issues moveBeing toward the target with the new span until it arrives. Cap only cause 'sim'
+  (never a Watcher's drag), never in an encounter (rounds own the clock). Interruption: narratedActs must snapshot the actor's open
+  acts BEFORE resolveIntent and interrupt only those (today it interrupts any open act after an applied act — fine for reading,
+  wrong once a move act is created by the act itself).
+- :3001 is on 4fe7fc0 (before these four commits) — rebuild before the next play to get the cross-wire + withheld fixes.
