@@ -48,7 +48,7 @@ import { readTableTalk, type TableTalkState, type TableUtterance } from '@/servi
 import { learnIntroductions, groupRows } from '@/services/introductions';
 import { perceptionReachOn, judgeCanonReach, stampPerception, storeUnnoticedAtTable, recordNoticedExposures, addRefs, type EventRefs } from '@/services/perception-reach';
 import { REACH_TUNING, cuesFromText, type ReachEvent, type ReachJudgement, type ReachVerdict } from '@/sim/senses/reach';
-import { ownVoice, type OwnVoiceActor } from '@/services/own-voice';
+import { ownVoice, tellsAnothersDeed, type OwnVoiceActor } from '@/services/own-voice';
 import { audibleOnly } from '@/services/senses-filter';
 import { planTableTalk, heardText, stimulusFor, answerers, overhearers, canonNarration, narrationSentences, type PlannedStimulus, type TableBeat, type TablePlan } from '@/services/table-plan';
 import type { TerminalEvent, TerminalActor, TerminalPayload, TableFeedFields } from '@/types/terminal';
@@ -975,7 +975,13 @@ async function runBeats(
     const hearerName = listeners.find((l) => l.id === listenerId)?.name ?? '';
     // The far side of its own signal names the caller — itself; that is not being addressed (GM scene 4: "says your name" on his own text).
     if (!own && !stimulus.farSide && hearerName) content = markAddressedByName(content, hearerName);
-    const carried: PlannedStimulus = { ...stimulus, content, ...(via ? { via } : {}), ...(own ? { own: true } : {}) };
+    // A MIXED STRETCH IS NOT WHOLLY ITS OWN (2026-11-07, the cross-wire's cause): the Watcher voiced him in a line that also tells
+    // another character's deed ("…Violet types 'Yes please' and hits send"); handed whole as "your own doing", the perception made her
+    // deed his. His own sentences are already "I …" (ownVoice); marked not-own, the perception keeps everyone else's deeds theirs.
+    const otherNames = listeners.filter((l) => l.id !== listenerId).map((l) => l.name.split(/\s+/)[0]).filter((n) => n.length > 1);
+    const mixed = own && tellsAnothersDeed(content, otherNames);
+    if (mixed) console.log(`[table-speak] ${hearerName || listenerId}: own stretch also tells another's deed — handed as not wholly its own`);
+    const carried: PlannedStimulus = { ...stimulus, content, ...(via ? { via } : {}), ...(own && !mixed ? { own: true } : {}) };
     // A voiced being already listening to this beat (the page was built from its monologue): take that, once.
     const pre = truth.preListened?.get(listenerId);
     if (pre) truth.preListened!.delete(listenerId);

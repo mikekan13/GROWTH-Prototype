@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { firstPersonVerb, firstPersonSentence, ownVoice } from './own-voice';
+import { firstPersonVerb, firstPersonSentence, ownVoice, tellsAnothersDeed } from './own-voice';
 
 describe("own voice — the Watcher's line about a being, in that being's person (HW6 2026-10-25)", () => {
   const kris = { name: 'Kristopher', sex: 'Male' };
@@ -44,5 +44,17 @@ describe('perspective flips (2026-11-07, session 6): only the being\'s own sente
   });
   it('his own sentence still turns', () => {
     expect(firstPersonSentence('He takes his cup.', kris)).toBe('I take my cup.');
+  });
+});
+
+describe('tellsAnothersDeed (2026-11-07, the cross-wire)', () => {
+  it('a stretch that tells another character\'s deed is not wholly the hearer\'s own', () => {
+    expect(tellsAnothersDeed('I sit in my car. Violet types "Yes please." and hits send.', ['Violet'])).toBe(true);
+    expect(tellsAnothersDeed("Violet's phone chimes.", ['Violet'])).toBe(true);
+  });
+  it('his own stretch, or another named only inside a quote or as a speaker tag, stays his', () => {
+    expect(tellsAnothersDeed('I sit in my car and open my phone.', ['Violet'])).toBe(false);
+    expect(tellsAnothersDeed('I say "Violet looks lovely."', ['Violet'])).toBe(false);
+    expect(tellsAnothersDeed('Violet: Hello?', ['Violet'])).toBe(false);
   });
 });

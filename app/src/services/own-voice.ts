@@ -124,3 +124,15 @@ export function ownVoice(content: string, actor: OwnVoiceActor): string {
     })
     .join('\n');
 }
+
+/**
+ * 2026-11-07 (the cross-wire's cause): does a stretch tell ANOTHER character's deed — a sentence (quotes aside) that opens on one of
+ * `otherNames`? Then the stretch is not wholly the hearer's own doing. Pure.
+ */
+export function tellsAnothersDeed(content: string, otherNames: string[]): boolean {
+  if (!otherNames.length) return false;
+  const plain = content.replace(/"[^"]*"|“[^”]*”/g, '""');
+  const names = otherNames.map(esc).join('|');
+  const opens = new RegExp(`^\\s*(?:${names})(?:['’]s)?\\b(?!:)`, 'i');
+  return plain.split(/\r?\n|(?<=[.!?…])\s+/).some((s) => opens.test(s));
+}
