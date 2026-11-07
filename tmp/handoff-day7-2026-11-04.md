@@ -283,3 +283,28 @@ write-back on :3001 (pod on only with Michael); then the remaining cross-wire pa
   acts BEFORE resolveIntent and interrupt only those (today it interrupts any open act after an applied act — fine for reading,
   wrong once a move act is created by the act itself).
 - :3001 REBUILT on fdd8443 (all of the above live), answering 200.
+
+### 11-07 morning, round 3 (Michael asleep; "1. Yes 2. Yes 3. Yes" = build the movement cap, strike the leftover canon, one capped describer pod run)
+- Leftover canon event of the rolled-back 11-06 attempt: STRUCK (778d87f; snapshot in app/data/archive).
+- MOVEMENT CAP BUILT (e64d3fd): the Watcher's line sets the beat's span (liveStatedTime → noteBeatSpan; an encounter clears it); world-apply's
+  move op asks moveBudget and passes maxSeconds; a walk the span cannot hold is cut along its own path (cutPolyline; doors only up to the
+  cut — alongFraction), stamped there, and a BeingAct kind 'move' carries it; every new Watcher line continueMoves() re-issues the walk
+  toward the target until it arrives (done) or the way is gone (abandoned). Never for cause 'gm' (a Watcher's drag), never in an
+  encounter. narratedActs now snapshots the being's open acts BEFORE applying an act and interrupts only those. Smoke-tested on a COPY of
+  the DB (tmp/smoke-move-cap.ts with GROWTH_DB_PATH — new env override in lib/db.ts): landing → kitchenette in five 2-second beats,
+  7 ft per beat at Celerity 22. NOT yet seen in live play. Moves continue only on Watcher lines (not on beings' own acts) — v1.
+- CLOCK (8c7b9a6): "It is 2:20 in the afternoon the next day" → next day 14:20 (a part-of-day clock time was not read; "the next day" fell to 07:00).
+- TONE FILTER (704f7cb): 'sexual' is explicit-only (sexy / lustrous / seductive / bare moan / breast pocket no longer withhold romance);
+  the minor-sexual block always runs, as strict. The exact cue that fired on 11-06 is UNCONFIRMED (the quoted lines match none).
+  Side effect: those dropped cues no longer mark a campaign adult-only through the maturity hook.
+- LINE READING (cfde6be): quote-first lines find their speaker (first names; a lone pronoun of one sex with no recent actor); "her text
+  "…" … he texts her: "…"" stays two quotes, two speakers; "You …" is never guessed onto a being (ParsedProse.unresolved — NOTHING READS
+  IT YET: JEWL/ticket hookup owed). The agent could not reproduce the original live misattribution exactly — two fixes are guards.
+- DEVICE LINES + MULTI-STEP (635211c): the scene builder no longer rewrites a world line as via 'typed' (world events skip the page);
+  an act's 'take' is applied before the text/answer/give that needs it (orderActEffects). Not covered: a step whose thing is not in the room.
+- SPEED (investigation only, no change): beings already start in parallel in code; the likely serializer is the single text-pod worker
+  (the chooser) and the reach judge (one world-sim call before every hear()). Ranked ideas: (1) recall in parallel with perception
+  (2–4 s/being), (2) speculative voice order beside the chooser (3–5 s), (3) check pod concurrency / a second worker (unknown, maybe the
+  biggest), (4) drop the second voice call on a repeated opening (3–5 s), (5) take tone softening off the hot path. First step: log
+  composeBeat start/end per being to prove where they serialize.
+- MAP for the coffee shop: left alone — it is the owed map migration (one spatial world, levels = storeys).
