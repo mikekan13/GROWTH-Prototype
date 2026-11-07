@@ -308,3 +308,14 @@ write-back on :3001 (pod on only with Michael); then the remaining cross-wire pa
   biggest), (4) drop the second voice call on a repeated opening (3–5 s), (5) take tone softening off the hot path. First step: log
   composeBeat start/end per being to prove where they serialize.
 - MAP for the coffee shop: left alone — it is the owed map migration (one spatial world, levels = storeys).
+- DESCRIBER PROTOTYPE RAN (Michael's one-time waiver, cap $5/1 h): pod kwqeeglzc25o9o, A100 80GB PCIe $1.19/h, vllm/vllm-openai:latest
+  serving Qwen/Qwen3-Omni-30B-A3B-Captioner (Apache-2.0) — boot + 61 GB download + load = 13 min; captions 4–7 s per clip; TERMINATED
+  after 14.5 min; RunPod balance 69.20 → 68.90 = $0.29. Script: tmp/describer-pod.mjs (create | status | caption | terminate).
+  The Captioner takes NO text prompt and ≤30 s of audio: Michael's 63 s take was cut by Whisper windows into intro (8–26 s), sinister
+  (26–37 s) and benevolent (36–63 s) clips (tmp/voice/jewl-take-*.wav, captions beside them as *.caption.txt). It heard: a Southern
+  accent with monophthongized vowels (intro), low gravelly theatrical self-assured delivery (benevolent), breathy intimate low delivery
+  (sinister) — and HALLUCINATED a "110 Hz synthetic tone" at the end of one clip: captions need a sanity pass. Step 2 (caption → voice
+  description) was done by Claude by hand tonight; step 3 = Qwen3-TTS design, 2 candidates per era, sent to Michael:
+  tmp/voice/jewl-now-described-{1,2}-*.wav and jewl-sinister-described-{1,2}-*.wav. NOTHING adopted on JEWL's sheet — his pick.
+  To productize: a describer service (pod on demand) + the caption→description step through the cloud lane + JEWL's voice ERAS
+  (history, undated) on the GodHead sheet.
