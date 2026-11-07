@@ -352,6 +352,16 @@ export async function moveBeing(
       await moveCharacterToLocation(actor.campaign?.gmUserId ?? '', 'WATCHER', { characterId, locationId: toRoom.id, broadcast: false });
     }
     const placedAt = await stampBeingPoint(characterId, end);
+    // POSITION HAS A HISTORY (Michael 2026-11-07: "GROWTH is just a giant log of history"; a session must be filmable from the record):
+    // every walk is logged with where it began and ended, the path, how far and how long — not only where the being stands now.
+    try {
+      const { writeHistory, currentCycleOf } = await import('@/services/history');
+      await writeHistory(campaignId, await currentCycleOf(campaignId), [{
+        subjectType: 'character', subjectId: characterId, type: 'move', actorId: characterId,
+        summary: `${actor.name} ${toRoom && fromRoom && toRoom.id !== fromRoom.id ? `went from ${fromRoom.name} to ${toRoom.name}` : `moved within ${toRoom?.name ?? 'the place'}`}`,
+        details: JSON.stringify({ from, to: end, fromRoom: fromRoom ? { id: fromRoom.id, name: fromRoom.name } : null, toRoom: toRoom ? { id: toRoom.id, name: toRoom.name } : null, path: path.points, feet: Math.round(path.feet * 10) / 10, seconds, pace: opts.pace ?? 'walk', cause: opts.cause, opened }),
+      }]);
+    } catch (err) { console.warn('[being-movement] the move was not logged (non-fatal):', err instanceof Error ? err.message : err); }
     // The clock is NEVER written here (Mike 2026-10-28): time passes by the Watcher's exposition — or six
     // seconds a round in combat — and a walk fits inside the time that passed. `seconds` is what the walk
     // takes, for the table to read against the span, not a charge.

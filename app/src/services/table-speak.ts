@@ -1121,13 +1121,15 @@ async function runBeats(
           const joinRowId = cardRowId ?? (sibling && sibling.truthId === truthId ? sibling.rowId : null);
           await sibling?.attached.catch(() => undefined);
           const actText = actInThirdPerson(actorName, truth.actors?.[listenerId]?.sex, chosenAct);
-          if (joinRowId && actText) await appendBeingCardSegments(campaignId, joinRowId, [{ kind: 'action', text: actText }], 'act').catch((err) => console.warn('[table-speak] act not joined to the card (non-fatal):', err instanceof Error ? err.message : err));
+          // A WRITE-BACK IS ON THE CARD ONLY ONCE IT IS SENT (session 6, 2026-11-06: the card said she typed and sent; nothing went).
+          const writeBack = asWriteBack(chosenAct, [], outcome.listened?.thought);
+          if (writeBack) { /* the deed joins the card below, with its words, when the text goes */ }
+          else if (joinRowId && actText) await appendBeingCardSegments(campaignId, joinRowId, [{ kind: 'action', text: actText }], 'act').catch((err) => console.warn('[table-speak] act not joined to the card (non-fatal):', err instanceof Error ? err.message : err));
           else await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listenerId, name: actorName, sex: truth.actors?.[listenerId]?.sex }, chosenAct, { heard: carried.content }).catch((err) => console.warn('[table-speak] act card not posted (non-fatal):', err instanceof Error ? err.message : err));
           // A WRITE-BACK NEEDS WORDS (finding 51, 2026-11-05): the deed "writes back to Kristopher on the phone" reached the world with no
           // message. The being composes its text (its own answer, as if its turn), the words go on the record as its text, and the deed
           // carries them to the other's thing as a received message.
           // FINDING 70 (2026-11-05): asWriteBack (composer.ts) — the offered deed, with the words the act itself carried when it quoted any.
-          const writeBack = asWriteBack(chosenAct, [], outcome.listened?.thought);
           if (writeBack) {
             // Words the act carried are sent as they are; the being composes only when it carried none.
             let words: string | null = outcome.listened?.actWords?.trim() || writeBack.words?.trim() || null;
@@ -1146,16 +1148,24 @@ async function runBeats(
               // FINDING 63 (2026-11-05): a reply that assents to a meeting makes a PLAN with a clock — read before the send changes the signal.
               await planFromReply(campaignId, listenerId, actorName, words);
               await postChat(campaignId, 'ai_copilot', actor.userId, actorName, listenerId, actorName, `texts ${to}: "${words}"`, { via: 'being', raw: `texts ${to}: ${words}` });
-              if (cardRowId) await appendBeingCardSegments(campaignId, cardRowId, [{ kind: 'speech', text: words }]).catch(() => undefined);
+              if (joinRowId) await appendBeingCardSegments(campaignId, joinRowId, [...(actText ? [{ kind: 'action' as const, text: actText }] : []), { kind: 'speech', text: words }], 'act').catch(() => undefined);
+              else await postActCard(campaignId, { userId: actor.userId, username: actor.username }, { id: listenerId, name: actorName, sex: truth.actors?.[listenerId]?.sex }, `${chosenAct}: "${words}"`, { heard: carried.content }).catch(() => undefined);
               const quote = { text: words, speakerId: listenerId, speakerLabel: actorName } as unknown as ProseQuote;
-              narratedActs(campaignId, [{ actorId: listenerId, actorLabel: actorName, text: `${chosenAct}: "${words}"` }], { userId: actor.userId, username: actor.username }, { narrated: false, quotes: [quote], planned: true });
+              narratedActs(campaignId, [{ actorId: listenerId, actorLabel: actorName, text: `${actText || chosenAct}: "${words}"` }], { userId: actor.userId, username: actor.username }, { narrated: false, quotes: [quote], planned: true });
               return;
             }
             // Finding 62 (2026-11-05): no words, no deed at the world — it sounded a phone and borrowed another speaker's quote.
-            console.log(`[table-speak] ${actorName}: meant to write back but found no words — nothing is sent; the card stands`);
+            // SHE KNOWS IT DID NOT GO (session 6): her own record says she meant to write back and sent nothing, so no later beat believes it went.
+            console.log(`[table-speak] ${actorName}: meant to write back but found no words — nothing is sent; her record says so`);
+            try {
+              const ent = await prisma.dayaEntity.findUnique({ where: { characterId: listenerId }, select: { id: true } });
+              const cyc = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
+              if (ent) await (await import('@/daya/memory')).writeMemoryEntry({ entityId: ent.id, narrativeCycle: cyc, source: 'action', content: `I meant to write back to ${writeBack.to}, but I sent nothing. No message went.`, valence: 0, arousal: 0.2, salience: 0.5, classification: { kind: 'unsent_write_back', to: writeBack.to } });
+            } catch (err) { console.warn('[table-speak] the unsent write-back was not remembered (non-fatal):', err instanceof Error ? err.message : err); }
             return;
           }
-          narratedActs(campaignId, [{ actorId: listenerId, actorLabel: actorName, text: chosenAct }], { userId: actor.userId, username: actor.username }, { narrated: false });
+          // The world is told the deed in the third person (2026-11-07, cross-wire trace: the raw "I …" reached the adjudicator and its sound lines).
+          narratedActs(campaignId, [{ actorId: listenerId, actorLabel: actorName, text: actText || chosenAct }], { userId: actor.userId, username: actor.username }, { narrated: false });
           return;
         }
         if (askFor && (impulse === 'speak' || impulse === 'act') && !granted.has(listenerId) && !voiced.has(listenerId)) {

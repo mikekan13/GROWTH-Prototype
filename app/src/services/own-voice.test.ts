@@ -30,3 +30,19 @@ describe("own voice — the Watcher's line about a being, in that being's person
     expect(firstPersonSentence('The radiator ticks.', kris)).toBe('The radiator ticks.');
   });
 });
+
+describe('perspective flips (2026-11-07, session 6): only the being\'s own sentences turn first person', () => {
+  const kris = { name: 'Kristopher', sex: 'male' };
+  it('a sentence about someone else keeps its pronouns', () => {
+    expect(firstPersonSentence('She just asked him a question.', kris)).toBe('She just asked him a question.');
+  });
+  it('quoted words are never rewritten', () => {
+    expect(firstPersonSentence('Kristopher says "she said that out loud."', kris)).toBe('I say "she said that out loud."');
+  });
+  it('with no sex on the sheet only the name turns first person', () => {
+    expect(firstPersonSentence('He hands Kristopher the cup and she smiles.', { name: 'Kristopher' })).toBe('He hands me the cup and she smiles.');
+  });
+  it('his own sentence still turns', () => {
+    expect(firstPersonSentence('He takes his cup.', kris)).toBe('I take my cup.');
+  });
+});

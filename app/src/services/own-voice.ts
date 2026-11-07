@@ -56,13 +56,25 @@ function sexOf(actor: OwnVoiceActor): 'm' | 'f' | null {
 
 /** One sentence of prose about the actor → the same sentence in the first person. Pure. */
 export function firstPersonSentence(sentence: string, actor: OwnVoiceActor): string {
+  // QUOTED WORDS ARE NEVER REWRITTEN (2026-11-07, perspective flips): what someone said stays as they said it.
+  const parts = sentence.split(/("[^"]*"|“[^”]*”)/);
+  if (parts.length > 1) return parts.map((p, i) => (i % 2 ? p : p.trim() ? firstPersonPlain(p, actor, i === 0) : p)).join('');
+  return firstPersonPlain(sentence, actor, true);
+}
+
+function firstPersonPlain(sentence: string, actor: OwnVoiceActor, atStart: boolean): string {
   const name = esc(actor.name);
   const sex = sexOf(actor);
-  const he = sex !== 'f';
-  const she = sex !== 'm';
+  // A SENTENCE ABOUT SOMEONE ELSE KEEPS ITS PRONOUNS (2026-11-07, session 6: "She just asked me that" — every he/she became I when the
+  // being's sex was unknown, and a third party's pronoun became the being). Pronouns are swapped only when the sentence is the being's
+  // own (it opens on its name or its own pronoun) and its sex is known; elsewhere only its NAME becomes me/my.
+  const ownPronoun = sex === 'm' ? 'he' : sex === 'f' ? 'she' : null;
+  const opensOnSelf = atStart && new RegExp(`^\\s*(?:${name}${ownPronoun ? `|${ownPronoun}` : ''})\\b`, 'i').test(sentence);
+  const he = opensOnSelf && sex === 'm';
+  const she = opensOnSelf && sex === 'f';
   let s = sentence;
   // The subject, and the verb right after it: "Kristopher knocks" / "He gets close" → "I knock" / "I get close".
-  const subject = new RegExp(`^(\\s*)(?:${name}|${he ? 'he' : ''}${he && she ? '|' : ''}${she ? 'she' : ''})\\b(,?\\s+)(\\w+(?:'t)?)`, 'i');
+  const subject = new RegExp(`^(\\s*)(?:${name}${he ? '|he' : ''}${she ? '|she' : ''})\\b(,?\\s+)(\\w+(?:'t)?)`, 'i');
   s = s.replace(subject, (_m, lead: string, gap: string, verb: string) => `${lead}I${gap}${firstPersonVerb(verb)}`);
   // A second verb after a conjunction shares the subject: "and then knocks again" → "and then knock again".
   s = s.replace(/\b(and then|and|then|but|before|while)(\s+)(\w+s)\b(?=\s|$|[,.!?])/gi, (m, conj: string, gap: string, verb: string) => {

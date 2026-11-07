@@ -378,7 +378,8 @@ export async function composeBeat(a: ComposeArgs, overrides: DayaClientOverrides
   // 2026-11-06 (session 5 cross-wire): the perception order rewrote ANOTHER being's act from this being's viewpoint and made it the actor —
   // Violet "heard" "I take the work phone out of my pocket" (Kristopher's deed) and Kristopher "heard" "I type 'Yes please.' and hit send"
   // (Violet's). What reached a being about someone else is never in the first person: fall back to the event as narrated.
-  const firstPersonLeak = !a.own && /^\s*(?:I|I'm|I've|I'll|My)(?=[\s,.!?;:]|$)/.test(perceivedRaw);
+  // 2026-11-07: "I hear him say…" is the being's own sensing and stands; a sentence where the being DOES someone else's deed is the leak.
+  const firstPersonLeak = !a.own && takesOverTheDeed(perceivedRaw);
   if (firstPersonLeak) console.warn(`[composer] perception came back in the first person for someone else's deed — kept the event as told: ${perceivedRaw.slice(0, 100)}`);
   const perceivedSafe = firstPersonLeak ? a.event : perceivedRaw;
   const perceived = a.standing || (!moved && NOTHING.test(perceivedSafe.trim())) ? null : (moved && NOTHING.test(perceivedSafe.trim()) ? a.event : perceivedSafe);
@@ -475,4 +476,26 @@ export function composerOn(): boolean {
 /** The first three words of a thought, lowercased and bare ("i think i"), the unit a formula repeats. Pure. */
 export function openingOf(text: string): string {
   return (text.toLowerCase().match(/[a-z']+/g) ?? []).slice(0, 3).join(' ');
+}
+
+/** The being's own senses and stance — "I hear…", "I see…": a first-person sentence led by one of these is perception, not a deed. */
+const SENSING = /^(?:hear|heard|see|saw|watch|watched|notice|noticed|feel|felt|smell|smelled|taste|tasted|catch|caught|sense|sensed|can|cannot|can't|could|couldn't|don't|do|am|was|'m|think|thought|wonder|know|knew|realize|realise|look|looked|glance|glanced|listen|listened|register)$/i;
+const OTHER = /\b(?:he|she|they|him|her|them|his|hers|their|someone|somebody)\b|(?:^|\s)[A-Z][a-z]{2,}/;
+
+/**
+ * 2026-11-07 (session 5 cross-wire, session 6 perspective flips): does a perception of SOMEONE ELSE's doing put the being in the
+ * actor's place? A sentence (quotes aside) that opens on I/My with a verb that is not sensing, and names no one else, is the being
+ * doing the other's deed ("I type 'Yes please' and hit send"). Pure.
+ */
+export function takesOverTheDeed(text: string): boolean {
+  const plain = text.replace(/"[^"]*"|“[^”]*”/g, '""');
+  for (const sentence of plain.split(/(?<=[.!?…])\s+/)) {
+    const m = /^\s*(?:I|My)\b(?:'m|'ve|'ll|'d)?\s+(\S+)/.exec(sentence);
+    if (!m) continue;
+    const verb = m[1].replace(/[^A-Za-z']/g, '');
+    if (SENSING.test(verb)) continue;
+    if (OTHER.test(sentence.replace(/^\s*(?:I|My)\b/, ''))) continue;
+    return true;
+  }
+  return false;
 }

@@ -526,7 +526,11 @@ export async function applyActEffects(campaignId: string, actorCharacterId: stri
                 // a TEXT's words come ONLY from the sender's own quote; no quote, nothing is sent.
                 const words = kind === 'text' ? quoted : e.words && /[\p{L}\p{N}]/u.test(e.words) ? e.words : undefined;
                 const state = kind === 'text' ? 'received' : 'ringing';
-                if (kind === 'text' && !words) { report.refused.push(`a text needs the sender's words (${actor.name} wrote none) - nothing was sent`); break; }
+                if (kind === 'text' && !words) {
+                  // No text went, so nothing chimed (2026-11-07, cross-wire trace: the refused text's sound was still narrated to the other side).
+                  report.sounds = (report.sounds ?? []).filter((x) => !(x.at === where.name && x.text === soundText));
+                  report.refused.push(`a text needs the sender's words (${actor.name} wrote none) - nothing was sent`); break;
+                }
                 // Finding 60: the sender's own thing, when it is plain which (exactly one thing in their hands carries the line).
                 // Finding 60 (live): named by the act, else the thing last used with the receiver, else the only one with history, else the only one held.
                 const mineHeld = await prisma.campaignItem.findMany({ where: { campaignId, holderId: actor.id, status: 'ACTIVE' }, select: { id: true, name: true, data: true } });

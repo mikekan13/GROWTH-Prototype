@@ -123,6 +123,8 @@ export function orderPrompt(order: Order): { system: string; user: string; maxTo
           // Table test 2026-11-03: Kristopher, in his car, "heard" the chime of the text he had just sent to a phone two miles away.
           'When what just happened is something the being itself set off ELSEWHERE (a call it placed, a message it sent, a knock it gave), it senses only what carries back to where it is: a call it placed rings in its own ear; a message it sent is only known to be sent; the other person is not heard. Say what it knows and what, if anything, it hears.',
           b.own ? 'This was the being\'s own doing: it knows it as its own act ("I …").' : '',
+          // 2026-11-07 (session 5 cross-wire, session 6 perspective flips): "first person" was read as "the deed is mine".
+          b.own ? '' : 'This was NOT the being\'s own doing. Whoever did it stays the one who did it: name them or call them he, she or they. "I", "me" and "my" are only the being\'s own senses and body ("I hear him say…", "I see her lift the cup"), never someone else\'s deed or words.',
           'At most 4 sentences. If nothing reaches the being, say so with "nothing": true and an empty "reaches".',
           names,
           `${JSON_ONLY} {"reaches": string, "nothing"?: boolean}`,

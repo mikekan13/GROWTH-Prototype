@@ -1743,11 +1743,13 @@ export async function answerAsk(
       revoiced = true;
     }
   }
+  // A TEXT'S WORDS ARE NOT A THOUGHT (session 6, 2026-11-06: Violet's write-back "I'm putting on my boots." was dropped as a repeat of
+  // her own thought, nothing was sent, and her card said she had sent it): for the 'message' ask only the table's words are filtered.
   // THE VOICE FILTER (HW8 run 6) on what the being says or does: the table's words, stock images, counting, light with no light fact,
   // a sentence already thought — dropped, logged; nothing left means it lets the moment pass. An act only loses the table's words
   // ("knocks three times" is a doing, not a count).
   if ((line.kind === 'speak' || line.kind === 'act') && line.content.trim() && ctx.persona.omniscient !== true) {
-    const f = filterVoice(line.content, { prior: priorVoice, heard: heardTexts.join(' '), hasLightFact: askGround.hasLight, facts: askGround.lines, noOneInView: askGround.noOneInView, absentNames: askGround.absentNames, heldNames: (heldRows ?? []).map((h) => h.name), rules: line.kind === 'act' ? 'vocab' : 'all' });
+    const f = filterVoice(line.content, { prior: priorVoice, heard: heardTexts.join(' '), hasLightFact: askGround.hasLight, facts: askGround.lines, noOneInView: askGround.noOneInView, absentNames: askGround.absentNames, heldNames: (heldRows ?? []).map((h) => h.name), rules: line.kind === 'act' || ask.kind === 'message' ? 'vocab' : 'all' });
     if (f.dropped.length) {
       const log = droppedLog(ctx.name, line.kind === 'speak' ? 'answer' : 'act', f.dropped);
       if (log) console.log(log);
@@ -1758,7 +1760,7 @@ export async function answerAsk(
   }
   // THE ANSWER REPLAY (HW8 run 7 #7: "I'm fine, just... checking the lock." said twice verbatim): a line (fuzzily) one of her last three
   // spoken lines is re-voiced once with "you already said that"; still a repeat, and she stays silent.
-  if (line.kind === 'speak' && line.content.trim() && ctx.campaignId && ctx.persona.omniscient !== true) {
+  if (line.kind === 'speak' && line.content.trim() && ctx.campaignId && ctx.persona.omniscient !== true && ask.kind !== 'message') {
     const saidBefore = await recentSpokenOf(ctx.campaignId, characterId, 3);
     if (isSpokenRepeat(line.content, saidBefore)) {
       console.warn(`[daya/ensemble] ${ctx.name} repeated a line - re-voicing once: "${line.content.slice(0, 80)}"`);
