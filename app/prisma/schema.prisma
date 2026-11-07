@@ -1745,3 +1745,21 @@ model BeingAct {
   @@index([campaignId, endedCycle])
   @@index([characterId])
 }
+
+// THE STATE JOURNAL (Michael 2026-11-07: "GROWTH is just a giant log of history"). Written by SQLite TRIGGERS (migration
+// 20261107140000_state_journal), never by app code: every insert, change and delete of Character, CampaignItem, Location, WorldFact,
+// EntityRelationship and Currency rows, inside the same transaction. `row` = the row before an update/delete, or as inserted.
+model StateJournal {
+  id         Int      @id @default(autoincrement())
+  at         DateTime @default(now())
+  campaignId String?
+  cycle      Float?
+  tableName  String
+  rowId      String
+  op         String   // insert | update | delete
+  row        String   // JSON
+  changed    String?  // JSON array of changed columns (nulls for unchanged)
+
+  @@index([tableName, rowId])
+  @@index([campaignId, cycle])
+}
