@@ -75,6 +75,30 @@ describe('screen()', () => {
   });
 });
 
+describe('sexual is explicit-only (coffee date, 2026-11-06)', () => {
+  const FLIRT = [
+    'you are the most beautiful woman to ever hand me her phone number',
+    "I'd like to take you to coffee, or dinner, or honestly just listen to your voice",
+    'my face is warm now',
+    'something in my chest',
+    'the way you talk',
+    "I think I'm in trouble",
+    "my gaze intensifies and it's as if my eyes see all of her",
+    'she smiles. gorgeous. her lips curve. I hope she will let me kiss her cheek someday. My chest tightens. She is sexy and attractive, with a seductive smile and lustrous hair.',
+  ];
+  it('flirting passes unflagged', () => {
+    for (const t of FLIRT) expect(screen(t).categories, t).toEqual([]);
+  });
+  it('explicit lines still flag sexual', () => {
+    for (const t of ['They made love all night.', 'She stood naked, aroused.', 'He touched her breasts.', 'a brothel with whores', 'They had sex.'])
+      expect(screen(t).categories, t).toContain('sexual');
+  });
+  it('minors + any sexual cue (even a softer one) still hard-block', () => {
+    for (const t of ['The twelve-year-old girl was sexy.', 'The girl was raped.', 'The fifteen-year-old made love.', 'The child was seduced.', 'The 14-year-old girl, lustrous and sexy'])
+      expect(screen(t).categories, t).toContain('minor-sexual');
+  });
+});
+
 describe('toneFilterAsync()', () => {
   it('clean text short-circuits with no model call', async () => {
     expect(await toneFilterAsync(CLEAN, { caller: 't' })).toBe(CLEAN);

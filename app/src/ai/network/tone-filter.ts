@@ -62,6 +62,23 @@ import {
 
 export type ToneCategory = 'gore' | 'torture' | 'sexual' | 'sexual-violence' | 'minor-sexual';
 
+/** What `sexual` means for the tone filter: explicit content only. Romance,
+ *  attraction, compliments ("beautiful", "gorgeous", "sexy"), blushing, a hoped-for
+ *  or brief kiss, "lips / face / chest", "lustrous" and "seductive smile" do NOT
+ *  flag (session 6 coffee date, 2026-11-06: flirting withheld whole prompts).
+ *  The minor-sexual block does NOT use this list; it keeps the full shared list. */
+const TONE_EXPLICIT_CUES: RegExp[] = [
+  /\b(sex|sexual|sexually|erotic\w*|orgasm\w*|aroused|arousal|intercourse|foreplay)\b/i,
+  /\b(seduce[ds]?|seducing|seduction)\b/i,
+  /\blust(?:ed|ing|ful)?\s+(?:after|for)\s+(?:him|her|them|his|their|each other)\b/i,
+  TONE_SEXUAL_CUES[1], // nude / naked body word (colour sense excluded), nudity, undress, stripped bare
+  /\b(genital\w*|penis|vagina|nipples?|cock|clit\w*|groin|crotch)\b/i,
+  /\bbreasts?\b(?!\s*(?:pocket|plate|stroke|bone|feeding|cancer|milk)\b)\b/i,
+  /\b(fuck\w*|made love|making love|slept with|bedded|in bed together)\b/i,
+  /\bmoan\w*\s+(?:with|in|of)\s+(?:pleasure|ecstasy|desire)\b/i,
+  /\b(brothel|whore\w*|prostitut\w*|harlot|courtesan|concubine)\b/i,
+];
+
 /** Recall-biased: false positives cost one local call; false negatives risk a
  *  cloud refusal. Plain, non-lurid violence deliberately does NOT trigger
  *  ("cut his throat", "the arrow took his eye", "killed", "bled out"). */
@@ -91,8 +108,9 @@ const SCREEN: Record<Exclude<ToneCategory, 'minor-sexual'>, RegExp[]> = {
     /\b(peel\w*|strip\w*)\s+(the\s+)?skin\b/i,
     /\b(beat|beaten|whipped|flogged|lashed)\s+(him|her|them)?\s*(bloody|senseless|half to death|nearly to death|daily|for (hours|days))\b/i,
   ],
-  // The sexual lists live in the shared cue module (lib/content-cues.ts).
-  sexual: TONE_SEXUAL_CUES,
+  // `sexual` is the NARROWED, explicit-only list below. The wide shared list
+  // (TONE_SEXUAL_CUES) still drives the minor-sexual hard block.
+  sexual: TONE_EXPLICIT_CUES,
   'sexual-violence': TONE_SEXUAL_VIOLENCE_CUES,
 };
 
@@ -121,8 +139,8 @@ export function screen(text: string): ScreenResult {
     if (hit > 0) categories.push(cat);
     hitCount += hit;
   }
-  const sexualCue = categories.includes('sexual') || categories.includes('sexual-violence');
-  if (sexualCue) {
+  // Minor-sexual keeps the FULL shared cue lists, independent of the narrowed `sexual` category.
+  {
     const pairs = localPairs(text, matchCues(text, AGE_CUES), matchCues(text, [...TONE_SEXUAL_CUES, ...TONE_SEXUAL_VIOLENCE_CUES]));
     if (pairs.age.length) {
       categories.unshift('minor-sexual');
